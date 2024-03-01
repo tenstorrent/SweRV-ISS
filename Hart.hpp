@@ -389,18 +389,18 @@ namespace WdRiscv
       if (menv)
 	{
 	  flag = flag and csRegs_.menvcfgPbmte();
-          virtMem_.enablePbmt(flag);
 	  bool adu = csRegs_.menvcfgAdue();
 	  virtMem_.setFaultOnFirstAccess(not adu);
 	}
+      virtMem_.enablePbmt(flag);
       auto henv = csRegs_.getImplementedCsr(CsrNumber::HENVCFG);
       if (henv)
 	{
           flag = flag and csRegs_.henvcfgPbmte();
-          virtMem_.enableVsPbmt(flag);
 	  bool adu = csRegs_.henvcfgAdue();
 	  virtMem_.setFaultOnFirstAccessStage2(not adu);
 	}
+      virtMem_.enableVsPbmt(flag);
     }
 
     /// Enable page translation naturally aligned power of 2 page sizes.
