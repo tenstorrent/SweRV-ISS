@@ -225,11 +225,12 @@ namespace WdRiscv
       stage1ImplicitAccessTrap_ = false;
       stage1AttemptedADUpdate_ = false;
       pbmt_ = Pbmt::None;
+      vsPbmt_ = Pbmt::None;
     }
 
-    /// Return page based memory type of last translation
-    Pbmt lastPbmt() const
-    { return pbmt_; }
+    /// Return the effective page based memory type of last translation.
+    Pbmt lastEffectivePbmt() const
+    { return vsMode_ != Mode::Bare? vsPbmt_ : pbmt_; }
 
     static constexpr const char* pageSize(Mode m, uint32_t level)
     {
@@ -282,6 +283,8 @@ namespace WdRiscv
 
     static Pma overridePmaWithPbmt(Pma pma, Pbmt pbmt)
     {
+      if (not pma.attributesToInt())
+        return pma;
       if (pbmt == Pbmt::None or pbmt == Pbmt::Reserved)
         return pma;
 
@@ -589,6 +592,14 @@ namespace WdRiscv
       return true;
     }
 
+    /// Return page based memory type of last translation, only
+    /// applicable if translation was successful.
+    Pbmt lastPbmt() const
+    { return pbmt_; }
+
+    Pbmt lastVsPbmt() const
+    { return vsPbmt_; }
+
   private:
 
     struct UpdatedPte
@@ -657,6 +668,7 @@ namespace WdRiscv
     bool stage1AttemptedADUpdate_ = false;
 
     Pbmt pbmt_ = Pbmt::None;
+    Pbmt vsPbmt_ = Pbmt::None;
 
     PmpManager& pmpMgr_;
     Tlb tlb_;

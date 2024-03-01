@@ -1052,7 +1052,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   tlbEntry.levels_ = 1+ii;
   tlbEntry.pbmt_ = pte.pbmt();
 
-  pbmt_ = Pbmt(pte.pbmt());
+  vsPbmt_ = Pbmt(pte.pbmt());
 
   return ExceptionCause::NONE;
 }

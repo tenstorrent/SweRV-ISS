@@ -83,11 +83,10 @@ Hart<URV>::amoLoad32(const DecodedInst* di, uint64_t virtAddr, Pma::Attrib attri
   if (cause == ExceptionCause::NONE)
     {
       Pma pma = memory_.pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt);
+      // Check for non-cacheable pbmt
+      pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt());
       if (not pma.hasAttrib(attrib))
 	cause = ExceptionCause::STORE_ACC_FAULT;
-      else if (virtMem_.lastPbmt() == VirtMem::Pbmt::Nc or
-	       virtMem_.lastPbmt() == VirtMem::Pbmt::Io)
-	cause = ExceptionCause::STORE_ACC_FAULT;  // Non-cacheable pbmt.
     }
 
   if (cause != ExceptionCause::NONE)
@@ -143,11 +142,9 @@ Hart<URV>::amoLoad64(const DecodedInst* di, uint64_t virtAddr, Pma::Attrib attri
   if (cause == ExceptionCause::NONE)
     {
       Pma pma = memory_.pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt);
+      pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt());
       if (not pma.hasAttrib(attrib))
 	cause = ExceptionCause::STORE_ACC_FAULT;
-      else if (virtMem_.lastPbmt() == VirtMem::Pbmt::Nc or
-	       virtMem_.lastPbmt() == VirtMem::Pbmt::Io)
-	cause = ExceptionCause::STORE_ACC_FAULT;  // Non-cacheable pbmt.
     }
 
   if (cause != ExceptionCause::NONE)
@@ -212,9 +209,9 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
 
   if (cause == ExceptionCause::NONE)
     {
-      fail = fail or not memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt).isRsrv();
-      fail = (fail or virtMem_.lastPbmt() == VirtMem::Pbmt::Nc or
-	      virtMem_.lastPbmt() == VirtMem::Pbmt::Io); // Non-cacheable pbmt.
+      Pma pma = memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt);
+      pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt());
+      fail = fail or not pma.isRsrv();
     }
 
   if (fail and cause == ExceptionCause::NONE)
