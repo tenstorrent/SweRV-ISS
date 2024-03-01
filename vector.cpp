@@ -897,7 +897,9 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
   GroupMultiplier gm = GroupMultiplier(imm & 7);
   ElementWidth ew = ElementWidth((imm >> 3) & 7);
 
-  bool vill = not vecRegs_.legalConfig(ew, gm);
+  // Only least sig 8 bits can be non-zero.
+  bool vill = (imm >> 8) != 0;
+  vill = vill or not vecRegs_.legalConfig(ew, gm);
 
   // Determine vl
   URV elems = avl;
