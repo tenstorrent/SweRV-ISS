@@ -485,6 +485,10 @@ namespace WdRiscv
     void enablePbmt(bool flag)
     { pbmtEnabled_ = flag; }
 
+    /// Enable/disable page-based-memory types.
+    void enableVsPbmt(bool flag)
+    { vsPbmtEnabled_ = flag; }
+
     /// Enable/disable NAPOT page size (naturally aligned power of 2).
     void enableNapot(bool flag)
     { napotEnabled_ = flag; }
@@ -618,6 +622,7 @@ namespace WdRiscv
     bool trace_ = true;
     bool bigEnd_ = false;
     bool pbmtEnabled_ = false;
+    bool vsPbmtEnabled_ = false;
     bool napotEnabled_ = false;
     bool pmEnabled_ = false;  // Pointer masking
 

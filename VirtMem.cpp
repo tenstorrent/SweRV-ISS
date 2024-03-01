@@ -952,7 +952,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
         }
 
       // 5.  pte.read_ or pte.exec_ : leaf pte
-      if (pbmtEnabled_)
+      if (vsPbmtEnabled_)
 	{
           if (trace_)
             walkVec.back().at(walkEntryIx).pbmt_ = static_cast<Pbmt>(pte.pbmt());
