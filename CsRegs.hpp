@@ -1671,6 +1671,23 @@ namespace WdRiscv
       return fields.bits_.STCE;
     }
 
+    /// Return the value of the PBMTE bit of the HENVCFG CSR. Return
+    /// false if CSR is not implemented.
+    bool henvcfgPbmte()
+    {
+      auto csr = getImplementedCsr(rv32_? CsrNumber::HENVCFGH : CsrNumber::HENVCFG);
+      if (not csr)
+	return false;
+      URV value = csr->read();
+      if (rv32_)
+	{
+	  HenvcfghFields<uint32_t> fields(value);
+	  return fields.bits_.PBMTE;
+	}
+      HenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.PBMTE;
+    }
+
     /// Return the ADUE bit of MENVCFG CSR.
     bool menvcfgAdue()
     {

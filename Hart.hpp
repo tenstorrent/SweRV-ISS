@@ -387,18 +387,19 @@ namespace WdRiscv
       bool flag = extensionIsEnabled(RvExtension::Svpbmt);
       auto menv = csRegs_.getImplementedCsr(CsrNumber::MENVCFG);
       if (menv)
-	flag = flag and csRegs_.menvcfgPbmte();
-      virtMem_.enablePbmt(flag);
-      if (menv)
 	{
-	  flag = csRegs_.menvcfgAdue();
-	  virtMem_.setFaultOnFirstAccess(not flag);
+	  flag = flag and csRegs_.menvcfgPbmte();
+          virtMem_.enablePbmt(flag);
+	  bool adu = csRegs_.menvcfgAdue();
+	  virtMem_.setFaultOnFirstAccess(not adu);
 	}
       auto henv = csRegs_.getImplementedCsr(CsrNumber::HENVCFG);
       if (henv)
 	{
-	  flag = csRegs_.henvcfgAdue();
-	  virtMem_.setFaultOnFirstAccessStage2(not flag);
+          flag = flag and csRegs_.henvcfgPbmte();
+          virtMem_.enableVsPbmt(flag);
+	  bool adu = csRegs_.henvcfgAdue();
+	  virtMem_.setFaultOnFirstAccessStage2(not adu);
 	}
     }
 
