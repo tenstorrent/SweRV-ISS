@@ -91,6 +91,11 @@ notify-risc-p-cores:
   trigger:
     project: riscv/risc-p-cores
 
+notify-riescue:
+  <<: *notify-template
+  trigger:
+    project: riscv/riescue
+
 # notify-archcov:
 #   <<: *notify-template
 #   trigger:
