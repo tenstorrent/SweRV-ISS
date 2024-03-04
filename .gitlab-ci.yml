@@ -27,6 +27,9 @@ variables:
     SHA_UPDATE_REPO: "whisper"
     SHA_UPDATE_POINTER: $CI_COMMIT_SHA
     GIT_STRATEGY: none
+    SKIP_BUILD: "True"
+    ANCESTRY: $ANCESTRY
+    ANCESTOR_COMMITS: $CI_COMMIT_TITLE # this is the previous HEAD, not the current branch? # why doesn't this need quotes
 
 stages:
   - build
