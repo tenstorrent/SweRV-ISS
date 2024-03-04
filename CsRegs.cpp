@@ -1517,16 +1517,23 @@ CsRegs<URV>::enableHenvcfgStce(bool flag)
   // If flag is false, HENVCFG.STCE becomes read-only-zero.
   if (rv32_)
     {
-      uint32_t mask = uint32_t(regs_.at(size_t(CN::HENVCFGH)).getReadMask());
-      HenvcfghFields<uint32_t> hf{mask};
+      HenvcfghFields<uint32_t> hf{uint32_t(regs_.at(size_t(CN::HENVCFGH)).getReadMask())};
       hf.bits_.STCE = flag;
       regs_.at(size_t(CN::HENVCFGH)).setReadMask(hf.value_);
+
+      hf = uint32_t(regs_.at(size_t(CN::HENVCFGH)).getWriteMask());
+      hf.bits_.STCE = flag;
+      regs_.at(size_t(CN::HENVCFGH)).setWriteMask(hf.value_);
     }
   else
     {
       HenvcfgFields<uint64_t> hf{regs_.at(size_t(CN::HENVCFG)).getReadMask()};
       hf.bits_.STCE = flag;
       regs_.at(size_t(CN::HENVCFG)).setReadMask(hf.value_);
+
+      hf = regs_.at(size_t(CN::HENVCFG)).getWriteMask();
+      hf.bits_.STCE = flag;
+      regs_.at(size_t(CN::HENVCFG)).setWriteMask(hf.value_);
     }
 }
 
@@ -1540,19 +1547,55 @@ CsRegs<URV>::enableMenvcfgStce(bool flag)
   // If flag is false, MENVCFG.STCE becomes read-only-zero.
   if (rv32_)
     {
-      uint32_t mask = uint32_t(regs_.at(size_t(CN::MENVCFGH)).getReadMask());
-      MenvcfghFields<uint32_t> hf{mask};
+      MenvcfghFields<uint32_t> hf{uint32_t(regs_.at(size_t(CN::MENVCFGH)).getReadMask())};
       hf.bits_.STCE = flag;
       regs_.at(size_t(CN::MENVCFGH)).setReadMask(hf.value_);
+
+      hf = uint32_t(regs_.at(size_t(CN::MENVCFGH)).getWriteMask());
+      hf.bits_.STCE = flag;
+      regs_.at(size_t(CN::MENVCFGH)).setWriteMask(hf.value_);
     }
   else
     {
       MenvcfgFields<uint64_t> hf{regs_.at(size_t(CN::MENVCFG)).getReadMask()};
       hf.bits_.STCE = flag;
       regs_.at(size_t(CN::MENVCFG)).setReadMask(hf.value_);
+
+      hf = regs_.at(size_t(CN::MENVCFG)).getWriteMask();
+      hf.bits_.STCE = flag;
+      regs_.at(size_t(CN::MENVCFG)).setWriteMask(hf.value_);
     }
 
   enableHenvcfgStce(flag);
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableHenvcfgPbmte(bool flag)
+{
+  using CN = CsrNumber;
+
+  if (rv32_)
+    {
+      HenvcfghFields<uint32_t> hf{regs_.at(size_t(CN::HENVCFGH)).getReadMask()};
+      hf.bits_.PBMTE = flag;
+      regs_.at(size_t(CN::HENVCFGH)).setReadMask(hf.value_);
+
+      hf = uint32_t(regs_.at(size_t(CN::HENVCFGH)).getWriteMask());
+      hf.bits_.PBMTE = flag;
+      regs_.at(size_t(CN::HENVCFGH)).setWriteMask(hf.value_);
+    }
+  else
+    {
+      HenvcfgFields<uint64_t> hf{regs_.at(size_t(CN::HENVCFG)).getReadMask()};
+      hf.bits_.PBMTE = flag;
+      regs_.at(size_t(CN::HENVCFG)).setReadMask(hf.value_);
+
+      hf = regs_.at(size_t(CN::HENVCFG)).getWriteMask();
+      hf.bits_.PBMTE = flag;
+      regs_.at(size_t(CN::HENVCFG)).setWriteMask(hf.value_);
+    }
 }
 
 
@@ -1667,6 +1710,9 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
     {
       bool stce = menvcfgStce();
       enableHenvcfgStce(stce); // MENVCFG.STCE off makes HENVCFG.STCE read-only zero.
+
+      bool pbmte = menvcfgPbmte();
+      enableHenvcfgPbmte(pbmte);
     }
   else if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
 	   (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))

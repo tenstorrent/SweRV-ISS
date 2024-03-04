@@ -1637,6 +1637,10 @@ namespace WdRiscv
       return fields.bits_.STCE;
     }
 
+    /// If flag is false, bit HENVCFG.PBMTE becomes read-only ero;
+    /// otherwise, bit is readable.
+    void enableHenvcfgPbmte(bool flag);
+
     /// Return the value of the PBMTE bit of the MENVCFG CSR. Return
     /// false if CSR is not implemented.
     bool menvcfgPbmte()
