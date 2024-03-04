@@ -1578,7 +1578,7 @@ CsRegs<URV>::enableHenvcfgPbmte(bool flag)
 
   if (rv32_)
     {
-      HenvcfghFields<uint32_t> hf{regs_.at(size_t(CN::HENVCFGH)).getReadMask()};
+      HenvcfghFields<uint32_t> hf{uint32_t(regs_.at(size_t(CN::HENVCFGH)).getReadMask())};
       hf.bits_.PBMTE = flag;
       regs_.at(size_t(CN::HENVCFGH)).setReadMask(hf.value_);
 
