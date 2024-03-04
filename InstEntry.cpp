@@ -100,6 +100,9 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::flh))     .setLoadSize(2);
   instVec_.at(size_t(InstId::flw))     .setLoadSize(4);
   instVec_.at(size_t(InstId::fld))     .setLoadSize(8);
+  instVec_.at(size_t(InstId::c_lbu))   .setLoadSize(1);
+  instVec_.at(size_t(InstId::c_lhu))   .setLoadSize(2);
+  instVec_.at(size_t(InstId::c_lh))    .setLoadSize(2);
   instVec_.at(size_t(InstId::c_fld))   .setLoadSize(8);
   instVec_.at(size_t(InstId::c_lq))    .setLoadSize(16);
   instVec_.at(size_t(InstId::c_lw))    .setLoadSize(4);
@@ -130,11 +133,13 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::fsw))     .setStoreSize(4);
   instVec_.at(size_t(InstId::fsd))     .setStoreSize(8);
   instVec_.at(size_t(InstId::c_fsd))   .setStoreSize(8);
-  instVec_.at(size_t(InstId::c_sq))    .setStoreSize(16);
+  instVec_.at(size_t(InstId::c_sb))    .setStoreSize(1);
+  instVec_.at(size_t(InstId::c_sh))    .setStoreSize(2);
   instVec_.at(size_t(InstId::c_sw))    .setStoreSize(4);
   instVec_.at(size_t(InstId::c_fsw))   .setStoreSize(4);
   instVec_.at(size_t(InstId::c_sd))    .setStoreSize(8);
   instVec_.at(size_t(InstId::c_fsdsp)) .setStoreSize(8);
+  instVec_.at(size_t(InstId::c_sq))    .setStoreSize(16);
   instVec_.at(size_t(InstId::c_swsp))  .setStoreSize(4);
   instVec_.at(size_t(InstId::c_fswsp)) .setStoreSize(4);
   instVec_.at(size_t(InstId::c_sdsp))  .setStoreSize(8);
