@@ -4337,8 +4337,8 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
 	  {
 	    bool input = false;
 	    vecRegs_.readMaskRegister(vs1, ix, input);
-	    found = found or input;
 	    flag = not found;
+	    found = found or input;
 	  }
 	vecRegs_.writeMaskRegister(vd, ix, flag);
       }
