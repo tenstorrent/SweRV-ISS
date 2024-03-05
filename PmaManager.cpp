@@ -62,21 +62,21 @@ Pma::attributesToString(uint32_t attrib)
   std::string result;
 
   result += (attrib & Pma::None)? "none," : "";
-  result += (attrib & Pma::Read)? "read," : ",";
-  result += (attrib & Pma::Write)? "write," : ",";
-  result += (attrib & Pma::Exec)? "exec," : ",";
-  result += (attrib & Pma::Idempotent)? "idempotent," : ",";
-  result += (attrib & Pma::AmoOther)? "amoother," : ",";
-  result += (attrib & Pma::AmoSwap)? "amoswap," : ",";
-  result += (attrib & Pma::AmoLogical)? "amological," : ",";
-  result += (attrib & Pma::Iccm)? "iccm," : ",";
-  result += (attrib & Pma::Dccm)? "dccm," : ",";
-  result += (attrib & Pma::MemMapped)? "memmapped," : ",";
-  result += (attrib & Pma::Rsrv)? "rsrv," : ",";
-  result += (attrib & Pma::Io)? "io," : ",";
-  result += (attrib & Pma::Cacheable)? "cacheable," : ",";
-  result += (attrib & Pma::MisalOk)? "misalok," : ",";
-  result += (attrib & Pma::MisalAccFault)? "misalaccfault" : "";
+  result += (attrib & Pma::Read)? "read," : "";
+  result += (attrib & Pma::Write)? "write," : "";
+  result += (attrib & Pma::Exec)? "exec," : "";
+  result += (attrib & Pma::Idempotent)? "idempotent," : "";
+  result += (attrib & Pma::AmoOther)? "amoother," : "";
+  result += (attrib & Pma::AmoSwap)? "amoswap," : "";
+  result += (attrib & Pma::AmoLogical)? "amological," : "";
+  result += (attrib & Pma::Iccm)? "iccm," : "";
+  result += (attrib & Pma::Dccm)? "dccm," : "";
+  result += (attrib & Pma::MemMapped)? "memmapped," : "";
+  result += (attrib & Pma::Rsrv)? "rsrv," : "";
+  result += (attrib & Pma::Io)? "io," : "";
+  result += (attrib & Pma::Cacheable)? "cacheable," : "";
+  result += (attrib & Pma::MisalOk)? "misalok," : "";
+  result += (attrib & Pma::MisalAccFault)? "misalaccfault," : "";
   return result;
 }
 

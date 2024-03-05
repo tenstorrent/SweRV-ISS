@@ -238,7 +238,7 @@ printPageTableWalk(FILE* out, const Hart<URV>& hart, const char* tag,
 
           Pma pma = hart.getPma(entry.addr_);
           pma = VirtMem::overridePmaWithPbmt(pma, entry.pbmt_);
-          fprintf(out, ", ma=0x%" PRIx32, pma.attributesToInt());
+          fprintf(out, ", ma=%s", pma.attributesToString(pma.attributesToInt()).c_str());
         }
       head = false;
     }
@@ -814,7 +814,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 
               Pma pma = getPma(addrs.at(i).addr_);
               pma = VirtMem::overridePmaWithPbmt(pma, addrs.at(i).pbmt_);
-              buffer.print("ma").print(pma.attributesToInt());
+              buffer.print(";ma=").print(pma.attributesToInt());
             }
           sep = ";";
         }
