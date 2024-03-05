@@ -600,11 +600,12 @@ namespace WdRiscv
     /// Return true if element at ix of mask destination is active; otherwise,
     /// return false and either read element at ix into val or set val to all
     /// ones depending on the mask-agnostic/tail-agnostic policy.
-    bool isMaskDestActive(unsigned vd, unsigned ix, bool masked, bool& val) const
+    bool isMaskDestActive(unsigned vd, unsigned ix, bool masked, unsigned nelems,
+			  bool& val) const
     {
       readMaskRegister(vd, ix, val);
 
-      if (ix >= elemCount())
+      if (ix >= nelems)
 	{
 	  if (tailAgnOnes_)   // For mask vectors, tail-agnostic is always true.
 	    val = true;
@@ -617,6 +618,14 @@ namespace WdRiscv
 	  return false;
 	}
       return true;
+    }
+
+    /// Return true if element at ix of mask destination is active; otherwise,
+    /// return false and either read element at ix into val or set val to all
+    /// ones depending on the mask-agnostic/tail-agnostic policy.
+    bool isMaskDestActive(unsigned vd, unsigned ix, bool masked, bool& val) const
+    {
+      return isMaskDestActive(vd, ix, masked, elemCount(), val);
     }
 
     /// Set the ith bit of the given mask register to the given value.

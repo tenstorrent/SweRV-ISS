@@ -251,9 +251,8 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
       if (not getJsonUnsigned(name + ".mask", conf.at("mask"), mask))
 	errors++;
 
-      // If defining a non-standard CSR (as popposed to
-      // configuring an existing CSR) then default the poke-mask
-      // to the write-mask.
+      // If defining a non-standard CSR (as popposed to configuring an
+      // existing CSR) then default the poke-mask to the write-mask.
       if (not csr)
 	pokeMask = mask;
     }
@@ -339,7 +338,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
       std::cerr << "Invalid CSR (" << name << ") in config file.\n";
       return false;
     }
-  if ((mask & pokeMask) != mask)
+  if ((mask & pokeMask) != mask and hart.sysHartIndex() == 0)
     {
       std::cerr << "Warning: For CSR " << name << " poke mask (0x" << std::hex << pokeMask
 		<< ") is not a superset of write mask (0x" << mask << std::dec << ")\n";
@@ -350,11 +349,11 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
       // If an extension bit is writable, it should reset to 1.
       URV extBits = (URV(1) << 26) - 1;
       URV writeable = extBits & mask, writeableReset = extBits & mask & reset;
-      if (writeable != writeableReset)
+      if (writeable != writeableReset and hart.sysHartIndex() == 0)
 	std::cerr << "Warning: Reset value of MISA should be 0x"
 		  << std::hex << (reset | writeable) << std::dec
 		  << " to be compatible with write mask.\n";
-      if (writeable & (URV(1) << ('E' - 'A')))
+      if ((writeable & (URV(1) << ('E' - 'A'))) and hart.sysHartIndex() == 0)
 	std::cerr << "Warning: Bit E of MISA cannot be writebale.\n";
       if ((reset & (1 << ('S' - 'A'))) and not (reset & (1 << ('U' - 'A'))))
         {
@@ -1303,7 +1302,7 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
       std::string_view tag = "pma";
       if (memMap.contains(tag))
 	{
-	  if (hasDefinedPmacfgCsr(*config_))
+	  if (hasDefinedPmacfgCsr(*config_) and hart.sysHartIndex() == 0)
 	    {
 	      std::cerr << "Warning: Configuration file has both memmap pma "
 			<< "and a pmacfg CSR. CSRs will override memmap.\n";
@@ -1626,10 +1625,11 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     }
 
   tag = "page_fault_on_first_access";
-  if (config_ -> contains(tag) and hart.sysHartIndex() == 0)
+  if (config_ -> contains(tag))
     {
-      cerr << "Warning: Config tag " << tag << " is deprecated -- "
-	   << "feature is now controlled by bit 61 of the MENVCFG CSR.\n";
+      if (hart.sysHartIndex() == 0)
+	cerr << "Warning: Config tag " << tag << " is deprecated -- "
+	     << "feature is now controlled by bit 61 of the MENVCFG CSR.\n";
       getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
       // hart.setFaultOnFirstAccess(flag);
     }
@@ -1710,14 +1710,16 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   // the timer expires (reaches timecmp).
   tag = "time_shift";
   if (config_ ->contains(tag))
-  {
-    cerr << "Warning: Config tag time_shift may overflow timecmp and have unintended consequences.\n";
-    unsigned shift = 0;
-    if (not getJsonUnsigned(tag, config_ -> at(tag), shift))
-      errors++;
-    else
-      hart.setTimeShift(shift);
-  }
+    {
+      if (hart.sysHartIndex() == 0)
+	cerr << "Warning: Config tag time_shift may overflow timecmp and have "
+	     << "unintended consequences.\n";
+      unsigned shift = 0;
+      if (not getJsonUnsigned(tag, config_ -> at(tag), shift))
+	errors++;
+      else
+	hart.setTimeShift(shift);
+    }
 
   tag = "cancel_lr_on_ret";
   if (config_ -> contains(tag))
@@ -1863,7 +1865,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_supervisor_time_compare";
   if (config_ -> contains(tag))
     {
-      if (hart.sysHartIndex() == 0)
+      if (hart.sysHartIndex() == 0 and hart.sysHartIndex() == 0)
 	cerr << "Warning: Config tag " << tag << " is deprecated. "
 	     << "Use sstc with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
