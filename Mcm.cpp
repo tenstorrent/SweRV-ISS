@@ -1513,7 +1513,7 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 	  cerr << "Error: Read op forwards from an atomic instruction"
 	       << " time=" << op.time_ << " hart-id=" << hart.hartId()
 	       << " instr-tag=" << tag << " addr=0x" << std::hex
-	       << op.physAddr_ << " amo-tag=" << instr.tag_ << std::dec << '\n';
+	       << op.physAddr_ << " amo-tag=" << std::dec << instr.tag_ << '\n';
 	}
     }
 
