@@ -213,7 +213,7 @@ Hart<URV>::countImplementedPmpRegisters() const
     if (csRegs_.isImplemented(CsrNumber(num)))
       count++;
 
-  if (count and count < 64)
+  if (count and count < 64 and hartIx_ == 0)
     std::cerr << "Warning: Some but not all PMPADDR CSRs are implemented\n";
 
   unsigned cfgCount = 0;
