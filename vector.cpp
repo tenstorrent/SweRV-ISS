@@ -4288,20 +4288,18 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
 
   bool found = false;  // true if set bit is found in vs1
 
-  if (start < elemCount)
-    for (uint32_t ix = start; ix < bitsPerReg; ++ix)
-      {
-	bool flag = false;
-	if (vecRegs_.updateWholeMask() or
-	    vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag))
-	  {
-	    bool input = false;
-	    vecRegs_.readMaskRegister(vs1, ix, input);
-	    found = found or input;
-	    flag = not found;
-	  }
-	vecRegs_.writeMaskRegister(vd, ix, flag);
-      }
+  for (uint32_t ix = start; ix < elemCount; ++ix)
+    {
+      bool flag = false;
+      if (vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag))
+	{
+	  bool input = false;
+	  vecRegs_.readMaskRegister(vs1, ix, input);
+	  found = found or input;
+	  flag = not found;
+	}
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 
   vecRegs_.touchMask(vd);
   postVecSuccess();
@@ -4332,20 +4330,18 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
 
   bool found = false;  // true if set bit is found in vs1
 
-  if (start < elemCount)
-    for (uint32_t ix = start; ix < bitsPerReg; ++ix)
-      {
-	bool flag = false;
-	if (vecRegs_.updateWholeMask() or
-	    vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag))
-	  {
-	    bool input = false;
-	    vecRegs_.readMaskRegister(vs1, ix, input);
-	    flag = not found;
-	    found = found or input;
-	  }
-	vecRegs_.writeMaskRegister(vd, ix, flag);
-      }
+  for (uint32_t ix = start; ix < elemCount; ++ix)
+    {
+      bool flag = false;
+      if (vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag))
+	{
+	  bool input = false;
+	  vecRegs_.readMaskRegister(vs1, ix, input);
+	  flag = not found;
+	  found = found or input;
+	}
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 
   vecRegs_.touchMask(vd);
   postVecSuccess();
@@ -4376,28 +4372,24 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
 
   bool found = false;  // true if set bit is found in vs1
 
-  if (start < elemCount)
-    for (uint32_t ix = start; ix < bitsPerReg; ++ix)
-      {
-	bool flag = false;
-	bool active = (vecRegs_.updateWholeMask() or
-		       vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag));
+  for (uint32_t ix = start; ix < elemCount; ++ix)
+    {
+      bool flag = false;
+      bool active = vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag);
 
-	bool input = false;
-	vecRegs_.readMaskRegister(vs1, ix, input);
+      bool input = false;
+      vecRegs_.readMaskRegister(vs1, ix, input);
 
-	if (active)
-	  vecRegs_.writeMaskRegister(vd, ix, false);
+      if (active)
+	vecRegs_.writeMaskRegister(vd, ix, false);
 
-	if (found or not input)
-	  continue;
+      if (found or not input)
+	continue;
 
-	if (active)
-	  {
-	    found = true;
-	    vecRegs_.writeMaskRegister(vd, ix, true);
-	  }
-      }
+      found = true;
+      if (active)
+	vecRegs_.writeMaskRegister(vd, ix, true);
+    }
 
   vecRegs_.touchMask(vd);  // In case nothing was written
   postVecSuccess();
