@@ -37,8 +37,8 @@ namespace WdRiscv
     friend class Hart<uint32_t>;
     friend class Hart<uint64_t>;
 
-    enum Mode { Bare = 0, Sv32 = 1, Sv39 = 8, Sv48 = 9, Sv57 = 10, Sv64 = 11,
-		Limit_ = 12};
+    enum class Mode : uint32_t { Bare = 0, Sv32 = 1, Sv39 = 8, Sv48 = 9, Sv57 = 10,
+				 Sv64 = 11, Limit_ = 12};
 
     enum class Pbmt : uint32_t { None = 0, Nc = 1, Io = 2, Reserved = 3 };
 
@@ -704,9 +704,9 @@ namespace WdRiscv
     uint64_t rootPage_ = 0;        // Root page for S mode (V==0).
     uint64_t vsRootPage_ = 0;      // Root page of VS 1st stage translation (V == 1).
     uint64_t rootPageStage2_ = 0;  // Root page of VS 2nd stage translation (V == 1).
-    Mode mode_ = Bare;
-    Mode vsMode_ = Bare;
-    Mode modeStage2_ = Bare;       // For 2nd stage translation.
+    Mode mode_ = Mode::Bare;
+    Mode vsMode_ = Mode::Bare;
+    Mode modeStage2_ = Mode::Bare; // For 2nd stage translation.
     uint32_t asid_ = 0;
     uint32_t vsAsid_ = 0;
     uint32_t vmid_ = 0;

@@ -144,7 +144,7 @@ VirtMem::transNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
   // TBD FIX -- use TLB for two-stage case.
   if (not twoStage)
     {
-      if (mode_ == Bare)
+      if (mode_ == Mode::Bare)
 	{
 	  pa = va;
 	  return ExceptionCause::NONE;
@@ -223,7 +223,7 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
   // Exactly one of read/write/exec must be true.
   assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
-  if (mode_ == Bare)
+  if (mode_ == Mode::Bare)
     {
       pa = va;
       return ExceptionCause::NONE;
@@ -278,14 +278,14 @@ VirtMem::twoStageTranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read,
 				bool write, bool exec, uint64_t& pa, TlbEntry& entry)
 {
   uint64_t gpa = va;
-  if (vsMode_ != Bare)
+  if (vsMode_ != Mode::Bare)
     {
       auto cause = stage1TranslateNoTlb(va, priv, read, write, exec, gpa, entry);
       if (cause != ExceptionCause::NONE)
 	return cause;
     }
 
-  if (modeStage2_ == Bare)
+  if (modeStage2_ == Mode::Bare)
     {
       pa = gpa;
       return ExceptionCause::NONE;
@@ -304,23 +304,23 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
     return twoStageTranslateNoTlb(va, priv, read, write, exec, pa, entry);
 
   // Perform a page table walk.
-  if (mode_ == Sv32)
+  if (mode_ == Mode::Sv32)
     return pageTableWalk1p12<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
 
   ExceptionCause (VirtMem::*walkFn)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
   unsigned vaMsb = 0;  // Most significant bit of va
 
-  if (mode_ == Sv39)
+  if (mode_ == Mode::Sv39)
     {
       vaMsb = 38; // Bits 63 to 39 of va must equal bit 38
       walkFn = &VirtMem::pageTableWalk1p12<Pte39, Va39>;
     }
-  else if (mode_ == Sv48)
+  else if (mode_ == Mode::Sv48)
     {
       vaMsb = 47; // Bits 63 to 48 of va must equal bit 47
       walkFn = &VirtMem::pageTableWalk1p12<Pte48, Va48>;
     }
-  else if (mode_ == Sv57)
+  else if (mode_ == Mode::Sv57)
     {
       vaMsb = 56; // Bits 63 to 57 of va must equal bit 56
       walkFn = &VirtMem::pageTableWalk1p12<Pte57, Va57>;
@@ -349,25 +349,25 @@ VirtMem::stage2TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read,
   ExceptionCause (VirtMem::*stage2PageTableWalk)(uint64_t, PrivilegeMode, bool, bool, bool, bool, uint64_t&, TlbEntry&);
   unsigned lowerMaskBitIndex = 0;
 
-  if (modeStage2_ == Sv32)
+  if (modeStage2_ == Mode::Sv32)
     {
       // Part 2 of address translation: Bits 63-34 must be zero
       lowerMaskBitIndex   = 34;
       stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte32, Va32x4>;
     }
-  else if (modeStage2_ == Sv39)
+  else if (modeStage2_ == Mode::Sv39)
     {
       // Part 2 of address translation: Bits 63-41 must be zero
       lowerMaskBitIndex   = 41;
       stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte39, Va39x4>;
     }
-  else if (modeStage2_ == Sv48)
+  else if (modeStage2_ == Mode::Sv48)
     {
       // Part 2 of address translation: Bits 63-50 must be zero
       lowerMaskBitIndex   = 50;
       stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte48, Va48x4>;
     }
-  else if (modeStage2_ == Sv57)
+  else if (modeStage2_ == Mode::Sv57)
     {
       // Part 2 of address translation: Bits 63-59 must be zero
       lowerMaskBitIndex   = 59;
@@ -392,7 +392,7 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
   // Exactly one of read/write/exec must be true.
   assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
-  if (modeStage2_ == Bare)
+  if (modeStage2_ == Mode::Bare)
     {
       pa = va;
       return ExceptionCause::NONE;
@@ -443,7 +443,7 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
   // Exactly one of read/write/exec must be true.
   assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
-  if (vsMode_ == Bare)
+  if (vsMode_ == Mode::Bare)
     {
       va = exec? va : applyPointerMaskPa(va, priv, true);
       gpa = pa = va;
@@ -502,7 +502,7 @@ ExceptionCause
 VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool write,
 			      bool exec, uint64_t& pa, TlbEntry& entry)
 {
-  if (vsMode_ == Sv32)
+  if (vsMode_ == Mode::Sv32)
     {
       auto cause =  stage1PageTableWalk<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
       stage1ImplicitAccessTrap_ = cause != ExceptionCause::NONE;
@@ -512,17 +512,17 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
   ExceptionCause (VirtMem::*walkFn)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
   unsigned vaMsb = 0;  // Most significant bit of va
 
-  if (vsMode_ == Sv39)
+  if (vsMode_ == Mode::Sv39)
     {
       vaMsb = 38; // Bits 63 to 39 of va must equal bit 38
       walkFn = &VirtMem::stage1PageTableWalk<Pte39, Va39>;
     }
-  else if (vsMode_ == Sv48)
+  else if (vsMode_ == Mode::Sv48)
     {
       vaMsb = 47; // Bits 63 to 48 of va must equal bit 47
       walkFn = &VirtMem::stage1PageTableWalk<Pte48, Va48>;
     }
-  else if (vsMode_ == Sv57)
+  else if (vsMode_ == Mode::Sv57)
     {
       vaMsb = 56; // Bits 63 to 57 of va must equal bit 56
       walkFn = &VirtMem::stage1PageTableWalk<Pte57, Va57>;
@@ -1078,12 +1078,12 @@ VirtMem::printPageTable(std::ostream& os) const
   os << "Mode: ";
   switch(mode_)
     {
-    case Bare: os << "Bare\n"; break;
-    case Sv32: os << "Sv32\n"; break;
-    case Sv39: os << "Sv39\n"; break;
-    case Sv48: os << "Sv48\n"; break;
-    case Sv57: os << "Sv57\n"; break;
-    case Sv64: os << "Sv64\n"; break;
+    case Mode::Bare: os << "Bare\n"; break;
+    case Mode::Sv32: os << "Sv32\n"; break;
+    case Mode::Sv39: os << "Sv39\n"; break;
+    case Mode::Sv48: os << "Sv48\n"; break;
+    case Mode::Sv57: os << "Sv57\n"; break;
+    case Mode::Sv64: os << "Sv64\n"; break;
     default:   os << "???\n";  break;
     }
 
@@ -1093,13 +1093,13 @@ VirtMem::printPageTable(std::ostream& os) const
 
   std::string path = "/";
 
-  if (mode_ == Bare)
+  if (mode_ == Mode::Bare)
     ;  // relax
-  else if (mode_ == Sv32)
+  else if (mode_ == Mode::Sv32)
     printEntries<Pte32, Va32>(os, addr, path);
-  else if (mode_ == Sv39)
+  else if (mode_ == Mode::Sv39)
     printEntries<Pte39, Va39>(os, addr, path);
-  else if (mode_ == Sv48)
+  else if (mode_ == Mode::Sv48)
     printEntries<Pte48, Va48>(os, addr, path);
   else
     os << "Unsupported virtual memory mode\n";

@@ -579,7 +579,7 @@ Hart<URV>::updateAddressTranslation()
 
       HgatpFields<URV> hgatp(value);
       virtMem_.setStage2Mode(VirtMem::Mode(hgatp.bits_.MODE));
-      virtMem_.setVmid(VirtMem::Mode(hgatp.bits_.VMID));
+      virtMem_.setVmid(hgatp.bits_.VMID);
       virtMem_.setStage2RootPage(hgatp.bits_.PPN);
 
       if (hgatp.bits_.VMID != prevVmid)
@@ -10402,7 +10402,16 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
   // Update integer register.
   intRegs_.write(intReg, intRegVal);
 
-  if (csr == CsrNumber::SATP or csr == CsrNumber::VSATP or csr == CsrNumber::HGATP)
+  // Legalize HGATP. We do this here to avoid making CsRegs depend on VirtMem.
+  if (csr == CsrNumber::HGATP)
+    {
+      HgatpFields<URV> hgatp(val);
+      auto mode = VirtMem::Mode{hgatp.bits_.MODE};
+      if (not virtMem_.isModeSupported(mode))
+	hgatp.bits_.MODE = unsigned(VirtMem::Mode::Bare);
+      val = hgatp.value_;
+    }
+  else if (csr == CsrNumber::SATP or csr == CsrNumber::VSATP)
     {
       unsigned modeBits = 0;
       if constexpr (sizeof(URV) == 4)
