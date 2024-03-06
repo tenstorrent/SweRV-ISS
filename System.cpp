@@ -43,7 +43,7 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
                     unsigned hartIdOffset, size_t memSize,
                     size_t pageSize)
   : hartCount_(coreCount * hartsPerCore), hartsPerCore_(hartsPerCore),
-    imsicMgr_((coreCount * hartsPerCore), pageSize)
+    imsicMgr_((coreCount * hartsPerCore), pageSize), time_(0)
 {
   cores_.resize(coreCount);
 
@@ -56,7 +56,7 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
   for (unsigned ix = 0; ix < coreCount; ++ix)
     {
       URV coreHartId = ix * hartIdOffset;
-      cores_.at(ix) = std::make_shared<CoreClass>(coreHartId, ix, hartsPerCore, mem);
+      cores_.at(ix) = std::make_shared<CoreClass>(coreHartId, ix, hartsPerCore, mem, time_);
 
       // Maintain a vector of all the harts in the system.  Map hart-id to index
       // of hart in system.
@@ -320,6 +320,7 @@ System<URV>::loadBinaryFiles(const std::vector<std::string>& fileSpecs,
 }
 
 
+static
 bool
 saveUsedMemBlocks(const std::string& filename,
 		  std::vector<std::pair<uint64_t, uint64_t>>& blocks)
@@ -333,6 +334,22 @@ saveUsedMemBlocks(const std::string& filename,
     }
   for (auto& it: blocks)
     ofs << it.first << " " << it.second << "\n";
+  return true;
+}
+
+
+static
+bool
+saveTime(const std::string& filename, uint64_t time)
+{
+  std::ofstream ofs(filename, std::ios::trunc);
+  if (not ofs)
+    {
+      std::cerr << "saveTime failed - cannot open "
+                << filename << " for write\n";
+      return false;
+    }
+  ofs << std::dec << time << "\n";
   return true;
 }
 
@@ -370,6 +387,10 @@ System<URV>::saveSnapshot(const std::string& dir)
     syscall.getUsedMemBlocks(usedBlocks);
 
   if (not saveUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
+    return false;
+
+  Filesystem::path timePath = dirPath / "time";
+  if (not saveTime(timePath.string(), time_))
     return false;
 
   Filesystem::path memPath = dirPath / "memory";
@@ -421,6 +442,26 @@ loadUsedMemBlocks(const std::string& filename,
       blocks.emplace_back(addr, length);
     }
 
+  return true;
+}
+
+
+static
+bool
+loadTime(const std::string& filename, uint64_t& time)
+{
+  std::ifstream ifs(filename);
+  if (not ifs)
+    {
+      std::cerr << "loadTime failed - cannot open "
+                << filename << " for read\n";
+      return false;
+    }
+
+  std::string line;
+  std::getline(ifs, line);
+  uint64_t val = strtoull(line.c_str(), nullptr, 0);
+  time = val;
   return true;
 }
 
@@ -916,11 +957,16 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snap
 
       batchRun(traceFiles, true /*waitAll*/, 0 /*stepWindow*/);
 
-      if (hart0.hasTargetProgramFinished() or nextLimit >= globalLimit)
-	{
-	  Filesystem::remove_all(path);
-	  break;
-	}
+      bool done = false;
+      for (auto& hartPtr : sysHarts_)
+	if (hartPtr->hasTargetProgramFinished() or nextLimit >= globalLimit)
+	  {
+	    done = true;
+	    Filesystem::remove_all(path);
+	    break;
+	  }
+      if (done)
+	break;
 
       if (not saveSnapshot(pathStr))
 	{
@@ -988,6 +1034,14 @@ System<URV>::loadSnapshot(const std::string& snapDir)
     return false;
 
   auto& hart0 = *ithHart(0);
+
+  Filesystem::path timePath = dirPath / "time";
+  if (not loadTime(timePath.string(), time_))
+    {
+      std::cerr << "Using instruction count for time\n";
+      time_ = hart0.getInstructionCount();  // Legacy snapshots.
+    }
+
   auto& syscall = hart0.getSyscall();
   Filesystem::path mmapPath = dirPath / "mmap";
   if (not syscall.loadMmap(mmapPath.string()))

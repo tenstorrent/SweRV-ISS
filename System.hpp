@@ -359,6 +359,7 @@ namespace WdRiscv
     unsigned hartCount_;
     unsigned hartsPerCore_;
     TT_IMSIC::ImsicMgr imsicMgr_;
+    uint64_t time_;
 
     std::vector< std::shared_ptr<CoreClass> > cores_;
     std::vector< std::shared_ptr<HartClass> > sysHarts_; // All harts in system.

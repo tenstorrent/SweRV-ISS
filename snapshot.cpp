@@ -24,15 +24,21 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
       return false;
     }
 
-  // Write Privilege Mode, Program Order, Program Break, and Program Counter.
-  ofs << "pm " << std::dec << unsigned(privilegeMode()) << '\n';
-  ofs << "po " << std::dec << getInstructionCount() << '\n';
+  // Write Privilege Mode, Virtual mode, Program Order, Program Break,
+  // and Program Counter.
+  ofs << "pm " << unsigned(privilegeMode()) << '\n';
+  ofs << "vm " << unsigned(virtMode()) << '\n';
+  ofs << "po " << getInstructionCount() << '\n';
   ofs << "pb 0x" << std::hex << syscall_.targetProgramBreak() << std::dec << '\n';
   ofs << "pc 0x" << std::hex << peekPc() << std::dec << '\n';
 
   // write integer registers
   for (unsigned i = 1; i < 32; i++)
-    ofs << "x " << std::dec << i << " 0x" << std::hex << peekIntReg(i) << std::dec << "\n";
+    {
+      URV val = peekIntReg(i);
+      if (val)
+	ofs << "x " << std::dec << i << " 0x" << std::hex << val << std::dec << "\n";
+    }
 
   // write floating point registers
   if (isRvf())
@@ -40,17 +46,26 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
       {
 	uint64_t val = 0;
 	peekFpReg(i, val);
-	ofs << "f " << std::dec << i << " 0x" << std::hex << val << std::dec << "\n";
+	if (val)
+	  ofs << "f " << std::dec << i << " 0x" << std::hex << val << std::dec << "\n";
       }
 
-  // write control & status registers
+  // Write control & status registers. Write MISA first.
+  ofs << std::hex;
+  auto csr = csRegs_.findCsr(CsrNumber::MISA);
+  if (csr)
+    ofs << "c 0x" << unsigned(CsrNumber::MISA) << " 0x" << csr->read() << "\n";
   for (unsigned i = unsigned(CsrNumber::MIN_CSR_); i <= unsigned(CsrNumber::MAX_CSR_); i++)
     {
-      URV val = 0;
-      if (not peekCsr(CsrNumber(i), val))
-        continue;
-      ofs << "c 0x" << std::hex << i << " 0x" << val << std::dec << "\n";
+      if (i == unsigned(CsrNumber::MISA))
+	continue;
+      auto csr = csRegs_.findCsr(CsrNumber(i));
+      if (not csr or not csr->isImplemented())
+	continue;
+      if (csr->read() != csr->getResetValue())
+	ofs << "c 0x" << i << " 0x" << csr->read() << "\n";
     }
+  ofs << std::dec;
 
   // write vector registers.
   if (isRvv())
@@ -176,78 +191,106 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
     }
   // read line by line and set registers
   std::string line;
-  unsigned lineNum = 0;
-  unsigned num = 0;
+  unsigned lineNum = 0, num = 0, errors = 0;
   uint64_t val = 0;
-  bool error = false;
   auto privMode = PrivilegeMode::Machine;
+  bool virtMode = false;
+
+  using std::cerr;
 
   while(std::getline(ifs, line))
     {
       lineNum++;
       std::istringstream iss(line);
       std::string type;
-      error = true;
       // parse first part (register class)
       if (not (iss >> type))
-        break; // error: parse failed
+	{
+	  errors++;
+	  cerr << "Error: Register snapshot loader: Line " << lineNum
+	       << ": Failed to read line tag\n";
+	  break;
+	}
 
       if (type == "pc")     // PC
         {
           if (not loadSnapshotValue(iss, val))
-            break; // error: parse failed
-          pokePc(val);
+            errors++;
+	  else
+	    pokePc(val);
         }
-      else if (type == "pm")  // Prrivilege Mode
+      else if (type == "pm")  // Prrivilege mode
 	{
 	  if (not loadSnapshotValue(iss, val))
-	    break;
-	  if (val == 0)
+	    errors++;
+	  else if (val == 0)
 	    privMode = PrivilegeMode::User;
 	  else if (val == 1)
 	    privMode = PrivilegeMode::Supervisor;
 	  else if (val == 3)
 	    privMode = PrivilegeMode::Machine;
-	  else 
-	    break; // error.
+	  else
+	    errors++;
+	}
+      else if (type == "vm")  // Virtual mode
+	{
+	  if (loadSnapshotValue(iss, val))
+	    virtMode = val;
+	  else
+	    errors++;
 	}
       else if (type == "po")  // Program order
         {
-          if (not loadSnapshotValue(iss, val))
-            break;
-          setInstructionCount(val);
+          if (loadSnapshotValue(iss, val))
+	    setInstructionCount(val);
+	  else
+	    errors++;
         }
       else if (type == "pb")  // Program break
         {
-          if (not loadSnapshotValue(iss, val))
-            break;
-          setTargetProgramBreak(val);
+          if (loadSnapshotValue(iss, val))
+	    setTargetProgramBreak(val);
+	  else
+	    errors++;
         }
       else if (type == "c")   // CSR
         {
           if (not loadRegNumAndValue(iss, num, val))
-            break;
-          if (not pokeCsr(CsrNumber(num), val))
-	    std::cerr << "Warning: Register snapshot loader: Line " << lineNum
-		      << ": No such CSR: " << line << '\n';
+	    {
+	      errors++;
+	      continue;
+	    }
+	  auto csr = csRegs_.findCsr(CsrNumber(num));
+          // Poke to propagate updates to cached values
+	  if (csr and csr->isImplemented())
+            pokeCsr(static_cast<CsrNumber>(num), val);
+	  else
+	    cerr << "Warning: Register snapshot loader: Line " << lineNum
+		 << ": No such CSR: " << line << '\n';
         }
       else if (type == "x")   // Integer register
-        {  
+        {
           if (not loadRegNumAndValue(iss, num, val))
-            break;
+	    {
+	      errors++;
+	      continue;
+	    }
           if (not pokeIntReg(num, val))
-	    std::cerr << "Warning: Register snapshot loader: Line " << lineNum
-		      << ": No such register: " << line << '\n';
+	    cerr << "Warning: Register snapshot loader: Line " << lineNum
+		 << ": No such register: " << line << '\n';
         }
       else if (type == "f")   // FP register
         {
           if (isRvf() or isRvd())
             {
               if (not loadRegNumAndValue(iss, num, val))
-                break;
+		{
+		  errors++;
+		  continue;
+		}
               if (not pokeFpReg(num, val))
-		std::cerr << "Warning: Register snapshot loader: Line " << lineNum
-			  << ": No such FP register: " << line << '\n';
+		cerr << "Warning: Register snapshot loader: Line " << lineNum
+		     << ": No such FP register: " << line << '\n';
             }
         }
       else if (type == "v") // Vector registers
@@ -256,27 +299,38 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
 	    {
 	      std::vector<uint8_t> vecBytes;
 	      if (not loadVecRegNumAndValue(iss, num, vecBytes))
-		break;
+		{
+		  errors++;
+		  continue;
+		}
 	      if (not pokeVecReg(num, vecBytes))
-		std::cerr << "Warning: Register snapshot loader: Line " << lineNum
-			  << ": No such vector register: " << line << '\n';
+		cerr << "Warning: Register snapshot loader: Line " << lineNum
+		     << ": No such vector register: " << line << '\n';
 	    }
 	}
       else
-        break;  // error: parse failed
-      error = false;
+	{
+	  cerr << "Warning: Register snapshot loader: Line " << lineNum
+	       << ": Ignoring unexpected line: " << line << '\n';
+	}
     }
 
   setPrivilegeMode(privMode);
+  virtMode_ = virtMode;
 
-  if (error)
+  if (errors)
     {
-      std::cerr << "Hart::loadSnapshotRegs failed to parse " << filename << ":"
-                << std::dec << lineNum << "\n";
-      std::cerr << "\t" << line << "\n";
+      cerr << "Hart::loadSnapshotRegs failed to parse " << filename << ":"
+	   << std::dec << lineNum << "\n";
+      cerr << "\t" << line << "\n";
     }
   ifs.close();
-  return not error;
+
+  updateCachedMstatus();
+  updateAddressTranslation();
+  updateTranslationPbmt();
+
+  return errors == 0;
 }
 
 

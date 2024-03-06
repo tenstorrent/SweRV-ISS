@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -193,7 +193,7 @@ namespace WdRiscv
     RvExtension extension() const
     { return ext_; }
 
-    /// Return the RISCV instruction format. 
+    /// Return the RISCV instruction format.
     RvFormat format() const
     { return fmt_; }
 
@@ -247,7 +247,8 @@ namespace WdRiscv
     /// Return true if a floating point instruction (fadd.s, fadd.d ...)
     bool isFp() const
     { return ext_ == RvExtension::F or ext_ == RvExtension::D or
-	ext_ == RvExtension::Zfh or ext_ == RvExtension::Zfbfmin; }
+	ext_ == RvExtension::Zfh or ext_ == RvExtension::Zfbfmin or
+	ext_ == RvExtension::Zfa; }
 
     /// Return true if this is a CSR instruction.
     bool isCsr() const
@@ -281,6 +282,12 @@ namespace WdRiscv
     /// Return true if this is an vector instruction.
     bool isVector() const
     { return isVector_; }
+
+    /// Return true if this is a CMO instruction
+    bool isCmo() const
+    { return ext_ == RvExtension::Zicbom or
+             ext_ == RvExtension::Zicboz or
+             ext_ == RvExtension::Zicbop; }
 
     /// Return true if source operands have unsigned integer values.
     bool isUnsigned() const
@@ -346,7 +353,7 @@ namespace WdRiscv
     /// Mark instruction as a divide/remainder instruction.
     void setIsDivide(bool flag)
     { isDiv_ = flag; }
-    
+
     /// Set the size of load instructions.
     void setLoadSize(unsigned size)
     { ldSize_ = size; isLoad_ = true; isPerfLoad_ = true; }

@@ -281,8 +281,13 @@ printFence(const Disassembler& , std::ostream& stream,
   if (di.isFenceSuccInput())  succ += "i";
   if (di.isFenceSuccOutput()) succ += "o";
 
-  if (not pred.empty() or not succ.empty())
-    stream << pred << ", " << succ;
+  if (pred.empty() and succ.empty())
+    return;
+  if (pred.empty())
+    pred = "0";
+  if (succ.empty())
+    succ = "0";
+  stream << pred << ", " << succ;
 }
 
 

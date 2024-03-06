@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -85,7 +85,7 @@ namespace WdRiscv
     uint64_t addr_ = 0;
     uint64_t val_ = 0;
   };
-    
+
 
   /// Changes made by the execution of one instruction. Useful for
   /// test pattern generation.
@@ -104,7 +104,7 @@ namespace WdRiscv
     bool hasFpReg = false;     // True if there is an FP register change.
     unsigned fpRegIx = 0;      // Number of changed fp register if any.
     uint64_t fpRegValue = 0;   // Value of changed fp register if any.
-    
+
     unsigned memSize = 0;      // Size of changed memory (0 if none).
     uint64_t memAddr = 0;      // Address of changed memory if any.
     uint64_t memValue = 0;     // Value of changed memory if any.
@@ -134,7 +134,7 @@ namespace WdRiscv
     /// within a system of cores -- see sysHartIndex method) and
     /// associate it with the given memory. The MHARTID is configured as
     /// a read-only CSR with a reset value of hartId.
-    Hart(unsigned hartIx, URV hartId, Memory& memory);
+    Hart(unsigned hartIx, URV hartId, Memory& memory, uint64_t& time);
 
     /// Destructor.
     ~Hart();
@@ -186,7 +186,7 @@ namespace WdRiscv
     /// bounds. If successful, set name to the register name.
     bool peekIntReg(unsigned reg, URV& val, std::string_view& name) const;
 
-    /// Return to the value of integer register reg which must not be 
+    /// Return to the value of integer register reg which must not be
     /// out of bounds (otherwise we trigger an assert).
     URV peekIntReg(unsigned reg) const;
 
@@ -217,6 +217,9 @@ namespace WdRiscv
     /// if csr is out of bounds.
     [[nodiscard]] bool peekCsr(CsrNumber csr, URV& val) const
     { return csRegs_.peek(csr, val); }
+
+    [[nodiscard]] bool peekCsr(CsrNumber csr, URV& val, bool virtMode) const
+    { return csRegs_.peek(csr, val, virtMode); }
 
     /// Return value of the given csr. Throw exception if csr is out of bounds.
     URV peekCsr(CsrNumber csr) const;
@@ -384,28 +387,49 @@ namespace WdRiscv
       bool flag = extensionIsEnabled(RvExtension::Svpbmt);
       auto menv = csRegs_.getImplementedCsr(CsrNumber::MENVCFG);
       if (menv)
-	flag = flag and csRegs_.menvcfgPbmte();
-      virtMem_.enablePbmt(flag);
-      if (menv)
 	{
-	  flag = csRegs_.menvcfgAdue();
-	  virtMem_.setFaultOnFirstAccess(not flag);
+	  flag = flag and csRegs_.menvcfgPbmte();
+	  bool adu = csRegs_.menvcfgAdue();
+	  virtMem_.setFaultOnFirstAccess(not adu);
 	}
+      virtMem_.enablePbmt(flag);
       auto henv = csRegs_.getImplementedCsr(CsrNumber::HENVCFG);
       if (henv)
 	{
-	  flag = csRegs_.henvcfgAdue();
-	  virtMem_.setFaultOnFirstAccessStage2(not flag);
+          flag = flag and csRegs_.henvcfgPbmte();
+	  bool adu = csRegs_.henvcfgAdue();
+	  virtMem_.setFaultOnFirstAccessStage2(not adu);
 	}
+      virtMem_.enableVsPbmt(flag);
+    }
+
+    /// Called when pointer masking configuration changes.
+    void updateTranslationPmm()
+    {
+      if (isRvSsnpm())
+        {
+          uint8_t pmm = csRegs_.senvcfgPmm();
+          if (isRvu())
+            virtMem_.enableUserPointerMasking(VirtMem::Pmm(pmm));
+
+          pmm = csRegs_.henvcfgPmm();
+          if (isRvh())
+            virtMem_.enableVsPointerMasking(VirtMem::Pmm(pmm));
+        }
+
+      if (isRvSmnpm())
+        {
+          uint8_t pmm = csRegs_.menvcfgPmm();
+          if (isRvs())
+            virtMem_.enablePointerMasking(VirtMem::Pmm(pmm));
+          else if (isRvu())
+            virtMem_.enableUserPointerMasking(VirtMem::Pmm(pmm));
+        }
     }
 
     /// Enable page translation naturally aligned power of 2 page sizes.
     void enableTranslationNapot(bool flag)
     { virtMem_.enableNapot(flag); }
-
-    /// Enable page pointer masking for user privilege (Zjpm).
-    void enableUserPointerMasking(bool flag)
-    { virtMem_.enablePointerMasking(flag); }
 
     /// Do not consider lr and sc instructions as load/store events for
     /// performance counter when flag is false. Do consider them when
@@ -453,7 +477,7 @@ namespace WdRiscv
     /// exceptions in SC.W/D.
     void keepReservationOnScException(bool flag)
     { keepReservOnScException_ = flag; }
-      
+
     /// Get the values of the three components of the given debug
     /// trigger. Return true on success and false if trigger is out of
     /// bounds.
@@ -571,7 +595,7 @@ namespace WdRiscv
     }
 
     /// Define a memory mapped locations for interruptor agent.
-    void configInterruptor(uint64_t addr, 
+    void configInterruptor(uint64_t addr,
 			   std::function<Hart<URV>*(unsigned ix)> indexToHart)
     {
       interruptor_ = addr;
@@ -835,7 +859,7 @@ namespace WdRiscv
 			     std::vector<uint64_t>& data,
 			     unsigned& elementSize) const
     { return vecRegs_.getLastMemory(addresses, data, elementSize); }
-      
+
 
     void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const
     { syscall_.getMemoryChanges(v); }
@@ -893,7 +917,7 @@ namespace WdRiscv
     { instCounter_ = count; }
 
     /// Get executed instruction count.
-    uint64_t getInstructionCount() const 
+    uint64_t getInstructionCount() const
     { return instCounter_; }
 
     /// Return count of traps (exceptions or interrupts) seen by this
@@ -977,7 +1001,7 @@ namespace WdRiscv
 
     /// Enable/disable the supervisor timer compare extension (sstc).
     void enableRvsstc(bool flag)
-    { enableExtension(RvExtension::Sstc, flag); }
+    { enableExtension(RvExtension::Sstc, flag); csRegs_.enableSstc(flag); }
 
     /// Enable/disable counter overflow extension (sscofpmf)
     void enableSscofpmf(bool flag)
@@ -990,6 +1014,14 @@ namespace WdRiscv
     /// Enable/disable the resumable non maskable interrupt (Smrnmi) extension.
     void enableSmrnmi(bool flag)
     { enableExtension(RvExtension::Smrnmi, flag); csRegs_.enableSmrnmi(flag); }
+
+    /// Enable/disable ssnpm extension.
+    void enableSsnpm(bool flag)
+    { enableExtension(RvExtension::Ssnpm, flag); csRegs_.enableSsnpm(flag); }
+
+    /// Enable/disable smnpm extension.
+    void enableSmnpm(bool flag)
+    { enableExtension(RvExtension::Smnpm, flag); csRegs_.enableSmnpm(flag); }
 
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
@@ -1329,6 +1361,12 @@ namespace WdRiscv
     bool isRvzcmop() const
     { return extensionIsEnabled(RvExtension::Zcmop); }
 
+    bool isRvSsnpm() const
+    { return extensionIsEnabled(RvExtension::Ssnpm); }
+
+    bool isRvSmnpm() const
+    { return extensionIsEnabled(RvExtension::Smnpm); }
+
     /// Return true if current program is considered finished (either
     /// reached stop address or executed exit limit).
     bool hasTargetProgramFinished() const
@@ -1535,7 +1573,7 @@ namespace WdRiscv
     void setTlbSize(unsigned size)
     { virtMem_.setTlbSize(size); }
 
-    /// Debug method: print address translation table. 
+    /// Debug method: print address translation table.
     void printPageTable(std::ostream& out) const
     { virtMem_.printPageTable(out); }
 
@@ -1571,6 +1609,14 @@ namespace WdRiscv
     VirtMem::Mode lastPageMode() const
     { return lastPageMode_; }
 
+    /// Return the VS paging mode before last executed instruction.
+    VirtMem::Mode lastVsPageMode() const
+    { return lastVsPageMode_; }
+
+    /// Return the 2nd stage paging mode before last executed instruction.
+    VirtMem::Mode lastPageModeStage2() const
+    { return lastPageModeStage2_; }
+
     /// Return the current paging mode
     VirtMem::Mode pageMode() const
     { return virtMem_.mode(); }
@@ -1595,21 +1641,32 @@ namespace WdRiscv
     void getPageTableWalkAddresses(bool isInstr, unsigned ix, std::vector<VirtMem::WalkEntry>& addrs) const
     { addrs = isInstr? virtMem_.getFetchWalks(ix) : virtMem_.getDataWalks(ix); }
 
-    /// Get the paget table entries of the page table walk of the last
-    /// executed instruction (see getPageTableAlkAddresses).
+    /// Get the page table entries of the page table walk of the last
+    /// executed instruction (see getPageTableWAlkAddresses).
     void getPageTableWalkEntries(bool isInstr, unsigned ix, std::vector<uint64_t>& ptes) const
     {
       const auto& addrs = isInstr? virtMem_.getFetchWalks(ix) : virtMem_.getDataWalks(ix);
       ptes.clear();
       for (const auto& addr : addrs)
 	{
-          if (addr.type_ == VirtMem::WalkEntry::Type::PA)
+        if (addr.type_ == VirtMem::WalkEntry::Type::PA)
           {
             URV pte = 0;
             peekMemory(addr.addr_, pte, true);
             ptes.push_back(pte);
           }
 	}
+    }
+
+    /// Get the page table walk of the last executed instruction.
+    void getPageTableWalkEntries(bool isInstr, std::vector<std::vector<VirtMem::WalkEntry>>& walks) const
+    {
+      walks.clear();
+      walks = isInstr? virtMem_.getFetchWalks() : virtMem_.getDataWalks();
+      for (auto& i : walks)
+        for (auto& entry: i)
+            if (entry.type_ == VirtMem::WalkEntry::Type::PA)
+                peekMemory(entry.addr_, entry.addr_, true);
     }
 
     /// Return PMP manager associated with this hart.
@@ -1627,12 +1684,32 @@ namespace WdRiscv
       pmps = pmpManager_.getPmpTrace();
     }
 
+    /// Get PMP associated with an address
+    Pmp getPmp(uint64_t addr) const
+    { return pmpManager_.getPmp(addr); }
+
+    /// Print current PMP map matching a particular address.
+    void printPmps(std::ostream& os, uint64_t address) const
+    { pmpManager_.printPmps(os, address); }
+
+    /// Print current PMP map.
+    void printPmps(std::ostream& os) const
+    { pmpManager_.printPmps(os); }
+
     // Get the PMAs accessed by the last executed instruction
     void getPmasAccessed(std::vector<PmaManager::PmaTrace>& pmas) const
     {
       pmas.clear();
       pmas = memory_.pmaMgr_.getPmaTrace();
     }
+
+    /// Print current PMA map matching a particular address.
+    void printPmas(std::ostream& os, uint64_t address) const
+    { memory_.pmaMgr_.printPmas(os, address); }
+
+    /// Print current PMA map.
+    void printPmas(std::ostream& os) const
+    { memory_.pmaMgr_.printPmas(os); }
 
     /// Invalidate whole cache.
     void invalidateDecodeCache();
@@ -1741,6 +1818,10 @@ namespace WdRiscv
     void enablePmpTor(bool flag)
     { csRegs_.enablePmpTor(flag); }
 
+    /// Enable/disable top-of-range mode in pmp configurations.
+    void enablePmpNa4(bool flag)
+    { csRegs_.enablePmpNa4(flag); }
+
     Syscall<URV>& getSyscall()
     { return syscall_; }
 
@@ -1750,10 +1831,10 @@ namespace WdRiscv
     // Load snapshot of registers (PC, integer, floating point, CSR) into file
     bool loadSnapshotRegs(const std::string& path);
 
-    // Define the log2 of the factor by which to divide the instruction count
-    // to generate a time value. This is relevant to the clint. 
-    void setCounterToTimeShift(unsigned shift)
-    { counterToTimeShift_ = shift; }
+    // Define the additional delay to add to the timecmp register
+    // before the timer expires. This is relevant to the clint.
+    void setTimeShift(unsigned shift)
+    { timeShift_ = shift; }
 
     /// Return true if external interrupts are enabled and one or more
     /// external interrupt that is pending is also enabled. Set cause
@@ -1875,7 +1956,10 @@ namespace WdRiscv
 	  }
 	return this->memory_.readInst(addr, value);
       };
-      return fetchCache_.addLine(addr, fetchMem);
+      bool ok = fetchCache_.addLine(addr, fetchMem);
+      if (not ok)
+	fetchCache_.removeLine(addr);
+      return ok;
     }
 
     /// Evict an instruction cache line.
@@ -1887,6 +1971,11 @@ namespace WdRiscv
     /// we update body, tail, and elements within VLEN beyond tail).
     void configVectorUpdateWholeMask(bool flag)
     { vecRegs_.configUpdateWholeMask(flag); }
+
+    /// When flag is trupe, trap on invalid/unsuported vtype configuraions in vsetvl,
+    /// vsetvli, vsetivli. When flag is false, set vtype.vill instead.  .
+    void configVectorTrapVtype(bool flag)
+    { vecRegs_.configVectorTrapVtype(flag); }
 
     bool readInstFromFetchCache(uint64_t addr, uint16_t& inst) const
     { return fetchCache_.read(addr, inst); }
@@ -2318,11 +2407,11 @@ namespace WdRiscv
 
     /// Helper to load methods: Initiate an exception with the given
     /// cause and data address.
-    void initiateLoadException(ExceptionCause cause, URV addr1, URV addr2 = 0);
+    void initiateLoadException(const DecodedInst* di, ExceptionCause cause, URV addr1, URV addr2 = 0);
 
     /// Helper to store methods: Initiate an exception with the given
     /// cause and data address.
-    void initiateStoreException(ExceptionCause cause, URV addr1, URV addr2 = 0);
+    void initiateStoreException(const DecodedInst* di, ExceptionCause cause, URV addr1, URV addr2 = 0);
 
     /// Helper to lb, lh, lw and ld. Load type should be int_8, int16_t
     /// etc... for signed byte, halfword etc... and uint8_t, uint16_t
@@ -2334,11 +2423,11 @@ namespace WdRiscv
     /// for hypervisor load/store instruction to select 2-stage address
     /// translation.
     template<typename LOAD_TYPE>
-    bool load(uint64_t virtAddr, bool hyper, uint64_t& value);
+    bool load(const DecodedInst* di, uint64_t virtAddr, bool hyper, uint64_t& value);
 
-    /// For use by performance model. 
+    /// For use by performance model.
     template<typename LOAD_TYPE>
-    bool fastLoad(uint64_t virtAddr, uint64_t& value);
+    bool fastLoad(const DecodedInst* di, uint64_t virtAddr, uint64_t& value);
 
     /// Helper to load method: Return possible load exception (without
     /// taking any exception). If supervisor mode is enabled, and
@@ -2370,11 +2459,11 @@ namespace WdRiscv
     /// be set to true for hypervisor load/store instruction to select
     /// 2-stage address translation.
     template<typename STORE_TYPE>
-    bool store(URV addr, bool hyper, STORE_TYPE value, bool amoLock = true);
+    bool store(const DecodedInst* di, URV addr, bool hyper, STORE_TYPE value, bool amoLock = true);
 
-    /// For use by performance model. 
+    /// For use by performance model.
     template<typename STORE_TYPE>
-    bool fastStore(URV addr, STORE_TYPE value);
+    bool fastStore(const DecodedInst* di, URV addr, STORE_TYPE value);
 
     /// Helper to store method: Return possible exception (without
     /// taking any exception). Update stored value by doing memory
@@ -2389,13 +2478,13 @@ namespace WdRiscv
     /// physAddr is set to the result of the virtual to physical
     /// translation of the referenced memory address.
     template<typename LOAD_TYPE>
-    bool loadReserve(uint32_t rd, uint32_t rs1);
+    bool loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1);
 
     /// Helper to execSc. Store type must be uint32_t, or uint64_t.
     /// Return true if store is successful. Return false otherwise
     /// (exception or trigger or condition failed).
     template<typename STORE_TYPE>
-    bool storeConditional(URV addr, STORE_TYPE value);
+    bool storeConditional(const DecodedInst* di, URV addr, STORE_TYPE value);
 
     /// Helper to the hypervisor load instructions.
     template<typename LOAD_TYPE>
@@ -2404,6 +2493,11 @@ namespace WdRiscv
     /// Helper to the hypervisor store instructions.
     template<typename LOAD_TYPE>
     void hyperStore(const DecodedInst* di);
+
+    /// Helper for IMSIC csr accesses. Return false if access would
+    /// raise virtual or illegal instruction exception and
+    /// false otherwise.
+    bool imsicAccessible(const DecodedInst* di, CsrNumber csr, PrivilegeMode mode, bool virtMode);
 
     /// Helper to CSR instructions: return true if given CSR is
     /// writebale in the given privielge level and virtual (V) mode
@@ -2534,7 +2628,7 @@ namespace WdRiscv
     void printInstCsvTrace(const DecodedInst& di, FILE* out);
 
     /// Start a synchronous exceptions.
-    void initiateException(ExceptionCause cause, URV pc, URV info, URV info2 = 0);
+    void initiateException(ExceptionCause cause, URV pc, URV info, URV info2 = 0, const DecodedInst* di = nullptr);
 
     /// Start an asynchronous exception (interrupt).
     void initiateInterrupt(InterruptCause cause, URV pc);
@@ -2570,8 +2664,11 @@ namespace WdRiscv
     /// exception or the instruction to resume after asynchronous
     /// exception is handled). The info and info2 value holds additional
     /// information about an exception.
-    void initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info,
+    void initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pcToSave, URV info,
                       URV info2 = 0);
+
+    /// Create trap instruction information for mtinst/htinst.
+    uint32_t createTrapInst(const DecodedInst* di, bool interrupt, unsigned cause, URV info) const;
 
     /// Illegal instruction. Initiate an illegal instruction trap.
     /// This is used for one of the following:
@@ -2604,7 +2701,7 @@ namespace WdRiscv
     /// the URV value (this is relevant for rv64). The accessed memory
     /// must have the given attribute (e.g. Pma::Arith, Pma::Swap ...)
     /// or access fault.
-    bool amoLoad32(uint64_t vaddr, Pma::Attrib attrib, URV& val);
+    bool amoLoad32(const DecodedInst* di, uint64_t vaddr, Pma::Attrib attrib, URV& val);
 
     /// Do the load value part of a double-word-sized AMO
     /// instruction. Return true on success putting the loaded value
@@ -2612,7 +2709,7 @@ namespace WdRiscv
     /// place in which case val is not modified. The accessed memory
     /// must have the given attribute (e.g. Pma::Arith, Pma::Swap ...)
     /// or access fault.
-    bool amoLoad64(uint64_t vaddr, Pma::Attrib attrib, URV& val);
+    bool amoLoad64(const DecodedInst* di, uint64_t vaddr, Pma::Attrib attrib, URV& val);
 
     /// Invalidate cache entries overlapping the bytes written by a
     /// store.
@@ -2763,7 +2860,7 @@ namespace WdRiscv
     bool checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned groupX8);
 
-    /// Emit a trace record for the given branch instruction in the
+    /// Emit a trace record for the given branch instruction or trap in the
     /// branch trace file.
     void traceBranch(const DecodedInst* di);
 
@@ -2774,7 +2871,7 @@ namespace WdRiscv
 
     /// Called at the end of a trapping vector instruction to mark VS
     /// dirty if a vector register was updated.
-    void postVecFail(const DecodedInst* di, bool clearVstart = false);
+    void postVecFail(const DecodedInst* di);
 
     /// The program counter is adjusted (size of current instruction
     /// added) before any of the following exec methods are called. To
@@ -3115,7 +3212,10 @@ namespace WdRiscv
     void execFsrw(const DecodedInst*);
     void execFsriw(const DecodedInst*);
 
-    void vsetvl(unsigned rd, unsigned rs1, URV vtypeVal);
+    /// Code common to execVsetvli, and execVsetvl. Return true on success and false if an
+    /// illegal instruction trap must be taken.
+    bool vsetvl(unsigned rd, unsigned rs1, URV vtypeVal);
+
     void execVsetvli(const DecodedInst*);
     void execVsetivli(const DecodedInst*);
     void execVsetvl(const DecodedInst*);
@@ -3375,11 +3475,11 @@ namespace WdRiscv
 
     void execVmand_mm(const DecodedInst*);
     void execVmnand_mm(const DecodedInst*);
-    void execVmandnot_mm(const DecodedInst*);
+    void execVmandn_mm(const DecodedInst*);
     void execVmxor_mm(const DecodedInst*);
     void execVmor_mm(const DecodedInst*);
     void execVmnor_mm(const DecodedInst*);
-    void execVmornot_mm(const DecodedInst*);
+    void execVmorn_mm(const DecodedInst*);
     void execVmxnor_mm(const DecodedInst*);
     void execVcpop_m(const DecodedInst*);
     void execVfirst_m(const DecodedInst*);
@@ -3601,7 +3701,7 @@ namespace WdRiscv
     template<typename ELEM_TYPE>
     void vadc_vxm(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned vcin,
                   unsigned group, unsigned start, unsigned elems);
-    
+
     template<typename ELEM_TYPE>
     void vsbc_vvm(unsigned vd, unsigned vs1, unsigned vs2, unsigned vbin,
                   unsigned group, unsigned start, unsigned elems);
@@ -4474,9 +4574,24 @@ namespace WdRiscv
 		 unsigned start, unsigned elems, bool masked);
     void execVcpop_v(const DecodedInst*);
 
+    template<typename ELEM_TYPE>
+    void vrol_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		  unsigned start, unsigned elems, bool masked);
     void execVrol_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vrol_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
     void execVrol_vx(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vror_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		  unsigned start, unsigned elems, bool masked);
     void execVror_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vror_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
     void execVror_vx(const DecodedInst*);
     void execVror_vi(const DecodedInst*);
 
@@ -4682,7 +4797,8 @@ namespace WdRiscv
       lastPageMode_ = virtMem_.mode();
       lastVsPageMode_ = virtMem_.vsMode();
       lastPageModeStage2_ = virtMem_.modeStage2();
-      clearTraceData();
+      virtMem_.clearExecInfo();
+      vecRegs_.clearTraceData();
     }
 
     void countBasicBlocks(const DecodedInst* di);
@@ -4767,6 +4883,8 @@ namespace WdRiscv
 
     unsigned cacheLineSize_ = 64;
 
+    uint64_t& time_;             // Only hart 0 increments this value.
+
     uint64_t retiredInsts_ = 0;  // Proxy for minstret CSR.
     uint64_t cycleCount_ = 0;    // Proxy for mcycle CSR.
     URV      fcsrValue_ = 0;     // Proxy for FCSR.
@@ -4820,7 +4938,7 @@ namespace WdRiscv
     Emstatus<URV> mstatus_;         // Cached value of mstatus CSR or mstatush/mstatus.
     MstatusFields<URV> vsstatus_;   // Cached value of vsstatus CSR
     HstatusFields<URV> hstatus_;    // Cached value of hstatus CSR
-    URV cachedMie_ = 0;             // Cached value of mie CSR
+    URV effectiveIe_ = 0;           // Effecive interrupt enable.
 
     bool clearMprvOnRet_ = true;
     bool cancelLrOnTrap_ = true;    // Cancel reservation on traps when true.
@@ -4877,7 +4995,7 @@ namespace WdRiscv
 
     bool misalDataOk_ = true;
     bool misalHasPriority_ = true;
-    bool trapNonZeroVstart_ = true;  // Trap if vstart > 0 in arithmetic vec instructions
+    bool trapNonZeroVstart_ = true;  // Trap if vstart > 0 in arith vec instructions
     bool bigEnd_ = false;            // True if big endian
     bool stimecmpActive_ = false;    // True if STIMECMP CSR is implemented.
     bool vstimecmpActive_ = false;   // True if VSTIMECMP CSR is implemented.
@@ -4962,7 +5080,7 @@ namespace WdRiscv
     // fake timer value. For example, if shift amount is 3, we are
     // dividing instruction count by 8 (2 to power 3) to produce a
     // timer value.
-    unsigned counterToTimeShift_ = 0;
+    unsigned timeShift_ = 0;
 
     bool traceHeaderPrinted_ = false;
     bool ownTrace_ = false;

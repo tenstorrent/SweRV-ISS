@@ -853,6 +853,10 @@ Mcm<URV>::forwardTo(const McmInstr& instr, uint64_t iaddr, uint64_t idata,
   if (roh < il or rol > ih)
     return false;  // no overlap
 
+  unsigned offset = rol - il;  // Offset from instr addr to readOp addr.
+  if (pageNum(rol) != pageNum(instr.physAddr_))
+    offset += offsetToNextPage(instr.physAddr_);   // Op is in second page.
+
   unsigned count = 0; // Count of forwarded bytes
   for (unsigned rix = 0; rix < readOp.size_; ++rix)
     {
@@ -1476,7 +1480,6 @@ bool
 Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 {
   uint64_t mask = (~uint64_t(0)) >> (8 - op.size_)*8;
-  uint64_t orig = mask;
 
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
   for (McmInstrIx ix = tag; ix > 0 and mask != 0; --ix)
@@ -1499,8 +1502,10 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 	    continue;
 	}
 
-      if (prev == orig and mask == 0)
+      if (op.forwardTime_ == 0)
 	op.forwardTime_ = earliestOpTime(instr);
+      else if (mask != prev)
+	op.forwardTime_ = std::min(earliestOpTime(instr), op.forwardTime_);
 
       const auto& di = instr.di_;
       if (di.instEntry()->isAtomic())
@@ -1508,7 +1513,7 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 	  cerr << "Error: Read op forwards from an atomic instruction"
 	       << " time=" << op.time_ << " hart-id=" << hart.hartId()
 	       << " instr-tag=" << tag << " addr=0x" << std::hex
-	       << op.physAddr_ << " amo-tag=" << instr.tag_ << std::dec << '\n';
+	       << op.physAddr_ << " amo-tag=" << std::dec << instr.tag_ << '\n';
 	}
     }
 
@@ -1957,6 +1962,23 @@ Mcm<URV>::finalChecks(Hart<URV>& hart)
     }
 
   pendingFences.clear();
+
+  auto& pendingWrites = hartPendingWrites_.at(hartIx);
+  if (not pendingWrites.empty())
+    cerr << "Warning: Merge buffer is not empty at end of run.\n";
+
+  uint64_t toHost = 0;
+  bool hasToHost = hart.getToHostAddress(toHost);
+
+  auto& vec = hartInstrVecs_.at(hartIx);
+  for (auto& instr : vec)
+    if (instr.isRetired() and instr.isStore_ and not instr.complete_)
+      {
+	if (not hasToHost or toHost != instr.virtAddr_)
+	  cerr << "Warning: Hart-id=" << hart.hartId() << " tag=" << instr.tag_
+	       << " Store instruction is not drained at end of run.\n";
+      }
+
   return ok;
 }
 
@@ -2148,14 +2170,15 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
       else
 	{
 	  auto timeB = earliestOpTime(instrB);
-	  if (timeB <= latestOpTime(instrA))
+	  auto timeA = latestOpTime(instrA);
+	  if (timeB <= timeA)
 	    {
-	      // B peforms before A -- Allow if there is no write overlapping B after B
-	      // from another core.
+	      // B peforms before A -- Allow if there is no write overlapping B 
+	      // between A and B from another core.
 	      for (size_t ix = sysMemOps_.size(); ix != 0 and not fail; ix--)
 		{
 		  const auto& op = sysMemOps_.at(ix-1);
-		  if (op.isCanceled())
+		  if (op.isCanceled() or op.time_ > timeA)
 		    continue;
 		  if (op.time_ < timeB)
 		    break;

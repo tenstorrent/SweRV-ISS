@@ -527,11 +527,11 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x17: return instTable_.getEntry(InstId::vcompress_vm);
         case 0x19: return masked? illegal : instTable_.getEntry(InstId::vmand_mm);
         case 0x1d: return masked? illegal : instTable_.getEntry(InstId::vmnand_mm);
-        case 0x18: return masked? illegal : instTable_.getEntry(InstId::vmandnot_mm);
+        case 0x18: return masked? illegal : instTable_.getEntry(InstId::vmandn_mm);
         case 0x1b: return masked? illegal : instTable_.getEntry(InstId::vmxor_mm);
         case 0x1a: return masked? illegal : instTable_.getEntry(InstId::vmor_mm);
         case 0x1e: return masked? illegal : instTable_.getEntry(InstId::vmnor_mm);
-        case 0x1c: return masked? illegal : instTable_.getEntry(InstId::vmornot_mm);
+        case 0x1c: return masked? illegal : instTable_.getEntry(InstId::vmorn_mm);
         case 0x1f: return masked? illegal : instTable_.getEntry(InstId::vmxnor_mm);
         case 0x20: return instTable_.getEntry(InstId::vdivu_vv);
         case 0x21: return instTable_.getEntry(InstId::vdiv_vv);
@@ -867,7 +867,7 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         }
       if ((f6 >> 4) == 3)
 	{
-          op2 = ((rform.bits.funct7 & 0xf) << 5 | op2);
+          op2 = ((rform.bits.funct7 & 0x1f) << 5 | op2);
 	  return instTable_.getEntry(InstId::vsetivli);
 	}
       if (rform.bits.funct7 == 0x40)  return instTable_.getEntry(InstId::vsetvl);
@@ -1779,12 +1779,12 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	  unsigned f6 = cl.bits.funct6;
 	  if (f6 == 0x20)
 	    {
-	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm;
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.immed();
 	      encodeLbu(op0, op1, op2, expanded);
 	    }
 	  else if (f6 == 0x21)
 	    {
-	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 1;
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.immed() & 2;
 	      if (cl.funct1() == 0)
 		encodeLhu(op0, op1, op2, expanded);
 	      else
@@ -1792,12 +1792,12 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	    }
 	  else if (f6 == 0x22)
 	    {
-	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm;
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.immed();
 	      encodeSb(op1, op0, op2, expanded);
 	    }
 	  else if (f6 == 0x23)
 	    {
-	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 1;
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.immed() & 2;
 	      if (cl.funct1() == 0)
 		encodeSh(op1, op0, op2, expanded);
 	    }
@@ -3003,17 +3003,18 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               case 4:
                 {
                   unsigned top12 = op2;
+                  unsigned top7 = top12 >> 5;
                   RFormInst rform(inst);
                   op2 = rform.bits.rs2;
                   // mop.rr, although are I format seem to have rs2 as well.
-                  if (top12 == 0x820) return instTable_.getEntry(InstId::mop_rr);
-                  if (top12 == 0x860) return instTable_.getEntry(InstId::mop_rr);
-                  if (top12 == 0x8a0) return instTable_.getEntry(InstId::mop_rr);
-                  if (top12 == 0x8e0) return instTable_.getEntry(InstId::mop_rr);
-                  if (top12 == 0xc20) return instTable_.getEntry(InstId::mop_rr);
-                  if (top12 == 0xc60) return instTable_.getEntry(InstId::mop_rr);
-                  if (top12 == 0xca0) return instTable_.getEntry(InstId::mop_rr);
-                  if (top12 == 0xce0) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x41) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x43) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x45) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x47) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x61) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x63) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x65) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x67) return instTable_.getEntry(InstId::mop_rr);
 
 
                   op2 = 0; // No offset for these instructions.
@@ -3060,7 +3061,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                   if (top12 == 0x681) return instTable_.getEntry(InstId::hlv_wu);
                   if (top12 == 0x6c0) return instTable_.getEntry(InstId::hlv_d);
 
-                  unsigned top7 = top12 >> 5;
                   unsigned rd = iform.fields.rd;
                   op0 = top12 & 0x1f;  // rs2 field
                   if (top7 == 0x31 and rd == 0) return instTable_.getEntry(InstId::hsv_b);

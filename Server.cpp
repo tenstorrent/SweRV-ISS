@@ -590,7 +590,8 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
   for (CsrNumber csr : csrs)
     {
       URV value;
-      if (hart.peekCsr(csr, value))
+      // We always record the real csr number for VS/S mappings
+      if (hart.peekCsr(csr, value, false))
 	{
 	  if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TDATA3)
 	    {
@@ -782,10 +783,11 @@ bool
 Server<URV>::translateCommand(const WhisperMessage& req, 
 			      WhisperMessage& reply)
 {
+  // FIXME: this needs to be updated for 2-stage translation
   reply = req;
 
   // Hart id must be valid. Hart must be started.
-  if (not checkHart(req, "step", reply))
+  if (not checkHart(req, "translate", reply))
     return false;
 
   uint32_t hartId = req.hart;
@@ -862,7 +864,12 @@ doPageTableWalk(const Hart<URV>& hart, WhisperMessage& reply)
       hart.getPageTableWalkAddresses(isInstr, index, addrs);
       for (auto& addr : addrs)
         if (addr.type_ == VirtMem::WalkEntry::Type::PA)
-          items.push_back(std::move(addr.addr_));
+          {
+            items.push_back(std::move(addr.addr_));
+            Pma pma = hart.getPma(addr.addr_);
+            pma = VirtMem::overridePmaWithPbmt(pma, addr.pbmt_);
+            items.push_back(pma.attributesToInt());
+          }
     }
   else
     hart.getPageTableWalkEntries(isInstr, index, items);
@@ -1205,7 +1212,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 
       case McmIFetch:
         if (commandLog)
-          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mifetch %" PRIu64 "\n",
+          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mifetch 0x%" PRIx64 "\n",
                   hartId, msg.time, msg.address);
         if (not system_.mcmIFetch(hart, msg.time, msg.address))
           reply.type = Invalid;
@@ -1213,7 +1220,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 
       case McmIEvict:
         if (commandLog)
-          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mievict %" PRIu64 "\n",
+          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mievict 0x%" PRIu64 "\n",
                   hartId, msg.time, msg.address);
         if (not system_.mcmIEvict(hart, msg.time, msg.address))
           reply.type = Invalid;
@@ -1256,6 +1263,38 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                     uintmax_t(msg.address));
         }
         break;
+
+      case PmpEntry:
+        {
+          auto pmp = hart.getPmp(msg.address);
+
+          reply.flags = pmp.isRead(PrivilegeMode::Machine);
+          reply.flags |= (pmp.isWrite(PrivilegeMode::Machine) << 1);
+          reply.flags |= (pmp.isExec(PrivilegeMode::Machine) << 2);
+          if (commandLog)
+            fprintf(commandLog, "hart=%" PRIu32 " pmp 0x%" PRIx64 "\n",
+                    hartId, msg.address);
+          break;
+        }
+
+      case PmaEntry:
+        {
+          auto pma = hart.getPma(msg.address);
+
+          reply.flags = uint32_t(pma.isRead());
+          reply.flags |= (uint32_t(pma.isWrite()) << 1);
+          reply.flags |= (uint32_t(pma.isExec()) << 2);
+          reply.flags |= (uint32_t(pma.isIdempotent()) << 3);
+          reply.flags |= (uint32_t(pma.isAmo()) << 4);
+          reply.flags |= (uint32_t(pma.isRsrv()) << 5);
+          reply.flags |= (uint32_t(pma.isIo()) << 6);
+          reply.flags |= (uint32_t(pma.isCacheable()) << 7);
+          reply.flags |= (uint32_t(pma.isMisalignedOk()) << 8);
+          if (commandLog)
+            fprintf(commandLog, "hart=%" PRIu32 " pma 0x%" PRIx64 "\n",
+                    hartId, msg.address);
+          break;
+        }
 
       default:
         std::cerr << "Unknown command\n";

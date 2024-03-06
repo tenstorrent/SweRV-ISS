@@ -69,7 +69,7 @@ namespace WdRiscv
     { return di_.ithOperand(i); }
 
     /// Return the size with which the immediate data is left shifted
-    unsigned immediateShiftSize() const 
+    unsigned immediateShiftSize() const
     { return di_.immediateShiftSize(); }
 
     /// Return the rounding mode associated with a floating point instruction
@@ -191,13 +191,21 @@ namespace WdRiscv
     GroupMultiplier groupMultiplier() const
     { return hart_->groupMultiplier(); }
 
-    /// Return the paging mode before last executed instruction.
+    /// Return the paging mode of the last executed instruction.
     VirtMem::Mode pageMode() const
     { return hart_->lastPageMode(); }
 
     /// Return the paging mode after last executed instruction.
     VirtMem::Mode nextPageMode() const
     { return hart_->pageMode(); }
+
+    /// Return the VS paging mode of the last executed instruction.
+    VirtMem::Mode vsMode() const
+    { return hart_->lastVsPageMode(); }
+
+    /// Return the 2nd stage paging mode after last executed instruction.
+    VirtMem::Mode pageModeStage2() const
+    { return hart_->lastPageModeStage2(); }
 
     /// Return CSR value after last executed instruction.
     bool peekCsr(CsrNumber csr, URV& val) const
@@ -223,6 +231,11 @@ namespace WdRiscv
     void getPageTableWalkEntries(bool instr, unsigned ix,
                                  std::vector<uint64_t>& ptes) const
     { hart_->getPageTableWalkEntries(instr, ix, ptes); }
+
+    /// Return the entire page table walk for load/store/fetch of last executed instruction.
+    /// Will be empty if there was no walk.
+    void getPageTableWalkEntries(bool instr, std::vector<std::vector<VirtMem::WalkEntry>>& walks) const
+    { hart_->getPageTableWalkEntries(instr, walks); }
 
     bool peekIntReg(unsigned i, URV& value) const
     { return hart_->peekIntReg(i, value); }
@@ -250,7 +263,7 @@ namespace WdRiscv
       /// Collect non-trigger CSRs and their values.
       for (CsrNumber csr : csrs)
         {
-          if (not hart_->peekCsr(csr, value))
+          if (not hart_->peekCsr(csr, value, false))
             continue;
           if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TDATA3)
             continue; // Debug trigger values collected below.
@@ -290,9 +303,12 @@ namespace WdRiscv
     }
 
     using SVP = std::pair<URV, uint64_t>;  // select-value pair
-    void getModifiedImsicCsrs(std::vector<SVP>& mcvps,
-                              std::vector<SVP>& scvps,
-                              std::vector<std::vector<SVP>>& gcvps) const
+    void getImsicChanges(std::vector<SVP>& mcvps,
+                         std::vector<SVP>& scvps,
+                         std::vector<std::vector<SVP>>& gcvps,
+                         std::vector<unsigned>& minterrupts,
+                         std::vector<unsigned>& sinterrupts,
+                         std::vector<std::vector<unsigned>>& ginterrupts) const
     {
       if (not hart_->imsic())
         return;
@@ -302,7 +318,7 @@ namespace WdRiscv
       std::vector<std::pair<unsigned, unsigned>> mselects, sselects;
       std::vector<std::vector<std::pair<unsigned, unsigned>>> gselects;
 
-      imsic.fileTraces(mselects, sselects, gselects);
+      imsic.fileTraces(mselects, sselects, gselects, minterrupts, sinterrupts, ginterrupts);
 
       bool ok; unsigned int value;
       for (auto [select, size] : mselects)

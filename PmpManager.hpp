@@ -218,6 +218,12 @@ namespace WdRiscv
     /// Print statistics on the given file.
     bool printStats(const std::string& path) const;
 
+    /// Print current pmp map matching a particular address.
+    void printPmps(std::ostream& os, uint64_t address) const;
+
+    /// Print current pmp map.
+    void printPmps(std::ostream& os) const;
+
     /// Return the access count of PMPs used in most recent instruction.
     const std::vector<PmpTrace>& getPmpTrace() const
     { return pmpTrace_; }
@@ -237,6 +243,21 @@ namespace WdRiscv
       uint64_t lastAddr_ = 0;
       Pmp pmp_;
     };
+
+    /// Return the Region object associated with the
+    /// word-aligned word designed by the given address. Return a
+    /// no-access object if the givena ddress is out of memory range.
+    Region getRegion(uint64_t addr) const
+    {
+      addr = (addr >> 2) << 2;
+      for (const auto& region : regions_)
+	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
+          return region;
+      return {};
+    }
+
+    /// Print current pmp map matching a particular address.
+    void printRegion(std::ostream& os, Region region) const;
 
     std::vector<Region> regions_;
     bool enabled_ = false;

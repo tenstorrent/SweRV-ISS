@@ -279,7 +279,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 825;
+  unsigned subversion = 838;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 #ifdef GIT_SHA
@@ -706,8 +706,12 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 
       // auto unparsed = po::collect_unrecognized(parsed.options, po::include_positional);
 
+      bool earlyExit = false;
       if (args.version)
-        printVersion();
+        {
+          printVersion();
+          earlyExit = true;
+        }
 
       if (args.help)
 	{
@@ -723,8 +727,11 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 	    "  whisper --newlib --log --target \"prog -x -y\"\n"
 	    "  whisper --linux --log --targetsep ':' --target \"prog:-x:-y\"\n\n";
 	  std::cout << desc;
-	  return true;
+          earlyExit = true;
 	}
+
+      if (earlyExit)
+        return true;
 
       if (not collectCommandLineValues(varMap, args))
 	return false;
@@ -1019,8 +1026,8 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   if (args.logStart)
     hart.setLogStart(*args.logStart);
 
-  if (args.logPerHart)
-    hart.setOwnTrace(args.logPerHart);
+  if (args.logPerHart or (system.hartCount() == 1))
+    hart.setOwnTrace(args.logPerHart or (system.hartCount() == 1));
 
   if (not args.loadFrom.empty())
     {
@@ -1054,7 +1061,10 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   // Command-line entry point overrides that of ELF.
   if (args.startPc)
-    hart.pokePc(URV(*args.startPc));
+    {
+      hart.defineResetPc(*args.startPc);
+      hart.pokePc(URV(*args.startPc));
+    }
 
   // Command-line exit point overrides that of ELF.
   if (args.endPc)
@@ -1074,17 +1084,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   if (args.syscallSlam)
     hart.defineSyscallSlam(*args.syscallSlam);
-
-  // Set instruction count limit.
-  if (args.instCountLim)
-    {
-      uint64_t count = args.relativeInstCount? hart.getInstructionCount() : 0;
-      count += *args.instCountLim;
-      hart.setInstructionCountLimit(count);
-    }
-
-  // Print load-instruction data-address when tracing instructions.
-  // if (args.traceLdSt)  // Deprecated -- now always on.
 
   if (args.tracePtw)
     hart.tracePtw(true);
@@ -1839,6 +1838,16 @@ session(const Args& args, const HartConfig& config)
     if (not system.loadSnapshot(args.loadFrom))
       return false;
 
+  // Set instruction count limit.
+  if (args.instCountLim)
+    for (unsigned i = 0; i < system.hartCount(); ++i)
+      {
+	auto& hart = *system.ithHart(i);
+	uint64_t count = args.relativeInstCount? hart.getInstructionCount() : 0;
+	count += *args.instCountLim;
+	hart.setInstructionCountLimit(count);
+      }
+
   if (not args.initStateFile.empty())
     {
       if (system.hartCount() > 1)
@@ -2000,7 +2009,7 @@ main(int argc, char* argv[])
       Args args;
       if (not parseCmdLineArgs(std::span(argv, argc), args))
         return 1;
-      if (args.help)
+      if (args.help or args.version)
         return 0;
 
       // Expand each target program string into program name and args.

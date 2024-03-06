@@ -46,10 +46,7 @@ namespace WdRiscv
       M_EXTERNAL   = 11, // Machine external
       G_EXTERNAL   = 12, // Guest external interrupt
       LCOF         = 13, // Local counter overflow
-      M_INT_TIMER1 = 28, // Internal timer 1 (WD extension) bit position.
-      M_INT_TIMER0 = 29, // Internal timer 0 (WD extension) bit position.
-      M_LOCAL      = 30, // Correctable error local interrupt (WD extension)
-      MAX_CAUSE    = M_LOCAL
+      MAX_CAUSE    = LCOF
     };
 
 

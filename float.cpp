@@ -288,7 +288,7 @@ Hart<URV>::execFlw(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<uint32_t>(virtAddr, false /*hyper*/, data))
+  if (load<uint32_t>(di, virtAddr, false /*hyper*/, data))
     {
       fpRegs_.writeSingle(di->op0(), std::bit_cast<float>(static_cast<uint32_t>(data)));
       markFsDirty();
@@ -315,7 +315,7 @@ Hart<URV>::execFsw(const DecodedInst* di)
   // This operation does not check for proper NAN boxing. We read raw bits.
   uint64_t val = fpRegs_.readBitsRaw(rs2);
 
-  store<uint32_t>(addr, false /*hyper*/, uint32_t(val));
+  store<uint32_t>(di, addr, false /*hyper*/, uint32_t(val));
 }
 
 
@@ -1019,7 +1019,7 @@ Hart<URV>::execFld(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<uint64_t>(virtAddr, false /*hyper*/, data))
+  if (load<uint64_t>(di, virtAddr, false /*hyper*/, data))
     {
       fpRegs_.writeDouble(di->op0(), std::bit_cast<double>(data));
       markFsDirty();
@@ -1044,7 +1044,7 @@ Hart<URV>::execFsd(const DecodedInst* di)
   URV addr = base + di->op2As<SRV>();
   double val = fpRegs_.readDouble(rs2);
 
-  store<uint64_t>(addr, false /*hyper*/, std::bit_cast<uint64_t>(val));
+  store<uint64_t>(di, addr, false /*hyper*/, std::bit_cast<uint64_t>(val));
 }
 
 
@@ -1738,7 +1738,7 @@ Hart<URV>::execFlh(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<uint16_t>(virtAddr, false /*hyper*/,  data))
+  if (load<uint16_t>(di, virtAddr, false /*hyper*/,  data))
     {
       fpRegs_.writeHalf(di->op0(), std::bit_cast<Float16>(static_cast<uint16_t>(data)));
       markFsDirty();
@@ -1765,7 +1765,7 @@ Hart<URV>::execFsh(const DecodedInst* di)
   // This operation does not check for proper NAN boxing. We read raw bits.
   uint16_t val = fpRegs_.readBitsRaw(rs2);
 
-  store<uint16_t>(addr, false /*hyper*/, val);
+  store<uint16_t>(di, addr, false /*hyper*/, val);
 }
 
 
@@ -2533,7 +2533,7 @@ template <typename URV>
 void
 Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
 {
-  if (not isRvzfa() or not isFpLegal())
+  if (not isRvzfa() or not isDpLegal())
     {
       illegalInst(di);
       return;
@@ -2552,7 +2552,9 @@ Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
   else
     {
       int    exp;
+      // frexp uses (-1, .5] and [.5, 1) for the fraction component
       double frac  = std::frexp(d1, &exp);
+
       if (exp < 1)
         {
           result = 0;
@@ -2561,6 +2563,7 @@ Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
         }
       else
         {
+          int32_t result32 = 0;
           if (exp >= (64 + std::numeric_limits<double>::digits))
             result = 0;
           else
@@ -2575,12 +2578,14 @@ Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
                 result64 <<= shift;
               else
                 result64 >>= -shift;
-	      int32_t result32 = result64;
+
+	      result32 = result64;
               if (std::signbit(d1))
                 result32 = -result32;
 	      result = result32;  // Sign extend.
             }
-          if (exp > std::numeric_limits<int32_t>::digits)
+          if (exp > (1 + std::numeric_limits<int32_t>::digits) or
+              (std::signbit(d1) ^ std::signbit(result32)))
             raiseSimulatorFpFlags(FpFlags::Invalid);
           else if (result != d1)
             raiseSimulatorFpFlags(FpFlags::Inexact);
@@ -2645,7 +2650,7 @@ Hart<URV>::execFli_h(const DecodedInst* di)
 {
   static constexpr auto valueTable = getFliValueTable<Float16>();
 
-  if (not isRvzfa() or not isFpLegal())
+  if (not isRvzfa() or not isZfhLegal())
     {
       illegalInst(di);
       return;
@@ -2686,7 +2691,7 @@ Hart<URV>::execFli_d(const DecodedInst* di)
 {
   static constexpr auto valueTable = getFliValueTable<double>();
 
-  if (not isRvzfa() or not isFpLegal())
+  if (not isRvzfa() or not isDpLegal())
     {
       illegalInst(di);
       return;
@@ -3145,7 +3150,7 @@ template <typename URV>
 void
 Hart<URV>::execFround_d(const DecodedInst* di)
 {
-  if (not isRvzfa() or not isFpLegal())
+  if (not isRvzfa() or not isDpLegal())
     {
       illegalInst(di);
       return;
@@ -3217,7 +3222,7 @@ template <typename URV>
 void
 Hart<URV>::execFroundnx_d(const DecodedInst* di)
 {
-  if (not isRvzfa() or not isFpLegal())
+  if (not isRvzfa() or not isDpLegal())
     {
       illegalInst(di);
       return;

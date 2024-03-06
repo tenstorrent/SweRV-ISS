@@ -232,9 +232,13 @@ printPageTableWalk(FILE* out, const Hart<URV>& hart, const char* tag,
       fprintf(out, "0x%" PRIx64, entry.addr_);
       if (entry.type_ == VirtMem::WalkEntry::Type::PA)
         {
-          uint64_t pte;
+          uint64_t pte = 0;
           hart.peekMemory(entry.addr_, pte, true);
           fprintf(out, "=0x%" PRIx64, pte);
+
+          Pma pma = hart.getPma(entry.addr_);
+          pma = VirtMem::overridePmaWithPbmt(pma, entry.pbmt_);
+          fprintf(out, ", ma=%s", pma.attributesToString(pma.attributesToInt()).c_str());
         }
       head = false;
     }
@@ -309,6 +313,8 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
           if (i > 0)
             oss << ";";
           oss << "0x" << std::hex << vecRegs_.ldStAddr_.at(i);
+          if (vecRegs_.ldStPhysAddr_.at(i) != vecRegs_.ldStAddr_.at(i))
+            oss << ":0x" << vecRegs_.ldStPhysAddr_.at(i);
           if (i < vecRegs_.stData_.size())
             oss << '=' << "0x" << vecRegs_.stData_.at(i);
         }
@@ -409,7 +415,8 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   // Collect non-trigger CSRs and their values.
   for (CsrNumber csr : csrs)
     {
-      if (not csRegs_.peek(csr, value))
+      // We always record the real csr number for VS/S mappings
+      if (not csRegs_.peek(csr, value, false))
         continue;
       if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TDATA3)
         continue; // Debug trigger values collected below.
@@ -706,11 +713,9 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   // Memory
   buffer.printChar(',');
   uint64_t virtDataAddr = 0, physDataAddr = 0;
-  bool load = false, store = false;
   if (lastLdStAddress(virtDataAddr, physDataAddr))
     {
-      store = ldStWrite_;
-      load = not store;
+      bool store = ldStWrite_;
       buffer.print(virtDataAddr);
       if (physDataAddr != virtDataAddr)
         buffer.printChar(':').print(physDataAddr);
@@ -724,6 +729,8 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
           if (i > 0)
             buffer.printChar(';');
           buffer.print(vecRegs_.ldStAddr_.at(i));
+          if (vecRegs_.ldStPhysAddr_.at(i) != vecRegs_.ldStAddr_.at(i))
+            buffer.printChar(':').print(vecRegs_.ldStPhysAddr_.at(i));
           if (i < vecRegs_.maskedAddr_.size() and vecRegs_.maskedAddr_.at(i))
             buffer.printChar('m');
           if (i < vecRegs_.stData_.size())
@@ -736,9 +743,9 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   RvExtension type = instEntry->extension();
   if (type == RvExtension::A)
     buffer.printChar('a');
-  else if (load)
+  else if (instEntry->isLoad())
     buffer.printChar('l');
-  else if (store)
+  else if (instEntry->isStore())
     buffer.printChar('s');
   else if (instEntry->isBranch())
     {
@@ -802,7 +809,13 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
         {
           buffer.print(sep).print(addrs.at(i).addr_);
           if (addrs.at(i).type_ == VirtMem::WalkEntry::Type::PA)
-            buffer.printChar('=').print(entries.at(entryIx++));
+            {
+              buffer.printChar('=').print(entries.at(entryIx++));
+
+              Pma pma = getPma(addrs.at(i).addr_);
+              pma = VirtMem::overridePmaWithPbmt(pma, addrs.at(i).pbmt_);
+              buffer.print(";ma=").print(pma.attributesToInt());
+            }
           sep = ";";
         }
 
@@ -815,7 +828,13 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
         {
           buffer.print(sep).print(addrs.at(i).addr_);
           if (addrs.at(i).type_ == VirtMem::WalkEntry::Type::PA)
-            buffer.printChar('=').print(entries.at(entryIx++));
+            {
+              buffer.printChar('=').print(entries.at(entryIx++));
+
+              Pma pma = getPma(addrs.at(i).addr_);
+              pma = VirtMem::overridePmaWithPbmt(pma, addrs.at(i).pbmt_);
+              buffer.print(";ma=").print(pma.attributesToInt());
+            }
           sep = ";";
         }
     }
@@ -889,7 +908,7 @@ Hart<URV>::logStop(const CoreException& ce, uint64_t counter, FILE* traceFile)
     cerr << std::dec;
     if (ce.type() == CoreException::Stop)
       cerr << (success? "Successful " : "Error: Failed ")
-           << "stop: " << ce.what() << ": " << ce.value() << "\n";
+           << "stop: Hart " << hartIx_ << ": " << ce.what() << ": " << ce.value() << "\n";
     else if (ce.type() == CoreException::Exit)
       cerr << "Target program exited with code " << ce.value() << '\n';
     else

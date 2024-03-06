@@ -251,9 +251,8 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
       if (not getJsonUnsigned(name + ".mask", conf.at("mask"), mask))
 	errors++;
 
-      // If defining a non-standard CSR (as popposed to
-      // configuring an existing CSR) then default the poke-mask
-      // to the write-mask.
+      // If defining a non-standard CSR (as popposed to configuring an
+      // existing CSR) then default the poke-mask to the write-mask.
       if (not csr)
 	pokeMask = mask;
     }
@@ -339,7 +338,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
       std::cerr << "Invalid CSR (" << name << ") in config file.\n";
       return false;
     }
-  if ((mask & pokeMask) != mask)
+  if ((mask & pokeMask) != mask and hart.sysHartIndex() == 0)
     {
       std::cerr << "Warning: For CSR " << name << " poke mask (0x" << std::hex << pokeMask
 		<< ") is not a superset of write mask (0x" << mask << std::dec << ")\n";
@@ -350,11 +349,11 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
       // If an extension bit is writable, it should reset to 1.
       URV extBits = (URV(1) << 26) - 1;
       URV writeable = extBits & mask, writeableReset = extBits & mask & reset;
-      if (writeable != writeableReset)
+      if (writeable != writeableReset and hart.sysHartIndex() == 0)
 	std::cerr << "Warning: Reset value of MISA should be 0x"
 		  << std::hex << (reset | writeable) << std::dec
 		  << " to be compatible with write mask.\n";
-      if (writeable & (URV(1) << ('E' - 'A')))
+      if ((writeable & (URV(1) << ('E' - 'A'))) and hart.sysHartIndex() == 0)
 	std::cerr << "Warning: Bit E of MISA cannot be writebale.\n";
       if ((reset & (1 << ('S' - 'A'))) and not (reset & (1 << ('U' - 'A'))))
         {
@@ -685,8 +684,8 @@ applyPerfEvents(Hart<URV>& hart, const nlohmann::json& config,
 
 // Min SEW per LMUL is allowed by the spec for m1, m2, m4, and m8.
 bool
-processMinByesPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned maxBytes,
-		      std::unordered_map<GroupMultiplier, unsigned>& bytesPerLmul)
+processMinBytesPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned maxBytes,
+		       std::unordered_map<GroupMultiplier, unsigned>& bytesPerLmul)
 {
   if (not jsonMap.is_object())
     {
@@ -735,7 +734,7 @@ processMinByesPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned
 // Maximum SEW per LMUL is allowed by the spec for mf8, mf4, and mf2.
 bool
 processMaxBytesPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned maxBytes,
-		     std::unordered_map<GroupMultiplier, unsigned>& bytesPerLmul)
+		       std::unordered_map<GroupMultiplier, unsigned>& bytesPerLmul)
 {
   if (not jsonMap.is_object())
     {
@@ -862,16 +861,16 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
   if (vconf.contains(tag))
     {
       std::cerr << "Tag min_sew_per_lmul is deprecated: Use min_bytes_per_lmul\n";
-      if (not processMinByesPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
-				   minBytesPerLmul))
+      if (not processMinBytesPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
+				     minBytesPerLmul))
 	errors++;
     }
 
   tag = "min_bytes_per_lmul";
   if (vconf.contains(tag))
     {
-      if (not processMinByesPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
-				   minBytesPerLmul))
+      if (not processMinBytesPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
+				     minBytesPerLmul))
 	errors++;
     }
 
@@ -969,6 +968,15 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         hart.configVectorUpdateWholeMask(flag);
     }
 
+  tag = "trap_invalid_vtype";
+  if (vconf.contains(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, vconf.at(tag), flag))
+        errors++;
+      else
+        hart.configVectorTrapVtype(flag);
+    }
 
   return errors == 0;
 }
@@ -1294,7 +1302,7 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
       std::string_view tag = "pma";
       if (memMap.contains(tag))
 	{
-	  if (hasDefinedPmacfgCsr(*config_))
+	  if (hasDefinedPmacfgCsr(*config_) and hart.sysHartIndex() == 0)
 	    {
 	      std::cerr << "Warning: Configuration file has both memmap pma "
 			<< "and a pmacfg CSR. CSRs will override memmap.\n";
@@ -1619,7 +1627,9 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "page_fault_on_first_access";
   if (config_ -> contains(tag))
     {
-      cerr << "Warning: Config tag page_fault_on_first_access is deprecated -- feature is now controlled by bit 61 of the MENVCFG CSR.\n";
+      if (hart.sysHartIndex() == 0)
+	cerr << "Warning: Config tag " << tag << " is deprecated -- "
+	     << "feature is now controlled by bit 61 of the MENVCFG CSR.\n";
       getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
       // hart.setFaultOnFirstAccess(flag);
     }
@@ -1694,23 +1704,22 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.enableClearMtvalOnEbreak(flag);
     }
 
-  tag = "log2_counter_to_time";
+  // This is used to reduce the frequency of timer interupts. By
+  // default the timer runs at the frequence of the instruction
+  // counter. By adding a time shift, we put additional delay before
+  // the timer expires (reaches timecmp).
+  tag = "time_shift";
   if (config_ ->contains(tag))
-  {
-    unsigned factor = 0;
-    if (not getJsonUnsigned(tag, config_ -> at(tag), factor))
-      errors++;
-    else
-      {
-	if (factor <= 6)
-	  hart.setCounterToTimeShift(factor);
-	else
-	  {
-	    cerr << "Invalid log2_counter_to_time: " << factor << " (expecting <= 6)\n";
-	    errors++;
-	  }
-      }
-  }
+    {
+      if (hart.sysHartIndex() == 0)
+	cerr << "Warning: Config tag time_shift may overflow timecmp and have "
+	     << "unintended consequences.\n";
+      unsigned shift = 0;
+      if (not getJsonUnsigned(tag, config_ -> at(tag), shift))
+	errors++;
+      else
+	hart.setTimeShift(shift);
+    }
 
   tag = "cancel_lr_on_ret";
   if (config_ -> contains(tag))
@@ -1771,6 +1780,13 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enablePmpTor(flag);
+    }
+
+  tag = "enable_pmp_na4";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enablePmpNa4(flag);
     }
 
   tag = "address_translation_modes";
@@ -1839,16 +1855,12 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enableSvinval(flag);
     }
 
-  tag = "enable_user_pointer_masking";
+  tag = "enable_supervisor_time_compare";
   if (config_ -> contains(tag))
     {
-      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
-      hart.enableUserPointerMasking(flag);
-    }
-
-  tag = "enable_supervisor_time_compare";
-  if (config_ ->contains(tag))
-    {
+      if (hart.sysHartIndex() == 0 and hart.sysHartIndex() == 0)
+	cerr << "Warning: Config tag " << tag << " is deprecated. "
+	     << "Use sstc with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableRvsstc(flag);
     }

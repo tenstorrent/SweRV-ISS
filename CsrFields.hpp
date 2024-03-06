@@ -332,7 +332,9 @@ namespace WdRiscv
       unsigned CBIE : 2;
       unsigned CBCFE : 1;
       unsigned CBZE : 1;
-      uint64_t reserved1 : 53;
+      uint64_t reserved1 : 24;
+      unsigned PMM : 2;
+      uint64_t reserved2 : 27;
       unsigned ADUE : 1;           // Bit 61
       unsigned PBMTE : 1;          // Bit 62
       unsigned STCE : 1;           // Bit 63
@@ -353,7 +355,8 @@ namespace WdRiscv
     uint32_t value_; // MENVCFGH register value
     struct
     {
-      unsigned reserved0 : 30;
+      unsigned PMM : 2;
+      unsigned reserved0 : 28;
       unsigned PBMTE : 1;
       unsigned STCE : 1;
     } bits_;
@@ -397,7 +400,9 @@ namespace WdRiscv
       unsigned CBIE : 2;
       unsigned CBCFE : 1;
       unsigned CBZE : 1;
-      uint64_t reserved1 : 56;
+      uint64_t reserved1 : 24;
+      unsigned PMM : 2;
+      uint64_t reserved2 : 30;
     } bits_;
   };
 
@@ -439,7 +444,10 @@ namespace WdRiscv
       unsigned CBIE : 2;
       unsigned CBCFE : 1;
       unsigned CBZE : 1;
-      uint64_t reserved1 : 54;
+      uint64_t reserved1 : 24;
+      unsigned PMM : 2;
+      uint64_t reserved2 : 27;
+      unsigned ADUE : 1;
       unsigned PBMTE : 1;
       unsigned STCE : 1;
     } bits_;
@@ -459,7 +467,8 @@ namespace WdRiscv
     uint32_t value_; // HENVCFGH register value
     struct
     {
-      unsigned reserved0 : 30;
+      unsigned PMM : 2;
+      unsigned reserved0 : 28;
       unsigned PBMTE : 1;
       unsigned STCE : 1;
     } bits_;

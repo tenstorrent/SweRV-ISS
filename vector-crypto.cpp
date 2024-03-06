@@ -549,6 +549,34 @@ Hart<URV>::execVcpop_v(const DecodedInst* di)
 
 
 template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vrol_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		  unsigned start, unsigned elems, bool masked)
+{
+  ELEM_TYPE e1{}, e2{}, dest{};
+
+  MyRol myRol;
+
+  unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
+
+  if (start >= vecRegs_.elemCount())
+    return;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
+	{
+	  vecRegs_.read(vs1, ix, group, e1);
+	  vecRegs_.read(vs2, ix, group, e2);
+	  dest = myRol(e1, e2);
+	}
+      vecRegs_.write(vd, ix, destGroup, dest);
+    }
+}
+
+
+template <typename URV>
 void
 Hart<URV>::execVrol_vv(const DecodedInst* di)
 {
@@ -575,16 +603,16 @@ Hart<URV>::execVrol_vv(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, rol<uint8_t>);
+      vrol_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked);
       break;
     case EW::Half:
-      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, rol<uint16_t>);
+      vrol_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked);
       break;
     case EW::Word:
-      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, rol<uint32_t>);
+      vrol_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked);
       break;
     case EW::Word2:
-      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, rol<uint64_t>);
+      vrol_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked);
       break;
     default:
       postVecFail(di);
@@ -592,6 +620,33 @@ Hart<URV>::execVrol_vv(const DecodedInst* di)
     }
 
   postVecSuccess();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vrol_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+		  unsigned start, unsigned elems, bool masked)
+{
+  ELEM_TYPE e1 = 0, dest = 0;
+
+  MyRol myRol;
+
+  unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
+
+  if (start >= vecRegs_.elemCount())
+    return;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
+	{
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = myRol(e1, e2);
+	}
+      vecRegs_.write(vd, ix, destGroup, dest);
+    }
 }
 
 
@@ -623,16 +678,16 @@ Hart<URV>::execVrol_vx(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, rol<uint8_t>);
+      vrol_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked);
       break;
     case EW::Half:
-      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, rol<uint16_t>);
+      vrol_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked);
       break;
     case EW::Word:
-      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, rol<uint32_t>);
+      vrol_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked);
       break;
     case EW::Word2:
-      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, rol<uint64_t>);
+      vrol_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked);
       break;
     default:
       postVecFail(di);
@@ -640,6 +695,34 @@ Hart<URV>::execVrol_vx(const DecodedInst* di)
     }
 
   postVecSuccess();
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vror_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		  unsigned start, unsigned elems, bool masked)
+{
+  ELEM_TYPE e1{}, e2{}, dest{};
+
+  MyRor myRor;
+
+  unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
+
+  if (start >= vecRegs_.elemCount())
+    return;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
+	{
+	  vecRegs_.read(vs1, ix, group, e1);
+	  vecRegs_.read(vs2, ix, group, e2);
+	  dest = myRor(e1, e2);
+	}
+      vecRegs_.write(vd, ix, destGroup, dest);
+    }
 }
 
 
@@ -670,16 +753,16 @@ Hart<URV>::execVror_vv(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, ror<uint8_t>);
+      vror_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked);
       break;
     case EW::Half:
-      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, ror<uint16_t>);
+      vror_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked);
       break;
     case EW::Word:
-      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, ror<uint32_t>);
+      vror_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked);
       break;
     case EW::Word2:
-      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, ror<uint64_t>);
+      vror_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked);
       break;
     default:
       postVecFail(di);
@@ -687,6 +770,33 @@ Hart<URV>::execVror_vv(const DecodedInst* di)
     }
 
   postVecSuccess();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vror_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+		  unsigned start, unsigned elems, bool masked)
+{
+  ELEM_TYPE e1 = 0, dest = 0;
+
+  MyRor myRor;
+
+  unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
+
+  if (start >= vecRegs_.elemCount())
+    return;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
+	{
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = myRor(e1, e2);
+	}
+      vecRegs_.write(vd, ix, destGroup, dest);
+    }
 }
 
 
@@ -718,16 +828,16 @@ Hart<URV>::execVror_vx(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, ror<uint8_t>);
+      vror_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked);
       break;
     case EW::Half:
-      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, ror<uint16_t>);
+      vror_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked);
       break;
     case EW::Word:
-      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, ror<uint32_t>);
+      vror_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked);
       break;
     case EW::Word2:
-      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, ror<uint64_t>);
+      vror_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked);
       break;
     default:
       postVecFail(di);
@@ -767,16 +877,16 @@ Hart<URV>::execVror_vi(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, ror<uint8_t>);
+      vror_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked);
       break;
     case EW::Half:
-      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, ror<uint16_t>);
+      vror_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked);
       break;
     case EW::Word:
-      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, ror<uint32_t>);
+      vror_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked);
       break;
     case EW::Word2:
-      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, ror<uint64_t>);
+      vror_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked);
       break;
     default:
       postVecFail(di);

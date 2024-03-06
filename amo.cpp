@@ -60,7 +60,7 @@ Hart<URV>::validateAmoAddr(uint64_t& addr, uint64_t& gaddr, unsigned accessSize)
 
 template <typename URV>
 bool
-Hart<URV>::amoLoad32(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
+Hart<URV>::amoLoad32(const DecodedInst* di, uint64_t virtAddr, Pma::Attrib attrib, URV& value)
 {
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr1_ = ldStAddr_;
@@ -83,6 +83,8 @@ Hart<URV>::amoLoad32(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
   if (cause == ExceptionCause::NONE)
     {
       Pma pma = memory_.pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt);
+      // Check for non-cacheable pbmt
+      pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt());
       if (not pma.hasAttrib(attrib))
 	cause = ExceptionCause::STORE_ACC_FAULT;
     }
@@ -90,7 +92,7 @@ Hart<URV>::amoLoad32(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-        initiateLoadException(cause, virtAddr, gaddr);
+        initiateLoadException(di, cause, virtAddr, gaddr);
       return false;
     }
 
@@ -117,7 +119,7 @@ Hart<URV>::amoLoad32(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
 
 template <typename URV>
 bool
-Hart<URV>::amoLoad64(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
+Hart<URV>::amoLoad64(const DecodedInst* di, uint64_t virtAddr, Pma::Attrib attrib, URV& value)
 {
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr1_ = ldStAddr_;
@@ -140,6 +142,7 @@ Hart<URV>::amoLoad64(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
   if (cause == ExceptionCause::NONE)
     {
       Pma pma = memory_.pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt);
+      pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt());
       if (not pma.hasAttrib(attrib))
 	cause = ExceptionCause::STORE_ACC_FAULT;
     }
@@ -147,7 +150,7 @@ Hart<URV>::amoLoad64(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-        initiateLoadException(cause, virtAddr, gaddr);
+        initiateLoadException(di, cause, virtAddr, gaddr);
       return false;
     }
 
@@ -165,7 +168,7 @@ Hart<URV>::amoLoad64(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
 template <typename URV>
 template <typename LOAD_TYPE>
 bool
-Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
+Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
 {
   URV virtAddr = intRegs_.read(rs1);
 
@@ -205,14 +208,18 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
     fail = true;
 
   if (cause == ExceptionCause::NONE)
-    fail = fail or not memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt).isRsrv();
+    {
+      Pma pma = memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt);
+      pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt());
+      fail = fail or not pma.isRsrv();
+    }
 
   if (fail and cause == ExceptionCause::NONE)
     cause = ExceptionCause::LOAD_ACC_FAULT;
 
   if (cause != ExceptionCause::NONE)
     {
-      initiateLoadException(cause, virtAddr, gaddr1);
+      initiateLoadException(di, cause, virtAddr, gaddr1);
       return false;
     }
 
@@ -253,7 +260,7 @@ Hart<URV>::execLr_w(const DecodedInst* di)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   lrCount_++;
-  if (not loadReserve<int32_t>(di->op0(), di->op1()))
+  if (not loadReserve<int32_t>(di, di->op0(), di->op1()))
     return;
 
   unsigned size = 4;
@@ -275,7 +282,7 @@ Hart<URV>::execLr_w(const DecodedInst* di)
 template <typename URV>
 template <typename STORE_TYPE>
 bool
-Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
+Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE storeVal)
 {
   ldStAtomic_ = true;
 
@@ -300,7 +307,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   if (misal and misalHasPriority_)
     {
       auto cause = misalAtomicCauseAccessFault_ ? EC::STORE_ACC_FAULT : EC::STORE_ADDR_MISAL;
-      initiateStoreException(cause, virtAddr, virtAddr);
+      initiateStoreException(di, cause, virtAddr, virtAddr);
       return false;
     }
 
@@ -314,6 +321,8 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
     {
       bool fail = not memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt).isRsrv();
       fail = fail or (amoInDccmOnly_ and not memory_.pmaMgr_.isAddrInDccm(addr1));
+      fail = (fail or virtMem_.lastPbmt() == VirtMem::Pbmt::Nc or
+	      virtMem_.lastPbmt() == VirtMem::Pbmt::Io); // Non-cacheable pbmt.
       if (fail)
 	cause = EC::STORE_ACC_FAULT;
     }
@@ -330,7 +339,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
 
   if (cause != EC::NONE)
     {
-      initiateStoreException(cause, virtAddr, gaddr1);
+      initiateStoreException(di, cause, virtAddr, gaddr1);
       return false;
     }
 
@@ -395,7 +404,7 @@ Hart<URV>::execSc_w(const DecodedInst* di)
   URV addr = intRegs_.read(rs1);
   scCount_++;
 
-  bool ok = storeConditional(addr, uint32_t(value));
+  bool ok = storeConditional(di, addr, uint32_t(value));
 
   // If there is an exception then reservation may/may-not be dropped
   // depending on config.
@@ -437,7 +446,7 @@ Hart<URV>::execAmo32Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
   URV loadedValue = 0;
   uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
   URV virtAddr = intRegs_.read(rs1);
-  bool loadOk = amoLoad32(virtAddr, attrib, loadedValue);
+  bool loadOk = amoLoad32(di, virtAddr, attrib, loadedValue);
   if (loadOk)
     {
       URV addr = intRegs_.read(rs1);
@@ -446,7 +455,7 @@ Hart<URV>::execAmo32Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
       URV rs2Val = intRegs_.read(rs2);
       URV result = op(rs2Val, rdVal);
 
-      bool storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(result), false);
+      bool storeOk = store<uint32_t>(di, addr, false /*hyper*/, uint32_t(result), false);
 
       if (storeOk and not triggerTripped_)
 	{
@@ -567,7 +576,7 @@ Hart<URV>::execLr_d(const DecodedInst* di)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   lrCount_++;
-  if (not loadReserve<int64_t>(di->op0(), di->op1()))
+  if (not loadReserve<int64_t>(di, di->op0(), di->op1()))
     return;
 
   unsigned size = 8;
@@ -602,7 +611,7 @@ Hart<URV>::execSc_d(const DecodedInst* di)
   URV addr = intRegs_.read(rs1);
   scCount_++;
 
-  bool ok = storeConditional(addr, uint64_t(value));
+  bool ok = storeConditional(di, addr, uint64_t(value));
 
   // If there is an exception then reservation may/may-not be dropped
   // depending on config.
@@ -644,7 +653,7 @@ Hart<URV>::execAmo64Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
   URV loadedValue = 0;
   URV rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
   URV virtAddr = intRegs_.read(rs1);
-  bool loadOk = amoLoad64(virtAddr, attrib, loadedValue);
+  bool loadOk = amoLoad64(di, virtAddr, attrib, loadedValue);
   if (loadOk)
     {
       URV addr = intRegs_.read(rs1);
@@ -652,7 +661,7 @@ Hart<URV>::execAmo64Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
       URV rs2Val = intRegs_.read(rs2);
       URV result = op(rs2Val, rdVal);
 
-      bool storeOk = store<uint64_t>(addr, false /*hyper*/, result, false);
+      bool storeOk = store<uint64_t>(di, addr, false /*hyper*/, result, false);
 
       if (storeOk and not triggerTripped_)
 	{
@@ -777,7 +786,7 @@ Hart<URV>::execAmocas_w(const DecodedInst* di)
   URV loadedVal = 0;
   uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
   URV addr = intRegs_.read(rs1);
-  bool loadOk = amoLoad32(addr, Pma::Attrib::AmoArith, loadedVal);
+  bool loadOk = amoLoad32(di, addr, Pma::Attrib::AmoArith, loadedVal);
   uint32_t temp = loadedVal;
 
   if (loadOk)
@@ -787,7 +796,7 @@ Hart<URV>::execAmocas_w(const DecodedInst* di)
 
       bool storeOk = true;
       if (temp == rdVal)
-	storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(rs2Val), false);
+	storeOk = store<uint32_t>(di, addr, false /*hyper*/, uint32_t(rs2Val), false);
 
       if (storeOk and not triggerTripped_)
 	{
@@ -823,8 +832,8 @@ Hart<uint32_t>::execAmocas_d(const DecodedInst* di)
 
   uint32_t temp0 = 0, temp1 = 0;
   uint32_t addr = intRegs_.read(rs1);
-  bool loadOk = (amoLoad32(addr, attrib, temp0) and
-		 amoLoad32(addr + 4, attrib, temp1));
+  bool loadOk = (amoLoad32(di, addr, attrib, temp0) and
+		 amoLoad32(di, addr + 4, attrib, temp1));
   if (loadOk)
     {
       uint32_t rs2Val0 = intRegs_.read(rs2);
@@ -839,8 +848,8 @@ Hart<uint32_t>::execAmocas_d(const DecodedInst* di)
       bool storeOk = true;
       if (temp0 == rdVal0 and temp1 == rdVal1)
 	{
-	  storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(rs2Val0), false);
-	  storeOk = storeOk and store<uint32_t>(addr, false, uint32_t(rs2Val1), false);
+	  storeOk = store<uint32_t>(di, addr, false /*hyper*/, uint32_t(rs2Val0), false);
+	  storeOk = storeOk and store<uint32_t>(di, addr, false, uint32_t(rs2Val1), false);
 	}
 
       if (storeOk and not triggerTripped_ and rd != 0)
@@ -872,7 +881,7 @@ Hart<uint64_t>::execAmocas_d(const DecodedInst* di)
 
   uint64_t temp = 0;
   uint64_t addr = intRegs_.read(rs1);
-  bool loadOk = amoLoad64(addr, attrib, temp);
+  bool loadOk = amoLoad64(di, addr, attrib, temp);
 
   if (loadOk)
     {
@@ -881,7 +890,7 @@ Hart<uint64_t>::execAmocas_d(const DecodedInst* di)
 
       bool storeOk = true;
       if (temp == rdVal)
-	storeOk = store<uint64_t>(addr, false /*hyper*/, rs2Val, false);
+	storeOk = store<uint64_t>(di, addr, false /*hyper*/, rs2Val, false);
 
       if (storeOk and not triggerTripped_)
 	intRegs_.write(rd, temp);
@@ -928,13 +937,13 @@ Hart<uint64_t>::execAmocas_q(const DecodedInst* di)
   if (misal and misalHasPriority_)
     {
       if (misalAtomicCauseAccessFault_)
-	initiateStoreException(ExceptionCause::STORE_ACC_FAULT, addr, addr);
-      initiateStoreException(ExceptionCause::STORE_ADDR_MISAL, addr, addr);
+	initiateStoreException(di, ExceptionCause::STORE_ACC_FAULT, addr, addr);
+      initiateStoreException(di, ExceptionCause::STORE_ADDR_MISAL, addr, addr);
       return;
     }
 
-  bool loadOk = (amoLoad64(addr, attrib, temp0) and
-		 amoLoad64(addr + 8, attrib, temp1));
+  bool loadOk = (amoLoad64(di, addr, attrib, temp0) and
+		 amoLoad64(di, addr + 8, attrib, temp1));
   if (loadOk)
     {
       uint64_t rs2Val0 = intRegs_.read(rs2);
@@ -949,8 +958,8 @@ Hart<uint64_t>::execAmocas_q(const DecodedInst* di)
       bool storeOk = true;
       if (temp0 == rdVal0 and temp1 == rdVal1)
 	{
-	  storeOk = store<uint64_t>(addr, false /*hyper*/, uint64_t(rs2Val0), false);
-	  storeOk = storeOk and store<uint32_t>(addr, false, uint64_t(rs2Val1), false);
+	  storeOk = store<uint64_t>(di, addr, false /*hyper*/, uint64_t(rs2Val0), false);
+	  storeOk = storeOk and store<uint32_t>(di, addr, false, uint64_t(rs2Val1), false);
 	}
 
       if (storeOk and not triggerTripped_ and rd != 0)

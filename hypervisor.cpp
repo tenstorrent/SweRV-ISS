@@ -60,12 +60,14 @@ Hart<URV>::execHfence_vvma(const DecodedInst* di)
   else if (di->op0() != 0 and di->op1() == 0)
     {
       URV addr = intRegs_.read(di->op0());
+      addr = virtMem_.applyPointerMask(addr, privMode_, virtMode_);
       uint64_t vpn = virtMem_.pageNumber(addr);
       tlb.invalidateVirtualPage(vpn);
     }
   else
     {
       URV addr = intRegs_.read(di->op0());
+      addr = virtMem_.applyPointerMask(addr, privMode_, virtMode_);
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV asid = intRegs_.read(di->op1());
       tlb.invalidateVirtualPageAsid(vpn, asid);
@@ -113,13 +115,15 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
     {
       URV addr = intRegs_.read(di->op0());
       // address is shifted right by 2 bits
-      uint64_t vpn = virtMem_.pageNumber(addr << 2);
+      addr = virtMem_.applyPointerMask(addr << 2, privMode_, virtMode_);
+      uint64_t vpn = virtMem_.pageNumber(addr);
       tlb.invalidateVirtualPage(vpn);
     }
   else
     {
       URV addr = intRegs_.read(di->op0());
-      uint64_t vpn = virtMem_.pageNumber(addr << 2);
+      addr = virtMem_.applyPointerMask(addr << 2, privMode_, virtMode_);
+      uint64_t vpn = virtMem_.pageNumber(addr);
       URV vmid = intRegs_.read(di->op1());
       tlb.invalidateVirtualPageVmid(vpn, vmid);
     }
@@ -151,18 +155,21 @@ Hart<URV>::hyperLoad(const DecodedInst* di)
       return;
     }
 
-  // Use VS mode big-endian for translation.
+  // Use VS mode big-endian/make-exec-readbale for translation.
   bool prevTbe = virtMem_.bigEndian();  // Previous translation big endian.
+  bool prevMxr = virtMem_.stage1ExecReadable();  // Previous stage1 MXR.
   virtMem_.setBigEndian(hstatus_.bits_.VSBE);
+  virtMem_.setStage1ExecReadable(vsstatus_.bits_.MXR);
   hyperLs_ = true;
 
   URV virtAddr = intRegs_.read(di->op1());
   uint64_t data = 0;
-  if (load<LOAD_TYPE>(virtAddr, true /*hyper*/, data))
+  if (load<LOAD_TYPE>(di, virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 
   hyperLs_ = false;
-  virtMem_.setBigEndian(prevTbe);
+  virtMem_.setBigEndian(prevTbe);            // Restore big endian mod.
+  virtMem_.setStage1ExecReadable(prevMxr);   // Restore stage1 MXR.
 }
 
 
@@ -267,16 +274,18 @@ Hart<URV>::hyperStore(const DecodedInst* di)
 
   // Use VS mode big-endian for translation.
   bool prevTbe = virtMem_.bigEndian();  // Previous translation big endian.
+  bool prevMxr = virtMem_.stage1ExecReadable();  // Previous stage1 MXR.
   virtMem_.setBigEndian(hstatus_.bits_.VSBE);
   hyperLs_ = true;
 
   uint32_t rs1 = di->op1();
   URV virtAddr = intRegs_.read(rs1);
   STORE_TYPE value = STORE_TYPE(intRegs_.read(di->op0()));
-  store<STORE_TYPE>(virtAddr, true /*hyper*/, value);
+  store<STORE_TYPE>(di, virtAddr, true /*hyper*/, value);
 
   hyperLs_ = false;
-  virtMem_.setBigEndian(prevTbe);
+  virtMem_.setBigEndian(prevTbe);            // Restore big endian mod.
+  virtMem_.setStage1ExecReadable(prevMxr);   // Restore stage1 MXR.
 }
 
 

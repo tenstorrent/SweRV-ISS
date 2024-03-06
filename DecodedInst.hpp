@@ -145,12 +145,21 @@ namespace WdRiscv
     { return entry_; }
 
     /// Relevant for floating point instructions with rounding mode.
+    bool hasRoundingMode() const
+    { return entry_ and entry_->hasRoundingMode(); }
+
     unsigned roundingMode() const
     { return ((inst_ >> 12) & 7); }
 
     /// Immediate values are to be (left) shifted by this size
     unsigned immediateShiftSize() const
     { return entry_? entry_->immediateShiftSize() : 0; }
+
+    /// Return true if instruction is one of mret/sret/dret.
+    bool isXRet() const
+    { return entry_ and (entry_->instId() == InstId::mret or
+                         entry_->instId() == InstId::sret or
+                         entry_->instId() == InstId::dret); }
 
     /// Relevant to atomic instructions: Return true if acquire bit is
     /// set in an atomic instruction.
@@ -231,6 +240,10 @@ namespace WdRiscv
     bool isVector() const
     { return entry_ and entry_->isVector(); }
 
+    // Return true if this is a CMO instruction.
+    bool isCmo() const
+    { return entry_ and entry_->isCmo(); }
+
     /// Return true if this is a vector load instruction.
     bool isVectorLoad() const
     {
@@ -297,6 +310,10 @@ namespace WdRiscv
     /// address is in a register.
     bool isBranchToRegister() const
     { return entry_ and entry_->isBranchToRegister(); }
+
+    /// Return true if this is a compressed instruction.
+    bool isCompressed() const
+    { return entry_ and entry_->isCompressed(); }
 
     /// Return the RISCV extension of this instruction.
     RvExtension extension() const

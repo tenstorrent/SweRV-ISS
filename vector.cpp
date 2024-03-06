@@ -444,7 +444,7 @@ template <typename URV>
 inline
 bool
 Hart<URV>::checkVecMaskInst(const DecodedInst* di, unsigned dest,
-				 unsigned src, unsigned groupX8)
+			    unsigned src, unsigned groupX8)
 {
   if (not checkSewLmulVstart(di))
     return false;
@@ -457,6 +457,14 @@ Hart<URV>::checkVecMaskInst(const DecodedInst* di, unsigned dest,
       return false;
     }
 #endif
+
+  // Source register (eew != 1) cannot overlap v0 (eew == 1) if instruction
+  // is masked.
+  if (di->isMasked() and src == 0)
+    {
+      postVecFail(di);
+      return false;
+    }
 
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
@@ -498,6 +506,14 @@ Hart<URV>::checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
       return false;
     }
 #endif
+
+  // Source registers (eew != 1) cannot overlap v0 (eew == 1) if instruction
+  // is masked.
+  if (di->isMasked() and (op1 == 0 or op2 == 0))
+    {
+      postVecFail(di);
+      return false;
+    }
 
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
@@ -731,7 +747,7 @@ Hart<URV>::checkVecFpMaskInst(const DecodedInst* di, unsigned dest,
 
 
 template <typename URV>
-void
+bool
 Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
 {
   bool ma = (vtypeVal >> 7) & 1;  // Mask agnostic
@@ -785,6 +801,9 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
 
   if (vill)
     {
+      // Spec gives us a choice: Trap on illegal config or set vtype.vill.
+      if (vecRegs_.trapVtype_)
+	return false;  // Caller must trap.
       ma = false; ta = false; gm = GroupMultiplier(0); ew = ElementWidth(0);
       elems = 0;
     }
@@ -809,6 +828,8 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
 
   // Update cached vtype fields in vecRegs_.
   vecRegs_.updateConfig(ew, gm, ma, ta, vill);
+
+  return true;
 }
 
 
@@ -827,12 +848,10 @@ Hart<URV>::postVecSuccess()
 
 template <typename URV>
 void
-Hart<URV>::postVecFail(const DecodedInst* di, bool clearVstart)
+Hart<URV>::postVecFail(const DecodedInst* di)
 {
   illegalInst(di);
-  if (clearVstart)
-    csRegs_.clearVstart();
-  if (vecRegs_.getLastWrittenReg() >= 0 or clearVstart)
+  if (vecRegs_.getLastWrittenReg() >= 0)
     markVsDirty();
 }
 
@@ -852,8 +871,10 @@ Hart<URV>::execVsetvli(const DecodedInst* di)
   unsigned imm = di->op2();
   
   URV vtypeVal = imm;
-  vsetvl(rd, rs1, vtypeVal);
-  postVecSuccess();
+  if (vsetvl(rd, rs1, vtypeVal))
+    postVecSuccess();
+  else
+    postVecFail(di);
 }
 
 
@@ -876,7 +897,9 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
   GroupMultiplier gm = GroupMultiplier(imm & 7);
   ElementWidth ew = ElementWidth((imm >> 3) & 7);
 
-  bool vill = not vecRegs_.legalConfig(ew, gm);
+  // Only least sig 8 bits can be non-zero.
+  bool vill = (imm >> 8) != 0;
+  vill = vill or not vecRegs_.legalConfig(ew, gm);
 
   // Determine vl
   URV elems = avl;
@@ -895,6 +918,12 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
 
   if (vill)
     {
+      // Spec gives us a choice: Trap on illegal config or set vtype.vill.
+      if (vecRegs_.trapVtype_)
+	{
+	  postVecFail(di);  // Trap.
+	  return;
+	}
       ma = false; ta = false; gm = GroupMultiplier(0); ew = ElementWidth(0);
       elems = 0;
     }
@@ -931,10 +960,12 @@ Hart<URV>::execVsetvl(const DecodedInst* di)
 
   unsigned rd = di->op0();
   unsigned rs1 = di->op1();
-
   URV vtypeVal = intRegs_.read(di->op2());
-  vsetvl(rd, rs1, vtypeVal);
-  postVecSuccess();
+
+  if (vsetvl(rd, rs1, vtypeVal))
+    postVecSuccess();
+  else
+    postVecFail(di);
 }
 
 
@@ -4077,21 +4108,30 @@ Hart<URV>::execVmop_mm(const DecodedInst* di, OP op)
     return;
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.bitsPerRegister();
-
+  unsigned bitsPerReg = vecRegs_.bitsPerRegister();
+  unsigned elemCount = vecRegs_.elemCount();
   unsigned vd = di->op0(), vs1 = di->op1(), vs2 = di->op2();
 
-  if (start < vecRegs_.elemCount())
-    for (unsigned ix = start; ix < elems; ++ix)
-      {
-	// Not masked. Tail elements computed.
-	bool in1 = false, in2 = false;
-	vecRegs_.readMaskRegister(vs1, ix, in1);
-	vecRegs_.readMaskRegister(vs2, ix, in2);
-	bool flag = op(unsigned(in1), unsigned(in2)) & 1;
+  if (start < elemCount)
+    {
+      unsigned count = vecRegs_.updateWholeMask() ? bitsPerReg : elemCount;
 
-	vecRegs_.writeMaskRegister(vd, ix, flag);
-      }
+      for (unsigned ix = start; ix < count; ++ix)
+	{
+	  // Not masked. Tail elements computed.
+	  bool in1 = false, in2 = false;
+	  vecRegs_.readMaskRegister(vs1, ix, in1);
+	  vecRegs_.readMaskRegister(vs2, ix, in2);
+	  bool flag = op(unsigned(in1), unsigned(in2)) & 1;
+
+	  vecRegs_.writeMaskRegister(vd, ix, flag);
+	}
+
+      // If not update-whole-mask and mask-anostic-ones, fill tail with ones.
+      if (vecRegs_.isTailAgnosticOnes())
+	for (unsigned ix = count; ix < bitsPerReg; ++ix)
+	  vecRegs_.writeMaskRegister(vd, ix, true);
+    }
 
   vecRegs_.touchMask(vd);  // In case nothing was written.
   postVecSuccess();
@@ -4116,7 +4156,7 @@ Hart<URV>::execVmnand_mm(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execVmandnot_mm(const DecodedInst* di)
+Hart<URV>::execVmandn_mm(const DecodedInst* di)
 {
   execVmop_mm(di, MyBitAndNot());
 }
@@ -4148,7 +4188,7 @@ Hart<URV>::execVmnor_mm(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execVmornot_mm(const DecodedInst* di)
+Hart<URV>::execVmorn_mm(const DecodedInst* di)
 {
   execVmop_mm(di, MyBitOrNot());
 }
@@ -4236,7 +4276,9 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
     }
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  elems = vecRegs_.bitsPerRegister();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned bitsPerReg = vecRegs_.bitsPerRegister();
+  unsigned elemCount = vecRegs_.updateWholeMask() ? bitsPerReg : vecRegs_.elemCount();
 
   if (vd == vs1 or (masked and vd == 0))
     {
@@ -4246,20 +4288,18 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
 
   bool found = false;  // true if set bit is found in vs1
 
-  if (start < vecRegs_.elemCount())
-    for (uint32_t ix = start; ix < elems; ++ix)
-      {
-	bool flag = false;
-	if (vecRegs_.isMaskDestActive(vd, ix, masked, flag))
-	  {
-	    bool input = false;
-	    vecRegs_.readMaskRegister(vs1, ix, input);
-
-	    found = found or input;
-	    flag = not found;
-	  }
-	vecRegs_.writeMaskRegister(vd, ix, flag);
-      }
+  for (uint32_t ix = start; ix < elemCount; ++ix)
+    {
+      bool flag = false;
+      if (vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag))
+	{
+	  bool input = false;
+	  vecRegs_.readMaskRegister(vs1, ix, input);
+	  found = found or input;
+	  flag = not found;
+	}
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 
   vecRegs_.touchMask(vd);
   postVecSuccess();
@@ -4278,7 +4318,9 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
     }
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  elems = vecRegs_.bitsPerRegister();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned bitsPerReg = vecRegs_.bitsPerRegister();
+  unsigned elemCount = vecRegs_.updateWholeMask() ? bitsPerReg : vecRegs_.elemCount();
 
   if (vd == vs1 or (masked and vd == 0))
     {
@@ -4288,19 +4330,18 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
 
   bool found = false;  // true if set bit is found in vs1
 
-  if (start < vecRegs_.elemCount())
-    for (uint32_t ix = start; ix < elems; ++ix)
-      {
-	bool flag = false;
-	if (vecRegs_.isMaskDestActive(vd, ix, masked, flag))
-	  {
-	    flag = not found;
-	    bool input = false;
-	    vecRegs_.readMaskRegister(vs1, ix, input);
-	    found = found or input;
-	  }
-	vecRegs_.writeMaskRegister(vd, ix, flag);
-      }
+  for (uint32_t ix = start; ix < elemCount; ++ix)
+    {
+      bool flag = false;
+      if (vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag))
+	{
+	  bool input = false;
+	  vecRegs_.readMaskRegister(vs1, ix, input);
+	  flag = not found;
+	  found = found or input;
+	}
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 
   vecRegs_.touchMask(vd);
   postVecSuccess();
@@ -4319,7 +4360,9 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
     }
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  elems = vecRegs_.bitsPerRegister();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned bitsPerReg = vecRegs_.bitsPerRegister();
+  unsigned elemCount = vecRegs_.updateWholeMask() ? bitsPerReg : vecRegs_.elemCount();
 
   if (vd == vs1 or (masked and vd == 0))
     {
@@ -4329,10 +4372,10 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
 
   bool found = false;  // true if set bit is found in vs1
 
-  for (uint32_t ix = start; ix < elems; ++ix)
+  for (uint32_t ix = start; ix < elemCount; ++ix)
     {
       bool flag = false;
-      bool active = vecRegs_.isMaskDestActive(vd, ix, masked, flag);
+      bool active = vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag);
 
       bool input = false;
       vecRegs_.readMaskRegister(vs1, ix, input);
@@ -4343,24 +4386,12 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
       if (found or not input)
 	continue;
 
+      found = true;
       if (active)
-	{
-	  found = true;
-	  vecRegs_.writeMaskRegister(vd, ix, true);
-	}
-    }
-
-  // Keep tail elements or set them the ones.
-  elems = vecRegs_.elemMax();
-  for (uint32_t ix = vecRegs_.elemCount(); ix < elems; ++ix)
-    {
-      bool flag = false;
-      vecRegs_.isMaskDestActive(vd, ix, masked, flag);
-      vecRegs_.writeMaskRegister(vd, ix, flag);
+	vecRegs_.writeMaskRegister(vd, ix, true);
     }
 
   vecRegs_.touchMask(vd);  // In case nothing was written
-
   postVecSuccess();
 }
 
@@ -8207,7 +8238,7 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vcin = 0;
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.updateWholeMask()? vecRegs_.bitsPerRegister() : vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (not checkVecMaskInst(di, vcout, vs1, group))
@@ -8339,8 +8370,11 @@ Hart<URV>::execVmerge_vvm(const DecodedInst* di)
   if (not checkSewLmulVstart(di))
     return;
 
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  start = csRegs_.peekVstart();
-  if (not di->isMasked() or di->op0() == 0) // Must be masked, dest must not overlap v0.
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned start = csRegs_.peekVstart();
+
+  // Must be masked, dest must not overlap v0. Source must not overlap v0.
+  if (not di->isMasked() or vd == 0 or vs1 == 0 or vs2 == 0)
     {
       postVecFail(di);
       return;
@@ -8398,8 +8432,11 @@ Hart<URV>::execVmerge_vxm(const DecodedInst* di)
   if (not checkSewLmulVstart(di))
     return;
 
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2(), start = csRegs_.peekVstart();
-  if (not di->isMasked() or di->op0() == 0)  // Must be masked, dest must not overlap v0.
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned start = csRegs_.peekVstart();
+
+  // Must be masked, dest must not overlap v0. Source must not overlap v0.
+  if (not di->isMasked() or vd == 0 or vs1 == 0)
     {
       postVecFail(di);
       return;
@@ -8436,7 +8473,9 @@ Hart<URV>::execVmerge_vim(const DecodedInst* di)
 
   unsigned vd = di->op0(), vs1 = di->op1(), start = csRegs_.peekVstart();
   int32_t imm = di->op2As<int32_t>();
-  if (not di->isMasked() or di->op0() == 0) // Must be masked. Dest must not overlap v0.
+
+  // Must be masked, dest must not overlap v0. Source must not overlap v0.
+  if (not di->isMasked() or vd == 0 or vs1 == 0)
     {
       postVecFail(di);
       return;
@@ -10800,6 +10839,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
         {
           vecRegs_.maskedAddr_.push_back(skip);
           vecRegs_.ldStAddr_.push_back(addr);
+          vecRegs_.ldStPhysAddr_.push_back(addr);
         }
       if (skip)
 	{
@@ -10818,20 +10858,23 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 	cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem), false);
 #endif
       if (cause == ExceptionCause::NONE)
-	memRead(pa1, pa2, elem);
+        {
+          memRead(pa1, pa2, elem);
+          vecRegs_.ldStPhysAddr_.back() = pa1;
+        }
       else
         {
 	  if (faultFirst)
 	    {
 	      if (ix == 0)
-		initiateLoadException(cause, pa1, gpa1);
+		initiateLoadException(di, cause, pa1, gpa1);
 	      else
 		csRegs_.write(CsrNumber::VL, PrivilegeMode::Machine, ix);
 	    }
 	  else
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateLoadException(cause, pa1, gpa1);
+	      initiateLoadException(di, cause, pa1, gpa1);
 	    }
           return false;
         }
@@ -10951,6 +10994,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
     {
       bool skip = masked and not vecRegs_.isActive(0, ix);
       vecRegs_.ldStAddr_.push_back(addr);
+      vecRegs_.ldStPhysAddr_.push_back(addr);
       vecRegs_.maskedAddr_.push_back(skip);
       if (skip)
 	{
@@ -10969,12 +11013,13 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
       if (cause == ExceptionCause::NONE)
 	{
 	  memWrite(pa1, pa2, elem);
+          vecRegs_.ldStPhysAddr_.back() = pa1;
 	  vecRegs_.stData_.push_back(elem);
 	}
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(cause, pa1, gpa1);
+          initiateStoreException(di, cause, pa1, gpa1);
           return false;
         }
     }
@@ -11160,13 +11205,14 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
       if (cause != ExceptionCause::NONE)
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateLoadException(cause, pa1, gpa1);
+          initiateLoadException(di, cause, pa1, gpa1);
           return false;
         }
 
       vecRegs_.write(vd, ix, groupX8, elem);
 
       vecRegs_.ldStAddr_.push_back(addr);
+      vecRegs_.ldStPhysAddr_.push_back(pa1);
       vecRegs_.maskedAddr_.push_back(false);
     }
 
@@ -11280,13 +11326,14 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
 	{
 	  memWrite(pa1, pa2, elem);
 	  vecRegs_.ldStAddr_.push_back(addr);
+          vecRegs_.ldStPhysAddr_.push_back(pa1);
 	  vecRegs_.maskedAddr_.push_back(false);
 	  vecRegs_.stData_.push_back(elem);
 	}
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(cause, pa1, gpa1);
+          initiateStoreException(di, cause, pa1, gpa1);
           return false;
         }
     }
@@ -11450,6 +11497,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
       if (ix < vecRegs_.elemCount())
         {
           vecRegs_.ldStAddr_.push_back(addr);
+          vecRegs_.ldStPhysAddr_.push_back(addr);
           vecRegs_.maskedAddr_.push_back(skip);
         }
       if (skip)
@@ -11467,11 +11515,14 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
                                      false /*hyper*/);
 #endif
       if (cause == ExceptionCause::NONE)
-	memRead(pa1, pa2, elem);
+        {
+          memRead(pa1, pa2, elem);
+          vecRegs_.ldStPhysAddr_.back() = pa1;
+        }
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateLoadException(cause, pa1, gpa1);
+          initiateLoadException(di, cause, pa1, gpa1);
           return false;
         }
 
@@ -11593,6 +11644,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
     {
       bool skip = masked and not vecRegs_.isActive(0, ix);
       vecRegs_.ldStAddr_.push_back(addr);
+      vecRegs_.ldStPhysAddr_.push_back(addr);
       vecRegs_.maskedAddr_.push_back(skip);
       if (skip)
 	{
@@ -11612,11 +11664,12 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 	{
 	  memWrite(pa1, pa2, elem);
 	  vecRegs_.stData_.push_back(elem);
+          vecRegs_.ldStPhysAddr_.back() = pa1;
 	}
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(cause, pa1, gpa1);
+          initiateStoreException(di, cause, pa1, gpa1);
           return false;
         }
     }
@@ -11742,6 +11795,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
           vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset);
           vaddr = addr + offset;
           vecRegs_.ldStAddr_.push_back(vaddr);
+          vecRegs_.ldStPhysAddr_.push_back(vaddr);
           vecRegs_.maskedAddr_.push_back(skip);
         }
       if (skip)
@@ -11762,11 +11816,12 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	{
 	  memRead(pa1, pa2, elem);
 	  vecRegs_.write(vd, ix, destGroup, elem);
+          vecRegs_.ldStPhysAddr_.back() = pa1;
 	}
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateLoadException(cause, pa1, gpa1);
+          initiateLoadException(di, cause, pa1, gpa1);
           return false;
         }
     }
@@ -11934,6 +11989,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       uint64_t vaddr = addr + offset, data = 0;
       bool skip = masked and not vecRegs_.isActive(0, ix);
       vecRegs_.ldStAddr_.push_back(vaddr);
+      vecRegs_.ldStPhysAddr_.push_back(vaddr);
       vecRegs_.maskedAddr_.push_back(skip);
       if (skip)
 	{
@@ -11991,11 +12047,12 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       if (cause != ExceptionCause::NONE)
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(cause, pa1, gpa1);
+          initiateStoreException(di, cause, pa1, gpa1);
           return false;
         }
 
       vecRegs_.stData_.push_back(data);
+      vecRegs_.ldStPhysAddr_.back() = pa1;
     }
 
   return true;
@@ -12177,6 +12234,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
           if (ix < vecRegs_.elemCount())
             {
               vecRegs_.ldStAddr_.push_back(faddr);
+              vecRegs_.ldStPhysAddr_.push_back(faddr);
               vecRegs_.maskedAddr_.push_back(skip);
             }
 	  if (skip)
@@ -12194,12 +12252,15 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 					 false /*hyper*/);
 #endif
 	  if (cause == ExceptionCause::NONE)
-            memRead(pa1, pa2, elem);
+            {
+              memRead(pa1, pa2, elem);
+              vecRegs_.ldStPhysAddr_.back() = pa1;
+            }
 	  else
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      if (ix == 0 or not faultFirst)
-		initiateLoadException(cause, pa1, gpa1);
+		initiateLoadException(di, cause, pa1, gpa1);
 	      return false;
 	    }
 
@@ -12343,6 +12404,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 
 	  bool skip = masked and not vecRegs_.isActive(0, ix);
 	  vecRegs_.ldStAddr_.push_back(faddr);
+          vecRegs_.ldStPhysAddr_.push_back(faddr);
 	  vecRegs_.maskedAddr_.push_back(skip);
 	  if (skip)
 	    {
@@ -12359,11 +12421,12 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	    {
 	      memWrite(pa1, pa2, elem);
 	      vecRegs_.stData_.push_back(elem);
+              vecRegs_.ldStPhysAddr_.back() = pa1;
 	    }
 	  else
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateStoreException(cause, pa1, gpa1);
+	      initiateStoreException(di, cause, pa1, gpa1);
 	      return false;
 	    }
 	}
@@ -12670,6 +12733,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
               faddr = addr + offset + field*elemSize;
               vecRegs_.ldStAddr_.push_back(faddr);
+              vecRegs_.ldStPhysAddr_.push_back(faddr);
               vecRegs_.maskedAddr_.push_back(skip);
             }
 	  if (skip)
@@ -12690,11 +12754,12 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    {
 	      memRead(pa1, pa2, elem);
 	      vecRegs_.write(dvg, ix, destGroup, elem);
+              vecRegs_.ldStPhysAddr_.back() = pa1;
 	    }
 	  else
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateLoadException(cause, pa1, gpa1);
+	      initiateLoadException(di, cause, pa1, gpa1);
 	      return false;
 	    }
 	}
@@ -12820,6 +12885,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  unsigned dvg = vd + field*eg;  // Source vector grop.
 	  bool skip = masked and not vecRegs_.isActive(0, ix);
 	  vecRegs_.ldStAddr_.push_back(faddr);
+          vecRegs_.ldStPhysAddr_.push_back(faddr);
 	  vecRegs_.maskedAddr_.push_back(skip);
 	  if (skip)
 	    {
@@ -12877,11 +12943,12 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  if (cause != ExceptionCause::NONE)
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateStoreException(cause, pa1, gpa1);
+	      initiateStoreException(di, cause, pa1, gpa1);
 	      return false;
 	    }
 
 	  vecRegs_.stData_.push_back(data);
+          vecRegs_.ldStPhysAddr_.back() = pa1;
 	}
     }
 
@@ -16258,7 +16325,9 @@ Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  if (not di->isMasked() or vd == 0)
+
+  // Must be masked, dest must not overlap v0. Source must not overlap v0.
+  if (not di->isMasked() or vd == 0 or vs1 == 0)
     {
       postVecFail(di);
       return;

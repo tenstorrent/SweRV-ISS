@@ -39,6 +39,7 @@ namespace WdRiscv
     bool accessed_ = false;
     bool dirty_ = false;
     uint8_t levels_ = 3;
+    uint8_t pbmt_ = 0;
   };
 
 

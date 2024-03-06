@@ -847,8 +847,8 @@ namespace WdRiscv
     bool write(CsrNumber number, PrivilegeMode mode, URV value);
 
     /// Return true if given register is writable by a CSR instruction
-    /// in the given mode.
-    bool isWriteable(CsrNumber number, PrivilegeMode mode) const;
+    /// in the given privilege and virtual mode.
+    bool isWriteable(CsrNumber number, PrivilegeMode mode, bool virtMode) const;
 
     /// Return true if this is a high-half of a CSR (e.g. MSTATUSH is
     /// the high half of MSTATUS).
@@ -859,8 +859,8 @@ namespace WdRiscv
     }
 
     /// Return true if given register is readable by a CSR instruction
-    /// in the given mode.
-    bool isReadable(CsrNumber number, PrivilegeMode mode) const;
+    /// in the given privlege and virtual modes.
+    bool isReadable(CsrNumber number, PrivilegeMode pm, bool virtMode) const;
 
     /// Fill the nums vector with the numbers of the CSRs written by
     /// the last instruction.
@@ -1078,8 +1078,14 @@ namespace WdRiscv
     { return triggers_.hasEnterDebugModeTripped(); }
 
     /// Set value to the value of the given register returning true on
+    /// success and false if number is out of bound. Peeks register assuming
+    /// virtMode.
+    bool peek(CsrNumber number, URV& value, bool virtMode) const;
+
+    /// Set value to the value of the given register returning true on
     /// success and false if number is out of bound.
-    bool peek(CsrNumber number, URV& value) const;
+    bool peek(CsrNumber number, URV& value) const
+    { return peek(number, value, virtMode_); }
 
     /// Set register to the given value masked by the poke mask. A
     /// read-only register can be changed this way as long as its poke
@@ -1246,7 +1252,7 @@ namespace WdRiscv
       return csr.read();
     }
 
-    /// Fast peek method for HGEIP.
+    /// Fast peek method for HGEIE.
     URV peekHgeie() const
     {
       const auto& csr = regs_.at(size_t(CsrNumber::HGEIE));
@@ -1258,6 +1264,14 @@ namespace WdRiscv
     {
       const auto& csr = regs_.at(size_t(CsrNumber::MIE));
       return csr.read();
+    }
+
+    /// Return the effective interrupt enable mask: This is MIE ored
+    /// with the virtual interrupt enable implied by MVIEN.
+    URV effectiveInterruptEnable() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::MIE));
+      return csr.read() | shadowSie_;
     }
 
     /// Fast peek method for MSTATUS
@@ -1393,9 +1407,19 @@ namespace WdRiscv
     /// Return adjusted value.
     URV adjustPmpValue(CsrNumber csrn, URV value) const;
 
-    /// Adjust the value of SIP/SIE by masking with MIDELEG (and if
-    /// hyerpervisor also by HIDELEG).
-    URV adjustSipSieValue(URV value) const;
+    /// Read value of SIP (MIP masked with MIDELEG). This never
+    /// maps to VSIP.
+    bool readSip(URV& value) const;
+
+    /// Read value of SIE (MIE masked with MIDELEG). This never
+    /// maps to VSIP.
+    bool readSie(URV& value) const;
+
+    /// Helper to read method.
+    bool readMvip(URV& value) const;
+
+    /// Helper to write method.
+    bool writeMvip(URV value);
 
     /// Adjust the value of TIME/TIMEH by adding the time delta in
     /// virtual mode.
@@ -1416,11 +1440,14 @@ namespace WdRiscv
     /// Heler to read method.
     bool readSireg(CsrNumber num, URV& value) const;
 
-    /// Heler to read method.
+    /// Helper to read method.
     bool readVsireg(CsrNumber num, URV& value) const;
 
-    /// Helper to write method: Mask with MIP/MIE/MIDELEG.
-    bool writeSipSie(CsrNumber num, URV value);
+    /// Helper to write method: Mask with MIP/MIDELEG.
+    bool writeSip(URV value);
+
+    /// Helper to write method: Mask with SIP/MIDELEG.
+    bool writeSie(URV value);
 
     /// Helper to write method: Mask with MSTATEEN/HSTATEEN.
     bool writeSstateen(CsrNumber num, URV value);
@@ -1461,6 +1488,9 @@ namespace WdRiscv
     /// Legalize scountovf, matching OF bit of given mhpmevent.
     void updateScountovfValue(CsrNumber mhpm, uint64_t value);
 
+    /// Legalize menvcfg/senvcfg/henvcfg. Changes pmm bits if necessary.
+    URV legalizeEnvcfgValue(URV current, URV value) const;
+
     /// Return true if given CSR number is a PMPADDR register and if
     /// that register is locked.  Return false otherwise.
     bool isPmpaddrLocked(CsrNumber csrn) const;
@@ -1486,11 +1516,15 @@ namespace WdRiscv
 
     /// Enable/disable supervisor time compare.
     void enableSstc(bool flag)
-    { sstcEnabled_ = flag; updateSstc(); }
+    { sstcEnabled_ = flag; enableMenvcfgStce(flag); updateSstc(); }
 
     /// Enable/disable top-of-range mode in pmp configurations.
     void enablePmpTor(bool flag)
     { pmpTor_ = flag; }
+
+    /// Enable/disable NA4 mode in pmp configurations.
+    void enablePmpNa4(bool flag)
+    { pmpNa4_ = flag; }
 
     /// Update implementation status of Sstc (supervisor timer)
     /// related CSRs.  This is called when Sstc related configuration
@@ -1532,6 +1566,14 @@ namespace WdRiscv
     /// Enable/disable advanced interrupt artchitecture extension.
     void enableAia(bool flag);
 
+    /// Enable/disable ssnpm extension. Sets senvcfg.PMM/henvcfg.PMM
+    /// to read-only zero if false.
+    void enableSsnpm(bool flag);
+
+    /// Enable/disable smnpm extension. Sets menvcfg.PMM to
+    /// read-only zero if false.
+    void enableSmnpm(bool flag);
+
     /// Enable/disable virtual supervisor. When enabled, the trap-related
     /// CSRs point to their virtual counterpars (e.g. reading writing sstatus will
     /// actually read/write vsstatus).
@@ -1543,6 +1585,10 @@ namespace WdRiscv
     /// Called after an MHPMEVENT CSR is written/poked to update the
     /// contorl of the underlying counter.
     void updateCounterControl(CsrNumber number);
+
+    /// Update bits of SIE that are distinct for MIE (happens where MVIEN bits are set and
+    /// corresponding bits in MIDELEG are clear).
+    void updateShadowSie();
 
     /// Turn on/off virtual mode. When virtual mode is on read/write to
     /// supervisor CSRs get redirected to virtual supervisor CSRs and read/write
@@ -1568,16 +1614,29 @@ namespace WdRiscv
     /// helper to add fields of hypervisor CSRs
     void addHypervisorFields();
 
+    /// helper to add fields of AIA CSRs
+    void addAiaFields();
+
     /// Return true if given CSR is a hypervisor CSR.
     bool isHypervisor(CsrNumber csrn) const
     { auto csr = getImplementedCsr(csrn); return csr and csr->isHypervisor(); }
 
+    /// If flag is false, bit HENVCFG.STCE becomes read-only-zero;
+    /// otherwise, bit is readable.
+    void enableHenvcfgStce(bool flag);
+
+    /// If flag is false, bit MENVCFG.STCE becomes read-only-zero;
+    /// otherwise, bit is readable.
+    void enableMenvcfgStce(bool flag);
+
     /// Return the value of the STCE bit of the MENVCFG CSR. Return
-    /// false if CSR is not implemented.
+    /// false if CSR is not implemented or if SSTC extension is off.
     bool menvcfgStce()
     {
       auto csr = getImplementedCsr(rv32_? CsrNumber::MENVCFGH : CsrNumber::MENVCFG);
       if (not csr)
+	return false;
+      if (not sstcEnabled_)
 	return false;
       URV value = csr->read();
       if (rv32_)
@@ -1588,6 +1647,10 @@ namespace WdRiscv
       MenvcfgFields<uint64_t> fields(value);
       return fields.bits_.STCE;
     }
+
+    /// If flag is false, bit HENVCFG.PBMTE becomes read-only ero;
+    /// otherwise, bit is readable.
+    void enableHenvcfgPbmte(bool flag);
 
     /// Return the value of the PBMTE bit of the MENVCFG CSR. Return
     /// false if CSR is not implemented.
@@ -1623,6 +1686,23 @@ namespace WdRiscv
       return fields.bits_.STCE;
     }
 
+    /// Return the value of the PBMTE bit of the HENVCFG CSR. Return
+    /// false if CSR is not implemented.
+    bool henvcfgPbmte()
+    {
+      auto csr = getImplementedCsr(rv32_? CsrNumber::HENVCFGH : CsrNumber::HENVCFG);
+      if (not csr)
+	return false;
+      URV value = csr->read();
+      if (rv32_)
+	{
+	  HenvcfghFields<uint32_t> fields(value);
+	  return fields.bits_.PBMTE;
+	}
+      HenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.PBMTE;
+    }
+
     /// Return the ADUE bit of MENVCFG CSR.
     bool menvcfgAdue()
     {
@@ -1634,15 +1714,64 @@ namespace WdRiscv
       return fields.bits_.ADUE;
     }
 
-    /// Return the ADUE bit of MENVCFG CSR.
+    /// Return the ADUE bit of HENVCFG CSR.
     bool henvcfgAdue()
     {
       auto csr = getImplementedCsr(CsrNumber::HENVCFG);
       if (not csr)
 	return false;
       URV value = csr->read();
-      MenvcfgFields<uint64_t> fields(value);
+      HenvcfgFields<uint64_t> fields(value);
       return fields.bits_.ADUE;
+    }
+
+    /// Return the PMM bits of MENVCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t menvcfgPmm()
+    {
+      if constexpr (sizeof(URV) == 4)
+        return 0;
+      else
+        {
+          auto csr = getImplementedCsr(CsrNumber::MENVCFG);
+          if (not csr)
+            return 0;
+          URV value = csr->read();
+          MenvcfgFields<uint64_t> fields(value);
+          return fields.bits_.PMM;
+        }
+    }
+
+    /// Return the PMM bits of SENVCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t senvcfgPmm()
+    {
+      if (rv32_)
+        return 0;
+
+      auto csr = getImplementedCsr(CsrNumber::SENVCFG);
+      if (not csr)
+	return 0;
+      URV value = csr->read();
+      SenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.PMM;
+    }
+
+    /// Return the PMM bits of HENVCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t henvcfgPmm()
+    {
+      if constexpr (sizeof(URV) == 4)
+        return 0;
+      else
+        {
+          auto csr = getImplementedCsr(CsrNumber::HENVCFG);
+          if (not csr)
+            return 0;
+          URV value = csr->read();
+          HenvcfgFields<uint64_t> fields(value);
+          return fields.bits_.PMM;
+        }
     }
 
     /// Set ix to the counter index corresponding to the given
@@ -1702,7 +1831,7 @@ namespace WdRiscv
 
     /// Returns true if CSR is defined as part of a STATEEN and enabled, or
     /// not part of STATEEN. Returns false otherwise.
-    bool isStateEnabled(CsrNumber num, PrivilegeMode mode) const;
+    bool isStateEnabled(CsrNumber num, PrivilegeMode mode, bool virtMode) const;
 
   private:
 
@@ -1732,6 +1861,8 @@ namespace WdRiscv
     bool hasPerfEventSet_ = false;
     std::unordered_set<unsigned> perfEventSet_;
 
+    URV shadowSie_ = 0;     // Used where mideleg is 0 and mvien is 1.
+
     unsigned pmpG_ = 0;     // PMP G value: ln2(pmpGrain) - 2
     unsigned geilen_ = 0;   // Guest interrupt count.
 
@@ -1742,6 +1873,7 @@ namespace WdRiscv
     bool cofEnabled_ = false;     // Counter overflow
     bool stateenOn_ = false;      // Mstateen extension.
     bool pmpTor_ = true;          // Top-of-range PMP mode enabled
+    bool pmpNa4_ = true;          // Na4 PMP mode enabled
     bool aiaEnabled_ = false;     // Aia extension.
 
     bool recordWrite_ = true;
