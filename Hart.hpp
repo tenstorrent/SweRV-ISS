@@ -403,13 +403,33 @@ namespace WdRiscv
       virtMem_.enableVsPbmt(flag);
     }
 
+    /// Called when pointer masking configuration changes.
+    void updateTranslationPmm()
+    {
+      if (isRvSsnpm())
+        {
+          uint8_t pmm = csRegs_.senvcfgPmm();
+          if (isRvu())
+            virtMem_.enableUserPointerMasking(VirtMem::Pmm(pmm));
+
+          pmm = csRegs_.henvcfgPmm();
+          if (isRvh())
+            virtMem_.enableVsPointerMasking(VirtMem::Pmm(pmm));
+        }
+
+      if (isRvSmnpm())
+        {
+          uint8_t pmm = csRegs_.menvcfgPmm();
+          if (isRvs())
+            virtMem_.enablePointerMasking(VirtMem::Pmm(pmm));
+          else if (isRvu())
+            virtMem_.enableUserPointerMasking(VirtMem::Pmm(pmm));
+        }
+    }
+
     /// Enable page translation naturally aligned power of 2 page sizes.
     void enableTranslationNapot(bool flag)
     { virtMem_.enableNapot(flag); }
-
-    /// Enable page pointer masking for user privilege (Zjpm).
-    void enableUserPointerMasking(bool flag)
-    { virtMem_.enablePointerMasking(flag); }
 
     /// Do not consider lr and sc instructions as load/store events for
     /// performance counter when flag is false. Do consider them when
@@ -995,6 +1015,14 @@ namespace WdRiscv
     void enableSmrnmi(bool flag)
     { enableExtension(RvExtension::Smrnmi, flag); csRegs_.enableSmrnmi(flag); }
 
+    /// Enable/disable ssnpm extension.
+    void enableSsnpm(bool flag)
+    { enableExtension(RvExtension::Ssnpm, flag); csRegs_.enableSsnpm(flag); }
+
+    /// Enable/disable smnpm extension.
+    void enableSmnpm(bool flag)
+    { enableExtension(RvExtension::Smnpm, flag); csRegs_.enableSmnpm(flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1332,6 +1360,12 @@ namespace WdRiscv
 
     bool isRvzcmop() const
     { return extensionIsEnabled(RvExtension::Zcmop); }
+
+    bool isRvSsnpm() const
+    { return extensionIsEnabled(RvExtension::Ssnpm); }
+
+    bool isRvSmnpm() const
+    { return extensionIsEnabled(RvExtension::Smnpm); }
 
     /// Return true if current program is considered finished (either
     /// reached stop address or executed exit limit).

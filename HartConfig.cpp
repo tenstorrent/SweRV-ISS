@@ -1855,13 +1855,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enableSvinval(flag);
     }
 
-  tag = "enable_user_pointer_masking";
-  if (config_ -> contains(tag))
-    {
-      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
-      hart.enableUserPointerMasking(flag);
-    }
-
   tag = "enable_supervisor_time_compare";
   if (config_ -> contains(tag))
     {

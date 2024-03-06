@@ -1110,6 +1110,42 @@ CsRegs<URV>::enableAia(bool flag)
 
 
 template <typename URV>
+void
+CsRegs<URV>::enableSsnpm(bool flag)
+{
+  using CN = CsrNumber;
+
+  if (not rv32_)
+    {
+      uint8_t mask = flag? 0x3 : 0;
+      SenvcfgFields<uint64_t> sf{regs_.at(size_t(CN::SENVCFG)).getReadMask()};
+      sf.bits_.PMM = mask;
+      regs_.at(size_t(CN::SENVCFG)).setReadMask(sf.value_);
+
+      HenvcfgFields<uint64_t> hf{regs_.at(size_t(CN::HENVCFG)).getReadMask()};
+      hf.bits_.PMM = mask;
+      regs_.at(size_t(CN::HENVCFG)).setReadMask(hf.value_);
+    }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableSmnpm(bool flag)
+{
+  using CN = CsrNumber;
+
+  if (not rv32_)
+    {
+      MenvcfgFields<uint64_t> hf{regs_.at(size_t(CN::MENVCFG)).getReadMask()};
+      uint8_t mask = flag? 0x3 : 0;
+      hf.bits_.PMM = mask;
+      regs_.at(size_t(CN::MENVCFG)).setReadMask(hf.value_);
+    }
+}
+
+
+template <typename URV>
 URV
 CsRegs<URV>::legalizeMstatusValue(URV value) const
 {
@@ -1701,6 +1737,13 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
 	  mnf.bits_.NMIE = 1;  // Attempt to clear mnstatus.nmie has no effect
 	  value = mnf.value_;
 	}
+    }
+
+  if (num == CN::MENVCFG or num == CN::SENVCFG or num == CN::HENVCFG)
+    {
+      URV prev = 0;
+      peek(num, prev);
+      value = legalizeEnvcfgValue(prev, value);
     }
 
   csr->write(value);
@@ -3217,6 +3260,13 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
       value = legalizeMstatusValue(value);
     }
 
+  if (num == CN::MENVCFG or num == CN::SENVCFG or num == CN::HENVCFG)
+    {
+      URV prev = 0;
+      peek(num, prev);
+      value = legalizeEnvcfgValue(prev, value);
+    }
+
   csr->poke(value);
 
   if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
@@ -3641,6 +3691,26 @@ CsRegs<URV>::updateScountovfValue(CsrNumber mhpm, uint64_t value)
   URV mask = ~ (1 << ix);
   URV prev = csr->read() & mask;
   csr->poke(of << ix | prev);
+}
+
+
+template <typename URV>
+URV
+CsRegs<URV>::legalizeEnvcfgValue(URV current, URV value) const
+{
+  if constexpr (sizeof(URV) == 8)
+    {
+      HenvcfgFields<uint64_t> hf{value};
+      unsigned pmm = hf.bits_.PMM;
+      if (pmm == 0x1) // 1 is reserved encoding for PMM
+        {
+          pmm = HenvcfgFields<uint64_t>(current).bits_.PMM;
+          hf.bits_.PMM = pmm;
+          value = hf.value_;
+        }
+      return value;
+    }
+  return 0;
 }
 
 

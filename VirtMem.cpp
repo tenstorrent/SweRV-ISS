@@ -105,13 +105,14 @@ VirtMem::translateForFetch2(uint64_t va, unsigned size, PrivilegeMode priv,
   if (n1 == n2)
     return ExceptionCause::NONE;  // Not page crossing
 
+  fetchPageCross_ = true;
   uint64_t va2 = n2*pageSize_;
   cause = translateForFetch(va2, priv, twoStage, gpa2, pa2);
-  if (cause != ExceptionCause::NONE) {
-    gpa1 = gpa2;
-    pa1 = pa2 = va2;
-  }
-  fetchPageCross_ = true;
+  if (cause != ExceptionCause::NONE)
+    {
+      gpa1 = gpa2;
+      pa1 = pa2 = va2;
+    }
 
   return cause;
 }
@@ -227,6 +228,11 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
       pa = va;
       return ExceptionCause::NONE;
     }
+  else
+    {
+      va = exec? va : applyPointerMaskVa(va, priv, false);
+      pa = va;
+    }
 
   // Lookup virtual page number in TLB.
   uint64_t virPageNum = va >> pageBits_;
@@ -303,24 +309,20 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
 
   ExceptionCause (VirtMem::*walkFn)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
   unsigned vaMsb = 0;  // Most significant bit of va
-  unsigned pmb = 0;    // Pointer masking bits (J extension).
 
   if (mode_ == Sv39)
     {
       vaMsb = 38; // Bits 63 to 39 of va must equal bit 38
-      pmb = 16;
       walkFn = &VirtMem::pageTableWalk1p12<Pte39, Va39>;
     }
   else if (mode_ == Sv48)
     {
       vaMsb = 47; // Bits 63 to 48 of va must equal bit 47
-      pmb = 16;
       walkFn = &VirtMem::pageTableWalk1p12<Pte48, Va48>;
     }
   else if (mode_ == Sv57)
     {
       vaMsb = 56; // Bits 63 to 57 of va must equal bit 56
-      pmb = 7;
       walkFn = &VirtMem::pageTableWalk1p12<Pte57, Va57>;
     }
   else
@@ -332,11 +334,6 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
   // Bits higher than bit vaMsb must be identical to bit vaMsb.
   uint64_t va1 = va;
   uint64_t va2 = (int64_t(va) << (63-vaMsb)) >> (63-vaMsb); // Expected va.
-  if (pmEnabled_ and priv == PrivilegeMode::User and not exec)
-    {
-      va1 = (va1 << pmb) >> pmb;
-      va2 = (va2 << pmb) >> pmb;
-    }
   if (va1 != va2)
     return stage1PageFaultType(read, write, exec);
 
@@ -447,9 +444,15 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
   assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
   if (vsMode_ == Bare)
-    gpa = va;
+    {
+      va = exec? va : applyPointerMaskPa(va, priv, true);
+      gpa = pa = va;
+    }
   else
     {
+      va = exec? va : applyPointerMaskVa(va, priv, true);
+      gpa = pa = va;
+
       // Lookup virtual page number in TLB.
       uint64_t virPageNum = va >> pageBits_;
       TlbEntry* entry = vsTlb_.findEntryUpdateTime(virPageNum, vsAsid_);
@@ -508,24 +511,20 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
 
   ExceptionCause (VirtMem::*walkFn)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
   unsigned vaMsb = 0;  // Most significant bit of va
-  unsigned pmb = 0;    // Pointer masking bits (J extension).
 
   if (vsMode_ == Sv39)
     {
       vaMsb = 38; // Bits 63 to 39 of va must equal bit 38
-      pmb = 16;
       walkFn = &VirtMem::stage1PageTableWalk<Pte39, Va39>;
     }
   else if (vsMode_ == Sv48)
     {
       vaMsb = 47; // Bits 63 to 48 of va must equal bit 47
-      pmb = 16; 
       walkFn = &VirtMem::stage1PageTableWalk<Pte48, Va48>;
     }
   else if (vsMode_ == Sv57)
     {
       vaMsb = 56; // Bits 63 to 57 of va must equal bit 56
-      pmb = 7;
       walkFn = &VirtMem::stage1PageTableWalk<Pte57, Va57>;
     }
   else
@@ -537,11 +536,6 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
   // Bits higher than bit vaMsb must be identical to bit vaMsb.
   uint64_t va1 = va;
   uint64_t va2 = (int64_t(va) << (63-vaMsb)) >> (63-vaMsb); // Expected va.
-  if (pmEnabled_ and priv == PrivilegeMode::User and not exec)
-    {
-      va1 = (va1 << pmb) >> pmb;
-      va2 = (va2 << pmb) >> pmb;
-    }
   if (va1 != va2)
     return stage1PageFaultType(read, write, exec);
 
