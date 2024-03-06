@@ -3924,12 +3924,12 @@ CsRegs<URV>::addMachineFields()
     {{"zero", 1}, {"SSIE", 1}, {"zero", 1}, {"MSIE", 1},
      {"zero", 1}, {"STIE", 1}, {"zero", 1}, {"MTIE", 1},
      {"zero", 1}, {"SEIE", 1}, {"zero", 1}, {"MEIE", 1},
-     {"zero", xlen - 12}});
+     {"zero", 1}, {"LCOFIE", 1}, {"zero", xlen - 14}});
   setCsrFields(CsrNumber::MIP,
     {{"zero", 1}, {"SSIP", 1}, {"zero", 1}, {"MSIP", 1},
      {"zero", 1}, {"STIP", 1}, {"zero", 1}, {"MTIP", 1},
      {"zero", 1}, {"SEIP", 1}, {"zero", 1}, {"MEIP", 1},
-     {"zero", xlen - 12}});
+     {"zero", 1}, {"LCOFIP", 1}, {"zero", xlen - 14}});
   setCsrFields(CsrNumber::MTVEC, {{"MODE", 2}, {"BASE", xlen - 2}});
 
   std::vector<typename Csr<URV>::Field> mcount = {{"CY", 1}, {"TM", 1}, {"IR", 1}};
@@ -4056,6 +4056,20 @@ CsRegs<URV>::addMachineFields()
           name += "h";
           setCsrFields(csrNum, {{name, xlen}});
         }
+
+      csrNum = advance(CsrNumber::MHPMEVENT3, i - 3);
+      name = "mhpmevent" + std::to_string(i);
+      if (rv32_)
+        {
+          setCsrFields(csrNum, {{name, xlen}});
+
+          // High register counterpart of mhpmevent
+          csrNum = advance(CsrNumber::MHPMEVENTH3, i - 3);
+          name += "h";
+        }
+      setCsrFields(csrNum,
+        {{name, xlen - 8}, {"res", 2}, {"VUINH", 1}, {"VSINH", 1},
+        {"UINH", 1}, {"SINH", 1}, {"MINH", 1}, {"OF", 1}});
     }
 }
 
@@ -4080,10 +4094,12 @@ CsRegs<URV>::addSupervisorFields()
   setCsrFields(CsrNumber::STVAL, {{"stval", xlen}});
   setCsrFields(CsrNumber::SIE,
     {{"zero", 1}, {"SSIE", 1}, {"zero", 3}, {"STIE", 1},
-     {"zero", 3}, {"SEIE", 1}, {"zero", xlen - 10}});
+     {"zero", 3}, {"SEIE", 1}, {"zero", 3}, {"LCOFIE", 1},
+     {"zero", xlen - 14}});
   setCsrFields(CsrNumber::SIP,
     {{"zero", 1}, {"SSIP", 1}, {"zero", 3}, {"STIP", 1},
-     {"zero", 3}, {"SEIP", 1}, {"zero", xlen - 10}});
+     {"zero", 3}, {"SEIP", 1}, {"zero", 3}, {"LCOFIP", 1},
+     {"zero", xlen - 14}});
 
   if (rv32_)
     {
