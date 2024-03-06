@@ -3708,9 +3708,8 @@ CsRegs<URV>::legalizeEnvcfgValue(URV current, URV value) const
           hf.bits_.PMM = pmm;
           value = hf.value_;
         }
-      return value;
     }
-  return 0;
+  return value;
 }
 
 
@@ -3925,12 +3924,12 @@ CsRegs<URV>::addMachineFields()
     {{"zero", 1}, {"SSIE", 1}, {"zero", 1}, {"MSIE", 1},
      {"zero", 1}, {"STIE", 1}, {"zero", 1}, {"MTIE", 1},
      {"zero", 1}, {"SEIE", 1}, {"zero", 1}, {"MEIE", 1},
-     {"zero", xlen - 12}});
+     {"zero", 1}, {"LCOFIE", 1}, {"zero", xlen - 14}});
   setCsrFields(CsrNumber::MIP,
     {{"zero", 1}, {"SSIP", 1}, {"zero", 1}, {"MSIP", 1},
      {"zero", 1}, {"STIP", 1}, {"zero", 1}, {"MTIP", 1},
      {"zero", 1}, {"SEIP", 1}, {"zero", 1}, {"MEIP", 1},
-     {"zero", xlen - 12}});
+     {"zero", 1}, {"LCOFIP", 1}, {"zero", xlen - 14}});
   setCsrFields(CsrNumber::MTVEC, {{"MODE", 2}, {"BASE", xlen - 2}});
 
   std::vector<typename Csr<URV>::Field> mcount = {{"CY", 1}, {"TM", 1}, {"IR", 1}};
@@ -3964,7 +3963,7 @@ CsRegs<URV>::addMachineFields()
         {{"FIOM", 1}, {"res0",  3}, {"CBIE", 2}, {"CBCFE", 1},
          {"CBZE", 1}, {"res1", 24}});
       setCsrFields(CsrNumber::MENVCFGH,
-        {{"res0", 30}, {"PBMTE", 1}, {"STCE", 1}});
+        {{"PMM", 2}, {"res0", 28}, {"PBMTE", 1}, {"STCE", 1}});
       setCsrFields(CsrNumber::MCYCLEH, {{"mcycleh", 32}});
       setCsrFields(CsrNumber::MINSTRETH, {{"minstreth", 32}});
     }
@@ -3980,8 +3979,8 @@ CsRegs<URV>::addMachineFields()
          {"GVA",  1},  {"MPV",  1}, {"res0", 23}, {"SD",   1}});
       setCsrFields(CsrNumber::MENVCFG,
         {{"FIOM", 1}, {"res0",  3}, {"CBIE", 2}, {"CBCFE", 1},
-         {"CBZE", 1}, {"res1", 53}, {"ADUE", 1}, {"PBMTE", 1},
-	 {"STCE", 1}});
+         {"CBZE", 1}, {"res1", 24}, {"PMM",  2}, {"res2", 27},
+         {"ADUE", 1}, {"PBMTE", 1}, {"STCE", 1}});
     }
 
   unsigned pmpIx = 0;
@@ -4057,6 +4056,20 @@ CsRegs<URV>::addMachineFields()
           name += "h";
           setCsrFields(csrNum, {{name, xlen}});
         }
+
+      csrNum = advance(CsrNumber::MHPMEVENT3, i - 3);
+      name = "mhpmevent" + std::to_string(i);
+      if (rv32_)
+        {
+          setCsrFields(csrNum, {{name, xlen}});
+
+          // High register counterpart of mhpmevent
+          csrNum = advance(CsrNumber::MHPMEVENTH3, i - 3);
+          name += "h";
+        }
+      setCsrFields(csrNum,
+        {{name, xlen - 8}, {"res", 2}, {"VUINH", 1}, {"VSINH", 1},
+        {"UINH", 1}, {"SINH", 1}, {"MINH", 1}, {"OF", 1}});
     }
 }
 
@@ -4081,13 +4094,12 @@ CsRegs<URV>::addSupervisorFields()
   setCsrFields(CsrNumber::STVAL, {{"stval", xlen}});
   setCsrFields(CsrNumber::SIE,
     {{"zero", 1}, {"SSIE", 1}, {"zero", 3}, {"STIE", 1},
-     {"zero", 3}, {"SEIE", 1}, {"zero", xlen - 10}});
+     {"zero", 3}, {"SEIE", 1}, {"zero", 3}, {"LCOFIE", 1},
+     {"zero", xlen - 14}});
   setCsrFields(CsrNumber::SIP,
     {{"zero", 1}, {"SSIP", 1}, {"zero", 3}, {"STIP", 1},
-     {"zero", 3}, {"SEIP", 1}, {"zero", xlen - 10}});
-  setCsrFields(CsrNumber::SENVCFG,
-    {{"FIOM", 1}, {"res0", 3}, {"CBIE", 2}, {"CBCFE", 1},
-     {"CBZE", 1}, {"res1", xlen - 8}});
+     {"zero", 3}, {"SEIP", 1}, {"zero", 3}, {"LCOFIP", 1},
+     {"zero", xlen - 14}});
 
   if (rv32_)
     {
@@ -4098,6 +4110,9 @@ CsRegs<URV>::addSupervisorFields()
          {"SUM",  1}, {"MXR",  1}, {"res5", 11}, {"SD",   1}});
       setCsrFields(CsrNumber::SATP,
         {{"PPN", 22}, {"ASID", 9}, {"MODE", 1}});
+      setCsrFields(CsrNumber::SENVCFG,
+        {{"FIOM", 1}, {"res0", 3}, {"CBIE", 2}, {"CBCFE", 1},
+         {"CBZE", 1}, {"res1", xlen - 8}});
     }
   else
     {
@@ -4109,6 +4124,9 @@ CsRegs<URV>::addSupervisorFields()
          {"res6", 29}, {"SD",   1}});
       setCsrFields(CsrNumber::SATP,
         {{"PPN", 44}, {"ASID", 16}, {"MODE", 4}});
+      setCsrFields(CsrNumber::SENVCFG,
+        {{"FIOM", 1}, {"res0",  3}, {"CBIE", 2}, {"CBCFE", 1},
+         {"CBZE", 1}, {"res1", 24}, {"PMM",  2}, {"res2", xlen - 34}});
     }
 }
 
@@ -4246,7 +4264,7 @@ CsRegs<URV>::addHypervisorFields()
         {{"FIOM", 1}, {"res0", 3}, {"CBIE", 2}, {"CBCFE", 1}, {"CBZE", 1},
          {"res1", xlen - 8}});
       setCsrFields(Csrn::HENVCFGH,
-        {{"res0", 30}, {"PBMTE", 1}, {"VSTCE", 1}});
+        {{"PMM", 2}, {"res0", 28}, {"PBMTE", 1}, {"VSTCE", 1}});
       setCsrFields(Csrn::HTIMEDELTAH, {{"htimedeltah", xlen}});
       setCsrFields(Csrn::HGATP,
         {{"PPN", 22}, {"VMID", 7}, {"zero", 2}, {"MODE", 1}});
@@ -4265,8 +4283,9 @@ CsRegs<URV>::addHypervisorFields()
          {"HU", 1},   {"res1", 2}, {"VGEIN", 6}, {"res2", 2}, {"VTVM", 1},
          {"VTW", 1},  {"VTSR", 1}, {"res3", 9},  {"VSXL", 2}, {"res4", 30}});
       setCsrFields(Csrn::HENVCFG,
-        {{"FIOM", 1}, {"res0", 3}, {"CBIE", 2}, {"CBCFE", 1}, {"CBZE", 1},
-         {"res1", 54}, {"PBMTE", 1}, {"VSTCE", 1}});
+        {{"FIOM",  1}, {"res0", 3}, {"CBIE", 2}, {"CBCFE", 1}, {"CBZE", 1},
+         {"res1", 24}, {"PMM", 2}, {"res2", 27}, {"ADUE",  1}, {"PBMTE", 1},
+         {"VSTCE", 1}});
       setCsrFields(Csrn::HGATP,
         {{"PPN", 44}, {"VMID", 14}, {"zero", 2}, {"MODE", 4}});
       setCsrFields(Csrn::VSSTATUS,
