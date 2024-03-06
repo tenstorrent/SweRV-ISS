@@ -3708,9 +3708,8 @@ CsRegs<URV>::legalizeEnvcfgValue(URV current, URV value) const
           hf.bits_.PMM = pmm;
           value = hf.value_;
         }
-      return value;
     }
-  return 0;
+  return value;
 }
 
 
