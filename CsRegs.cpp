@@ -755,20 +755,29 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
   hyperEnabled_ = flag;
 
   using CN = CsrNumber;
+
   for (auto csrn : { CN::HSTATUS, CN::HEDELEG, CN::HIDELEG, CN::HIE, CN::HCOUNTEREN,
 	CN::HGEIE, CN::HTVAL, CN::HIP, CN::HVIP, CN::HTINST, CN::HGEIP, CN::HENVCFG,
-	CN::HENVCFGH, CN::HGATP, CN::HCONTEXT, CN::HTIMEDELTA, CN::HTIMEDELTAH,
-        CN::MTVAL2, CN::MTINST, CN::HCONTEXT } )
+	CN::HGATP, CN::HCONTEXT, CN::HTIMEDELTA, CN::MTVAL2, CN::MTINST, CN::HCONTEXT } )
     {
       auto csr = findCsr(csrn);
       if (not csr)
-        {
-          std::cerr << "Error: enableHypervisorMode: CSR number 0x"
-                    << std::hex << URV(csrn) << std::dec << " undefined\n";
-        }
+	std::cerr << "Error: enableHypervisorMode: CSR number 0x"
+		  << std::hex << URV(csrn) << std::dec << " undefined\n";
       else
         csr->setImplemented(flag);
     }
+
+  if (rv32_)
+    for (auto csrn : { CN::HENVCFGH, CN::HTIMEDELTAH } )
+      {
+	auto csr = findCsr(csrn);
+	if (not csr)
+	  std::cerr << "Error: enableHypervisorMode: CSR number 0x"
+		    << std::hex << URV(csrn) << std::dec << " undefined\n";
+	else
+	  csr->setImplemented(flag);
+      }
 
   if (superEnabled_)
     {
