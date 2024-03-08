@@ -1992,6 +1992,29 @@ namespace WdRiscv
     void enableStee(bool flag)
     { steeEnabled_ = flag; }
 
+    /// Return true if CLINT is configured.
+    bool hasClint() const
+    { return clintStart_ < clintEnd_; }
+
+    /// Return true if CLINT is configured setting address to the clint address.
+    /// Return false otherwise leaving address unmodifed.
+    bool hasClint(uint64_t& addr) const
+    {
+      if (clintStart_ < clintEnd_)
+	{
+	  addr = clintStart_;
+	  return true;
+	}
+      return false;
+    }
+
+    /// Set the CLINT alarm to the given value.
+    void setClintAlarm(uint64_t value)
+    {
+      if (hasClint())
+	clintAlarm_ = value;
+    }
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
@@ -2130,10 +2153,6 @@ namespace WdRiscv
 
     /// Helper to reset.
     void resetVector();
-
-    /// Return true if CLINT is configured.
-    bool hasClint() const
-    { return clintStart_ < clintEnd_; }
 
     // Return true if FS field of mstatus is not off.
     bool isFpEnabled() const
