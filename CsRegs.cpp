@@ -679,7 +679,12 @@ void
 CsRegs<URV>::updateSstc()
 {
   bool stce = menvcfgStce();
-  PrivilegeMode mode = stce? PrivilegeMode::Supervisor : PrivilegeMode::Machine;
+  URV mMask = 0;
+  if (not peek(CsrNumber::MCOUNTEREN, mMask))
+    return;
+  bool mTm = (mMask & 2) >> 1;
+
+  PrivilegeMode mode = (stce & mTm)? PrivilegeMode::Supervisor : PrivilegeMode::Machine;
 
   auto stimecmp = findCsr(CsrNumber::STIMECMP);
   if (sstcEnabled_ and not stimecmp->isImplemented())
@@ -710,7 +715,9 @@ CsRegs<URV>::updateSstc()
 	}
     }
 
-  bool hstce = henvcfgStce();
+  URV hMask = 0;
+  peek(CsrNumber::HCOUNTEREN, hMask);
+  bool hstce = ((hMask & 2) >> 1) and henvcfgStce();
 
   auto vstimecmp = findCsr(CsrNumber::VSTIMECMP);
   if (sstcEnabled_ and hyperEnabled_ and not vstimecmp->isImplemented())
@@ -3807,6 +3814,10 @@ CsRegs<URV>::updateCounterPrivilege()
           csr->setHypervisor(!virtAccess);
         }
     }
+
+  // Both STCE and TM control (v)stimecmp accessability.
+  bool stce = menvcfgStce(); mMask &= (stce << 1);
+  bool hstce = henvcfgStce(); hMask &= (hstce << 1);
 
   auto stimecmp = getImplementedCsr(CsrNumber::STIMECMP);
   auto stimecmph = getImplementedCsr(CsrNumber::STIMECMPH);
