@@ -254,8 +254,16 @@ namespace WdRiscv
     }
 
     /// Return the effective page based memory type of last translation.
-    Pbmt lastEffectivePbmt() const
-    { return vsMode_ != Mode::Bare? vsPbmt_ : pbmt_; }
+    Pbmt lastEffectivePbmt(bool twoStage) const
+    {
+      if (twoStage)
+        {
+          if (vsMode_ != Mode::Bare and
+              vsPbmt_ != Pbmt::None)
+            return vsPbmt_;
+        }
+      return pbmt_;
+    }
 
     static constexpr const char* pageSize(Mode m, uint32_t level)
     {
