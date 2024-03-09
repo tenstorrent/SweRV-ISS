@@ -9582,8 +9582,21 @@ Hart<URV>::execFence(const DecodedInst*)
 
 template <typename URV>
 void
-Hart<URV>::execFence_tso(const DecodedInst*)
+Hart<URV>::execFence_tso(const DecodedInst* di)
 {
+  // Only fence_tso rw,rw is legal.
+
+  if ( di->isFencePredRead() and
+       di->isFencePredWrite() and
+       di->isFenceSuccRead() and
+       di->isFenceSuccWrite() and
+       not di->isFencePredInput() and
+       not di->isFencePredOutput() and
+       not di->isFenceSuccInput() and
+       not di->isFenceSuccOutput() )
+    return;
+
+  illegalInst(di);
 }
 
 

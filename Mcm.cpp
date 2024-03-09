@@ -2030,9 +2030,9 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
   bool succRead = instr.di_.isFenceSuccRead();
   bool succWrite = instr.di_.isFenceSuccWrite();
   bool predIn = instr.di_.isFencePredInput();
-  bool predOut = instr.di_.isFencePredInput();
+  bool predOut = instr.di_.isFencePredOutput();
   bool succIn = instr.di_.isFencePredInput();
-  bool succOut = instr.di_.isFencePredInput();
+  bool succOut = instr.di_.isFencePredOutput();
 
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
