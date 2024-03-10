@@ -223,7 +223,7 @@ Hart<URV>::countImplementedPmpRegisters() const
       for (unsigned ix = 0; ix < 16; ++ix, ++num)
         if (csRegs_.isImplemented(CsrNumber(num)))
           cfgCount++;
-      if (count and cfgCount != 16)
+      if (count and cfgCount != 16 and hartIx_ == 0)
         std::cerr << "Warning: Physical memory protection enabled but only "
                   << cfgCount << "/16" << " PMPCFG CSRs implemented\n";
     }
