@@ -717,7 +717,8 @@ CsRegs<URV>::updateSstc()
 
   URV hMask = 0;
   peek(CsrNumber::HCOUNTEREN, hMask);
-  bool hstce = ((hMask & 2) >> 1) and henvcfgStce();
+  bool hstce = henvcfgStce();
+  bool hTm = (hMask & 2) >> 1;
 
   auto vstimecmp = findCsr(CsrNumber::VSTIMECMP);
   if (sstcEnabled_ and hyperEnabled_ and not vstimecmp->isImplemented())
@@ -733,7 +734,7 @@ CsRegs<URV>::updateSstc()
       vstimecmph->setPrivilegeMode(mode);
     }
 
-  if (stce and not hstce)
+  if (stce and not (hstce and hTm))
     {
       stimecmp->setHypervisor(true);
       if (rv32_)
