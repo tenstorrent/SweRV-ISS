@@ -206,6 +206,8 @@ template <typename URV>
 unsigned
 Hart<URV>::countImplementedPmpRegisters() const
 {
+  using std::cerr;
+
   unsigned count = 0;
 
   unsigned num = unsigned(CsrNumber::PMPADDR0);
@@ -214,7 +216,7 @@ Hart<URV>::countImplementedPmpRegisters() const
       count++;
 
   if (count and count < 64 and hartIx_ == 0)
-    std::cerr << "Warning: Some but not all PMPADDR CSRs are implemented\n";
+    cerr << "Warning: Some but not all PMPADDR CSRs are implemented\n";
 
   unsigned cfgCount = 0;
   if (mxlen_ == 32)
@@ -224,8 +226,8 @@ Hart<URV>::countImplementedPmpRegisters() const
         if (csRegs_.isImplemented(CsrNumber(num)))
           cfgCount++;
       if (count and cfgCount != 16 and hartIx_ == 0)
-        std::cerr << "Warning: Physical memory protection enabled but only "
-                  << cfgCount << "/16" << " PMPCFG CSRs implemented\n";
+        cerr << "Warning: Physical memory protection enabled but only "
+	     << cfgCount << "/16" << " PMPCFG CSRs implemented\n";
     }
   else
     {
@@ -233,9 +235,9 @@ Hart<URV>::countImplementedPmpRegisters() const
       for (unsigned ix = 0; ix < 16; ++ix, ++num)
         if (csRegs_.isImplemented(CsrNumber(num)))
           cfgCount++;
-      if (count and cfgCount != 8)  // Only even numbered CFG CSRs implemented.
-        std::cerr << "Warning: Physical memory protection enabled but only "
-		  << cfgCount << "/8" << " PMPCFG CSRs implemented.\n";
+      if (count and cfgCount != 8 and hartIx_ == 0)  // Only even numbered implemented.
+        cerr << "Warning: Physical memory protection enabled but only "
+	     << cfgCount << "/8" << " PMPCFG CSRs implemented.\n";
     }
 
   return count;
@@ -3546,8 +3548,9 @@ Hart<URV>::configMemoryProtectionGrain(uint64_t size)
 
   if (size < 4)
     {
-      std::cerr << "Memory protection grain size (" << size << ") is "
-                << "smaller than 4. Using 4.\n";
+      if (hartIx_ == 0)
+	std::cerr << "Memory protection grain size (" << size << ") is "
+		  << "smaller than 4. Using 4.\n";
       size = 4;
       ok = false;
     }
@@ -3556,9 +3559,10 @@ Hart<URV>::configMemoryProtectionGrain(uint64_t size)
   uint64_t powerOf2 = uint64_t(1) << log2Size;
   if (size != powerOf2)
     {
-      std::cerr << "Memory protection grain size (0x" << std::hex
-                << size << ") is not a power of 2. Using: 0x"
-                << powerOf2 << std::dec << '\n';
+      if (hartIx_ == 0)
+	std::cerr << "Memory protection grain size (0x" << std::hex
+		  << size << ") is not a power of 2. Using: 0x"
+		  << powerOf2 << std::dec << '\n';
       size = powerOf2;
       ok = false;
     }
@@ -3566,10 +3570,11 @@ Hart<URV>::configMemoryProtectionGrain(uint64_t size)
   uint64_t limit = sizeof(URV)*8 + 3;
   if (log2Size > limit)  // This can only happen in RV32.
     {
-      std::cerr << "Memory protection grain size (0x" << std::hex
-                << size << ") is larger than 2 to the power "
-		<< std::dec << limit << ". "
-                << "Using 2 to the power " << limit << ".\n";
+      if (hartIx_ == 0)
+	std::cerr << "Memory protection grain size (0x" << std::hex
+		  << size << ") is larger than 2 to the power "
+		  << std::dec << limit << ". "
+		  << "Using 2 to the power " << limit << ".\n";
       size = uint64_t(1) << limit;
       powerOf2 = size;
       log2Size = limit;
