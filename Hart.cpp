@@ -4617,9 +4617,9 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
   bool success = untilAddress(address, traceFile);
       
   if (instCounter_ >= limit)
-    std::cerr << "Stopped -- Reached instruction limit\n";
+    std::cerr << "Stopped -- Reached instruction limit hart=" << hartIx_ << "\n";
   else if (pc_ == address)
-    std::cerr << "Stopped -- Reached end address\n";
+    std::cerr << "Stopped -- Reached end address hart=" << hartIx_ << "\n";
 
   // Simulator stats.
   struct timeval t1;
