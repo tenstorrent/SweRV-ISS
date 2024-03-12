@@ -1619,7 +1619,8 @@ CsRegs<URV>::enableMenvcfgStce(bool flag)
       regs_.at(size_t(CN::MENVCFG)).setWriteMask(hf.value_);
     }
 
-  enableHenvcfgStce(flag);
+  bool stce = menvcfgStce();
+  enableHenvcfgStce(stce);
 }
 
 
@@ -1649,6 +1650,38 @@ CsRegs<URV>::enableHenvcfgPbmte(bool flag)
       hf.bits_.PBMTE = flag;
       regs_.at(size_t(CN::HENVCFG)).setWriteMask(hf.value_);
     }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableMenvcfgPbmte(bool flag)
+{
+  using CN = CsrNumber;
+
+  if (rv32_)
+    {
+      HenvcfghFields<uint32_t> hf{uint32_t(regs_.at(size_t(CN::MENVCFGH)).getReadMask())};
+      hf.bits_.PBMTE = flag;
+      regs_.at(size_t(CN::MENVCFGH)).setReadMask(hf.value_);
+
+      hf = uint32_t(regs_.at(size_t(CN::MENVCFGH)).getWriteMask());
+      hf.bits_.PBMTE = flag;
+      regs_.at(size_t(CN::MENVCFGH)).setWriteMask(hf.value_);
+    }
+  else
+    {
+      HenvcfgFields<uint64_t> hf{regs_.at(size_t(CN::MENVCFG)).getReadMask()};
+      hf.bits_.PBMTE = flag;
+      regs_.at(size_t(CN::MENVCFG)).setReadMask(hf.value_);
+
+      hf = regs_.at(size_t(CN::MENVCFG)).getWriteMask();
+      hf.bits_.PBMTE = flag;
+      regs_.at(size_t(CN::MENVCFG)).setWriteMask(hf.value_);
+    }
+
+  bool pbmte = menvcfgPbmte();
+  enableHenvcfgPbmte(pbmte);
 }
 
 
