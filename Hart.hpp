@@ -385,6 +385,8 @@ namespace WdRiscv
     void updateTranslationPbmt()
     {
       bool flag = extensionIsEnabled(RvExtension::Svpbmt);
+      csRegs_.enableSvpbmt(flag);
+
       auto menv = csRegs_.getImplementedCsr(CsrNumber::MENVCFG);
       if (menv)
 	{

@@ -1516,7 +1516,15 @@ namespace WdRiscv
 
     /// Enable/disable supervisor time compare.
     void enableSstc(bool flag)
-    { sstcEnabled_ = flag; enableMenvcfgStce(flag); updateSstc(); }
+    {
+      sstcEnabled_ = flag;
+      enableMenvcfgStce(flag);
+      updateSstc();
+    }
+
+    /// Enable/disable svpbmt.
+    void enableSvpbmt(bool flag)
+    { enableMenvcfgPbmte(flag); }
 
     /// Enable/disable top-of-range mode in pmp configurations.
     void enablePmpTor(bool flag)
@@ -1651,6 +1659,10 @@ namespace WdRiscv
     /// If flag is false, bit HENVCFG.PBMTE becomes read-only ero;
     /// otherwise, bit is readable.
     void enableHenvcfgPbmte(bool flag);
+
+    /// If flag is false, bit MENVCFG.PBMTE becomes read-only-zero;
+    /// otherwise, bit is readable.
+    void enableMenvcfgPbmte(bool flag);
 
     /// Return the value of the PBMTE bit of the MENVCFG CSR. Return
     /// false if CSR is not implemented.

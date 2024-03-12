@@ -189,35 +189,35 @@ namespace WdRiscv
 
     /// Predecessor read bit of fence instruction.
     bool isFencePredRead() const
-    { return isFence() and ((inst_ >> 25) & 1); }
+    { return (isFence() or isFenceTso()) and ((inst_ >> 25) & 1); }
 
     /// Predecessor write bit of fence instruction.
     bool isFencePredWrite() const
-    { return isFence() and ((inst_ >> 24) & 1); }
+    { return (isFence() or isFenceTso()) and ((inst_ >> 24) & 1); }
 
     /// Predecessor input (io read) bit of fence instruction.
     bool isFencePredInput() const
-    { return isFence() and ((inst_ >> 27) & 1); }
+    { return (isFence() or isFenceTso()) and ((inst_ >> 27) & 1); }
 
     /// Predecessor output (io write) bit of fence instruction.
     bool isFencePredOutput() const
-    { return isFence() and ((inst_ >> 26) & 1); }
+    { return (isFence() or isFenceTso()) and ((inst_ >> 26) & 1); }
 
     /// Successor read bit of fence instruction.
     bool isFenceSuccRead() const
-    { return isFence() and ((inst_ >> 21) & 1); }
+    { return (isFence() or isFenceTso()) and ((inst_ >> 21) & 1); }
 
     /// Successor write bit of fence instruction.
     bool isFenceSuccWrite() const
-    { return isFence() and ((inst_ >> 20) & 1); }
+    { return (isFence() or isFenceTso()) and ((inst_ >> 20) & 1); }
 
     /// Successor input (io read) bit of fence instruction.
     bool isFenceSuccInput() const
-    { return isFence() and ((inst_ >> 23) & 1); }
+    { return (isFence() or isFenceTso()) and ((inst_ >> 23) & 1); }
 
     /// Successor output (io write) bit of fence instruction.
     bool isFenceSuccOutput() const
-    { return isFence() and ((inst_ >> 22) & 1); }
+    { return (isFence() or isFenceTso()) and ((inst_ >> 22) & 1); }
 
     /// Return true if this is an AMO instruction (atomic but not lr/sc).
     bool isAmo() const
