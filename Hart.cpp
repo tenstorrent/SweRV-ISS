@@ -4469,6 +4469,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
   uint64_t limit = instCountLim_;
   bool doStats = instFreq_ or enableCounters_;
   bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
+  bool prevIsBranch = true;  // For basic block tracing.
 
   // Check for gdb break every 1000000 instructions.
   unsigned gdbCount = 0, gdbLimit = 1000000;
@@ -4574,7 +4575,10 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
             ++retiredInsts_;
 
 	  if (bbFile_)
-	    countBasicBlocks(di);
+	    {
+	      countBasicBlocks(prevIsBranch, physPc);
+	      prevIsBranch = di->isBranch();
+	    }
 
 	  if (instrLineTrace_)
 	    memory_.traceInstructionLine(currPc_, physPc);
@@ -4736,8 +4740,8 @@ Hart<URV>::dumpBasicBlocks()
                   fprintf(bbFile_, "T");
                   first = false;
                 }
-              fprintf(bbFile_, ":%" PRIu64 ":%" PRIu64 ":%" PRIu64 ":%" PRIu64 " ", kv.first, stat.count_,
-                stat.access_, stat.hit_);
+              fprintf(bbFile_, ":%" PRIu64 ":%" PRIu64 ":%" PRIu64 ":%" PRIu64 " ", kv.first,
+		      stat.count_, stat.access_, stat.hit_);
             }
         }
       if (not first)
@@ -4758,26 +4762,26 @@ Hart<URV>::dumpBasicBlocks()
 
 template <typename URV>
 void
-Hart<URV>::countBasicBlocks(const DecodedInst* di)
+Hart<URV>::countBasicBlocks(bool isBranch, uint64_t physPc)
 {
   if (bbInsts_ >= bbLimit_)
     dumpBasicBlocks();
 
   bbInsts_++;
 
-  if (di->instEntry()->isBranch())
+  if (isBranch)
     {
-      auto& blockStat = basicBlocks_[pc_];
+      auto& blockStat = basicBlocks_[physPc];
       blockStat.count_++;
-      bbPc_ = pc_;
+      bbPc_ = physPc;
     }
   else
     {
-      auto iter = basicBlocks_.find(pc_);
+      auto iter = basicBlocks_.find(physPc);
       if (iter != basicBlocks_.end())
 	{
 	  iter->second.count_++;
-	  bbPc_ = pc_;
+	  bbPc_ = physPc;
 	}
       else
 	basicBlocks_[bbPc_].count_++;
@@ -4793,6 +4797,7 @@ Hart<URV>::simpleRunWithLimit()
   std::string instStr;
 
   bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
+  bool prevIsBranch = true;  // For basic block tracing.
 
   while (noUserStop and instCounter_ < limit) 
     {
@@ -4831,7 +4836,10 @@ Hart<URV>::simpleRunWithLimit()
 	memory_.traceInstructionLine(currPc_, physPc);
 
       if (bbFile_)
-	countBasicBlocks(di);
+	{
+	  countBasicBlocks(prevIsBranch, physPc);
+	  prevIsBranch = di->isBranch();
+	}
 
       if (traceBranchOn and (di->isBranch() or di->isXRet()))
 	traceBranch(di);

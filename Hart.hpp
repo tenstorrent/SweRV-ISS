@@ -4820,7 +4820,7 @@ namespace WdRiscv
       vecRegs_.clearTraceData();
     }
 
-    void countBasicBlocks(const DecodedInst* di);
+    void countBasicBlocks(bool isBranch, uint64_t physPc);
     void dumpBasicBlocks();
     void dumpInitState(const char* tag, uint64_t vaddr, uint64_t paddr);
 
