@@ -4294,7 +4294,8 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
       if (vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag))
 	{
 	  bool input = false;
-	  vecRegs_.readMaskRegister(vs1, ix, input);
+	  if (ix < vecRegs_.elemCount())
+	    vecRegs_.readMaskRegister(vs1, ix, input);
 	  found = found or input;
 	  flag = not found;
 	}
@@ -4336,7 +4337,8 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
       if (vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag))
 	{
 	  bool input = false;
-	  vecRegs_.readMaskRegister(vs1, ix, input);
+	  if (ix < vecRegs_.elemCount())
+	    vecRegs_.readMaskRegister(vs1, ix, input);
 	  flag = not found;
 	  found = found or input;
 	}
@@ -4378,7 +4380,8 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
       bool active = vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag);
 
       bool input = false;
-      vecRegs_.readMaskRegister(vs1, ix, input);
+      if (ix < vecRegs_.elemCount())
+	vecRegs_.readMaskRegister(vs1, ix, input);
 
       if (active)
 	vecRegs_.writeMaskRegister(vd, ix, false);

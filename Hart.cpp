@@ -206,6 +206,8 @@ template <typename URV>
 unsigned
 Hart<URV>::countImplementedPmpRegisters() const
 {
+  using std::cerr;
+
   unsigned count = 0;
 
   unsigned num = unsigned(CsrNumber::PMPADDR0);
@@ -214,7 +216,7 @@ Hart<URV>::countImplementedPmpRegisters() const
       count++;
 
   if (count and count < 64 and hartIx_ == 0)
-    std::cerr << "Warning: Some but not all PMPADDR CSRs are implemented\n";
+    cerr << "Warning: Some but not all PMPADDR CSRs are implemented\n";
 
   unsigned cfgCount = 0;
   if (mxlen_ == 32)
@@ -223,9 +225,9 @@ Hart<URV>::countImplementedPmpRegisters() const
       for (unsigned ix = 0; ix < 16; ++ix, ++num)
         if (csRegs_.isImplemented(CsrNumber(num)))
           cfgCount++;
-      if (count and cfgCount != 16)
-        std::cerr << "Warning: Physical memory protection enabled but only "
-                  << cfgCount << "/16" << " PMPCFG CSRs implemented\n";
+      if (count and cfgCount != 16 and hartIx_ == 0)
+        cerr << "Warning: Physical memory protection enabled but only "
+	     << cfgCount << "/16" << " PMPCFG CSRs implemented\n";
     }
   else
     {
@@ -233,9 +235,9 @@ Hart<URV>::countImplementedPmpRegisters() const
       for (unsigned ix = 0; ix < 16; ++ix, ++num)
         if (csRegs_.isImplemented(CsrNumber(num)))
           cfgCount++;
-      if (count and cfgCount != 8)  // Only even numbered CFG CSRs implemented.
-        std::cerr << "Warning: Physical memory protection enabled but only "
-		  << cfgCount << "/8" << " PMPCFG CSRs implemented.\n";
+      if (count and cfgCount != 8 and hartIx_ == 0)  // Only even numbered implemented.
+        cerr << "Warning: Physical memory protection enabled but only "
+	     << cfgCount << "/8" << " PMPCFG CSRs implemented.\n";
     }
 
   return count;
@@ -3546,8 +3548,9 @@ Hart<URV>::configMemoryProtectionGrain(uint64_t size)
 
   if (size < 4)
     {
-      std::cerr << "Memory protection grain size (" << size << ") is "
-                << "smaller than 4. Using 4.\n";
+      if (hartIx_ == 0)
+	std::cerr << "Memory protection grain size (" << size << ") is "
+		  << "smaller than 4. Using 4.\n";
       size = 4;
       ok = false;
     }
@@ -3556,9 +3559,10 @@ Hart<URV>::configMemoryProtectionGrain(uint64_t size)
   uint64_t powerOf2 = uint64_t(1) << log2Size;
   if (size != powerOf2)
     {
-      std::cerr << "Memory protection grain size (0x" << std::hex
-                << size << ") is not a power of 2. Using: 0x"
-                << powerOf2 << std::dec << '\n';
+      if (hartIx_ == 0)
+	std::cerr << "Memory protection grain size (0x" << std::hex
+		  << size << ") is not a power of 2. Using: 0x"
+		  << powerOf2 << std::dec << '\n';
       size = powerOf2;
       ok = false;
     }
@@ -3566,10 +3570,11 @@ Hart<URV>::configMemoryProtectionGrain(uint64_t size)
   uint64_t limit = sizeof(URV)*8 + 3;
   if (log2Size > limit)  // This can only happen in RV32.
     {
-      std::cerr << "Memory protection grain size (0x" << std::hex
-                << size << ") is larger than 2 to the power "
-		<< std::dec << limit << ". "
-                << "Using 2 to the power " << limit << ".\n";
+      if (hartIx_ == 0)
+	std::cerr << "Memory protection grain size (0x" << std::hex
+		  << size << ") is larger than 2 to the power "
+		  << std::dec << limit << ". "
+		  << "Using 2 to the power " << limit << ".\n";
       size = uint64_t(1) << limit;
       powerOf2 = size;
       log2Size = limit;
@@ -4464,6 +4469,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
   uint64_t limit = instCountLim_;
   bool doStats = instFreq_ or enableCounters_;
   bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
+  bool prevIsBranch = true;  // For basic block tracing.
 
   // Check for gdb break every 1000000 instructions.
   unsigned gdbCount = 0, gdbLimit = 1000000;
@@ -4569,7 +4575,10 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
             ++retiredInsts_;
 
 	  if (bbFile_)
-	    countBasicBlocks(di);
+	    {
+	      countBasicBlocks(prevIsBranch, physPc);
+	      prevIsBranch = di->isBranch();
+	    }
 
 	  if (instrLineTrace_)
 	    memory_.traceInstructionLine(currPc_, physPc);
@@ -4612,9 +4621,9 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
   bool success = untilAddress(address, traceFile);
       
   if (instCounter_ >= limit)
-    std::cerr << "Stopped -- Reached instruction limit\n";
+    std::cerr << "Stopped -- Reached instruction limit hart=" << hartIx_ << "\n";
   else if (pc_ == address)
-    std::cerr << "Stopped -- Reached end address\n";
+    std::cerr << "Stopped -- Reached end address hart=" << hartIx_ << "\n";
 
   // Simulator stats.
   struct timeval t1;
@@ -4731,8 +4740,8 @@ Hart<URV>::dumpBasicBlocks()
                   fprintf(bbFile_, "T");
                   first = false;
                 }
-              fprintf(bbFile_, ":%" PRIu64 ":%" PRIu64 ":%" PRIu64 ":%" PRIu64 " ", kv.first, stat.count_,
-                stat.access_, stat.hit_);
+              fprintf(bbFile_, ":%" PRIu64 ":%" PRIu64 ":%" PRIu64 ":%" PRIu64 " ", kv.first,
+		      stat.count_, stat.access_, stat.hit_);
             }
         }
       if (not first)
@@ -4753,26 +4762,26 @@ Hart<URV>::dumpBasicBlocks()
 
 template <typename URV>
 void
-Hart<URV>::countBasicBlocks(const DecodedInst* di)
+Hart<URV>::countBasicBlocks(bool isBranch, uint64_t physPc)
 {
   if (bbInsts_ >= bbLimit_)
     dumpBasicBlocks();
 
   bbInsts_++;
 
-  if (di->instEntry()->isBranch())
+  if (isBranch)
     {
-      auto& blockStat = basicBlocks_[pc_];
+      auto& blockStat = basicBlocks_[physPc];
       blockStat.count_++;
-      bbPc_ = pc_;
+      bbPc_ = physPc;
     }
   else
     {
-      auto iter = basicBlocks_.find(pc_);
+      auto iter = basicBlocks_.find(physPc);
       if (iter != basicBlocks_.end())
 	{
 	  iter->second.count_++;
-	  bbPc_ = pc_;
+	  bbPc_ = physPc;
 	}
       else
 	basicBlocks_[bbPc_].count_++;
@@ -4788,6 +4797,7 @@ Hart<URV>::simpleRunWithLimit()
   std::string instStr;
 
   bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
+  bool prevIsBranch = true;  // For basic block tracing.
 
   while (noUserStop and instCounter_ < limit) 
     {
@@ -4826,7 +4836,10 @@ Hart<URV>::simpleRunWithLimit()
 	memory_.traceInstructionLine(currPc_, physPc);
 
       if (bbFile_)
-	countBasicBlocks(di);
+	{
+	  countBasicBlocks(prevIsBranch, physPc);
+	  prevIsBranch = di->isBranch();
+	}
 
       if (traceBranchOn and (di->isBranch() or di->isXRet()))
 	traceBranch(di);
@@ -9582,8 +9595,21 @@ Hart<URV>::execFence(const DecodedInst*)
 
 template <typename URV>
 void
-Hart<URV>::execFence_tso(const DecodedInst*)
+Hart<URV>::execFence_tso(const DecodedInst* di)
 {
+  // Only fence_tso rw,rw is legal.
+
+  if ( di->isFencePredRead() and
+       di->isFencePredWrite() and
+       di->isFenceSuccRead() and
+       di->isFenceSuccWrite() and
+       not di->isFencePredInput() and
+       not di->isFencePredOutput() and
+       not di->isFenceSuccInput() and
+       not di->isFenceSuccOutput() )
+    return;
+
+  illegalInst(di);
 }
 
 

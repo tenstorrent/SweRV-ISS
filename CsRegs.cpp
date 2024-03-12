@@ -679,7 +679,12 @@ void
 CsRegs<URV>::updateSstc()
 {
   bool stce = menvcfgStce();
-  PrivilegeMode mode = stce? PrivilegeMode::Supervisor : PrivilegeMode::Machine;
+  URV mMask = 0;
+  if (not peek(CsrNumber::MCOUNTEREN, mMask))
+    return;
+  bool mTm = (mMask & 2) >> 1;
+
+  PrivilegeMode mode = (stce & mTm)? PrivilegeMode::Supervisor : PrivilegeMode::Machine;
 
   auto stimecmp = findCsr(CsrNumber::STIMECMP);
   if (sstcEnabled_ and not stimecmp->isImplemented())
@@ -710,7 +715,10 @@ CsRegs<URV>::updateSstc()
 	}
     }
 
+  URV hMask = 0;
+  peek(CsrNumber::HCOUNTEREN, hMask);
   bool hstce = henvcfgStce();
+  bool hTm = (hMask & 2) >> 1;
 
   auto vstimecmp = findCsr(CsrNumber::VSTIMECMP);
   if (sstcEnabled_ and hyperEnabled_ and not vstimecmp->isImplemented())
@@ -726,7 +734,7 @@ CsRegs<URV>::updateSstc()
       vstimecmph->setPrivilegeMode(mode);
     }
 
-  if (stce and not hstce)
+  if (stce and not (hstce and hTm))
     {
       stimecmp->setHypervisor(true);
       if (rv32_)
@@ -755,20 +763,29 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
   hyperEnabled_ = flag;
 
   using CN = CsrNumber;
+
   for (auto csrn : { CN::HSTATUS, CN::HEDELEG, CN::HIDELEG, CN::HIE, CN::HCOUNTEREN,
 	CN::HGEIE, CN::HTVAL, CN::HIP, CN::HVIP, CN::HTINST, CN::HGEIP, CN::HENVCFG,
-	CN::HENVCFGH, CN::HGATP, CN::HCONTEXT, CN::HTIMEDELTA, CN::HTIMEDELTAH,
-        CN::MTVAL2, CN::MTINST, CN::HCONTEXT } )
+	CN::HGATP, CN::HCONTEXT, CN::HTIMEDELTA, CN::MTVAL2, CN::MTINST, CN::HCONTEXT } )
     {
       auto csr = findCsr(csrn);
       if (not csr)
-        {
-          std::cerr << "Error: enableHypervisorMode: CSR number 0x"
-                    << std::hex << URV(csrn) << std::dec << " undefined\n";
-        }
+	std::cerr << "Error: enableHypervisorMode: CSR number 0x"
+		  << std::hex << URV(csrn) << std::dec << " undefined\n";
       else
         csr->setImplemented(flag);
     }
+
+  if (rv32_)
+    for (auto csrn : { CN::HENVCFGH, CN::HTIMEDELTAH } )
+      {
+	auto csr = findCsr(csrn);
+	if (not csr)
+	  std::cerr << "Error: enableHypervisorMode: CSR number 0x"
+		    << std::hex << URV(csrn) << std::dec << " undefined\n";
+	else
+	  csr->setImplemented(flag);
+      }
 
   if (superEnabled_)
     {
@@ -1602,7 +1619,8 @@ CsRegs<URV>::enableMenvcfgStce(bool flag)
       regs_.at(size_t(CN::MENVCFG)).setWriteMask(hf.value_);
     }
 
-  enableHenvcfgStce(flag);
+  bool stce = menvcfgStce();
+  enableHenvcfgStce(stce);
 }
 
 
@@ -1632,6 +1650,38 @@ CsRegs<URV>::enableHenvcfgPbmte(bool flag)
       hf.bits_.PBMTE = flag;
       regs_.at(size_t(CN::HENVCFG)).setWriteMask(hf.value_);
     }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableMenvcfgPbmte(bool flag)
+{
+  using CN = CsrNumber;
+
+  if (rv32_)
+    {
+      HenvcfghFields<uint32_t> hf{uint32_t(regs_.at(size_t(CN::MENVCFGH)).getReadMask())};
+      hf.bits_.PBMTE = flag;
+      regs_.at(size_t(CN::MENVCFGH)).setReadMask(hf.value_);
+
+      hf = uint32_t(regs_.at(size_t(CN::MENVCFGH)).getWriteMask());
+      hf.bits_.PBMTE = flag;
+      regs_.at(size_t(CN::MENVCFGH)).setWriteMask(hf.value_);
+    }
+  else
+    {
+      HenvcfgFields<uint64_t> hf{regs_.at(size_t(CN::MENVCFG)).getReadMask()};
+      hf.bits_.PBMTE = flag;
+      regs_.at(size_t(CN::MENVCFG)).setReadMask(hf.value_);
+
+      hf = regs_.at(size_t(CN::MENVCFG)).getWriteMask();
+      hf.bits_.PBMTE = flag;
+      regs_.at(size_t(CN::MENVCFG)).setWriteMask(hf.value_);
+    }
+
+  bool pbmte = menvcfgPbmte();
+  enableHenvcfgPbmte(pbmte);
 }
 
 
@@ -3798,6 +3848,10 @@ CsRegs<URV>::updateCounterPrivilege()
           csr->setHypervisor(!virtAccess);
         }
     }
+
+  // Both STCE and TM control (v)stimecmp accessability.
+  bool stce = menvcfgStce(); mMask &= (stce << 1);
+  bool hstce = henvcfgStce(); hMask &= (hstce << 1);
 
   auto stimecmp = getImplementedCsr(CsrNumber::STIMECMP);
   auto stimecmph = getImplementedCsr(CsrNumber::STIMECMPH);

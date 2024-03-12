@@ -1051,6 +1051,19 @@ System<URV>::loadSnapshot(const std::string& snapDir)
   if (not memory_->loadSnapshot(memPath.string(), usedBlocks))
     return false;
 
+  // Rearm CLINT timers.
+  for (auto hartPtr : sysHarts_)
+    {
+      uint64_t clintAddr = 0;
+      if (hartPtr->hasClint(clintAddr))
+	{
+	  uint64_t timeCmpAddr = clintAddr + 0x4000 + hartPtr->sysHartIndex() * 8;
+	  uint64_t timeCmp = 0;
+	  memory_->peek(timeCmpAddr, timeCmp, false);
+	  hartPtr->setClintAlarm(timeCmp);
+	}
+    }
+
   Filesystem::path fdPath = dirPath / "fd";
   return syscall.loadFileDescriptors(fdPath.string());
 }
