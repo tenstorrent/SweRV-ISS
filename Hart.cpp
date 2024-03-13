@@ -36,6 +36,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#include <thread>
+#include <chrono>
+
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
@@ -4365,6 +4368,10 @@ static std::atomic<bool> userStop = false;
 // Negation of the preceding variable. Exists for speed (obsessive
 // compulsive engineering).
 static std::atomic<bool> noUserStop = true;
+
+// Occasionally may need to suspend to perform a race condition
+// operation, like a system callback.
+static std::atomic<bool> suspend = false;
 //NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 void
@@ -4411,6 +4418,32 @@ private:
 
   struct sigaction prevKbdAction_;
 };
+
+
+template <typename URV>
+void
+Hart<URV>::forceSnapshot()
+{
+  static std::mutex _m;
+  suspended_ = true;
+  {
+    std::lock_guard<std::mutex> lock(_m);
+
+    suspend = true;
+    if (snapshotSystem_)
+      {
+        std::cout << "Snapshot triggered from program context.\n";
+        snapshotSystem_();
+      }
+    else
+      {
+        std::cerr << "No snapshot callback registered.\n";
+        assert(0);
+      }
+    suspend = false;
+  }
+  suspended_ = false;
+}
 
 
 template <typename URV>
@@ -4478,6 +4511,13 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
   while (pc_ != address and instCounter_ < limit)
     {
+      while (suspend) [[unlikely]]
+        {
+          suspended_ = true;
+          std::this_thread::sleep_for(std::chrono::milliseconds(100));
+          if (not suspend)
+            suspended_ = false;
+        }
       if (userStop)
         break;
       resetExecInfo(); clearTraceData();
@@ -4687,7 +4727,7 @@ Hart<URV>::simpleRun()
         {
           bool hasLim = (instCountLim_ < ~uint64_t(0));
           if (hasLim or bbFile_ or instrLineTrace_ or not branchTraceFile_.empty() or
-	      isRvs() or isRvu() or isRvv() or hasClint())
+	      isRvs() or isRvu() or isRvv() or hasClint() or snapshotSystem_)
             simpleRunWithLimit();
           else
             simpleRunNoLimit();
@@ -4796,6 +4836,14 @@ Hart<URV>::simpleRunWithLimit()
 
   while (noUserStop and instCounter_ < limit) 
     {
+      while (suspend) [[unlikely]]
+        {
+          suspended_ = true;
+          std::this_thread::sleep_for(std::chrono::milliseconds(100));
+          if (not suspend)
+            suspended_ = false;
+        }
+
       resetExecInfo();
 
       currPc_ = pc_;

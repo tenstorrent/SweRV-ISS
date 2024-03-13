@@ -654,6 +654,41 @@ System<URV>::addPciDevices(const std::vector<std::string>& devs)
 
 
 template <typename URV>
+void
+System<URV>::addSnapshotCallback()
+{
+  auto cb = [this]() -> void {
+      uint64_t tag = ++snapIx_;
+      std::string pathStr = snapDir_ + std::to_string(tag);
+      Filesystem::path path = pathStr;
+      if (not Filesystem::is_directory(path) and
+	  not Filesystem::create_directories(path))
+        {
+          std::cerr << "Error: Failed to create snapshot directory " << pathStr << '\n';
+          std::cerr << "Continuing...\n";
+        }
+
+      bool allSuspended = true;
+      do
+        {
+          allSuspended = true;
+          for (const auto& hart : sysHarts_)
+            allSuspended = allSuspended and (hart->suspended() or hart->hasTargetProgramFinished());
+        } while (not allSuspended);
+
+      if (not saveSnapshot(pathStr))
+        {
+          std::cerr << "Error: Failed to save a snapshot\n";
+          std::cerr << "Continuining...\n";
+        }
+  };
+
+  for (auto& hart : sysHarts_)
+    hart->addSnapshotCallback(cb);
+}
+
+
+template <typename URV>
 bool
 System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll)
 {
@@ -917,8 +952,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
 /// 0. Return true on success and false on failure.
 template <typename URV>
 bool
-System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snapDir,
-			 const std::vector<uint64_t>& periods)
+System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::vector<uint64_t>& periods)
 {
   if (hartCount() == 0)
     return true;
@@ -940,10 +974,12 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snap
 
       nextLimit = std::min(nextLimit, globalLimit);
 
-      uint64_t tag = ix;
+      uint64_t tag = 0;
       if (periods.size() > 1)
 	tag = ix < periods.size() ? periods.at(ix) : nextLimit;
-      std::string pathStr = snapDir + std::to_string(tag);
+      else
+        tag = ++snapIx_;
+      std::string pathStr = snapDir_ + std::to_string(tag);
       Filesystem::path path = pathStr;
       if (not Filesystem::is_directory(path) and
 	  not Filesystem::create_directories(path))
