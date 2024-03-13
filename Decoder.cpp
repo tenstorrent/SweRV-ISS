@@ -1485,8 +1485,6 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	{
 	  CiFormInst cif(inst);
 	  op0 = cif.bits.rd; op1 = RegX0; op2 = cif.addiImmed();
-	  if (op0 == 0)
-	    return instTable_.getEntry(InstId::illegal);  // Rd == 0 reserved.
 	  return instTable_.getEntry(InstId::c_li);
 	}
 
@@ -1510,8 +1508,8 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	      return instTable_.getEntry(InstId::c_addi16sp);
 	    }
 	  op0 = cif.bits.rd; op1 = cif.luiImmed(); op2 = 0;
-	  if (op1 != 0 and (op0 == 0 or op0 == 2))
-	    return instTable_.getEntry(InstId::illegal);  // Imm != 0 and Rd in {0,2} reserved.
+	  if (op1 == 0)
+	    return instTable_.getEntry(InstId::illegal);  // Imm == 0 reserved.
 	  return instTable_.getEntry(InstId::c_lui);
 	}
 
