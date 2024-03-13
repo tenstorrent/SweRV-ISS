@@ -1537,8 +1537,6 @@ Mcm<URV>::effectiveRegIx(const DecodedInst& di, unsigned opIx) const
     case OperandType::CsReg:
       {
 	CsrNumber csr{di.ithOperand(opIx)};
-	if (csr == CsrNumber::FFLAGS or csr == CsrNumber::FRM)
-	  csr = CsrNumber::FCSR;
 	return unsigned(csr) + csRegOffset_;
       }
 
@@ -1571,12 +1569,11 @@ Mcm<URV>::identifyRegisters(const DecodedInst& di,
       assert(0 && "Mcm::identifyRegisters: Error invalid instr entry");
     }
 
-  if (entry->hasRoundingMode() and
-      RoundingMode(di.roundingMode()) == RoundingMode::Dynamic)
-    sourceRegs.push_back(unsigned(CsrNumber::FCSR) + csRegOffset_);
+  if (entry->hasRoundingMode() and RoundingMode(di.roundingMode()) == RoundingMode::Dynamic)
+    sourceRegs.push_back(unsigned(CsrNumber::FRM) + csRegOffset_);
 
   if (entry->modifiesFflags())
-    destRegs.push_back(unsigned(CsrNumber::FCSR) + csRegOffset_);
+    destRegs.push_back(unsigned(CsrNumber::FFLAGS) + csRegOffset_);
 
   auto id = entry->instId();
   bool skipCsr = ((id == InstId::csrrs or id == InstId::csrrc or
@@ -1598,10 +1595,26 @@ Mcm<URV>::identifyRegisters(const DecodedInst& di,
 	continue;
 
       size_t regIx = effectiveRegIx(di, i);
-      if (isDest)
-	destRegs.push_back(regIx);
-      if (isSource)
-	sourceRegs.push_back(regIx);
+      if (regIx == size_t(CsrNumber::FCSR) + csRegOffset_)
+	{
+	  if (isDest)
+	    {
+	      destRegs.push_back(size_t(CsrNumber::FFLAGS) + csRegOffset_);
+	      destRegs.push_back(size_t(CsrNumber::FRM) + csRegOffset_);
+	    }
+	  if (isSource)
+	    {
+	      sourceRegs.push_back(size_t(CsrNumber::FFLAGS) + csRegOffset_);
+	      sourceRegs.push_back(size_t(CsrNumber::FRM) + csRegOffset_);
+	    }
+	}
+      else
+	{
+	  if (isDest)
+	    destRegs.push_back(regIx);
+	  if (isSource)
+	    sourceRegs.push_back(regIx);
+	}
     }
 }
 
