@@ -1136,7 +1136,7 @@ Decoder::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& fieldCount) const
 	}
       else if (lumop == 8)
         {   // store whole register
-          if (mew == 0)
+          if (mew == 0 and f3 == 0)
             {
               if (nf == 0) return instTable_.getEntry(InstId::vs1r_v);
               if (nf == 1) return instTable_.getEntry(InstId::vs2r_v);
