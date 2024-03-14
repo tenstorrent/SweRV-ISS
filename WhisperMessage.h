@@ -29,8 +29,8 @@ enum WhisperMessageType { Peek, Poke, Step, Until, Change, ChangeCount,
  };
 
 /// Resource identifiers for peek special.
-enum WhisperSpecialResource { PrivMode, PrevPrivMode, FpFlags, Trap, DeferredInterrupts,
-			      Seipin, EffMemAttr };
+enum WhisperSpecialResource { PrivMode, PrevPrivMode, FpFlags, FpFlagsVec, Trap,
+                              DeferredInterrupts, Seipin, EffMemAttr };
 
 
 /// Structure used to communicate with the whisper program using
