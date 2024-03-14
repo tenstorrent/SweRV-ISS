@@ -343,6 +343,21 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
 	  case WhisperSpecialResource::Seipin:
 	    reply.value = hart.getSeiPin();
 	    return true;
+          case WhisperSpecialResource::EffMemAttr:
+            // Special resource so we don't have to re-translate.
+            {
+            uint64_t va = 0, pa = 0;
+            if (hart.lastLdStAddress(va, pa))
+              {
+                auto pma = hart.getPma(pa);
+                auto effpbmt = VirtMem::effectivePbmt(hart.lastVirtMode(), hart.lastVsPageMode(),
+                                                      hart.virtMem().lastPbmt(), hart.virtMem().lastPbmt());
+                pma = VirtMem::overridePmaWithPbmt(pma, effpbmt);
+                reply.value = pma.attributesToInt();
+              }
+            else
+              break;
+            }
 	  default:
 	    break;
 	  }
@@ -844,6 +859,7 @@ specialResourceToStr(uint64_t v)
     case WhisperSpecialResource::Trap:                return "trap";
     case WhisperSpecialResource::DeferredInterrupts:  return "defi";
     case WhisperSpecialResource::Seipin:              return "seipin";
+    case WhisperSpecialResource::EffMemAttr:          return "effma";
     }
   return "?";
 }
@@ -864,12 +880,7 @@ doPageTableWalk(const Hart<URV>& hart, WhisperMessage& reply)
       hart.getPageTableWalkAddresses(isInstr, index, addrs);
       for (auto& addr : addrs)
         if (addr.type_ == VirtMem::WalkEntry::Type::PA)
-          {
-            items.push_back(std::move(addr.addr_));
-            Pma pma = hart.getPma(addr.addr_);
-            pma = VirtMem::overridePmaWithPbmt(pma, addr.pbmt_);
-            items.push_back(pma.attributesToInt());
-          }
+          items.push_back(std::move(addr.addr_));
     }
   else
     hart.getPageTableWalkEntries(isInstr, index, items);
