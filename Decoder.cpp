@@ -1138,6 +1138,7 @@ Decoder::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& fieldCount) const
         {   // store whole register
           if (mew == 0 and f3 == 0)
             {
+              fieldCount = 1 + nf;
               if (nf == 0) return instTable_.getEntry(InstId::vs1r_v);
               if (nf == 1) return instTable_.getEntry(InstId::vs2r_v);
               if (nf == 3) return instTable_.getEntry(InstId::vs4r_v);
