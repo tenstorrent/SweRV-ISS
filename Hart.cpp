@@ -1121,6 +1121,11 @@ Hart<URV>::execAddi(const DecodedInst* di)
   SRV imm = di->op2As<SRV>();
   SRV v = intRegs_.read(di->op1()) + imm;
   intRegs_.write(di->op0(), v);
+
+#ifdef HINT_OPS
+  if (di->op0() == 0 and di->op1() == 31)
+    forceSnapshot();
+#endif
 }
 
 
@@ -4435,11 +4440,6 @@ Hart<URV>::forceSnapshot()
         std::cout << "Snapshot triggered from program context.\n";
         snapshotSystem_();
       }
-    else
-      {
-        std::cerr << "No snapshot callback registered.\n";
-        assert(0);
-      }
     suspend = false;
   }
   suspended_ = false;
@@ -4893,7 +4893,7 @@ template <typename URV>
 bool
 Hart<URV>::simpleRunNoLimit()
 {
-  while (noUserStop) 
+  while (noUserStop)
     {
       currPc_ = pc_;
       ++instCounter_;

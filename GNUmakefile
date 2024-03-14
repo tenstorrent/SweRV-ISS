@@ -49,6 +49,10 @@ ifeq ($(MEM_CALLBACKS), 1)
   endif
 endif
 
+ifdef HINT_OPS
+  override CPPFLAGS += -DHINT_OPS
+endif
+
 ifdef FAST_SLOPPY
   override CPPFLAGS += -DFAST_SLOPPY
 endif
