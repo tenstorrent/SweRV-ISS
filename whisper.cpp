@@ -1177,6 +1177,9 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
         }
     }
 
+  if (not args.snapshotDir.empty())
+    system.setSnapshotDir(args.snapshotDir);
+
   return errors == 0;
 }
 
@@ -1631,7 +1634,7 @@ sessionRun(System<URV>& system, const Args& args, std::vector<FILE*>& traceFiles
     }
 
   if (not args.snapshotPeriods.empty())
-    return system.snapshotRun(traceFiles, args.snapshotDir, args.snapshotPeriods);
+    return system.snapshotRun(traceFiles, args.snapshotPeriods);
 
   bool waitAll = not args.quitOnAnyHart;
   uint64_t stepWindow = args.deterministic.value_or(0);

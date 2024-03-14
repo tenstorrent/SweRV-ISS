@@ -2284,6 +2284,37 @@ defineMcountinhibitSideEffects(System<URV>& system)
 
 
 template <typename URV>
+void
+defineSemihostSideEffects(System<URV>& system)
+{
+  bool found = false;
+  for (unsigned i = 0; i < system.hartCount(); ++i)
+    {
+      auto hart = system.ithHart(i);
+      auto csrPtr = hart->findCsr("whisper");
+      if (not csrPtr)
+        continue;
+
+      found = true;
+      std::weak_ptr<Hart<URV>> wHart(hart);
+
+      auto postWrite = [wHart] (Csr<URV>&, URV val) -> void {
+                          auto hart = wHart.lock();
+                          if (not hart)
+                            return;  // Should not happen.
+
+                          if (val == 0x121)
+                            hart->forceSnapshot();
+                       };
+      csrPtr->registerPostWrite(postWrite);
+    }
+
+  if (found)
+    system.addSnapshotCallback();
+}
+
+
+template <typename URV>
 bool
 HartConfig::finalizeCsrConfig(System<URV>& system) const
 {
@@ -2312,6 +2343,8 @@ HartConfig::finalizeCsrConfig(System<URV>& system) const
 
   // Define callback to react to write/poke to mcountinhibit CSR.
   defineMcountinhibitSideEffects(system);
+  // Define callback to react to write/poke to semihost CSR.
+  defineSemihostSideEffects(system);
 
   return true;
 }
