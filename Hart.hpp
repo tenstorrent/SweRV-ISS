@@ -804,6 +804,12 @@ namespace WdRiscv
     /// group multiplier.
     int lastVecReg(const DecodedInst& di, unsigned& group) const;
 
+    /// Support for tracing: Return incremental changes to fp flags
+    /// (same as lastFpFlags), but for vector instructions on per-element
+    /// basis.
+    std::vector<unsigned> lastFpFlagsVec() const
+    { return vecRegs_.lastFpFlags(); }
+
     /// Return true if the last executed instruction triggered a trap
     /// (had an exception or encoutered an interrupt).
     bool lastInstructionTrapped() const
@@ -3259,6 +3265,13 @@ namespace WdRiscv
     void vop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		unsigned start, unsigned elems, bool masked,
 		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op);
+
+    /// Same as vop_vv, but for floating-point operations. This updates
+    /// incremental fp flags for each vector element.
+    template<typename ELEM_TYPE>
+    void vfop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		 unsigned start, unsigned elems, bool masked,
+		 std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> fop);
 
     /// Helper to vector vv instructions (eg vadd.vx, vsub.vx). Operation
     /// to be performed (eg. add, sub) is passed in op.
