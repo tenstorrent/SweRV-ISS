@@ -991,7 +991,7 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::vector<uint6
       for (auto hartPtr : sysHarts_)
 	hartPtr->setInstructionCountLimit(nextLimit);
 
-      batchRun(traceFiles, true /*waitAll*/, 0 /*stepWindow*/);
+      batchRun(traceFiles, false /*waitAll*/, 0 /*stepWindow*/);
 
       bool done = false;
       for (auto& hartPtr : sysHarts_)

@@ -779,12 +779,13 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   // Send privilege mode (2 bits), incremental floating point flags (4 bits),
   // and trap info (1 bit), stop indicator (1 bit), interrupt (1 bit),
   // and virtual mode (1 bit).
-  unsigned fpFlags = hart.lastFpFlags();
-  unsigned trap = hart.lastInstructionTrapped()? 1 : 0;
-  unsigned stop = hart.hasTargetProgramFinished()? 1 : 0;
-  unsigned virt = hart.lastVirtMode()? 1 : 0;
-  reply.flags = ((pm & 3) | ((fpFlags & 0xf) << 2) | (trap << 6) |
-		 (stop << 7) | (interrupted << 8) | (virt << 9));
+  WhisperFlags flags;
+  flags.bits.privMode = pm;
+  flags.bits.fpFlags = hart.lastFpFlags();
+  flags.bits.trap = hart.lastInstructionTrapped()? 1 : 0;
+  flags.bits.stop = hart.hasTargetProgramFinished()? 1 : 0;
+  flags.bits.virt = hart.lastVirtMode()? 1 : 0;
+  reply.flags = flags.value;
 
   if (wasInDebug)
     hart.enterDebugMode(hart.peekPc());
