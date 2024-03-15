@@ -1125,7 +1125,7 @@ Hart<URV>::execAddi(const DecodedInst* di)
 
 #ifdef HINT_OPS
   if (di->op0() == 0 and di->op1() == 31)
-    throw CoreException(CoreException::Snapshot, "Taking snapshot.");
+    throw CoreException(CoreException::Snapshot, "Taking snapshot from HINT.");
 #endif
 }
 
