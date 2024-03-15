@@ -2078,10 +2078,6 @@ HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
   if (not applyPciConfig(system))
     return false;
 
-#ifdef HINT_OPS
-  system.addSnapshotCallback();
-#endif
-
   return finalizeCsrConfig(system);
 }
 

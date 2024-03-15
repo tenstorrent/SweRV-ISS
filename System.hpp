@@ -277,9 +277,6 @@ namespace WdRiscv
     /// Add PCIe devices specified by the user.
     bool addPciDevices(const std::vector<std::string>& devs);
 
-    /// Add snapshot callback for harts.
-    void addSnapshotCallback();
-
     /// Return true if memory consistency model is enabled.
     bool isMcmEnabled() const
     { return mcm_ != nullptr; }

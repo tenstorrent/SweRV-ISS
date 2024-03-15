@@ -1125,7 +1125,7 @@ Hart<URV>::execAddi(const DecodedInst* di)
 
 #ifdef HINT_OPS
   if (di->op0() == 0 and di->op1() == 31)
-    forceSnapshot();
+    throw CoreException(CoreException::Snapshot, "Taking snapshot.");
 #endif
 }
 
@@ -4374,10 +4374,6 @@ static std::atomic<bool> userStop = false;
 // Negation of the preceding variable. Exists for speed (obsessive
 // compulsive engineering).
 static std::atomic<bool> noUserStop = true;
-
-// Occasionally may need to suspend to perform a race condition
-// operation, like a system callback.
-static std::atomic<bool> suspend = false;
 //NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 void
@@ -4424,27 +4420,6 @@ private:
 
   struct sigaction prevKbdAction_;
 };
-
-
-template <typename URV>
-void
-Hart<URV>::forceSnapshot()
-{
-  static std::mutex _m;
-  suspended_ = true;
-  {
-    std::lock_guard<std::mutex> lock(_m);
-
-    suspend = true;
-    if (snapshotSystem_)
-      {
-        std::cout << "Snapshot triggered from program context.\n";
-        snapshotSystem_();
-      }
-    suspend = false;
-  }
-  suspended_ = false;
-}
 
 
 template <typename URV>
@@ -4513,13 +4488,6 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
   while (pc_ != address and instCounter_ < limit)
     {
-      while (suspend) [[unlikely]]
-        {
-          suspended_ = true;
-          std::this_thread::sleep_for(std::chrono::milliseconds(100));
-          if (not suspend)
-            suspended_ = false;
-        }
       if (userStop)
         break;
       resetExecInfo(); clearTraceData();
@@ -4638,7 +4606,10 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	}
       catch (const CoreException& ce)
 	{
-	  return logStop(ce, instCounter_, traceFile);
+	  bool success = logStop(ce, instCounter_, traceFile);
+          if (ce.type() == CoreException::Type::Snapshot)
+            throw;
+          return success;
 	}
     }
 
@@ -4732,7 +4703,7 @@ Hart<URV>::simpleRun()
         {
           bool hasLim = (instCountLim_ < ~uint64_t(0));
           if (hasLim or bbFile_ or instrLineTrace_ or not branchTraceFile_.empty() or
-	      isRvs() or isRvu() or isRvv() or hasClint() or snapshotSystem_)
+	      isRvs() or isRvu() or isRvv() or hasClint())
             simpleRunWithLimit();
           else
             simpleRunNoLimit();
@@ -4751,6 +4722,8 @@ Hart<URV>::simpleRun()
   catch (const CoreException& ce)
     {
       success = logStop(ce, 0, nullptr);
+      if (ce.type() == CoreException::Type::Snapshot)
+        throw;
     }
 
   csRegs_.enableRecordWrite(true);
@@ -4842,14 +4815,6 @@ Hart<URV>::simpleRunWithLimit()
 
   while (noUserStop and instCounter_ < limit) 
     {
-      while (suspend) [[unlikely]]
-        {
-          suspended_ = true;
-          std::this_thread::sleep_for(std::chrono::milliseconds(100));
-          if (not suspend)
-            suspended_ = false;
-        }
-
       resetExecInfo();
 
       currPc_ = pc_;
@@ -5451,6 +5416,8 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 	enterDebugMode_(DebugModeCause::STEP, pc_);
 
       stepResult_ = logStop(ce, instCounter_, traceFile);
+      if (ce.type() == CoreException::Type::Snapshot)
+        throw;
     }
 }
 
