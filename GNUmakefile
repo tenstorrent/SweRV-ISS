@@ -57,6 +57,12 @@ ifdef FAST_SLOPPY
   override CPPFLAGS += -DFAST_SLOPPY
 endif
 
+ifdef LZ4_COMPRESS
+  override CPPFLAGS += -DLZ4_COMPRESS
+  EXTRA_LIBS += -llz4
+endif
+
+
 # Add External Library location paths here
 LINK_DIRS := $(addprefix -L,$(BOOST_LIB_DIR))
 

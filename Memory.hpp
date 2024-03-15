@@ -359,6 +359,12 @@ namespace WdRiscv
     /// or cannot be opened.
     bool loadBinaryFile(const std::string& file, uint64_t addr);
 
+    /// Load the lz4 compressed binary file and set memory locations
+    /// accordingly.
+    /// Return true on success. Return false if file does not exist,
+    /// or cannot be opened.
+    bool loadLz4File(const std::string& file, uint64_t addr);
+
     /// Load the given ELF file and set memory locations accordingly.
     /// Return true on success. Return false if file does not exists,
     /// cannot be opened or contains malformed data, or if it contains
@@ -788,5 +794,7 @@ namespace WdRiscv
 
     /// Callback to obtain pointer to memory; uint8_t*(uint64_t addr, size_t len);
     std::function<uint8_t*(uint64_t, size_t)> mapCallback_ = nullptr;
+
+    void *mmap_file(const std::string& filename, size_t& length);
   };
 }

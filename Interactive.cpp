@@ -1109,6 +1109,25 @@ Interactive<URV>::hexCommand(Hart<URV>& , const std::string& line,
 }
 
 
+#ifdef LZ4_COMPRESS
+template <typename URV>
+bool
+Interactive<URV>::lz4Command(Hart<URV>& , const std::string& line,
+			     const std::vector<std::string>& tokens)
+{
+  if (tokens.size() != 2)
+    {
+      std::cerr << "Invalid lz4 command: " << line << '\n';
+      std::cerr << "Expecting: lz4 <file-name>\n";
+      return false;
+    }
+
+  std::vector<std::string> fileNames = { tokens.at(1) };
+  return system_.loadLz4Files(fileNames, 0, false /*verbose*/);
+}
+#endif
+
+
 template <typename URV>
 bool
 Interactive<URV>::resetCommand(Hart<URV>& hart, const std::string& /*line*/,
@@ -1623,6 +1642,17 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 	fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
+
+#ifdef LZ4_COMPRESS
+  if (command == "lz4")
+    {
+      if (not lz4Command(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+#endif
 
   if (command == "reset")
     {

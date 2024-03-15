@@ -338,6 +338,57 @@ System<URV>::loadBinaryFiles(const std::vector<std::string>& fileSpecs,
 }
 
 
+#ifdef LZ4_COMPRESS
+template <typename URV>
+bool
+System<URV>::loadLz4Files(const std::vector<std::string>& fileSpecs,
+			  uint64_t defOffset, bool verbose)
+{
+  using std::cerr;
+  unsigned errors = 0;
+
+  for (const auto& spec : fileSpecs)
+    {
+      std::string filename;
+      uint64_t offset;
+      bool update;
+
+      if (!binaryFileParams(spec, defOffset, filename, offset, update))
+        {
+	  errors++;
+	  continue;
+        }
+
+      if (update)
+	{
+	  cerr << "Updating not supported on lz4 files, ignoring " << filename << '\n';
+	  errors++;
+	  continue;
+	}
+
+      if (verbose)
+	cerr << "Loading lz4 compressed file " << filename << " at address 0x" << std::hex
+	     << offset << std::dec << '\n';
+
+      if (not memory_->loadLz4File(filename, offset))
+	{
+	  errors++;
+	  continue;
+	}
+
+      if (update)
+	{
+	  uint64_t size = Filesystem::file_size(filename);
+	  BinaryFile bf = { filename, offset, size };
+	  binaryFiles_.push_back(bf);
+	}
+    }
+
+  return errors == 0;
+}
+#endif
+
+
 static
 bool
 saveUsedMemBlocks(const std::string& filename,
@@ -1121,8 +1172,6 @@ System<URV>::loadSnapshot(const std::string& snapDir)
   Filesystem::path fdPath = dirPath / "fd";
   return syscall.loadFileDescriptors(fdPath.string());
 }
-
-
 
 
 template class WdRiscv::System<uint32_t>;
