@@ -9116,6 +9116,7 @@ Hart<URV>::vsaddu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
+      bool saturated = false;
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
 	  vecRegs_.read(vs1, ix, group, e1);
@@ -9125,8 +9126,10 @@ Hart<URV>::vsaddu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	    {
 	      dest = maxVal;
 	      csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+              saturated = true;
 	    }
 	}
+      vecRegs_.vxsat_.push_back(saturated);
       vecRegs_.write(vd, ix, destGroup, dest);
     }
 }
@@ -9178,6 +9181,7 @@ Hart<URV>::vsaddu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
+      bool saturated = false;
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
 	  vecRegs_.read(vs1, ix, group, e1);
@@ -9186,8 +9190,10 @@ Hart<URV>::vsaddu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	    {
 	      dest = maxVal;
 	      csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+              saturated = true;
 	    }
 	}
+      vecRegs_.vxsat_.push_back(saturated);
       vecRegs_.write(vd, ix, destGroup, dest);
     }
 }
@@ -9272,6 +9278,7 @@ Hart<URV>::vsadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
+      bool saturated = false;
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
 	  vecRegs_.read(vs1, ix, group, e1);
@@ -9286,8 +9293,10 @@ Hart<URV>::vsadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	      else
 		dest = maxVal;
 	      csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+              saturated = true;
 	    }
 	}
+      vecRegs_.vxsat_.push_back(saturated);
       vecRegs_.write(vd, ix, destGroup, dest);
     }
 }
@@ -9340,6 +9349,7 @@ Hart<URV>::vsadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
+      bool saturated = false;
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
 	  vecRegs_.read(vs1, ix, group, e1);
@@ -9353,8 +9363,10 @@ Hart<URV>::vsadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	      else
 		dest = maxVal;
 	      csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+              saturated = true;
 	    }
 	}
+      vecRegs_.vxsat_.push_back(saturated);
       vecRegs_.write(vd, ix, destGroup, dest);
     }
 }
@@ -9438,6 +9450,7 @@ Hart<URV>::vssubu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
+      bool saturated = false;
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
 	  vecRegs_.read(vs1, ix, group, e1);
@@ -9448,8 +9461,10 @@ Hart<URV>::vssubu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	    {
 	      dest = minVal;
 	      csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
-	    }
+              saturated = true;
+            }
 	}
+      vecRegs_.vxsat_.push_back(saturated);
       vecRegs_.write(vd, ix, destGroup, dest);
     }
 }
@@ -9500,6 +9515,7 @@ Hart<URV>::vssubu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
+      bool saturated = false;
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
 	  vecRegs_.read(vs1, ix, group, e1);
@@ -9509,8 +9525,10 @@ Hart<URV>::vssubu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	    {
 	      dest = minVal;
 	      csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+              saturated = true;
 	    }
 	}
+      vecRegs_.vxsat_.push_back(saturated);
       vecRegs_.write(vd, ix, destGroup, dest);
     }
 }
@@ -9565,6 +9583,7 @@ Hart<URV>::vssub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
+      bool saturated = false;
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
 	  vecRegs_.read(vs1, ix, group, e1);
@@ -9579,8 +9598,10 @@ Hart<URV>::vssub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	      else
 		dest = maxVal;
 	      csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+              saturated = true;
 	    }
 	}
+      vecRegs_.vxsat_.push_back(saturated);
       vecRegs_.write(vd, ix, destGroup, dest);
     }
 }
@@ -9633,6 +9654,7 @@ Hart<URV>::vssub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
+      bool saturated = false;
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
 	  vecRegs_.read(vs1, ix, group, e1);
@@ -9646,8 +9668,10 @@ Hart<URV>::vssub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	      else
 		dest = maxVal;
 	      csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+              saturated = true;
 	    }
 	}
+      vecRegs_.vxsat_.push_back(saturated);
       vecRegs_.write(vd, ix, destGroup, dest);
     }
 }
@@ -10129,6 +10153,7 @@ Hart<URV>::vsmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   for (unsigned ix = start; ix < elems; ++ix)
     {
       ELEM_TYPE dest{};
+      bool saturated = false;
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
 	  vecRegs_.read(vs1, ix, group, e1);
@@ -10139,6 +10164,7 @@ Hart<URV>::vsmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	      // Result saturates at max positive value.
 	      dest = std::numeric_limits<ELEM_TYPE>::max();
 	      csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+              saturated = true;
 	    }
 	  else
 	    {
@@ -10148,6 +10174,7 @@ Hart<URV>::vsmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	      dest = ELEM_TYPE(temp);
 	    }
 	}
+      vecRegs_.vxsat_.push_back(saturated);
       vecRegs_.write(vd, ix, destGroup, dest);
     }
 }
@@ -10205,7 +10232,7 @@ Hart<URV>::vsmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   for (unsigned ix = start; ix < elems; ++ix)
     {
       ELEM_TYPE dest{};
-
+      bool saturated = false;
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
 	  vecRegs_.read(vs1, ix, group, e1);
@@ -10215,6 +10242,7 @@ Hart<URV>::vsmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	      // Result saturates at max positive value.
 	      dest = std::numeric_limits<ELEM_TYPE>::max();
 	      csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+              saturated = true;
 	    }
 	  else
 	    {
@@ -10224,6 +10252,7 @@ Hart<URV>::vsmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	      dest = ELEM_TYPE(temp);
 	    }
 	}
+      vecRegs_.vxsat_.push_back(saturated);
       vecRegs_.write(vd, ix, destGroup, dest);
     }
 }
@@ -10562,6 +10591,7 @@ Hart<URV>::vnclip_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   if (saturated)
     csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+  vecRegs_.vxsat_.push_back(saturated);
 }
 
 
@@ -10651,6 +10681,7 @@ Hart<URV>::vnclip_wx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   if (saturated)
     csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+  vecRegs_.vxsat_.push_back(saturated);
 }
 
 

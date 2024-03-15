@@ -804,11 +804,10 @@ namespace WdRiscv
     /// group multiplier.
     int lastVecReg(const DecodedInst& di, unsigned& group) const;
 
-    /// Support for tracing: Return incremental changes to fp flags
-    /// (same as lastFpFlags), but for vector instructions on per-element
-    /// basis.
-    std::vector<unsigned> lastFpFlagsVec() const
-    { return vecRegs_.lastFpFlags(); }
+    /// Support for tracing: Return incremental changes to fp flags and vxsat,
+    /// but for vector instructions on per-element basis.
+    void lastIncVec(std::vector<uint8_t>& fpFlags, std::vector<uint8_t>& vxsat) const
+    { return vecRegs_.lastIncVec(fpFlags, vxsat); }
 
     /// Return true if the last executed instruction triggered a trap
     /// (had an exception or encoutered an interrupt).

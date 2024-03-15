@@ -29,7 +29,7 @@ enum WhisperMessageType { Peek, Poke, Step, Until, Change, ChangeCount,
  };
 
 /// Resource identifiers for peek special.
-enum WhisperSpecialResource { PrivMode, PrevPrivMode, FpFlags, FpFlagsVec, Trap,
+enum WhisperSpecialResource { PrivMode, PrevPrivMode, FpFlags, IncrementalVec, Trap,
                               DeferredInterrupts, Seipin, EffMemAttr };
 
 
