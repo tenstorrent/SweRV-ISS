@@ -10479,10 +10479,14 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
   // Legalize HGATP. We do this here to avoid making CsRegs depend on VirtMem.
   if (csr == CsrNumber::HGATP)
     {
+      URV oldVal = 0;
+      if (not peekCsr(csr, oldVal))
+	oldVal = URV(VirtMem::Mode::Bare);  // Should not happen
+      HgatpFields<URV> oldHgatp(oldVal);
       HgatpFields<URV> hgatp(val);
       auto mode = VirtMem::Mode{hgatp.bits_.MODE};
       if (not virtMem_.isModeSupported(mode))
-	hgatp.bits_.MODE = unsigned(VirtMem::Mode::Bare);
+	hgatp.bits_.MODE = oldHgatp.bits_.MODE;  // Preserve MODE field.
       val = hgatp.value_;
     }
   else if (csr == CsrNumber::SATP or csr == CsrNumber::VSATP)
