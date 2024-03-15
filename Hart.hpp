@@ -61,7 +61,7 @@ namespace WdRiscv
   {
   public:
 
-    enum Type { Stop, Exit };
+    enum Type { Stop, Exit, Snapshot };
 
     CoreException(Type type, const char* message = "", uint64_t address = 0,
 		  uint64_t value = 0)
@@ -1839,17 +1839,6 @@ namespace WdRiscv
 
     // Load snapshot of registers (PC, integer, floating point, CSR) into file
     bool loadSnapshotRegs(const std::string& path);
-
-    /// Force snapshot in running context.
-    void forceSnapshot();
-
-    /// Add snapshot callback.
-    void addSnapshotCallback(const std::function<void()>& cb)
-    { snapshotSystem_ = cb; }
-
-    /// Returns true if hart is in suspended state.
-    bool suspended() const
-    { return suspended_; }
 
     // Define the additional delay to add to the timecmp register
     // before the timer expires. This is relevant to the clint.
@@ -5145,9 +5134,6 @@ namespace WdRiscv
       uint8_t value_ = 0;
     };
     InterruptAlarm swInterrupt_;
-
-    std::atomic<bool> suspended_ = false;
-    std::function<void()> snapshotSystem_ = nullptr;
   };
 }
 
