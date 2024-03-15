@@ -718,6 +718,19 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
 	out << unsigned(hart.lastPrivMode()) << std::endl;
       else if (addrStr == "iff")
 	out << (boost::format("0x%x") % hart.lastFpFlags()) << std::endl;
+      else if (addrStr == "iffv")
+        {
+          auto fpflags = hart.lastFpFlagsVec();
+          std::reverse(fpflags.begin(), fpflags.end());
+          std::string sep = "";
+          out << "[";
+          for (unsigned flag : fpflags)
+            {
+              out << sep << (boost::format("0x%x") % flag);
+              sep = ",";
+            }
+          out << "]\n";
+        }
       else if (addrStr == "trap")
 	out << (hart.lastInstructionTrapped() ? "1" : "0") << std::endl;
       else if (addrStr == "defi")
