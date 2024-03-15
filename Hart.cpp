@@ -711,9 +711,10 @@ Hart<URV>::resetVector()
       auto csr = csRegs_.findCsr(CsrNumber::VSTART);
       if (not csr or csr->getWriteMask() != vstartMask)
 	{
-	  std::cerr << "Warning: Write mask of CSR VSTART changed to 0x" << std::hex
-		    << vstartMask << " to be compatible with VLEN=" << std::dec
-		    << (bytesPerReg*8) << '\n';
+	  if (hartIx_ == 0)
+	    std::cerr << "Warning: Write mask of CSR VSTART changed to 0x" << std::hex
+		      << vstartMask << " to be compatible with VLEN=" << std::dec
+		      << (bytesPerReg*8) << '\n';
 	  csRegs_.configCsr(CsrNumber::VSTART, true, 0, vstartMask, vstartMask, false, false);
 	}
     }
