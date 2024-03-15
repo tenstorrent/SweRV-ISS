@@ -718,15 +718,21 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
 	out << unsigned(hart.lastPrivMode()) << std::endl;
       else if (addrStr == "iff")
 	out << (boost::format("0x%x") % hart.lastFpFlags()) << std::endl;
-      else if (addrStr == "iffv")
+      else if (addrStr == "iv")
         {
-          auto fpflags = hart.lastFpFlagsVec();
-          std::reverse(fpflags.begin(), fpflags.end());
+          std::vector<uint8_t> fpFlags; std::vector<uint8_t> vxsat;
+          hart.lastIncVec(fpFlags, vxsat);
+          std::reverse(fpFlags.begin(), fpFlags.end());
+          std::reverse(vxsat.begin(), vxsat.end());
+
+          std::string name = (not fpFlags.empty())? "fflags" : "vxsat";
+          auto& buf = (not fpFlags.empty())? fpFlags : vxsat;
+
           std::string sep = "";
-          out << "[";
-          for (unsigned flag : fpflags)
+          out << name << ": [";
+          for (uint8_t element : buf)
             {
-              out << sep << (boost::format("0x%x") % flag);
+              out << sep << (boost::format("0x%x") % unsigned(element));
               sep = ",";
             }
           out << "]\n";

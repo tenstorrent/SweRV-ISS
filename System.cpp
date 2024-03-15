@@ -867,35 +867,25 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
 
   while (true)
     {
+      std::atomic<bool> result = true;
+
       if (hartCount() == 1)
         {
           auto& hart = *ithHart(0);
           try
             {
-              bool ok = hart.run(traceFiles.at(0));
+              result = hart.run(traceFiles.at(0));
 #ifdef FAST_SLOPPY
               hart.reportOpenedFiles(std::cout);
 #endif
-              return ok;
             }
           catch (const CoreException& ce)
             {
               if (ce.type() == CoreException::Type::Snapshot)
                 progSnapshot = true;
             }
-
-          if (progSnapshot)
-            {
-              forceSnapshotAndClear();
-              continue;
-            }
-          else
-            assert(0);
         }
-
-      std::atomic<bool> result = true;
-
-      if (not stepWindow)
+      else if (not stepWindow)
         {
           // Run each hart in its own thread.
           std::vector<std::thread> threadVec;

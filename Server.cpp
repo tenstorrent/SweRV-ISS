@@ -334,11 +334,16 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
 	  case WhisperSpecialResource::FpFlags:
 	    reply.value = hart.lastFpFlags();
 	    return true;
-          case WhisperSpecialResource::FpFlagsVec:
+          case WhisperSpecialResource::IncrementalVec:
             {
-              auto fpflags = hart.lastFpFlagsVec();
-              for (unsigned i = 0; i < fpflags.size(); ++i)
-                reply.buffer[i] = fpflags.at(i);
+              std::vector<uint8_t> fpFlags; std::vector<uint8_t> vxsat;
+              hart.lastIncVec(fpFlags, vxsat);
+              assert((fpFlags.size() != 0 and vxsat.size() == 0) or
+                     (fpFlags.size() == 0 and vxsat.size() != 0));
+              for (unsigned i = 0; i < fpFlags.size(); ++i)
+                reply.buffer[i] = fpFlags.at(i);
+              for (unsigned i = 0; i < vxsat.size(); ++i)
+                reply.buffer[i] = vxsat.at(i);
               return true;
             }
 	  case WhisperSpecialResource::Trap:
@@ -865,7 +870,7 @@ specialResourceToStr(uint64_t v)
     case WhisperSpecialResource::PrivMode:            return "pm";
     case WhisperSpecialResource::PrevPrivMode:        return "ppm";
     case WhisperSpecialResource::FpFlags:             return "iff";
-    case WhisperSpecialResource::FpFlagsVec:          return "iffv";
+    case WhisperSpecialResource::IncrementalVec:      return "iv";
     case WhisperSpecialResource::Trap:                return "trap";
     case WhisperSpecialResource::DeferredInterrupts:  return "defi";
     case WhisperSpecialResource::Seipin:              return "seipin";
