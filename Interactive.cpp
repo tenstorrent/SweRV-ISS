@@ -1216,7 +1216,7 @@ printInteractiveHelp()
   using std::cout;
   cout << "The arguments hart=<id> and.or time=<tine> may be used with any command\n";
   cout << "to select a hart and specify event time (relevant to memory model)\n";
-  cout << "They presist until explicitly changed.\n\n";
+  cout << "They persist until explicitly changed.\n\n";
   cout << "help [<command>]\n";
   cout << "  Print help for given command or for all commands if no command given.\n\n";
   cout << "run\n";
@@ -1277,15 +1277,20 @@ printInteractiveHelp()
   cout << "  data (hexadecimal string) is from a different model (RTL) and is compared\n";
   cout << "  to whisper data. Addr should be a multiple of cache-line size. If hex\n";
   cout << "  string is smaller than twice the cache-line size, it will be padded with\n";
-  cout << "  zeros on the most signficant side.\n\n";
+  cout << "  zeros on the most significant side.\n\n";
   cout << "mbbypass tag addr size data\n";
-  cout << "  Perform a memory write operation bypassing the mrege buffer. Given\n";
+  cout << "  Perform a memory write operation bypassing the merge buffer. Given\n";
   cout << "  data (hexadecimal string) is from a different model (RTL) and is compared\n";
-  cout << "  to whisper data.\n";
+  cout << "  to whisper data.\n\n";
   cout << "pmp [<address>]\n";
-  cout << "  Print the pmp map (all) or for a matching address\n";
+  cout << "  Print the pmp map (all) or for a matching address\n\n";
   cout << "pma [<address>]\n";
-  cout << "  Print the pma map (all) or for a matching address\n";
+  cout << "  Print the pma map (all) or for a matching address\n\n";
+  cout << "translate <va> [<permission> [<privilege>]]\n";
+  cout << "  Translate given virtual address <va> to a physical address assuming given\n";
+  cout << "  permission (defaults to read) and privilege mode (defaults to user)\n";
+  cout << "  Allowed permission: r for read, w for write, or x for execute.\n";
+  cout << "  Allowed privilege: u to user or s for supervisor\n\n";
   cout << "quit\n";
   cout << "  Terminate the simulator\n\n";
 }
