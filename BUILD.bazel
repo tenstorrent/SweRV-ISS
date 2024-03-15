@@ -19,9 +19,9 @@ cc_library(
     name          = "rvcore",
     srcs          = glob(include = ["*.cpp", "*.hpp"], exclude = ["whisper.cpp", "py-bindings.cpp"] + hdrs),
     hdrs          = hdrs,
-    local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS"],
+    local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS", "LZ4_COMPRESS"],
     deps          = ["//third_party:nlohmann", "//third_party:elfio", "//third_party:softfloat", "//third_party:linenoise", "//pci:pci"],
-    linkopts      = ["-lpthread", "-lz", "-ldl", "-lrt"],
+    linkopts      = ["-lpthread", "-lz", "-ldl", "-lrt", "-llz4"],
     visibility    = ["//visibility:public"],
 )
 
