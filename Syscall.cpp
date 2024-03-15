@@ -1638,10 +1638,10 @@ Syscall<URV>::mmap_alloc(uint64_t size)
           mmap_blocks_.insert(std::make_pair(addr+size, blk_t(orig_size-size, true)));
           it->second.length =  size;
         }
-      //print_mmap("alloc");
       return addr;
     }
-  assert(false);
+
+  std::cerr << "Whisper: Target program failed in mmap: size=" << size << '\n';
   return uint64_t(-1);
 }
 
@@ -1674,7 +1674,7 @@ Syscall<URV>::mmap_dealloc(uint64_t addr, uint64_t size)
       // Merge new block with block following it if that is free.
       if (next != mmap_blocks_.end() and next->second.free and addr + size == next->first)
 	{
-	  latest->second.length += size;
+	  latest->second.length += next->second.length;
 	  mmap_blocks_.erase(next);
 	}
       return 0;

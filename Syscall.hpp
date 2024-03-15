@@ -44,12 +44,7 @@ namespace WdRiscv
     	auto mem_size = hart.getMemorySize();
     	mmap_blocks_.insert(std::make_pair(mem_size/2L, blk_t(mem_size/2L, true)));
     }
-//    void print_mmap(const std::string prefix) {
-//    	 for(auto& it: mmap_blocks_)
-//    		 printf("%s --> 0x%llx: 0x%llx, %d\n",prefix.c_str(), it.first, it.second.length, it.second.free);
-//    	 fflush(stdout);
-//
-//    }
+
     /// Emulate a system call on the associated hart. Return an integer
     /// value corresponding to the result.
     URV emulate();

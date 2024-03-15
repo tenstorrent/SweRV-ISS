@@ -29,8 +29,8 @@ enum WhisperMessageType { Peek, Poke, Step, Until, Change, ChangeCount,
  };
 
 /// Resource identifiers for peek special.
-enum WhisperSpecialResource { PrivMode, PrevPrivMode, FpFlags, Trap, DeferredInterrupts,
-			      Seipin };
+enum WhisperSpecialResource { PrivMode, PrevPrivMode, FpFlags, IncrementalVec, Trap,
+                              DeferredInterrupts, Seipin, EffMemAttr };
 
 
 /// Structure used to communicate with the whisper program using
@@ -70,4 +70,25 @@ struct WhisperMessage
   uint64_t value;
   std::array<char, 128> buffer;
   std::array<char, 20>  tag;
+};
+
+
+/// Union to pack/unpack flags we send in reply to a step request.
+union WhisperFlags
+{
+  WhisperFlags(uint32_t val = 0)
+    : value(val)
+  { }
+
+  uint32_t value;    // First variant of union.
+
+  struct             // Second variant of union.
+  {
+    unsigned privMode  : 2;    // privilege mode
+    unsigned fpFlags   : 4;    // floating point flags from last instruction
+    unsigned trap      : 1;    // true if last instruction trapped
+    unsigned stop      : 1;    // true if target program stopped
+    unsigned interrupt : 1;    // true if last instruction interrupted
+    unsigned virt      : 1;    // virtual mode before last instruction
+  } bits;
 };

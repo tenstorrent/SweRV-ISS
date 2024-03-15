@@ -342,7 +342,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
     {
       std::cerr << "Warning: For CSR " << name << " poke mask (0x" << std::hex << pokeMask
 		<< ") is not a superset of write\n  mask (0x" << mask << std::dec << ")."
-		<< " Only 1 bits in both masks will be writable by CSR instructions.\n";
+		<< " Only bits set in both masks will be writable by CSR instructions.\n";
     }
 
   if (name == "misa")
@@ -2312,7 +2312,6 @@ HartConfig::finalizeCsrConfig(System<URV>& system) const
 
   // Define callback to react to write/poke to mcountinhibit CSR.
   defineMcountinhibitSideEffects(system);
-
   return true;
 }
 

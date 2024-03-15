@@ -363,6 +363,10 @@ command will produce information about command x.
 
 Here's the output of the "help" command:
 
+    The arguments hart=<id> and.or time=<tine> may be used with any command
+    to select a hart and specify event time (relevant to memory model)
+    They persist until explicitly changed.
+    
     help [<command>]
       Print help for given command or for all commands if no command given.
     
@@ -376,26 +380,28 @@ Here's the output of the "help" command:
       Execute n instructions (1 if n is missing).
     
     peek <res> <addr>
-      Print value of resource res (one of r, f, c, m) and address addr.
+      Print value of resource res (one of r, f, c, v, m) and address addr.
       For memory (m) up to 2 addresses may be provided to define a range
-      of memory locations to be printed.
+      of memory locations to be printed; also, an optional filename after
+      the two addresses writes the command output to that file.
       examples: peek r x1   peek c mtval   peek m 0x4096
+                peek m 0x10 0x40 out
     
     peek pc
       Print value of the program counter.
     
     peek all
-      Print value of all non-memory resources.
+      Print value of all non-memory resources
     
     poke res addr value
-      Set value of resource res (one of r, c or m) and address addr.
+      Set value of resource res (one of r, c or m) and address addr
       Examples: poke r x1 0xff  poke c 0x4096 0xabcd
     
     disass opcode <code> <code> ...
       Disassemble opcodes. Example: disass opcode 0x3b 0x8082
     
     disass function <name>
-      Disassemble function with given name. Example: disass func main
+      Disassemble function with given name. Example: disas func main
     
     disass <addr1> <addr2>>
       Disassemble memory locations between addr1 and addr2.
@@ -415,15 +421,55 @@ Here's the output of the "help" command:
     
     replay step n
       Execute consecutive commands from the replay file until n
-      step commands are executed or the file is exhausted.
+      step commands are executed or the file is exhausted
     
     reset [<reset_pc>]
       Reset hart.  If reset_pc is given, then change the reset program
       counter to the given reset_pc before resetting the hart.
-
-    quit
-      Terminate the simulator.
     
+    symbols
+      List all the symbols in the loaded ELF file(s).
+    
+    pagetable
+      Print the entries of the address translation table.
+    
+    nmi [<cause-number>]
+      Post a non-maskable interrupt with a given cause number (default 0).
+    
+    mread tag addr size data i|e
+      Perform a memory model (out of order) read for load/amo instruction with
+      given tag. Data is the RTL data to be compared with whisper data
+      when instruction is later retired. The whisper data is obtained
+      forwarding from preceding instructions if 'i' is present; otherwise,
+      it is obtained from memory.
+    
+    mbwrite addr data
+      Perform a memory model merge-buffer-write for given address. Given
+      data (hexadecimal string) is from a different model (RTL) and is compared
+      to whisper data. Addr should be a multiple of cache-line size. If hex
+      string is smaller than twice the cache-line size, it will be padded with
+      zeros on the most significant side.
+    
+    mbbypass tag addr size data
+      Perform a memory write operation bypassing the merge buffer. Given
+      data (hexadecimal string) is from a different model (RTL) and is compared
+      to whisper data.
+    
+    pmp [<address>]
+      Print the pmp map (all) or for a matching address
+    
+    pma [<address>]
+      Print the pma map (all) or for a matching address
+    
+    translate <va> [<permission> [<privilege>]]
+      Translate given virtual address <va> to a physical address assuming given
+      permission (defaults to read) and privilege mode (defaults to user)
+      Allowed permission: r for read, w for write, or x for execute.
+      Allowed privilege: u to user or s for supervisor
+    
+    quit
+      Terminate the simulator
+        
 
 ## Newlib Emulation
 

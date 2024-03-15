@@ -351,8 +351,11 @@ namespace WdRiscv
     /// snapshot goes into its own directory names <dir><n> where <dir> is
     /// the string in snapDir and <n> is a sequential integer starting at
     /// 0. Return true on success and false on failure.
-    bool snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snapDir,
-		     const std::vector<uint64_t>& periods);
+    bool snapshotRun(std::vector<FILE*>& traceFiles, const std::vector<uint64_t>& periods);
+
+    /// Set snapshot directory path.
+    void setSnapshotDir(const std::string& snapDir)
+    { snapDir_ = snapDir; }
 
   private:
 
@@ -377,5 +380,8 @@ namespace WdRiscv
     // Name, size, and address in memory of a binary file.
     typedef std::tuple<std::string, uint64_t, uint64_t> BinaryFile;
     std::vector<BinaryFile> binaryFiles_;
+
+    std::string snapDir_ = "snapshot"; // Directory to save snapshots.
+    std::atomic<int> snapIx_ = -1;
   };
 }

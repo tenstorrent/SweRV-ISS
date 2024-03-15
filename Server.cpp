@@ -334,6 +334,18 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
 	  case WhisperSpecialResource::FpFlags:
 	    reply.value = hart.lastFpFlags();
 	    return true;
+          case WhisperSpecialResource::IncrementalVec:
+            {
+              std::vector<uint8_t> fpFlags; std::vector<uint8_t> vxsat;
+              hart.lastIncVec(fpFlags, vxsat);
+              assert((fpFlags.size() != 0 and vxsat.size() == 0) or
+                     (fpFlags.size() == 0 and vxsat.size() != 0));
+              for (unsigned i = 0; i < fpFlags.size(); ++i)
+                reply.buffer[i] = fpFlags.at(i);
+              for (unsigned i = 0; i < vxsat.size(); ++i)
+                reply.buffer[i] = vxsat.at(i);
+              return true;
+            }
 	  case WhisperSpecialResource::Trap:
 	    reply.value = hart.lastInstructionTrapped()? 1 : 0;
 	    return true;
@@ -343,6 +355,21 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
 	  case WhisperSpecialResource::Seipin:
 	    reply.value = hart.getSeiPin();
 	    return true;
+          case WhisperSpecialResource::EffMemAttr:
+            // Special resource so we don't have to re-translate.
+            {
+            uint64_t va = 0, pa = 0;
+            if (hart.lastLdStAddress(va, pa))
+              {
+                auto pma = hart.getPma(pa);
+                auto effpbmt = VirtMem::effectivePbmt(hart.lastVirtMode(), hart.lastVsPageMode(),
+                                                      hart.virtMem().lastPbmt(), hart.virtMem().lastPbmt());
+                pma = VirtMem::overridePmaWithPbmt(pma, effpbmt);
+                reply.value = pma.attributesToInt();
+              }
+            else
+              break;
+            }
 	  default:
 	    break;
 	  }
@@ -764,12 +791,14 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   // Send privilege mode (2 bits), incremental floating point flags (4 bits),
   // and trap info (1 bit), stop indicator (1 bit), interrupt (1 bit),
   // and virtual mode (1 bit).
-  unsigned fpFlags = hart.lastFpFlags();
-  unsigned trap = hart.lastInstructionTrapped()? 1 : 0;
-  unsigned stop = hart.hasTargetProgramFinished()? 1 : 0;
-  unsigned virt = hart.lastVirtMode()? 1 : 0;
-  reply.flags = ((pm & 3) | ((fpFlags & 0xf) << 2) | (trap << 6) |
-		 (stop << 7) | (interrupted << 8) | (virt << 9));
+  WhisperFlags flags;
+  flags.bits.privMode = pm;
+  flags.bits.fpFlags = hart.lastFpFlags();
+  flags.bits.trap = hart.lastInstructionTrapped()? 1 : 0;
+  flags.bits.stop = hart.hasTargetProgramFinished()? 1 : 0;
+  flags.bits.interrupt = interrupted;
+  flags.bits.virt = hart.lastVirtMode()? 1 : 0;
+  reply.flags = flags.value;
 
   if (wasInDebug)
     hart.enterDebugMode(hart.peekPc());
@@ -841,9 +870,11 @@ specialResourceToStr(uint64_t v)
     case WhisperSpecialResource::PrivMode:            return "pm";
     case WhisperSpecialResource::PrevPrivMode:        return "ppm";
     case WhisperSpecialResource::FpFlags:             return "iff";
+    case WhisperSpecialResource::IncrementalVec:      return "iv";
     case WhisperSpecialResource::Trap:                return "trap";
     case WhisperSpecialResource::DeferredInterrupts:  return "defi";
     case WhisperSpecialResource::Seipin:              return "seipin";
+    case WhisperSpecialResource::EffMemAttr:          return "effma";
     }
   return "?";
 }
@@ -864,12 +895,7 @@ doPageTableWalk(const Hart<URV>& hart, WhisperMessage& reply)
       hart.getPageTableWalkAddresses(isInstr, index, addrs);
       for (auto& addr : addrs)
         if (addr.type_ == VirtMem::WalkEntry::Type::PA)
-          {
-            items.push_back(std::move(addr.addr_));
-            Pma pma = hart.getPma(addr.addr_);
-            pma = VirtMem::overridePmaWithPbmt(pma, addr.pbmt_);
-            items.push_back(pma.attributesToInt());
-          }
+          items.push_back(std::move(addr.addr_));
     }
   else
     hart.getPageTableWalkEntries(isInstr, index, items);

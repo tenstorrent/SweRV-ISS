@@ -1136,8 +1136,9 @@ Decoder::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& fieldCount) const
 	}
       else if (lumop == 8)
         {   // store whole register
-          if (mew == 0)
+          if (mew == 0 and f3 == 0)
             {
+              fieldCount = 1 + nf;
               if (nf == 0) return instTable_.getEntry(InstId::vs1r_v);
               if (nf == 1) return instTable_.getEntry(InstId::vs2r_v);
               if (nf == 3) return instTable_.getEntry(InstId::vs4r_v);
@@ -1485,8 +1486,6 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	{
 	  CiFormInst cif(inst);
 	  op0 = cif.bits.rd; op1 = RegX0; op2 = cif.addiImmed();
-	  if (op0 == 0)
-	    return instTable_.getEntry(InstId::illegal);  // Rd == 0 reserved.
 	  return instTable_.getEntry(InstId::c_li);
 	}
 
@@ -1510,8 +1509,6 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	      return instTable_.getEntry(InstId::c_addi16sp);
 	    }
 	  op0 = cif.bits.rd; op1 = cif.luiImmed(); op2 = 0;
-	  if (op1 != 0 and (op0 == 0 or op0 == 2))
-	    return instTable_.getEntry(InstId::illegal);  // Imm != 0 and Rd in {0,2} reserved.
 	  return instTable_.getEntry(InstId::c_lui);
 	}
 
@@ -1883,7 +1880,16 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	  CiFormInst cif(inst);
 	  int immed16 = cif.addi16spImmed();
 	  if (immed16 == 0)
-	    return expanded; // Illegal
+	    { // could be c.mop
+	      if (cif.bits.rd & 1)
+		{
+		  op0 = cif.bits.rd ; op1 = 0; op2 = 0;
+		  encodeLui(op0, op1, op2, expanded);
+		  return expanded;
+		} 
+	      return expanded;
+	    }
+
 	  if (cif.bits.rd == RegSp)  // c.addi16sp
 	    {
 	      op0 = cif.bits.rd; op1 = cif.bits.rd; op2 = immed16;
@@ -1940,7 +1946,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
               return expanded;
 	    }
 	  // Bit 5 of immed is 1
-	  if (imm34 == 3)  // Zcb insrructions
+	  if (imm34 == 3)  // Zcb instructions
 	    {
 	      unsigned imm012 = immed & 7;
 	      op0 = op1 = rd;
@@ -2031,9 +2037,9 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	  unsigned rd = cif.bits.rd;
 	  if (isRv64())
 	    {
+	      op0 = rd; op1 = RegSp; op2 = cif.ldspImmed();
 	      if (rd == 0)
 		return expanded; // Illegal (rd == 0 reserved).
-	      op0 = rd; op1 = RegSp; op2 = cif.ldspImmed();
 	      encodeLd(op0, op1, op2, expanded);
               return expanded;
 	    }
@@ -2062,6 +2068,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	      encodeAdd(op0, op1, op2, expanded);
               return expanded;
 	    }
+
 	  // c.ebreak, c.jalr or c.add
           if (rs2 == RegX0)
             {

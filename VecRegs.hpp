@@ -506,6 +506,12 @@ namespace WdRiscv
     const std::vector<bool>& maskedAddrs() const
     { return maskedAddr_; }
 
+    void lastIncVec(std::vector<uint8_t>& fpFlags, std::vector<uint8_t>& vxsat) const
+    {
+      fpFlags = fpFlags_;
+      vxsat = vxsat_;
+    }
+
   protected:
 
     /// Clear load/address and store data used for logging/tracing.
@@ -516,6 +522,8 @@ namespace WdRiscv
       ldStPhysAddr_.clear();
       maskedAddr_.clear();
       stData_.clear();
+      fpFlags_.clear();
+      vxsat_.clear();
       clearLastWrittenReg();
       opsEmul_.assign(opsEmul_.size(), 1);
     }
@@ -774,6 +782,8 @@ namespace WdRiscv
     std::vector<uint64_t> ldStAddr_;      // Addresses of vector load/store instruction.
     std::vector<uint64_t> ldStPhysAddr_;  // Phys addresses of vector load/store instruction (FIXME: page crosses).
     std::vector<bool> maskedAddr_;        // True if address is masked off (element skipped).
+    std::vector<uint8_t> fpFlags_;        // Incremental fp flags (useful for vector instruction debugging).
+    std::vector<uint8_t> vxsat_;          // VXSAT per-element operation (useful for vector instruction debugging).
     std::vector<uint64_t> stData_;        // Data of vector store instruction.
     std::vector<unsigned> opsEmul_;       // Effective grouping of vector operands.
   };

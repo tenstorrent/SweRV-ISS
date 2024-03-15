@@ -36,6 +36,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#include <thread>
+#include <chrono>
+
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
@@ -708,9 +711,10 @@ Hart<URV>::resetVector()
       auto csr = csRegs_.findCsr(CsrNumber::VSTART);
       if (not csr or csr->getWriteMask() != vstartMask)
 	{
-	  std::cerr << "Warning: Write mask of CSR VSTART changed to 0x" << std::hex
-		    << vstartMask << " to be compatible with VLEN=" << std::dec
-		    << (bytesPerReg*8) << '\n';
+	  if (hartIx_ == 0)
+	    std::cerr << "Warning: Write mask of CSR VSTART changed to 0x" << std::hex
+		      << vstartMask << " to be compatible with VLEN=" << std::dec
+		      << (bytesPerReg*8) << '\n';
 	  csRegs_.configCsr(CsrNumber::VSTART, true, 0, vstartMask, vstartMask, false, false);
 	}
     }
@@ -1118,6 +1122,11 @@ Hart<URV>::execAddi(const DecodedInst* di)
   SRV imm = di->op2As<SRV>();
   SRV v = intRegs_.read(di->op1()) + imm;
   intRegs_.write(di->op0(), v);
+
+#ifdef HINT_OPS
+  if (di->op0() == 0 and di->op1() == 31)
+    throw CoreException(CoreException::Snapshot, "Taking snapshot.");
+#endif
 }
 
 
@@ -4597,7 +4606,10 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	}
       catch (const CoreException& ce)
 	{
-	  return logStop(ce, instCounter_, traceFile);
+	  bool success = logStop(ce, instCounter_, traceFile);
+          if (ce.type() == CoreException::Type::Snapshot)
+            throw;
+          return success;
 	}
     }
 
@@ -4710,6 +4722,8 @@ Hart<URV>::simpleRun()
   catch (const CoreException& ce)
     {
       success = logStop(ce, 0, nullptr);
+      if (ce.type() == CoreException::Type::Snapshot)
+        throw;
     }
 
   csRegs_.enableRecordWrite(true);
@@ -4853,7 +4867,7 @@ template <typename URV>
 bool
 Hart<URV>::simpleRunNoLimit()
 {
-  while (noUserStop) 
+  while (noUserStop)
     {
       currPc_ = pc_;
       ++instCounter_;
@@ -5402,6 +5416,8 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 	enterDebugMode_(DebugModeCause::STEP, pc_);
 
       stepResult_ = logStop(ce, instCounter_, traceFile);
+      if (ce.type() == CoreException::Type::Snapshot)
+        throw;
     }
 }
 
@@ -10431,10 +10447,14 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
   // Legalize HGATP. We do this here to avoid making CsRegs depend on VirtMem.
   if (csr == CsrNumber::HGATP)
     {
+      URV oldVal = 0;
+      if (not peekCsr(csr, oldVal))
+	oldVal = URV(VirtMem::Mode::Bare);  // Should not happen
+      HgatpFields<URV> oldHgatp(oldVal);
       HgatpFields<URV> hgatp(val);
       auto mode = VirtMem::Mode{hgatp.bits_.MODE};
       if (not virtMem_.isModeSupported(mode))
-	hgatp.bits_.MODE = unsigned(VirtMem::Mode::Bare);
+	hgatp.bits_.MODE = oldHgatp.bits_.MODE;  // Preserve MODE field.
       val = hgatp.value_;
     }
   else if (csr == CsrNumber::SATP or csr == CsrNumber::VSATP)

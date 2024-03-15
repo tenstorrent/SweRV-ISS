@@ -842,72 +842,132 @@ template <typename URV>
 bool
 System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t stepWindow)
 {
+  bool progSnapshot = false;
+  auto forceSnapshotAndClear = [this, &progSnapshot]() -> void {
+      progSnapshot = false;
+      uint64_t tag = ++snapIx_;
+      std::string pathStr = snapDir_ + std::to_string(tag);
+      Filesystem::path path = pathStr;
+      if (not Filesystem::is_directory(path) and
+	  not Filesystem::create_directories(path))
+        {
+          std::cerr << "Error: Failed to create snapshot directory " << pathStr << '\n';
+          std::cerr << "Continuing...\n";
+        }
+
+      if (not saveSnapshot(pathStr))
+        {
+          std::cerr << "Error: Failed to save a snapshot\n";
+          std::cerr << "Continuining...\n";
+        }
+  };
+
   if (hartCount() == 0)
     return true;
 
-  if (hartCount() == 1)
+  while (true)
     {
-      auto& hart = *ithHart(0);
-      bool ok = hart.run(traceFiles.at(0));
-#ifdef FAST_SLOPPY
-      hart.reportOpenedFiles(std::cout);
-#endif
-      return ok;
-    }
-
-  if (not stepWindow)
-    {
-      // Run each hart in its own thread.
-      std::vector<std::thread> threadVec;
       std::atomic<bool> result = true;
-      std::atomic<unsigned> finished = 0;  // Count of finished threads.
 
-      auto threadFunc = [&result, &finished] (Hart<URV>* hart, FILE* traceFile) {
-                          bool r = hart->run(traceFile);
-                          result = result and r;
-                          finished++;
-                        };
-
-      for (unsigned i = 0; i < hartCount(); ++i)
+      if (hartCount() == 1)
         {
-          Hart<URV>* hart = ithHart(i).get();
-          threadVec.emplace_back(std::thread(threadFunc, hart, traceFiles.at(i)));
+          auto& hart = *ithHart(0);
+          try
+            {
+              result = hart.run(traceFiles.at(0));
+#ifdef FAST_SLOPPY
+              hart.reportOpenedFiles(std::cout);
+#endif
+            }
+          catch (const CoreException& ce)
+            {
+              if (ce.type() == CoreException::Type::Snapshot)
+                progSnapshot = true;
+            }
         }
-
-      if (not waitAll)
+      else if (not stepWindow)
         {
-          // First thread to finish terminates run.
-          while (finished == 0)
-            sleep(1);
-          forceUserStop(0);
+          // Run each hart in its own thread.
+          std::vector<std::thread> threadVec;
+          std::atomic<unsigned> finished = 0;  // Count of finished threads.
+
+          auto threadFunc = [&result, &finished, &progSnapshot] (Hart<URV>* hart, FILE* traceFile) {
+                              try
+                                {
+                                  bool r = hart->run(traceFile);
+                                  result = result and r;
+                                }
+                              catch (const CoreException& ce)
+                                {
+                                  if (ce.type() == CoreException::Type::Snapshot)
+                                    progSnapshot = true;
+                                }
+                              finished++;
+                            };
+
+          for (unsigned i = 0; i < hartCount(); ++i)
+            {
+              Hart<URV>* hart = ithHart(i).get();
+              threadVec.emplace_back(std::thread(threadFunc, hart, traceFiles.at(i)));
+            }
+
+          if (not waitAll)
+            {
+              // First thread to finish terminates run.
+              while (finished == 0)
+                sleep(1);
+              forceUserStop(0);
+            }
+
+          for (auto& t : threadVec)
+            {
+              if (progSnapshot)
+                forceUserStop(0);
+              t.join();
+            }
+        }
+      else
+        {
+          // Run all harts in one thread round-robin.
+          bool result = true;
+          unsigned finished = 0;
+
+          for (auto hptr : sysHarts_)
+            finished += hptr->hasTargetProgramFinished();
+
+          while ((waitAll and finished != hartCount()) or
+                 (not waitAll and finished != 0))
+            {
+              for (auto hptr : sysHarts_)
+                {
+                  if (hptr->hasTargetProgramFinished())
+                    continue;
+                  unsigned steps = (rand() % stepWindow) + 1;
+                  // step N times
+                  unsigned ix = hptr->sysHartIndex();
+                  try
+                    {
+                      result = hptr->runSteps(steps, traceFiles.at(ix)) and result;
+                    }
+                  catch (const CoreException& ce)
+                    {
+                      if (ce.type() == CoreException::Type::Snapshot)
+                        progSnapshot = true;
+                    }
+                  if (hptr->hasTargetProgramFinished())
+                    finished++;
+                }
+
+              if (progSnapshot)
+                break;
+            }
         }
 
-      for (auto& t : threadVec)
-	t.join();
-      return result;
+      if (progSnapshot)
+        forceSnapshotAndClear();
+      else
+        return result;
     }
-
-  // Run all harts in one thread round-robin.
-  bool result = true;
-  unsigned finished = 0;
-
-  while ((waitAll and finished != hartCount()) or
-	 (not waitAll and finished == 0))
-    {
-      for (auto hptr : sysHarts_)
-	{
-	  if (hptr->hasTargetProgramFinished())
-	    continue;
-	  unsigned steps = (rand() % stepWindow) + 1;
-	  // step N times
-	  unsigned ix = hptr->sysHartIndex();
-	  result = hptr->runSteps(steps, traceFiles.at(ix)) and result;
-	  if (hptr->hasTargetProgramFinished())
-	    finished++;
-        }
-    }
-
-  return result;
 }
 
 
@@ -917,8 +977,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
 /// 0. Return true on success and false on failure.
 template <typename URV>
 bool
-System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snapDir,
-			 const std::vector<uint64_t>& periods)
+System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::vector<uint64_t>& periods)
 {
   if (hartCount() == 0)
     return true;
@@ -940,10 +999,12 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snap
 
       nextLimit = std::min(nextLimit, globalLimit);
 
-      uint64_t tag = ix;
+      uint64_t tag = 0;
       if (periods.size() > 1)
 	tag = ix < periods.size() ? periods.at(ix) : nextLimit;
-      std::string pathStr = snapDir + std::to_string(tag);
+      else
+        tag = ++snapIx_;
+      std::string pathStr = snapDir_ + std::to_string(tag);
       Filesystem::path path = pathStr;
       if (not Filesystem::is_directory(path) and
 	  not Filesystem::create_directories(path))

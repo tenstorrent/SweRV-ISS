@@ -23,6 +23,7 @@
 #include <type_traits>
 #include <functional>
 #include <boost/circular_buffer.hpp>
+#include <atomic>
 #include "IntRegs.hpp"
 #include "CsRegs.hpp"
 #include "float-util.hpp"
@@ -60,7 +61,7 @@ namespace WdRiscv
   {
   public:
 
-    enum Type { Stop, Exit };
+    enum Type { Stop, Exit, Snapshot };
 
     CoreException(Type type, const char* message = "", uint64_t address = 0,
 		  uint64_t value = 0)
@@ -802,6 +803,11 @@ namespace WdRiscv
     /// no vector register was written. Set group to the effective
     /// group multiplier.
     int lastVecReg(const DecodedInst& di, unsigned& group) const;
+
+    /// Support for tracing: Return incremental changes to fp flags and vxsat,
+    /// but for vector instructions on per-element basis.
+    void lastIncVec(std::vector<uint8_t>& fpFlags, std::vector<uint8_t>& vxsat) const
+    { return vecRegs_.lastIncVec(fpFlags, vxsat); }
 
     /// Return true if the last executed instruction triggered a trap
     /// (had an exception or encoutered an interrupt).
@@ -3247,6 +3253,13 @@ namespace WdRiscv
     void vop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		unsigned start, unsigned elems, bool masked,
 		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op);
+
+    /// Same as vop_vv, but for floating-point operations. This updates
+    /// incremental fp flags for each vector element.
+    template<typename ELEM_TYPE>
+    void vfop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		 unsigned start, unsigned elems, bool masked,
+		 std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> fop);
 
     /// Helper to vector vv instructions (eg vadd.vx, vsub.vx). Operation
     /// to be performed (eg. add, sub) is passed in op.
