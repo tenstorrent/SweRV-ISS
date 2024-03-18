@@ -240,6 +240,61 @@ System<URV>::loadHexFiles(const std::vector<std::string>& files, bool verbose)
 }
 
 
+static bool
+binaryFileParams(std::string spec, uint64_t defOffset, std::string& filename, uint64_t &offset, bool &update)
+{
+  using std::cerr;
+  // Split filespec around colons. Spec format: <file>,
+  // <file>:<offset>, or <file>:<offset>:u
+  std::vector<std::string> parts;
+  boost::split(parts, spec, boost::is_any_of(":"));
+
+  filename = parts.at(0);
+  offset = defOffset;
+  update = false;
+
+  if (parts.empty())
+    {
+      std::cerr << "Error: Empty binary file name\n";
+      return false;
+    }
+
+  filename = parts.at(0);
+
+  if (parts.size() > 1)
+    {
+      std::string offsStr = parts.at(1);
+      if (offsStr.empty())
+	cerr << "Warning: Empty binary file offset: " << spec << '\n';
+      else
+	{
+	  char* tail = nullptr;
+	  offset = strtoull(offsStr.c_str(), &tail, 0);
+	  if (tail and *tail)
+	    {
+	      cerr << "Error: Invalid binary file offset: " << spec << '\n';
+	      return false;
+	    }
+	}
+    }
+  else
+    cerr << "Binary file " << filename << " does not have an address, will use address 0x"
+	 << std::hex << offset << std::dec << '\n';
+
+  if (parts.size() > 2)
+    {
+      if (parts.at(2) != "u")
+	{
+	  cerr << "Error: Invalid binary file attribute: " << spec << '\n';
+	  return false;
+	}
+      update = true;
+    }
+
+  return true;
+}
+
+
 template <typename URV>
 bool
 System<URV>::loadBinaryFiles(const std::vector<std::string>& fileSpecs,
@@ -250,53 +305,16 @@ System<URV>::loadBinaryFiles(const std::vector<std::string>& fileSpecs,
 
   for (const auto& spec : fileSpecs)
     {
-      // Split filespec around colons. Spec format: <file>,
-      // <file>:<offset>, or <file>:<offset>:u
-      std::vector<std::string> parts;
-      boost::split(parts, spec, boost::is_any_of(":"));
 
-      if (parts.empty())
-	{
-	  std::cerr << "Error: Empty binary file name\n";
+      std::string filename;
+      uint64_t offset;
+      bool update;
+
+      if (!binaryFileParams(spec, defOffset, filename, offset, update))
+        {
 	  errors++;
 	  continue;
-	}
-
-      std::string filename = parts.at(0);
-      uint64_t offset = defOffset;
-
-      if (parts.size() > 1)
-        {
-          std::string offsStr = parts.at(1);
-	  if (offsStr.empty())
-	    cerr << "Warning: Empty binary file offset: " << spec << '\n';
-	  else
-	    {
-	      char* tail = nullptr;
-	      offset = strtoull(offsStr.c_str(), &tail, 0);
-	      if (tail and *tail)
-		{
-		  cerr << "Error: Invalid binary file offset: " << spec << '\n';
-		  errors++;
-		  continue;
-		}
-	    }
         }
-      else
-        cerr << "Binary file " << filename << " does not have an address, will use address 0x"
-	     << std::hex << offset << std::dec << '\n';
-
-      bool update = false;
-      if (parts.size() > 2)
-	{
-	  if (parts.at(2) != "u")
-	    {
-	      cerr << "Error: Invalid binary file attribute: " << spec << '\n';
-	      errors++;
-	      continue;
-	    }
-	  update = true;
-	}
 
       if (verbose)
 	cerr << "Loading binary " << filename << " at address 0x" << std::hex
@@ -318,6 +336,57 @@ System<URV>::loadBinaryFiles(const std::vector<std::string>& fileSpecs,
 
   return errors == 0;
 }
+
+
+#ifdef LZ4_COMPRESS
+template <typename URV>
+bool
+System<URV>::loadLz4Files(const std::vector<std::string>& fileSpecs,
+			  uint64_t defOffset, bool verbose)
+{
+  using std::cerr;
+  unsigned errors = 0;
+
+  for (const auto& spec : fileSpecs)
+    {
+      std::string filename;
+      uint64_t offset;
+      bool update;
+
+      if (!binaryFileParams(spec, defOffset, filename, offset, update))
+        {
+	  errors++;
+	  continue;
+        }
+
+      if (update)
+	{
+	  cerr << "Updating not supported on lz4 files, ignoring " << filename << '\n';
+	  errors++;
+	  continue;
+	}
+
+      if (verbose)
+	cerr << "Loading lz4 compressed file " << filename << " at address 0x" << std::hex
+	     << offset << std::dec << '\n';
+
+      if (not memory_->loadLz4File(filename, offset))
+	{
+	  errors++;
+	  continue;
+	}
+
+      if (update)
+	{
+	  uint64_t size = Filesystem::file_size(filename);
+	  BinaryFile bf = { filename, offset, size };
+	  binaryFiles_.push_back(bf);
+	}
+    }
+
+  return errors == 0;
+}
+#endif
 
 
 static
@@ -1128,8 +1197,6 @@ System<URV>::loadSnapshot(const std::string& snapDir)
   Filesystem::path fdPath = dirPath / "fd";
   return syscall.loadFileDescriptors(fdPath.string());
 }
-
-
 
 
 template class WdRiscv::System<uint32_t>;

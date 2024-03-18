@@ -20,8 +20,15 @@
 #include <cstdlib>
 #include <boost/algorithm/string.hpp>
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <elfio/elfio.hpp>
 #include <zlib.h>
+#ifdef LZ4_COMPRESS
+#include <lz4frame.h>
+#endif
 #include "Memory.hpp"
 #include "wideint.hpp"
 
@@ -245,6 +252,131 @@ Memory::loadBinaryFile(const std::string& fileName, uint64_t addr)
   return true;
 }
 
+#ifdef LZ4_COMPRESS
+void *Memory::mmap_file(const std::string& filename, size_t& length)
+  {
+    int fd;
+    struct stat sbuf;
+    void *src;
+
+    fd = open(filename.c_str(), O_RDONLY);
+    if (fd == -1)
+      {
+	throw std::runtime_error("Couldn't open " + filename);
+      }
+
+  if (fstat(fd, &sbuf) == -1)
+    {
+      throw std::runtime_error("Couldn't fstat " + filename);
+    }
+  length = sbuf.st_size;
+
+  src = mmap(0, length, PROT_READ, MAP_SHARED, fd, 0);
+  if (src == MAP_FAILED)
+    {
+      close(fd);
+      throw std::runtime_error("Couldn't mmap " + filename);
+    }
+
+  close(fd);
+
+  return src;
+}
+
+#define BLOCK_SIZE (4*1024*1024)
+
+bool
+Memory::loadLz4File(const std::string& fileName, uint64_t addr)
+{
+  LZ4F_dctx *dctx;
+  LZ4F_errorCode_t ret;
+  uint8_t *src;
+  uint8_t *dst;
+  size_t src_size;
+  size_t dst_size;
+
+  src = (uint8_t *)mmap_file(fileName, src_size);
+  if (src == (uint8_t *)MAP_FAILED)
+    {
+      throw std::runtime_error("Out of memory");
+    }
+
+  dst_size = BLOCK_SIZE;
+  dst = (uint8_t *)malloc(dst_size);
+  if (!dst)
+    {
+      throw std::runtime_error("Out of memory");
+    }
+
+  ret = LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
+  if (LZ4F_isError(ret))
+    {
+      throw std::runtime_error("Couldn't initialize LZ4 context");
+    }
+
+  // unmapped and out of bounds addresses
+  size_t unmappedCount = 0, oob = 0, num = 0;
+
+  while (src_size)
+    {
+      size_t src_bytes_read = src_size;
+      size_t dst_bytes_written = dst_size;
+
+      size_t ret = LZ4F_decompress(dctx, dst, &dst_bytes_written, src, &src_bytes_read, NULL);
+      if (LZ4F_isError(ret))
+	{
+	  throw std::runtime_error("LZ4F_decompress failed");
+	}
+
+      for (size_t n = 0; n < dst_bytes_written; n++)
+	{
+	  char b = dst[n];
+
+	  if (addr < size_)
+	    {
+	      // Speed things up but not initalizing zero bytes
+	      if (b and not initializeByte(addr, b))
+		{
+		  if (unmappedCount == 0)
+		    std::cerr << "Failed to copy binary file byte at address 0x"
+			      << std::hex << addr << std::dec
+			      << ": corresponding location is not mapped\n";
+		  unmappedCount++;
+		  if (checkUnmappedElf_)
+		    return false;
+		}
+	      addr++;
+	    }
+	  else
+	    {
+	      if (not oob)
+		std::cerr << "File " << fileName << ", Byte " << num << ": "
+			  << "Warning: Address out of bounds: "
+			  << std::hex << addr << '\n' << std::dec;
+	      oob++;
+	    }
+	  num++;
+	}
+
+      src = src + src_bytes_read;
+      src_size = src_size - src_bytes_read;
+    }
+
+  munmap(src, src_size);
+  free(dst);
+
+  if (oob > 1)
+    std::cerr << "File " << fileName << ": Warning: File contained "
+	      << oob << " out of bounds addresses.\n";
+
+  // In case writing ELF data modified last-written-data associated
+  // with each hart.
+  for (unsigned hartId = 0; hartId < reservations_.size(); ++hartId)
+    clearLastWriteInfo(hartId);
+
+  return true;
+}
+#endif
 
 bool
 Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, uint64_t& end)

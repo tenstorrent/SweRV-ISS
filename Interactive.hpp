@@ -93,6 +93,10 @@ namespace WdRiscv
     bool hexCommand(Hart<URV>&, const std::string& line,
 		    const std::vector<std::string>& tokens);
 
+    /// Helper to interact: "lz4" command. Load LZ4 compresed binary file.
+    bool lz4Command(Hart<URV>& , const std::string& line,
+		    const std::vector<std::string>& tokens);
+
     /// Helper to interact: "reset" command. Reset processor.
     bool resetCommand(Hart<URV>&, const std::string& line,
 		     const std::vector<std::string>& tokens);
