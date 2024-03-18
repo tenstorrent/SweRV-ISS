@@ -2251,73 +2251,48 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
 
 template <typename URV>
 inline
-bool
-Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
+ExceptionCause
+Hart<URV>::fetchInstNoTrap(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 {
   physAddr = virtAddr;
+  assert(not triggerTripped_);
 
   // Inst address translation and memory protection is not affected by MPRV.
 
   if (isRvs() and privMode_ != PrivilegeMode::Machine)
     {
-      if (triggerTripped_)
-        return false;
-
       uint64_t gPhysAddr = virtAddr;
       auto cause = virtMem_.translateForFetch(virtAddr, privMode_, virtMode_, gPhysAddr, physAddr);
       if (cause != ExceptionCause::NONE)
-        {
-          initiateException(cause, virtAddr, virtAddr, gPhysAddr);
-          return false;
-        }
+	return cause;
     }
 
   if (virtAddr & 1)
-    {
-      if (triggerTripped_)
-        return false;
-      initiateException(ExceptionCause::INST_ADDR_MISAL, virtAddr, virtAddr);
-      return false;
-    }
+    return ExceptionCause::INST_ADDR_MISAL;
 
   if ((physAddr & 3) == 0 and not mcm_)   // Word aligned
     {
       if (not memory_.readInst(physAddr, inst))
-        {
-          if (triggerTripped_)
-            return false;
-          initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr);
-          return false;
-        }
+	return ExceptionCause::INST_ACC_FAULT;
 
       if (pmpEnabled_)
         {
           Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
           if (not pmp.isExec(privMode_))
-            {
-              if (triggerTripped_)
-                return false;
-              initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr);
-              return false;
-            }
+	    return ExceptionCause::INST_ACC_FAULT;
         }
 
       if (initStateFile_)
 	dumpInitState("fetch", virtAddr, physAddr);
 
-      return true;
+      return ExceptionCause::NONE;
     }
 
   if (pmpEnabled_)
     {
       Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
       if (not pmp.isExec(privMode_))
-        {
-          if (triggerTripped_)
-            return false;
-          initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr);
-          return false;
-        }
+	return ExceptionCause::INST_ACC_FAULT;
     }
 
   uint16_t half = 0;
@@ -2326,18 +2301,13 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
     done = readInstFromFetchCache(physAddr, half);
 
   if (not done and not memory_.readInst(physAddr, half))
-    {
-      if (triggerTripped_)
-        return false;
-      initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr);
-      return false;
-    }
+    return ExceptionCause::INST_ACC_FAULT;
 
   if (initStateFile_)
     dumpInitState("fetch", virtAddr, physAddr);
   inst = half;
   if (isCompressedInst(inst))
-    return true;
+    return ExceptionCause::NONE;
 
   // If we cross page boundary, translate address of other page.
   uint64_t physAddr2 = physAddr + 2;
@@ -2345,26 +2315,17 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   if (memory_.getPageIx(physAddr) != memory_.getPageIx(physAddr2))
     if (isRvs() and privMode_ != PrivilegeMode::Machine)
       {
-	auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, virtMode_, gPhysAddr2, physAddr2);
+	auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, virtMode_, gPhysAddr2,
+						physAddr2);
 	if (cause != ExceptionCause::NONE)
-	  {
-	    if (triggerTripped_)
-	      return false;
-	    initiateException(cause, virtAddr, virtAddr+2, gPhysAddr2);
-	    return false;
-	  }
+	  return cause;
       }
 
   if (pmpEnabled_)
     {
       Pmp pmp2 = pmpManager_.accessPmp(physAddr2, PmpManager::AccessReason::Fetch);
       if (not pmp2.isExec(privMode_))
-        {
-          if (triggerTripped_)
-            return false;
-          initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr + 2);
-          return false;
-        }
+	return ExceptionCause::INST_ACC_FAULT;
     }
 
   uint16_t upperHalf = 0;
@@ -2373,17 +2334,27 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
     done = readInstFromFetchCache(physAddr2, upperHalf);
 
   if (not done and not memory_.readInst(physAddr2, upperHalf))
-    {
-      if (triggerTripped_)
-        return false;
-      initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr + 2);
-      return false;
-    }
+    return ExceptionCause::INST_ACC_FAULT;
 
   if (initStateFile_)
     dumpInitState("fetch", virtAddr, physAddr2);
 
   inst = inst | (uint32_t(upperHalf) << 16);
+  return ExceptionCause::NONE;
+}
+
+
+template <typename URV>
+inline
+bool
+Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
+{
+  auto cause = fetchInstNoTrap(virtAddr, physAddr, inst);
+  if (cause != ExceptionCause::NONE)
+    {
+      initiateException(cause, virtAddr, physAddr);
+      return false;
+    }
   return true;
 }
 
