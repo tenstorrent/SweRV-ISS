@@ -2252,16 +2252,18 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
 template <typename URV>
 inline
 ExceptionCause
-Hart<URV>::fetchInstNoTrap(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
+Hart<URV>::fetchInstNoTrap(URV virtAddr, uint64_t& physAddr, uint64_t& gPhysAddr,
+			   uint32_t& inst)
 {
   physAddr = virtAddr;
   assert(not triggerTripped_);
 
   // Inst address translation and memory protection is not affected by MPRV.
 
+  gPhysAddr = 0;
   if (isRvs() and privMode_ != PrivilegeMode::Machine)
     {
-      uint64_t gPhysAddr = virtAddr;
+      gPhysAddr = virtAddr;
       auto cause = virtMem_.translateForFetch(virtAddr, privMode_, virtMode_, gPhysAddr, physAddr);
       if (cause != ExceptionCause::NONE)
 	return cause;
@@ -2311,11 +2313,11 @@ Hart<URV>::fetchInstNoTrap(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 
   // If we cross page boundary, translate address of other page.
   uint64_t physAddr2 = physAddr + 2;
-  uint64_t gPhysAddr2 = physAddr2;
+  gPhysAddr = physAddr2;
   if (memory_.getPageIx(physAddr) != memory_.getPageIx(physAddr2))
     if (isRvs() and privMode_ != PrivilegeMode::Machine)
       {
-	auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, virtMode_, gPhysAddr2,
+	auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, virtMode_, gPhysAddr,
 						physAddr2);
 	if (cause != ExceptionCause::NONE)
 	  return cause;
@@ -2349,10 +2351,11 @@ inline
 bool
 Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 {
-  auto cause = fetchInstNoTrap(virtAddr, physAddr, inst);
+  uint64_t gPhysAddr = 0;
+  auto cause = fetchInstNoTrap(virtAddr, physAddr, gPhysAddr, inst);
   if (cause != ExceptionCause::NONE)
     {
-      initiateException(cause, virtAddr, virtAddr);
+      initiateException(cause, virtAddr, virtAddr, gPhysAddr);
       return false;
     }
   return true;
