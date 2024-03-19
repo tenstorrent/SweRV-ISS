@@ -9596,7 +9596,8 @@ Hart<URV>::execFence_tso(const DecodedInst* di)
        not di->isFenceSuccOutput() )
     return;
 
-  illegalInst(di);
+  // Spec says that reserved configurations should be treated as normal FENCE.
+  // We do not take an exception.
 }
 
 
