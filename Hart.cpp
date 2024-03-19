@@ -2352,7 +2352,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   auto cause = fetchInstNoTrap(virtAddr, physAddr, inst);
   if (cause != ExceptionCause::NONE)
     {
-      initiateException(cause, virtAddr, physAddr);
+      initiateException(cause, virtAddr, virtAddr);
       return false;
     }
   return true;
