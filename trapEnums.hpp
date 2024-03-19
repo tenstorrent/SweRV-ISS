@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -36,11 +36,11 @@ namespace WdRiscv
       S_SOFTWARE   = 1,  // Supervisor mode software interrupt
       VS_SOFTWARE  = 2,  // Virtual supervisor software interrupt
       M_SOFTWARE   = 3,  // Machine mode software interrupt
-      RESERVED1    = 4,  // 
+      RESERVED1    = 4,  //
       S_TIMER      = 5,  // Supervisor timer
       VS_TIMER     = 6,  // Virtual supervisor timer interrupt
       M_TIMER      = 7,  // Machine timer
-      RESERVED2    = 8,  // 
+      RESERVED2    = 8,  //
       S_EXTERNAL   = 9,  // Supervisor external
       VS_EXTERNAL  = 10, // Virtual supervisor external
       M_EXTERNAL   = 11, // Machine external
@@ -121,6 +121,7 @@ namespace WdRiscv
       EXIT_DEBUG,     // Exited debug mode
       WRS_NTO,        // Executed wait for reservation no timeout
       WRS_STO,        // Executed wait for reservation short timeout
+      FENCE,          // Fence
       INTERACTIVE,    // Interactive cancel_lr command
       SERVER          // Server cancel_lr command
     };
