@@ -1105,8 +1105,18 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::vector<uint6
 	}
     }
 
+  // Incremental branch traces are in snapshot directories. Turn off
+  // branch tracing to prevent top-level branch tracing file from
+  // being generated since the data will be for the last snapshot and
+  // not for the whole run. Same is done for instruction and data line
+  // tracing.
   for (auto hartPtr : sysHarts_)
-    hartPtr->traceBranches(std::string(), 0);  // Turn off branch tracing.
+    {
+      hartPtr->traceBranches(std::string(), 0);
+      std::string emptyPath;
+      memory_->enableDataLineTrace(emptyPath);
+      memory_->enableInstructionLineTrace(emptyPath);
+    }
 
   return true;
 }

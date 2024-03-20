@@ -1803,12 +1803,12 @@ namespace WdRiscv
     void setMcm(std::shared_ptr<Mcm<URV>> mcm);
 
     /// Enable instruction line address tracing.
-    void enableInstructionLineTrace()
-    { instrLineTrace_ = true; }
+    void enableInstructionLineTrace(bool flag)
+    { instrLineTrace_ = flag; }
 
     /// Enable instruction line address tracing.
-    void enableDataLineTrace()
-    { dataLineTrace_ = true; }
+    void enableDataLineTrace(bool flag)
+    { dataLineTrace_ = flag; }
 
     /// Enable/disable page-table-walk info in log.
     void tracePtw(bool flag)

@@ -125,14 +125,14 @@ namespace WdRiscv
     void enableDataLineTrace(const std::string& path)
     {
       memory_->enableDataLineTrace(path);
-      for (auto hart : sysHarts_)  hart->enableDataLineTrace();
+      for (auto hart : sysHarts_)  hart->enableDataLineTrace(true);
     }
 
     /// Similar to enableDataLineTrace but for instructions.
     void enableInstructionLineTrace(const std::string& path)
     {
       memory_->enableInstructionLineTrace(path);
-      for (auto hart : sysHarts_)  hart->enableInstructionLineTrace();
+      for (auto hart : sysHarts_)  hart->enableInstructionLineTrace(true);
     }
 
     /// Define read memory callback. This (along with
