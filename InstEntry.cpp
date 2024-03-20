@@ -620,6 +620,9 @@ InstTable::setupInstVec()
 	OperandType::Imm, OperandMode::None, 0x0f000000,
 	OperandType::Imm, OperandMode::None, 0x00f00000 },
 
+      { "pause", InstId::pause, 0x100000f, 0xffffffff,
+        RvExtension::I, RvFormat::I },
+
       { "fence.tso", InstId::fence_tso, 0x800000f, 0xf000707f,
 	RvExtension::I, RvFormat::I,
 	OperandType::Imm, OperandMode::None, 0x0f000000,

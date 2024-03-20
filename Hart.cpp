@@ -5569,6 +5569,10 @@ Hart<URV>::execute(const DecodedInst* di)
       execFence(di);
       return;
 
+    case InstId::pause:
+      execFence(di);
+      return;
+
     case InstId::fence_tso:
       execFence_tso(di);
       return;
