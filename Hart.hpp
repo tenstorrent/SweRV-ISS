@@ -2023,6 +2023,15 @@ namespace WdRiscv
 	clintAlarm_ = value;
     }
 
+    /// Fetch an instruction from the given virtual address. Return
+    /// ExceptionCause::None on success. Return exception cause on
+    /// fail. If successful set pysAddr to the physical address
+    /// corresponding to the given virtual address, gPhysAddr to the
+    /// guest physical address (0 if not in VS/VU mode), and
+    /// instr to the fetched instruction.
+    ExceptionCause fetchInstNoTrap(URV virAddr, uint64_t& physAddr,
+				   uint64_t& gPhysAddr, uint32_t& instr);
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
@@ -2616,13 +2625,6 @@ namespace WdRiscv
     // counters from within the code executing the CSR instruction
     // using this method.
     void updatePerformanceCountersForCsr(const DecodedInst& di);
-
-    /// Fetch an instruction from the given virtual address. Return
-    /// ExceptionCause::None on success. Return exception cause on
-    /// fail. If successful set pysAddr to the physical address
-    /// corresponding to the given virtual address.
-    ExceptionCause fetchInstNoTrap(URV virAddr, uint64_t& physAddr,
-				   uint64_t& gPhysAddr, uint32_t& instr);
 
     /// Fetch an instruction from the given virtual address. Return
     /// true on success. Return false on fail (in which case an
