@@ -11709,8 +11709,6 @@ Hart<URV>::execCmop(const DecodedInst* di)
         illegalInst(di);
         return;
       }
-    URV value = 0;
-    intRegs_.write(di->op0(), value);
 }
 
 template
