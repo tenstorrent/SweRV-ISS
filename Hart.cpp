@@ -9580,7 +9580,6 @@ template <typename URV>
 void
 Hart<URV>::execFence(const DecodedInst*)
 {
-  cancelLr(CancelLrCause::FENCE);
 }
 
 
@@ -9589,8 +9588,6 @@ void
 Hart<URV>::execFence_tso(const DecodedInst* di)
 {
   // Only fence_tso rw,rw is legal.
-
-  cancelLr(CancelLrCause::FENCE);
 
   if ( di->isFencePredRead() and
        di->isFencePredWrite() and
@@ -9619,7 +9616,6 @@ Hart<URV>::execFencei(const DecodedInst* di)
 
   if (mcm_)
     fetchCache_.clear();
-  cancelLr(CancelLrCause::FENCE);
 
   // invalidateDecodeCache();  // No need for this. We invalidate on each write.
 }
