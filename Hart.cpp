@@ -11710,7 +11710,7 @@ Hart<URV>::execCmop(const DecodedInst* di)
         return;
       }
     URV value = 0;
-    intRegs_.write(di->op0(), value);
+    intRegs_.write(RegX0, value);
 }
 
 template
