@@ -193,13 +193,69 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
     /// the vpc on the subsequent call to fetch.
     /// Return true on success and false if given tag has already been fetched.
     bool fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
-	       bool& trap, ExceptionCause& cause, uint64_t& trapPC);
+	       bool& trap, ExceptionCause& cause, uint64_t& trapPC)
+    {
+      auto packet = getInstructionPacket(hartIx, tag);
+      if (packet)
+	return false;
+
+      auto hart = getHart(hartIx);
+      if (not hart)
+	{
+	  std::cerr << "Fetch: Bad hart index: " << hartIx << '\n';
+	  assert(0);
+	  return false;
+	}
+
+      auto prev = this->prevFetch_;
+      if (prev)
+	{
+	  if (prev->nextPc() != vpc and not prev->trapped() and not prev->predicted())
+	    prev->predictBranch(true /*taken*/, vpc);
+	}
+
+      uint64_t ppc = 0;  // Physical pc.
+      uint32_t opcode = 0;
+      uint64_t gpc = 0; // Guest physical pc.
+      cause = hart->fetchInstNoTrap(vpc, ppc, gpc, opcode);
+
+      if (cause == ExceptionCause::NONE)
+	{
+	  packet = std::make_shared<InstrPac>(tag, vpc, ppc);
+	  assert(packet);
+	  packet->fetched_ = true;
+	  insertPacket(hartIx, tag, packet);
+	  if (not decode(hartIx, time, tag, opcode))
+	    assert(0);
+	  prevFetch_ = packet;
+	  trap = false;
+	}
+      else
+	{
+	  prevFetch_ = nullptr;
+	  trap = true;
+	}
+
+      return true;
+    }
 
     /// Called by the performance model to affect a decode in whisper. Whisper
     /// will return false if the instruction has not been fetched; otherwise, it
     /// will return true after decoding the instruction, updating the di field of
     /// the corresponding packet, and marking the packed as decoded.
-    bool decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode);
+    bool decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode)
+    {
+      auto hart = getHart(hartIx);
+      if (not hart)
+	return false;
+      auto packet = getInstructionPacket(hartIx, tag);
+      if (not packet)
+	return false;
+      if (packet->decoded())
+	return true;
+      hart->decode(packet->instrVa(), packet->instrPa(), opcode, packet->di_);
+      return true;
+    }
 
     /// Optionally called by performance model after decode to inform Whisper of branch
     /// prediction. Returns true on success and false on error (tag was never decoded).
