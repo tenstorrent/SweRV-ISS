@@ -62,6 +62,7 @@ namespace WdRiscv
      or_,
      and_,
      fence,
+     pause,
      fence_tso,
      fence_i,
      ecall,
