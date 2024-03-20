@@ -2252,7 +2252,7 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
 template <typename URV>
 inline
 ExceptionCause
-Hart<URV>::fetchInstNoTrap(URV virtAddr, uint64_t& physAddr, uint64_t& gPhysAddr,
+Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& gPhysAddr,
 			   uint32_t& inst)
 {
   physAddr = virtAddr;
@@ -2317,7 +2317,8 @@ Hart<URV>::fetchInstNoTrap(URV virtAddr, uint64_t& physAddr, uint64_t& gPhysAddr
   if (memory_.getPageIx(physAddr) != memory_.getPageIx(physAddr2))
     if (isRvs() and privMode_ != PrivilegeMode::Machine)
       {
-	auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, virtMode_, gPhysAddr,
+	virtAddr += 2;
+	auto cause = virtMem_.translateForFetch(virtAddr, privMode_, virtMode_, gPhysAddr,
 						physAddr2);
 	if (cause != ExceptionCause::NONE)
 	  return cause;
@@ -2351,11 +2352,14 @@ inline
 bool
 Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 {
-  uint64_t gPhysAddr = 0;
-  auto cause = fetchInstNoTrap(virtAddr, physAddr, gPhysAddr, inst);
+  uint64_t gPhysAddr = 0, va = virtAddr;
+
+  // If a trap occurs on a page crossing fetch, va is updated with the
+  // portion of the access that caused the trap.
+  auto cause = fetchInstNoTrap(va, physAddr, gPhysAddr, inst);
   if (cause != ExceptionCause::NONE)
     {
-      initiateException(cause, virtAddr, virtAddr, gPhysAddr);
+      initiateException(cause, va, va, gPhysAddr);
       return false;
     }
   return true;

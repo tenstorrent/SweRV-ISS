@@ -2621,7 +2621,7 @@ namespace WdRiscv
     /// ExceptionCause::None on success. Return exception cause on
     /// fail. If successful set pysAddr to the physical address
     /// corresponding to the given virtual address.
-    ExceptionCause fetchInstNoTrap(URV virAddr, uint64_t& physAddr,
+    ExceptionCause fetchInstNoTrap(uint64_t& virAddr, uint64_t& physAddr,
 				   uint64_t& gPhysAddr, uint32_t& instr);
 
     /// Fetch an instruction from the given virtual address. Return
