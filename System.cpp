@@ -911,9 +911,7 @@ template <typename URV>
 bool
 System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t stepWindow)
 {
-  bool progSnapshot = false;
-  auto forceSnapshotAndClear = [this, &progSnapshot]() -> void {
-      progSnapshot = false;
+  auto forceSnapshot = [this]() -> void {
       uint64_t tag = ++snapIx_;
       std::string pathStr = snapDir_ + std::to_string(tag);
       Filesystem::path path = pathStr;
@@ -936,6 +934,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
 
   while (true)
     {
+      bool progSnapshot = false;
       std::atomic<bool> result = true;
 
       if (hartCount() == 1)
@@ -1033,7 +1032,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
         }
 
       if (progSnapshot)
-        forceSnapshotAndClear();
+        forceSnapshot();
       else
         return result;
     }
