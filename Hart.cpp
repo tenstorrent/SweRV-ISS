@@ -10192,11 +10192,11 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
 	  URV mask = URV(1) << bitIx;
 	  if ((hcounteren & mask) == 0)
 	    {
-	      if ((mcounteren & mask) != 0) virtualInst(di); else illegalInst(di);
+	      if ((mcounteren & mask) == 0) illegalInst(di); else virtualInst(di);
 	      return false;
 	    }
-	  else if (privMode_ == PM::User and (scounteren & mask) == 0)
-	    { virtualInst(di); return false; }
+	  if (privMode_ == PM::User and (scounteren & mask) == 0)
+	    { illegalInst(di); return false; }
 	}
       else if (csRegs_.isHypervisor(csr) or
 	       (privMode_ == PM::User and not csRegs_.isReadable(csr, PM::User, virtMode_)))
