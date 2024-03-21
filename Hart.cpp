@@ -2317,8 +2317,7 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& gPh
   if (memory_.getPageIx(physAddr) != memory_.getPageIx(physAddr2))
     if (isRvs() and privMode_ != PrivilegeMode::Machine)
       {
-	virtAddr += 2;
-	auto cause = virtMem_.translateForFetch(virtAddr, privMode_, virtMode_, gPhysAddr,
+	auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, virtMode_, gPhysAddr,
 						physAddr2);
 	if (cause != ExceptionCause::NONE)
 	  return cause;
@@ -2359,7 +2358,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   auto cause = fetchInstNoTrap(va, physAddr, gPhysAddr, inst);
   if (cause != ExceptionCause::NONE)
     {
-      initiateException(cause, va, va, gPhysAddr);
+      initiateException(cause, virtAddr, va, gPhysAddr);
       return false;
     }
   return true;
