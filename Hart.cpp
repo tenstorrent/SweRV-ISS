@@ -10182,16 +10182,29 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
     hsq = hsq and csRegs_.isWriteable(csr, PM::Supervisor, false /*virtMode*/);
   if (virtMode_)
     {
-      if (csRegs_.isHypervisor(csr) or
-	  (privMode_ == PM::User and not csRegs_.isReadable(csr, PM::User, virtMode_)))
-	{
-	  if (not csRegs_.isHighHalf(csr))
+      if (csr >= CN::CYCLE and csr <= CN::HPMCOUNTER31)
+	{       // Section 9.2.6 of privileged spec.
+	  URV hcounteren = 0, mcounteren = 0, scounteren = 0;
+	  if (not peekCsr(CN::MCOUNTEREN, mcounteren) or not peekCsr(CN::HCOUNTEREN, hcounteren) or
+	      not peekCsr(CN::SCOUNTEREN, scounteren))
+	    assert(0);
+	  unsigned bitIx = unsigned(csr) - unsigned(CN::CYCLE);
+	  URV mask = URV(1) << bitIx;
+	  if ((hcounteren & mask) == 0)
 	    {
-	      if (hsq) virtualInst(di); else illegalInst(di);
+	      if ((mcounteren & mask) != 0) virtualInst(di); else illegalInst(di);
+	      return false;
 	    }
-          else if (sizeof(URV) == 4 and hsq)
-            virtualInst(di);
-          else
+	  else if (privMode_ == PM::User and (scounteren & mask) == 0)
+	    { virtualInst(di); return false; }
+	}
+      else if (csRegs_.isHypervisor(csr) or
+	       (privMode_ == PM::User and not csRegs_.isReadable(csr, PM::User, virtMode_)))
+	{
+	  assert(not csRegs_.isHighHalf(csr) or sizeof(URV) == 4);
+	  if (hsq)
+	    virtualInst(di);
+	  else
 	    illegalInst(di);
 	  return false;
         }
