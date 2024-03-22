@@ -794,10 +794,11 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   WhisperFlags flags;
   flags.bits.privMode = pm;
   flags.bits.fpFlags = hart.lastFpFlags();
-  flags.bits.trap = hart.lastInstructionTrapped()? 1 : 0;
-  flags.bits.stop = hart.hasTargetProgramFinished()? 1 : 0;
+  flags.bits.trap = hart.lastInstructionTrapped();
+  flags.bits.stop = hart.hasTargetProgramFinished();
   flags.bits.interrupt = interrupted;
-  flags.bits.virt = hart.lastVirtMode()? 1 : 0;
+  flags.bits.virt = hart.lastVirtMode();
+  flags.bits.debug = hart.inDebugMode();
   reply.flags = flags.value;
 
   if (wasInDebug)
