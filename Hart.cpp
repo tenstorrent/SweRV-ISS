@@ -5236,6 +5236,9 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	    mipVal = mipVal | (URV(1) << URV(IC::VS_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(IC::VS_TIMER));
+	  // Bits HIP.VSTIP is the logical-OR of hvip.VSTIP and the
+	  // timer interrupt signal resulting from vstimecmp.
+	  mipVal |= csRegs_.peekHvip() & (URV(1) << URV(IC::VS_TIMER));
 	}
 
       if (mipVal != prev)
