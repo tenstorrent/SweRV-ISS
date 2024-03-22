@@ -4420,9 +4420,11 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
       if (found or not input)
 	continue;
 
-      found = true;
       if (active)
-	vecRegs_.writeMaskRegister(vd, ix, true);
+	{
+	  found = true;
+	  vecRegs_.writeMaskRegister(vd, ix, true);
+	}
     }
 
   vecRegs_.touchMask(vd);  // In case nothing was written
