@@ -5235,10 +5235,13 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	  if (time_ >= (vstimecmp_ - htimedelta_ + timeShift_))
 	    mipVal = mipVal | (URV(1) << URV(IC::VS_TIMER));
 	  else
-	    mipVal = mipVal & ~(URV(1) << URV(IC::VS_TIMER));
-	  // Bits HIP.VSTIP is the logical-OR of hvip.VSTIP and the
-	  // timer interrupt signal resulting from vstimecmp.
-	  mipVal |= csRegs_.peekHvip() & (URV(1) << URV(IC::VS_TIMER));
+	    {
+	      mipVal = mipVal & ~(URV(1) << URV(IC::VS_TIMER));
+	      // Bits HIP.VSTIP (alias of MIP.VSTIP) is the logical-OR
+	      // of HVIP.VSTIP and the timer interrupt signal
+	      // resulting from vstimecmp. Section 9.2.3 of priv sepc.
+	      mipVal |= csRegs_.peekHvip() & (URV(1) << URV(IC::VS_TIMER));
+	    }
 	}
 
       if (mipVal != prev)
