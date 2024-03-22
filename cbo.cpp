@@ -139,10 +139,7 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
-    {
-      uint64_t mask = uint64_t(cacheLineSize_) - 1;
-      initiateStoreException(di, cause, virtAddr & ~mask, gPhysAddr & ~mask);
-    }
+    initiateStoreException(di, cause, virtAddr, gPhysAddr);
 }
 
 
@@ -187,10 +184,7 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
-    {
-      uint64_t mask = uint64_t(cacheLineSize_) - 1;
-      initiateStoreException(di, cause, virtAddr & ~mask, gPhysAddr & ~mask);
-    }
+    initiateStoreException(di, cause, virtAddr, gPhysAddr);
 }
 
 
@@ -253,10 +247,7 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
-    {
-      uint64_t mask = uint64_t(cacheLineSize_) - 1;
-      initiateStoreException(di, cause, virtAddr & ~mask, gPhysAddr & ~mask);
-    }
+    initiateStoreException(di, cause, virtAddr, gPhysAddr);
 }
 
 
