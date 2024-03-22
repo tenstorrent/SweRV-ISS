@@ -1651,6 +1651,10 @@ Hart<URV>::fastLoad(const DecodedInst* di, uint64_t addr, uint64_t& value)
         value = uval;
       else
         value = SRV(LOAD_TYPE(uval)); // Sign extend.
+
+      if (dataLineTrace_)
+	memory_.traceDataLine(addr, addr);
+
       return true;  // Success.
     }
 
@@ -1908,6 +1912,9 @@ Hart<URV>::fastStore(const DecodedInst* di, URV addr, STORE_TYPE storeVal)
 	  throw CoreException(CoreException::Stop, "write to to-host",
 			      toHost_, storeVal);
 	}
+
+      if (dataLineTrace_)
+	memory_.traceDataLine(addr, addr);
       return true;
     }
 
