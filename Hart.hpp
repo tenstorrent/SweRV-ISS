@@ -2808,6 +2808,9 @@ namespace WdRiscv
     /// Same as above but with explicit group multiplier and element width.
     bool checkVecIntInst(const DecodedInst* di, GroupMultiplier gm, ElementWidth eew);
 
+    /// Same as above but for vector load/store. Ignores vstart.
+    bool checkVecLdStInst(const DecodedInst* di);
+
     /// Return true if given arithmetic (non load/store) instruction is
     /// legal. Check if vector extension is enabled. Check if the
     /// current sew/lmul is legal. Return true if legal. Take an
@@ -2861,6 +2864,11 @@ namespace WdRiscv
     /// vector operands.
     bool checkVecFpMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
 				 unsigned op2, unsigned groupX8);
+
+    /// Similar to the above but for vector load/store indexed.
+    /// Checks overlap for vd/vs3 and index registers.
+    bool checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned vi,
+                                  unsigned offsetWidth, unsigned offsetGroupX8);
 
     /// Check reduction vector operand against the group multiplier. Return true
     /// if operand is a multiple of multiplier and false otherwise. Record group

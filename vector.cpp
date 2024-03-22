@@ -215,6 +215,34 @@ Hart<URV>::checkVecFpInst(const DecodedInst* di, bool wide,
 }
 
 
+template <typename URV>
+bool
+Hart<URV>::checkVecLdStInst(const DecodedInst* di)
+{
+  // Dest register (vd) cannot overlap mask register v0 and data source (vs3)
+  // cannot overlap mask register v0.
+  if (di->isMasked() and di->op0() == 0)
+    {
+      postVecFail(di);
+      return false;
+    }
+
+  // None of the vector source registers can overlap mask regiser v0.
+  // This is only applicable to vector indexed ld/st.
+  // Section 5.2 of vector spec version 1.1.
+  if (di->isMasked())
+    {
+      for (unsigned i = 1; i < di->operandCount(); ++i)
+	if (di->ithOperand(i) == 0 and di->ithOperandType(i) == OperandType::VecReg)
+	  {
+	    postVecFail(di);
+	    return false;
+	  }
+    }
+
+  return true;
+}
+
 
 template <typename URV>
 bool
@@ -742,6 +770,27 @@ Hart<URV>::checkVecFpMaskInst(const DecodedInst* di, unsigned dest,
   if (not ok)
     postVecFail(di);
 
+  return ok;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned vi,
+                                    unsigned offsetWidth, unsigned offsetGroupX8)
+{
+  if (not checkVecLdStInst(di))
+    return false;
+
+  unsigned sew = vecRegs_.elemWidthInBits();
+  uint32_t groupX8 = vecRegs_.groupMultiplierX8();
+
+  bool ok = (di->ithOperandMode(0) == OperandMode::Write)?
+    checkDestSourceOverlap(vd, sew, groupX8, vi, offsetWidth, offsetGroupX8) :
+    checkSourceOverlap(vd, sew, groupX8, vi, offsetWidth, offsetGroupX8);
+
+  if (not ok)
+    postVecFail(di);
   return ok;
 }
 
@@ -10871,6 +10920,9 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 {
+  if (not checkVecLdStInst(di))
+    return false;
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -11029,6 +11081,9 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 {
+  if (not checkVecLdStInst(di))
+    return false;
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -11526,6 +11581,9 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 {
+  if (not checkVecLdStInst(di))
+    return false;
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -11677,6 +11735,9 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 {
+  if (not checkVecLdStInst(di))
+    return false;
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -11841,6 +11902,9 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
   if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+    return false;
+
+  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8))
     return false;
 
   uint64_t addr = intRegs_.read(rs1);
@@ -12040,6 +12104,9 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
   if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+    return false;
+
+  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8))
     return false;
 
   uint64_t addr = intRegs_.read(rs1);
@@ -12252,6 +12319,9 @@ bool
 Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 			 unsigned fieldCount, uint64_t stride, bool faultFirst)
 {
+  if (not checkVecLdStInst(di))
+    return false;
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -12425,6 +12495,9 @@ bool
 Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 			  unsigned fieldCount, uint64_t stride)
 {
+  if (not checkVecLdStInst(di))
+    return false;
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -12766,7 +12839,10 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8))
+  if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+    return false;
+
+  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8))
     return false;
 
   uint64_t addr = intRegs_.read(rs1);
@@ -12923,7 +12999,10 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8))
+  if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+    return false;
+
+  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8))
     return false;
 
   uint64_t addr = intRegs_.read(rs1);
