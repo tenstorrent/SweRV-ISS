@@ -385,8 +385,8 @@ Hart<URV>::processExtensions(bool verbose)
   if (isa_.isEnabled(RvExtension::Smnpm))
     enableSmnpm(true);
 
-  stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
-  vstimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::VSTIMECMP) != nullptr;
+  stimecmpActive_ = csRegs_.menvcfgStce();
+  vstimecmpActive_ = csRegs_.henvcfgStce();
 }
 
 
