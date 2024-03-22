@@ -1004,7 +1004,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
             finished += hptr->hasTargetProgramFinished();
 
           while ((waitAll and finished != hartCount()) or
-                 (not waitAll and finished != 0))
+                 (not waitAll and finished == 0))
             {
               for (auto hptr : sysHarts_)
                 {
