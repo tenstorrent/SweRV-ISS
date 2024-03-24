@@ -979,6 +979,16 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         hart.configVectorTrapVtype(flag);
     }
 
+  tag = "fp_unordered_sum_tree_reduction";
+  if (vconf.contains(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, vconf.at(tag), flag))
+        errors++;
+      else
+        hart.configVectorFpUnorderedSumRed(flag);
+    }
+
   return errors == 0;
 }
 

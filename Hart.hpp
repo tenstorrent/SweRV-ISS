@@ -1986,6 +1986,10 @@ namespace WdRiscv
     void configVectorTrapVtype(bool flag)
     { vecRegs_.configVectorTrapVtype(flag); }
 
+    /// When flag is true, use binary tree reduction for vfredusum and vfwredusum.
+    void configVectorFpUnorderedSumRed(bool flag)
+    { vecRegs_.configVectorFpUnorderedSumRed(flag); }
+
     bool readInstFromFetchCache(uint64_t addr, uint16_t& inst) const
     { return fetchCache_.read(addr, inst); }
 
@@ -2900,6 +2904,17 @@ namespace WdRiscv
     /// Similar to above but 2 vector operands with 2nd operand wide.
     bool checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned groupX8);
+
+    /// Performs an in-place group-wise reduction on a series of vector registers.
+    /// Does nothing if LMUL <= 1.
+    template <typename ELEM_TYPE>
+    void doVecFpRedSumGroup(std::vector<ELEM_TYPE>& elems, ElementWidth eew, unsigned groupX8);
+
+    /// Performs an in-place tree sum reduction on adjacent vector elements (starting
+    /// at index 0) until numResult is remaining.
+    template <typename ELEM_TYPE>
+    void doVecFpRedSumAdjacent(std::vector<ELEM_TYPE>& elems, unsigned numElems,
+                              unsigned numResult);
 
     /// Emit a trace record for the given branch instruction or trap in the
     /// branch trace file.

@@ -176,6 +176,19 @@ namespace WdRiscv
       value = data[elemIx];
     }
 
+    /// Same as above, but copies entire register group.
+    template<typename T>
+    void read(uint32_t regNum, std::vector<T>& values, uint32_t groupX8) const
+    {
+      std::size_t regOffset = static_cast<std::size_t>(regNum)*bytesPerReg_;
+      if (regNum >= regCount_ or
+         ((regOffset + bytesPerReg_) > bytesInRegFile_))
+        throw std::runtime_error("invalid vector register number");
+
+      const T* data = reinterpret_cast<const T*>(data_.data() + regOffset);
+      memcpy(values.data(), data, (groupX8*bytesPerReg_) >> 3);
+    }
+
     /// Set the element with given index within the vector register of
     /// the given number to the given value. Throw an exception
     /// if the combination of element index, vector number and group
@@ -392,13 +405,18 @@ namespace WdRiscv
       return gm8*bytesPerReg_/eewInBits;
     }
 
+    /// Return the number of elements in a vector register given
+    /// an EEW.
+    uint32_t singleMax(ElementWidth eew) const
+    {
+      uint32_t eewInBits = elemWidthInBits(eew);
+      return 8*bytesPerReg_/eewInBits;
+    }
+
     /// Return the maximum of the VLMAX and VLEN/EEW for tail elements
     /// when LMUL < 1.
     uint32_t elemMax(ElementWidth eew) const
-    {
-      uint32_t eewInBits = elemWidthInBits(eew);
-      return std::max(vlmax(), 8*bytesPerReg_/eewInBits);
-    }
+    { return std::max(vlmax(), singleMax(eew)); }
 
     /// Return the maximum of the VLMAX and VLEN/SEW for tail elements
     /// when LMUL < 1.
@@ -439,6 +457,11 @@ namespace WdRiscv
     /// vsetvli, vsetivli. When flag is false, set vtype.vill instead.
     void configVectorTrapVtype(bool flag)
     { trapVtype_ = flag; }
+
+    /// If flag is true, unordered fp reduction should use a reduction tree computation,
+    /// else uses ordered version.
+    void configVectorFpUnorderedSumRed(bool flag)
+    { fpUnorderedSumTreeRed_ = flag; }
 
     /// Return a string representation of the given group multiplier.
     static constexpr std::string_view to_string(GroupMultiplier group)
@@ -766,6 +789,7 @@ namespace WdRiscv
     bool tailAgnOnes_ = true; // True if ones written in tail elems when mask agnostic.
     bool updateWholeMask_ = false;  // True if mask instructions update whole mask reg.
     bool trapVtype_ = false; // If true trap invalid vtype; else set VTYPE.VILL.
+    bool fpUnorderedSumTreeRed_ = false; // True if unordered fp reduction should use a reduction tree computation
 
     uint32_t groupX8_ = 8;    // Group multiplier as a number scaled by 8.
     uint32_t sewInBits_ = 8;  // SEW expressed in bits (Byte corresponds to 8).
