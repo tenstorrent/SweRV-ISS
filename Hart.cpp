@@ -10195,7 +10195,7 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
     hsq = hsq and csRegs_.isWriteable(csr, PM::Supervisor, false /*virtMode*/);
   if (virtMode_)
     {
-      if (csr >= CN::CYCLE and csr <= CN::HPMCOUNTER31)
+      if (csr >= CN::CYCLE and csr <= CN::HPMCOUNTER31 and not isWrite)
 	{       // Section 9.2.6 of privileged spec.
 	  URV hcounteren = 0, mcounteren = 0, scounteren = 0;
 	  if (not peekCsr(CN::MCOUNTEREN, mcounteren) or not peekCsr(CN::HCOUNTEREN, hcounteren) or
