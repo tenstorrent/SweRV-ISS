@@ -84,6 +84,7 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
 	return false;
       prTaken_ = taken;
       prTarget_ = target;
+      return true;
     }
 
     uint64_t nextPc() const
@@ -95,8 +96,14 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
     bool predicted() const
     { return predicted_; }
 
-    bool decoded () const
+    bool decoded() const
     { return decoded_; }
+
+    bool executed() const
+    { return executed_; }
+
+    bool retired() const
+    { return executed_; }
 
     uint64_t tag() const
     { return tag_; }
@@ -137,7 +144,11 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
 
     PerfApi(System64& system)
       : system_(system)
-    { }
+    {
+      unsigned n = system.hartCount();
+      hartPacketMaps_.resize(n);
+      hartLastRetired_.resize(n);
+    }
 
     /// Called by the performance model to affect a fetch in whisper. The
     /// instruction tag must be monotonically increasing for a particular
@@ -148,69 +159,13 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
     /// the vpc on the subsequent call to fetch.
     /// Return true on success and false if given tag has already been fetched.
     bool fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
-	       bool& trap, ExceptionCause& cause, uint64_t& trapPC)
-    {
-      auto packet = getInstructionPacket(hartIx, tag);
-      if (packet)
-	return false;
-
-      auto hart = getHart(hartIx);
-      if (not hart)
-	{
-	  std::cerr << "Fetch: Bad hart index: " << hartIx << '\n';
-	  assert(0);
-	  return false;
-	}
-
-      auto prev = this->prevFetch_;
-      if (prev)
-	{
-	  if (prev->nextPc() != vpc and not prev->trapped() and not prev->predicted())
-	    prev->predictBranch(true /*taken*/, vpc);
-	}
-
-      uint64_t ppc = 0;  // Physical pc.
-      uint32_t opcode = 0;
-      uint64_t gpc = 0; // Guest physical pc.
-      cause = hart->fetchInstNoTrap(vpc, ppc, gpc, opcode);
-
-      if (cause == ExceptionCause::NONE)
-	{
-	  packet = std::make_shared<InstrPac>(tag, vpc, ppc);
-	  assert(packet);
-	  packet->fetched_ = true;
-	  insertPacket(hartIx, tag, packet);
-	  if (not decode(hartIx, time, tag, opcode))
-	    assert(0);
-	  prevFetch_ = packet;
-	  trap = false;
-	}
-      else
-	{
-	  prevFetch_ = nullptr;
-	  trap = true;
-	}
-
-      return true;
-    }
+	       bool& trap, ExceptionCause& cause, uint64_t& trapPC);
 
     /// Called by the performance model to affect a decode in whisper. Whisper
     /// will return false if the instruction has not been fetched; otherwise, it
     /// will return true after decoding the instruction, updating the di field of
     /// the corresponding packet, and marking the packed as decoded.
-    bool decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode)
-    {
-      auto hart = getHart(hartIx);
-      if (not hart)
-	return false;
-      auto packet = getInstructionPacket(hartIx, tag);
-      if (not packet)
-	return false;
-      if (packet->decoded())
-	return true;
-      hart->decode(packet->instrVa(), packet->instrPa(), opcode, packet->di_);
-      return true;
-    }
+    bool decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode);
 
     /// Optionally called by performance model after decode to inform Whisper of branch
     /// prediction. Returns true on success and false on error (tag was never decoded).
@@ -245,18 +200,22 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
       return nullptr;
     }
 
-    /// Translate an instruction virtual address into a physical address providing
-    /// the addresses of the page table walk. If two-stage translation is on,
-    /// stage1Ptw will contain the guest physical addresses used by stage1, and
-    /// for each one of these stage2Ptw will contain a vector containing the
-    /// physical addresses of the corresponding page guest-physical to
-    /// true-physical table walk. If two-stage translation is off or if stage2
-    /// mode is bare, stage2Ptw will be empty. If two-stage is on but stage1 mode
-    /// is bare, then stage1Ptw will be empty.  Return ExceptionCause::NONE on
-    /// success and actual cause on failure.
-    WdRiscv::ExceptionCause translateInstrAddr(unsigned hart, uint64_t iva, uint64_t& ipa,
-					       std::vector<uint64_t>& stage1Ptw,
-					       std::vector<std::vector<uint64_t>>& stage2Ptw);
+    /// Translate an instruction virtual address into a physical address. Return
+    /// ExceptionCause::NONE on success and actual cause on failure.
+    WdRiscv::ExceptionCause translateInstrAddr(unsigned hart, uint64_t iva, uint64_t& ipa);
+
+    /// Translate a load data virtual address into a physical address.  Return
+    /// ExceptionCause::NONE on success and actual cause on failure.
+    WdRiscv::ExceptionCause translateLoadAddr(unsigned hart, uint64_t va, uint64_t& pa);
+
+    /// Translate a store data virtual address into a physical address.  Return
+    /// ExceptionCause::NONE on success and actual cause on failure.
+    WdRiscv::ExceptionCause translateStoreAddr(unsigned hart, uint64_t va, uint64_t& pa);
+
+    /// Called by performance model to request that whisper updates its own memory with
+    /// the data of a store instruction. Return true on success and false on error. It is
+    /// an error for a store to be drained before it is retired.
+    bool drainStore(unsigned hart, uint64_t time, uint64_t tag);
 
     /// Return a pointer of the hart having the given index or null if no such hart.
     std::shared_ptr<Hart64> getHart(unsigned hartIx)
@@ -272,6 +231,12 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
       packetMap[tag] = ptr;
     }
 
+    std::shared_ptr<Hart64> checkHart(const char* caller, unsigned hartIx);
+
+    std::shared_ptr<InstrPac> checkTag(const char* caller, unsigned HartIx, uint64_t tag);
+
+    bool checkTime(const char* caller, uint64_t time);
+
   private:
 
     typedef std::map<uint64_t, std::shared_ptr<InstrPac>> PacketMap;
@@ -281,6 +246,11 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
 
     /// Map a hart index to the corresponding instruction packet map.
     std::vector<PacketMap> hartPacketMaps_;
+
+    /// Map a hart index to the tag of the last retired instruction.
+    std::vector<uint64_t> hartLastRetired_;
+
+    uint64_t time_ = 0;
   };
 
 }
