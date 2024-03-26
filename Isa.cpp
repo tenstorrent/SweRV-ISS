@@ -79,7 +79,7 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "zihintpause", RvExtension::Zihintpause },
   { "ssnpm", RvExtension::Ssnpm },
   { "smnpm", RvExtension::Smnpm },
-  { "smnpm", RvExtension::Sscofpmf },
+  { "sscofpmf", RvExtension::Sscofpmf },
 });
 static_assert(STRING_EXT_PAIRS.size() == static_cast<unsigned>(RvExtension::None));
 
