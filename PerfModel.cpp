@@ -133,7 +133,48 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   if (packet->executed())
     assert(0 && "Mark as non-executed insructions following re-executed instruction");
 
+  // Collect register operand values. Remeber the in-flight instructions producing
+  // these values.
+  using OM = WdRiscv::OperandMode;
+  auto& producers = hartRegProducers_.at(hartIx);
+  WdRiscv::DecodedInst& di = packet->di_;
+  assert(di.operandCount() < packet->opVal_.size());
+  for (unsigned i = 0; i < di.operandCount(); ++i)
+    {
+      auto mode = di.ithOperandMode(i);
+      if (mode == OM::Read or mode == OM::ReadWrite)
+	{
+	  unsigned regNum = di.ithOperand(i);
+	  unsigned uri = unifiedRegIx(di.ithOperandType(i), regNum);
+	  auto& producer = producers.at(uri);
+	  uint64_t value = 0;
+	  if (producer)
+	    value = getDestValue(producer, uri);
+	  else if (not peekRegister(hart, di.ithOperandType(i), regNum, value))
+	    assert(0);
+	  packet->opVal_.at(i) = value;
+	}
+    }
+
+  // Execute the instruction: Poke register values, execute, restore poked registers
+  // and restination registers.
   assert(0 && "implement execute");
+  std::array<uint64_t, 3> opValues;   // Operand values of executed instruction.
+
+  // Mark this insruction as the producer of each of its destination registers (at most 2:
+  // one register and one csr). Record the values of the dstination register.
+  unsigned destIx = 0;
+  for (unsigned i = 0; i < di.operandCount(); ++i)
+    {
+      auto mode = di.ithOperandMode(i);
+      if (mode == OM::Write or mode == OM::ReadWrite)
+	{
+	  unsigned uri = unifiedRegIx(di.ithOperandType(i), di.ithOperand(i));
+	  auto prevProducer = producers.at(uri);
+	  producers.at(uri) = packet;
+	  packet->destValues_.at(destIx++) = InstrPac::DestValue(uri, opValues.at(i));
+	}
+    }
 
   packet->executed_ = true;
   return false;
