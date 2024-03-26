@@ -131,7 +131,21 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
     return false;
 
   if (packet->executed())
-    assert(0 && "Mark as non-executed insructions following re-executed instruction");
+    {
+      // Instruction is being re-executed. Must be load/store. Every instruction that
+      // depends on it must be re-executed.
+      auto& di = packet->decodedInst();
+      assert(di.isLoad() or di.isStore());
+      auto& packetMap = hartPacketMaps_.at(hartIx);
+      auto iter = packetMap.find(packet->tag());
+      assert(iter != packetMap.end());
+      for ( ; iter != packetMap.end(); ++iter)
+	{
+	  auto succ = iter->second;   // Successor packet
+	  if (succ->dependsOn(*packet))
+	    succ->executed_ = false;
+	}
+    }
 
   // Collect register operand values. Remeber the in-flight instructions producing
   // these values.
