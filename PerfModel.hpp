@@ -119,12 +119,22 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
     uint64_t dpa_ = 0;        // ld/st data physical address
     uint64_t dsize_ = 0;      // ld/st data size (total)
 
-    WdRiscv::DecodedInst di_;          // decoded instruction.
+    WdRiscv::DecodedInst di_; // decoded instruction.
 
     uint64_t execTime_ = 0;   // Execution time
     uint64_t prTarget_ = 0;   // Predicted branch target
 
-    uint64_t opVal_[3];       // Operand values (count and types are in di)
+    std::array<uint64_t, 3> opVal_;       // Operand values (count and types are in di)
+
+    // Each entry is a unified register number of a source operand and the
+    // corresponding in-flight packet that produced that opernad
+    typedef std::pair<unsigned, std::unique_ptr<InstrPac>> SourceProducer;
+    std::array<SourceProducer, 3> sourceProducer_;
+
+    /// Universal register index of a destination register and its corresponding
+    /// value
+    typedef std::pair<unsigned, uint64_t> DestValue;
+    std::array<DestValue, 2> destValues_;
 
     // Following applicable if instruction is a branch
     bool predicted_  : 1 = false;  // true if predicted to be a branch
@@ -148,6 +158,9 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
       unsigned n = system.hartCount();
       hartPacketMaps_.resize(n);
       hartLastRetired_.resize(n);
+      hartRegProducers_.resize(n);
+      for (auto& producers : hartRegProducers_)
+	producers.resize(totalRegCount_);
     }
 
     /// Called by the performance model to affect a fetch in whisper. The
@@ -237,6 +250,52 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
 
     bool checkTime(const char* caller, uint64_t time);
 
+    /// Return the unified register for the register of the given type (INT, FP, CSR,
+    /// ...)  and the given relative register number.
+    unsigned unifiedRegIx(WdRiscv::OperandType type, unsigned regNum)
+    {
+      using OT = WdRiscv::OperandType;
+      switch(type)
+	{
+	case OT::IntReg: return regNum + intRegOffset_;
+	case OT::FpReg:  return regNum + fpRegOffset_;
+	case OT::CsReg:  return regNum + csRegOffset_;
+	case OT::VecReg:
+	case OT::Imm:
+	case OT::None:   assert(0); return ~unsigned(0);
+	}
+      assert(0);
+      return ~unsigned(0);
+    }
+
+    bool peekRegister(std::shared_ptr<Hart64>& hart, WdRiscv::OperandType type,
+		      unsigned regNum, uint64_t& value)
+    {
+      using OT = WdRiscv::OperandType;
+      switch(type)
+	{
+	case OT::IntReg: return hart->peekIntReg(regNum, value);
+	case OT::FpReg:  return hart->peekFpReg(regNum, value);
+	case OT::CsReg:  return hart->peekCsr(WdRiscv::CsrNumber(regNum), value);
+	case OT::VecReg: 
+	case OT::Imm:
+	case OT::None:   assert(0); return ~unsigned(0);
+	}
+
+      return false;
+    }
+
+    /// Get from the producing packet, the value of the register with the given
+    /// unified register index.
+    uint64_t getDestValue(std::shared_ptr<InstrPac>& producer, unsigned uri)
+    {
+      for (auto& p : producer->destValues_)
+	if (p.first == uri)
+	  return p.second;
+      assert(0);
+      return 0;
+    }
+
   private:
 
     typedef std::map<uint64_t, std::shared_ptr<InstrPac>> PacketMap;
@@ -250,7 +309,20 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
     /// Map a hart index to the tag of the last retired instruction.
     std::vector<uint64_t> hartLastRetired_;
 
+    /// Map a unified register index to the in-flight instruction producing that
+    /// register. This is register renaming.
+    typedef std::vector<std::shared_ptr<InstrPac>> RegProducers;
+
+    /// Map a hart index to the register renaming-table.
+    std::vector<RegProducers> hartRegProducers_;
+
     uint64_t time_ = 0;
+
+    /// Unified indexing for all registers.
+    const unsigned intRegOffset_ = 0;
+    const unsigned fpRegOffset_ = 32;
+    const unsigned csRegOffset_ = 64;
+    const unsigned totalRegCount_ = csRegOffset_ + 4096; // 4096: max csr count.
   };
 
 }
