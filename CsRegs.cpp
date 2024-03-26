@@ -927,19 +927,24 @@ CsRegs<URV>::enableSscofpmf(bool flag)
   else
     csr->setImplemented(flag & superEnabled_);
 
-  // un-mask LCOF bits
-  if (flag)
+  // Mask/unmask LCOF bits
+  for (auto csrn : {CsrNumber::MIE, CsrNumber::MIP, CsrNumber::SIE, CsrNumber::SIP})
     {
-      for (auto csrn : {CsrNumber::MIE, CsrNumber::MIP, CsrNumber::SIE, CsrNumber::SIP})
-        {
-          auto csr = findCsr(csrn);
-          if (csr)
-            {
-              auto lcof = 1 << URV(InterruptCause::LCOF);
-              csr->setWriteMask(csr->getWriteMask() | lcof);
-              csr->setPokeMask(csr->getPokeMask() | lcof);
-            }
-        }
+      auto csr = findCsr(csrn);
+      if (csr)
+	{
+	  auto lcof = URV(1) << URV(InterruptCause::LCOF);
+	  if (flag)
+	    {
+	      csr->setWriteMask(csr->getWriteMask() | lcof);
+	      csr->setReadMask(csr->getReadMask() | lcof);
+	    }
+	  else
+	    {
+	      csr->setWriteMask(csr->getWriteMask() & ~lcof);
+	      csr->setReadMask(csr->getReadMask() & ~lcof);
+	    }
+	}
     }
 
   mPerfRegs_.enableOverflow(flag);
@@ -2609,9 +2614,9 @@ CsRegs<URV>::defineSupervisorRegs()
   defineCsr("scause",     Csrn::SCAUSE,     !mand, !imp, 0, wam, wam);
   defineCsr("stval",      Csrn::STVAL,      !mand, !imp, 0, wam, wam);
 
-  // Bits of SIE appear hardwired to zreo unless delegated. By default
-  // only ssie, stie, and seie are writeable.
-  mask = 0x222;
+  // Bits of SIE appear hardwired to zreo unless delegated. By default only bit LOCFIE,
+  // SSIE, STIE, and SEIE are writeable when delegated.
+  mask = 0x2222;
   defineCsr("sie",        Csrn::SIE,        !mand, !imp, 0, mask, mask);
   auto sie = findCsr(Csrn::SIE);
   auto mie = findCsr(Csrn::MIE);
@@ -2619,7 +2624,7 @@ CsRegs<URV>::defineSupervisorRegs()
     sie->tie(mie->valuePtr_);
 
   // Bits of SIP appear hardwired to zreo unless delegated.
-  mask = 0x2;  // Only ssip bit writable (when delegated)
+  mask = 0x2002;  // Only bits LCOFIP and SSIP bit writable (when delegated)
   defineCsr("sip",        Csrn::SIP,        !mand, !imp, 0, mask, mask);
 
   auto sip = findCsr(Csrn::SIP);

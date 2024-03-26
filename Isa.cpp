@@ -79,6 +79,7 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "zihintpause", RvExtension::Zihintpause },
   { "ssnpm", RvExtension::Ssnpm },
   { "smnpm", RvExtension::Smnpm },
+  { "smnpm", RvExtension::Sscofpmf },
 });
 static_assert(STRING_EXT_PAIRS.size() == static_cast<unsigned>(RvExtension::None));
 
@@ -153,6 +154,7 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zihintpause)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Ssnpm)) = Info{ {{0,81}}, {0,81} };
   infoVec_.at(extIx(RvExtension::Smnpm)) = Info{ {{0,81}}, {0,81} };
+  infoVec_.at(extIx(RvExtension::Sscofpmf)) = Info{ {{0,5}}, {0,5} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
 }

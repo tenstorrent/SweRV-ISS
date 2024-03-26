@@ -1489,15 +1489,23 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	cerr << "Config file tag \"" << etag << "\" is no longer supported.\n";
     }
 
+  // Counter overflow: sscofpmf extension
+  std::string isa;
+  bool cof = getIsa(isa) and isa.find("sscofpmf") != std::string::npos;
+
   tag = "enable_counter_overflow";
-  bool cof = false;  // Counter overflow: sscofpmf extension
   if (config_ ->contains(tag))
-    getJsonBoolean(tag, config_ ->at(tag), cof) or errors++;
+    {
+      cerr << "Config file tag \"enable_counter_overflow\" deprecated: "
+	   << " Add extension string \"ssofpmf\" to \"isa\" tag instread.\n";
+      getJsonBoolean(tag, config_ ->at(tag), cof) or errors++;
+    }
 
   applyPerfEvents(hart, *config_, userMode, cof, verbose) or errors++;
   applyCsrConfig(hart, *config_, verbose) or errors++;
   applyTriggerConfig(hart, *config_) or errors++;
 
+  // No longer needed here. Remove once enable_counter_overflow is removed.
   hart.enableSscofpmf(cof);
 
   tag = "trap_non_zero_vstart";

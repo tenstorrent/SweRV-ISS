@@ -384,6 +384,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableSsnpm(true);
   if (isa_.isEnabled(RvExtension::Smnpm))
     enableSmnpm(true);
+  if (isa_.isEnabled(RvExtension::Sscofpmf))
+    enableSscofpmf(true);
 
   stimecmpActive_ = csRegs_.menvcfgStce();
   vstimecmpActive_ = csRegs_.henvcfgStce();
