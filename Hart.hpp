@@ -609,7 +609,8 @@ namespace WdRiscv
     /// Set the output file in which to dump the state of accessed
     /// memory lines. Return true on success and false if file cannot
     /// be opened.
-    bool setInitialStateFile(const std::string& path);
+    void setInitialStateFile(FILE* file)
+    { initStateFile_ = file; }
 
     /// Disassemble given instruction putting results into the given
     /// string.

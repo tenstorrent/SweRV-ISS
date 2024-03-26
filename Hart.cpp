@@ -863,20 +863,6 @@ Hart<URV>::updateBigEndian()
 
 template <typename URV>
 bool
-Hart<URV>::setInitialStateFile(const std::string& path)
-{
-  initStateFile_ = fopen(path.c_str(), "w");
-  if (not initStateFile_)
-    {
-      std::cerr << "Failed to open '" << path << "' for output\n";
-      return false;
-    }
-  return true;
-}
-
-
-template <typename URV>
-bool
 Hart<URV>::peekMemory(uint64_t address, uint8_t& val, bool usePma) const
 {
   return memory_.peek(address, val, usePma);
