@@ -435,6 +435,7 @@ System<URV>::saveSnapshot(const std::string& dir)
 	return false;
       }
 
+  uint64_t minSp = ~uint64_t(0);
   for (auto hartPtr : sysHarts_)
     {
       std::string name = "registers";
@@ -443,6 +444,11 @@ System<URV>::saveSnapshot(const std::string& dir)
       Filesystem::path regPath = dirPath / name;
       if (not hartPtr->saveSnapshotRegs(regPath.string()))
 	return false;
+
+      URV sp = 0;
+      if (not hartPtr->peekIntReg(IntRegNumber::RegSp, sp))
+	assert(0);
+      minSp = std::min(minSp, uint64_t(sp));
     }
 
   auto& hart0 = *ithHart(0);
@@ -453,7 +459,7 @@ System<URV>::saveSnapshot(const std::string& dir)
   if (sparseMem_)
     sparseMem_->getUsedBlocks(usedBlocks);
   else
-    syscall.getUsedMemBlocks(usedBlocks);
+    syscall.getUsedMemBlocks(minSp, usedBlocks);
 
   if (not saveUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
     return false;

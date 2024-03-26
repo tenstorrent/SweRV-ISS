@@ -89,7 +89,7 @@ namespace WdRiscv
     void getMemoryChanges(std::vector<AddrLen>& changes) const
     { changes = memChanges_; }
 
-    void getUsedMemBlocks(std::vector<AddrLen>& used_blocks);
+    void getUsedMemBlocks(uint64_t sp, std::vector<AddrLen>& used_blocks);
 
     bool saveMmap(const std::string & filename);
 

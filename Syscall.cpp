@@ -1771,7 +1771,7 @@ Syscall<URV>::mmap_remap(uint64_t addr, uint64_t old_size, uint64_t new_size,
 // TBD FIX: Needs improvement.
 template<typename URV>
 void
-Syscall<URV>::getUsedMemBlocks(std::vector<AddrLen>& usedBlocks)
+Syscall<URV>::getUsedMemBlocks(uint64_t sp, std::vector<AddrLen>& usedBlocks)
 {
   usedBlocks.clear();
 
@@ -1785,11 +1785,19 @@ Syscall<URV>::getUsedMemBlocks(std::vector<AddrLen>& usedBlocks)
 
   // This does not work for raw mode. This does not work if
   // stack size exeeds 8 Mb.
-  const uint64_t maxStackSize = UINT64_C(1024)*1024*8;
   usedBlocks.emplace_back(0, progBreak_);
   for(auto& it:mmap_blocks_)
     if(not it.second.free)
       usedBlocks.emplace_back(it.first, it.second.length);
+
+  const uint64_t maxStackSize = UINT64_C(1024)*1024*128;
+  uint64_t stackSize = memSize - sp + 4096;;
+  if (stackSize > maxStackSize)
+    {
+      stackSize = maxStackSize;
+      std::cerr << "Error: detUsedMemBlocks: Stack size too large\n";
+    }
+  
   usedBlocks.emplace_back(memSize - maxStackSize, maxStackSize);
 }
 
