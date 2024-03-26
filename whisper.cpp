@@ -1372,7 +1372,7 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
 static
 bool
 openUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandLog,
-	      FILE*& consoleOut, FILE*& bblockFile)
+	      FILE*& consoleOut, FILE*& bblockFile, FILE*& initStateFile)
 {
   unsigned ix = 0;
   for (auto& traceFile : traceFiles)
@@ -1450,6 +1450,17 @@ openUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandLo
 	}
     }
 
+  if (not args.initStateFile.empty())
+    {
+      initStateFile = fopen(args.initStateFile.c_str(), "w");
+      if (not initStateFile)
+	{
+	  std::cerr << "Failed to open init state file '"
+		    << args.initStateFile << "' for output\n";
+	  return false;
+	}
+    }
+
   return true;
 }
 
@@ -1458,7 +1469,7 @@ openUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandLo
 static
 void
 closeUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandLog,
-	       FILE*& consoleOut, FILE*& bblockFile)
+	       FILE*& consoleOut, FILE*& bblockFile, FILE*& initStateFile)
 {
   if (consoleOut and consoleOut != stdout)
     fclose(consoleOut);
@@ -1491,6 +1502,10 @@ closeUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandL
   if (bblockFile and bblockFile != stdout)
     fclose(bblockFile);
   bblockFile = nullptr;
+
+  if (initStateFile and initStateFile != stdout)
+    fclose(initStateFile);
+  initStateFile = nullptr;
 }
 
 
@@ -1807,7 +1822,8 @@ session(const Args& args, const HartConfig& config)
   FILE* commandLog = nullptr;
   FILE* consoleOut = stdout;
   FILE* bblockFile = nullptr;
-  if (not openUserFiles(args, traceFiles, commandLog, consoleOut, bblockFile))
+  FILE* initStateFile = nullptr;
+  if (not openUserFiles(args, traceFiles, commandLog, consoleOut, bblockFile, initStateFile))
     return false;
 
   bool newlib = false, linux = false;
@@ -1859,8 +1875,7 @@ session(const Args& args, const HartConfig& config)
 	  return false;
 	}
       auto& hart0 = *system.ithHart(0);
-      if (not hart0.setInitialStateFile(args.initStateFile))
-	return false;
+      hart0.setInitialStateFile(initStateFile);
     }
 
   bool result = sessionRun(system, args, traceFiles, commandLog);
@@ -1883,7 +1898,7 @@ session(const Args& args, const HartConfig& config)
       std::cout << "Used blocks: 0x" << std::hex << bytes << std::endl;
     }
 
-  closeUserFiles(args, traceFiles, commandLog, consoleOut, bblockFile);
+  closeUserFiles(args, traceFiles, commandLog, consoleOut, bblockFile, initStateFile);
 
   return result;
 }
