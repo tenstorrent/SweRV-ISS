@@ -87,8 +87,26 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
       return true;
     }
 
+    /// Return true if this instruction depends on the given instruction.
+    bool dependsOn(const InstrPac& other) const
+    {
+      for (auto& sp : sourceProducers_)
+	{
+	  auto producer = sp.second;
+	  if (producer and producer->tag_ == other.tag_)
+	    return true;
+	}
+      return false;
+    }
+
+    /// Return the decoded instruction object associated with this packet.
+    const WdRiscv::DecodedInst& decodedInst() const
+    { return di_; }
+
+    /// Return the PC of the instruction following this instruction in program order.
+    /// Only valid if instruction is executed.
     uint64_t nextPc() const
-    { return nextIva_; }
+    { assert(executed_); return nextIva_; }
 
     bool trapped() const
     { return trap_; }
@@ -128,8 +146,8 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
 
     // Each entry is a unified register number of a source operand and the
     // corresponding in-flight packet that produced that opernad
-    typedef std::pair<unsigned, std::unique_ptr<InstrPac>> SourceProducer;
-    std::array<SourceProducer, 3> sourceProducer_;
+    typedef std::pair<unsigned, std::shared_ptr<InstrPac>> SourceProducer;
+    std::array<SourceProducer, 3> sourceProducers_;
 
     /// Universal register index of a destination register and its corresponding
     /// value
@@ -140,7 +158,7 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
     bool predicted_  : 1 = false;  // true if predicted to be a branch
     bool prTaken_    : 1 = false;  // true if predicted branch/jump is taken
 
-    bool fetched_    : 1 = false;
+    bool fetched_    : 1 = false;  // true if instruction fetched
     bool decoded_    : 1 = false;  // true if instruction decoded
     bool executed_   : 1 = false;  // true if instruction executed
     bool retired_    : 1 = false;  // true if instruction retired (committed)
