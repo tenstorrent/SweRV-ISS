@@ -1860,6 +1860,9 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_svinval";
   if (config_ -> contains(tag))
     {
+      if (hart.sysHartIndex() == 0)
+	cerr << "Warning: Config tag " << tag << " is deprecated. "
+	     << "Use sstc with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableSvinval(flag);
     }
@@ -1867,7 +1870,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_supervisor_time_compare";
   if (config_ -> contains(tag))
     {
-      if (hart.sysHartIndex() == 0 and hart.sysHartIndex() == 0)
+      if (hart.sysHartIndex() == 0)
 	cerr << "Warning: Config tag " << tag << " is deprecated. "
 	     << "Use sstc with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
