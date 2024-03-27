@@ -176,19 +176,6 @@ namespace WdRiscv
       value = data[elemIx];
     }
 
-    /// Same as above, but copies entire register group.
-    template<typename T>
-    void read(uint32_t regNum, std::vector<T>& values, uint32_t groupX8) const
-    {
-      std::size_t regOffset = static_cast<std::size_t>(regNum)*bytesPerReg_;
-      if (regNum >= regCount_ or
-         ((regOffset + bytesPerReg_) > bytesInRegFile_))
-        throw std::runtime_error("invalid vector register number");
-
-      const T* data = reinterpret_cast<const T*>(data_.data() + regOffset);
-      memcpy(values.data(), data, (groupX8*bytesPerReg_) >> 3);
-    }
-
     /// Set the element with given index within the vector register of
     /// the given number to the given value. Throw an exception
     /// if the combination of element index, vector number and group

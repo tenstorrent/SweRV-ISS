@@ -18770,7 +18770,6 @@ Hart<URV>::vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     {
       std::vector<ELEM_TYPE> tree(vecRegs_.elemMax());
       bool roundDown = getFpRoundingMode() == RoundingMode::Down;
-      vecRegs_.read(vs1, tree, group);
 
       // Replace inactive elements with additive identity.
       for (unsigned ix = start; ix < vecRegs_.elemMax(); ix++)
@@ -18778,7 +18777,11 @@ Hart<URV>::vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
             (masked and not vecRegs_.isActive(0, ix)))
           tree.at(ix) = roundDown? ELEM_TYPE{0} : -ELEM_TYPE{0};
         else
-          anyActive = true;
+          {
+            vecRegs_.read(vs1, ix, group, e1);
+            tree.at(ix) = e1;
+            anyActive = true;
+          }
 
       // Perform group-wise reduction first.
       if (group)
