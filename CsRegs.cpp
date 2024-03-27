@@ -1794,13 +1794,6 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
 	}
     }
 
-  if (num == CN::MENVCFG or num == CN::SENVCFG or num == CN::HENVCFG)
-    {
-      URV prev = 0;
-      peek(num, prev);
-      value = legalizeEnvcfgValue(prev, value);
-    }
-
   csr->write(value);
   recordWrite(csrn);
 
@@ -3315,13 +3308,6 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
       value = legalizeMstatusValue(value);
     }
 
-  if (num == CN::MENVCFG or num == CN::SENVCFG or num == CN::HENVCFG)
-    {
-      URV prev = 0;
-      peek(num, prev);
-      value = legalizeEnvcfgValue(prev, value);
-    }
-
   csr->poke(value);
 
   if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
@@ -3746,25 +3732,6 @@ CsRegs<URV>::updateScountovfValue(CsrNumber mhpm, uint64_t value)
   URV mask = ~ (1 << ix);
   URV prev = csr->read() & mask;
   csr->poke(of << ix | prev);
-}
-
-
-template <typename URV>
-URV
-CsRegs<URV>::legalizeEnvcfgValue(URV current, URV value) const
-{
-  if constexpr (sizeof(URV) == 8)
-    {
-      HenvcfgFields<uint64_t> hf{value};
-      unsigned pmm = hf.bits_.PMM;
-      if (pmm == 0x1) // 1 is reserved encoding for PMM
-        {
-          pmm = HenvcfgFields<uint64_t>(current).bits_.PMM;
-          hf.bits_.PMM = pmm;
-          value = hf.value_;
-        }
-    }
-  return value;
 }
 
 

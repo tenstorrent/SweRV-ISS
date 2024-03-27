@@ -1495,9 +1495,6 @@ namespace WdRiscv
     /// Legalize scountovf, matching OF bit of given mhpmevent.
     void updateScountovfValue(CsrNumber mhpm, uint64_t value);
 
-    /// Legalize menvcfg/senvcfg/henvcfg. Changes pmm bits if necessary.
-    URV legalizeEnvcfgValue(URV current, URV value) const;
-
     /// Return true if given CSR number is a PMPADDR register and if
     /// that register is locked.  Return false otherwise.
     bool isPmpaddrLocked(CsrNumber csrn) const;

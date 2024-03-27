@@ -10465,6 +10465,25 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
       if (not virtMem_.isModeSupported(mode))
 	return;  // Unsupported mode: Write has no effect.
     }
+  else if (csr == CsrNumber::MENVCFG or csr == CsrNumber::SENVCFG or
+            csr == CsrNumber::HENVCFG)
+    {
+      if constexpr (sizeof(URV) == 8)
+        {
+          URV oldVal = 0;
+          if (not peekCsr(csr, oldVal))
+            oldVal = 0;
+
+          HenvcfgFields<uint64_t> hf{val};
+          unsigned pmm = hf.bits_.PMM;
+          if (not virtMem_.isPmmSupported(VirtMem::Pmm{pmm}))
+            {
+              pmm = HenvcfgFields<uint64_t>(oldVal).bits_.PMM;
+              hf.bits_.PMM = pmm;
+              val = hf.value_;
+            }
+        }
+    }
 
   // Update CSR.
   URV lastVal = 0;
