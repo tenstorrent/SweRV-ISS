@@ -18678,6 +18678,63 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
 
 
 template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::doVecFpRedSumGroup(std::vector<ELEM_TYPE>& elems, ElementWidth eew, unsigned groupX8)
+{
+  // No reduction needed, LMUL <= 1.
+  if (groupX8 <= 8)
+    return;
+
+  const unsigned group = groupX8 >> 3;
+  const unsigned numGroupRed = group >> 1;
+  const unsigned elemsPerVec = vecRegs_.singleMax(eew);
+
+  for (unsigned gn = 0; gn < numGroupRed; gn++)
+    {
+      for (unsigned ix = 0; ix < elemsPerVec; ix++)
+        {
+          unsigned elemIx = gn*elemsPerVec + ix;
+          unsigned oelemIx = (gn + numGroupRed)*elemsPerVec + ix;
+
+          ELEM_TYPE e1 = elems.at(elemIx);
+          ELEM_TYPE e2 = elems.at(oelemIx);
+
+          ELEM_TYPE result = doFadd(e1, e2);
+          elems.at(elemIx) = result;
+          URV incFlags = activeSimulatorFpFlags();
+          vecRegs_.fpFlags_.push_back(incFlags);
+        }
+    }
+
+  return doVecFpRedSumGroup(elems, eew, numGroupRed * 8);
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::doVecFpRedSumAdjacent(std::vector<ELEM_TYPE>& elems, unsigned numElems, unsigned numResult)
+{
+  if (numElems <= numResult)
+    return;
+
+  for (unsigned ix = 0; ix < numElems; ix+=2)
+    {
+      ELEM_TYPE e1 = elems.at(ix);
+      ELEM_TYPE e2 = elems.at(ix + 1);
+
+      ELEM_TYPE result = doFadd(e1, e2);
+      elems.at(ix >> 1) = result;
+      URV incFlags = activeSimulatorFpFlags();
+      vecRegs_.fpFlags_.push_back(incFlags);
+    }
+
+  return doVecFpRedSumAdjacent(elems, numElems >> 1, numResult);
+}
+
+
+template <typename URV>
 template<typename ELEM_TYPE>
 void
 Hart<URV>::vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
@@ -18692,18 +18749,55 @@ Hart<URV>::vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   bool anyActive = false;
 
-  for (unsigned ix = start; ix < elems; ++ix)
+  if (not vecRegs_.fpUnorderedSumTreeRed_)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      for (unsigned ix = start; ix < elems; ++ix)
         {
-          vecRegs_.fpFlags_.push_back(0);
-          continue;
-        }
+          if (masked and not vecRegs_.isActive(0, ix))
+            {
+              vecRegs_.fpFlags_.push_back(0);
+              continue;
+            }
 
-      anyActive = true;
-      vecRegs_.read(vs1, ix, group, e1);
-      result = doFadd(result, e1);
+          anyActive = true;
+          vecRegs_.read(vs1, ix, group, e1);
+          result = doFadd(result, e1);
+          URV incFlags = activeSimulatorFpFlags();
+          vecRegs_.fpFlags_.push_back(incFlags);
+        }
+    }
+  else
+    {
+      std::vector<ELEM_TYPE> tree(vecRegs_.elemMax());
+      bool roundDown = getFpRoundingMode() == RoundingMode::Down;
+
+      // Replace inactive elements with additive identity.
+      for (unsigned ix = start; ix < vecRegs_.elemMax(); ix++)
+        if ((ix >= elems) or
+            (masked and not vecRegs_.isActive(0, ix)))
+          tree.at(ix) = roundDown? ELEM_TYPE{0} : -ELEM_TYPE{0};
+        else
+          {
+            vecRegs_.read(vs1, ix, group, e1);
+            tree.at(ix) = e1;
+            anyActive = true;
+          }
+
+      // Perform group-wise reduction first.
+      if (group)
+        doVecFpRedSumGroup(tree, vecRegs_.elemWidth(), group);
+
+      // Perform adjacent vec register reduce.
+      doVecFpRedSumAdjacent(tree, vecRegs_.singleMax(vecRegs_.elemWidth()), 2);
+
+      // scalar operand in second-to-last step.
+      result = doFadd(tree.at(0), e2);
       URV incFlags = activeSimulatorFpFlags();
+      vecRegs_.fpFlags_.push_back(incFlags);
+
+      // remaining operand in last step.
+      result = doFadd(tree.at(1), result);
+      incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
     }
 
@@ -18994,19 +19088,65 @@ Hart<URV>::vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
 
   bool anyActive = false;
 
-  for (unsigned ix = start; ix < elems; ++ix)
+  if (not vecRegs_.fpUnorderedSumTreeRed_)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      for (unsigned ix = start; ix < elems; ++ix)
         {
-          vecRegs_.fpFlags_.push_back(0);
-          continue;
+          if (masked and not vecRegs_.isActive(0, ix))
+            {
+              vecRegs_.fpFlags_.push_back(0);
+              continue;
+            }
+
+          anyActive = true;
+          vecRegs_.read(vs1, ix, group, e1);
+          ELEM_TYPE2X e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+          result           = doFadd(result, e1dw);
+          URV incFlags = activeSimulatorFpFlags();
+          vecRegs_.fpFlags_.push_back(incFlags);
+        }
+    }
+  else
+    {
+      std::vector<ELEM_TYPE2X> tree(vecRegs_.elemMax());
+      bool roundDown = getFpRoundingMode() == RoundingMode::Down;
+
+      // Replace inactive elements with additive identity.
+      for (unsigned ix = start; ix < vecRegs_.elemMax(); ix++)
+        {
+          if ((ix >= elems) or
+              (masked and not vecRegs_.isActive(0, ix)))
+            tree.at(ix) = roundDown? ELEM_TYPE2X{0} : -ELEM_TYPE2X{0};
+          else
+            {
+              vecRegs_.read(vs1, ix, group, e1);
+              ELEM_TYPE2X e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+              tree.at(ix) = e1dw;
+              anyActive = true;
+            }
         }
 
-      anyActive = true;
-      vecRegs_.read(vs1, ix, group, e1);
-      ELEM_TYPE2X e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-      result           = doFadd(result, e1dw);
+      // Perform reduction first for double-wide on register group.
+      doVecFpRedSumAdjacent(tree, vecRegs_.elemMax(), vecRegs_.elemMax() / 2);
+
+      ElementWidth dsew;
+      assert(vecRegs_.doubleSew(vecRegs_.elemWidth(), dsew));
+
+      // Perform group-wise reduction.
+      if (group > 8)
+        doVecFpRedSumGroup(tree, dsew, group);
+
+      // Perform adjacent vec register elements reduce.
+      doVecFpRedSumAdjacent(tree, vecRegs_.singleMax(dsew), 2);
+
+      // scalar operand in second-to-last step.
+      result = doFadd(tree.at(0), result);
       URV incFlags = activeSimulatorFpFlags();
+      vecRegs_.fpFlags_.push_back(incFlags);
+
+      // remaining operand in last step.
+      result = doFadd(tree.at(1), result);
+      incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
     }
 
