@@ -1783,11 +1783,10 @@ Syscall<URV>::getUsedMemBlocks(uint64_t sp, std::vector<AddrLen>& usedBlocks)
       return;
     }
 
-  // This does not work for raw mode. This does not work if
-  // stack size exeeds 8 Mb.
+  // This does not work for raw mode.
   usedBlocks.emplace_back(0, progBreak_);
-  for(auto& it:mmap_blocks_)
-    if(not it.second.free)
+  for (auto& it:mmap_blocks_)
+    if (not it.second.free)
       usedBlocks.emplace_back(it.first, it.second.length);
 
   const uint64_t maxStackSize = UINT64_C(1024)*1024*128;

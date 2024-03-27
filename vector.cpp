@@ -19129,8 +19129,9 @@ Hart<URV>::vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
       // Perform reduction first for double-wide on register group.
       doVecFpRedSumAdjacent(tree, vecRegs_.elemMax(), vecRegs_.elemMax() / 2);
 
-      ElementWidth dsew;
-      assert(vecRegs_.doubleSew(vecRegs_.elemWidth(), dsew));
+      ElementWidth dsew = vecRegs_.elemWidth();
+      if (not vecRegs_.doubleSew(vecRegs_.elemWidth(), dsew))
+	assert(0);
 
       // Perform group-wise reduction.
       if (group > 8)
