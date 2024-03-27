@@ -663,4 +663,50 @@ namespace WdRiscv
     } bits_;
   };
 
+
+  /// Structure used to unpack/pack the fields of the MSECCFG register
+  template <typename URV>
+  union MseccfgFields;
+
+  template <>
+  union MseccfgFields<uint32_t>
+  {
+    MseccfgFields(uint32_t value = 0)
+      : value_(value)
+    { }
+
+    uint32_t value_;
+    struct
+    {
+      unsigned MML   : 1;
+      unsigned MMWP  : 1;
+      unsigned RLB   : 1;
+      unsigned res0  : 5;
+      unsigned USEED : 1;
+      unsigned SSEED : 1;
+      unsigned res1  : 22;
+    } bits_;
+  };
+
+  template <>
+  union MseccfgFields<uint64_t>
+  {
+    MseccfgFields(uint64_t value = 0)
+      : value_(value)
+    { }
+
+    uint64_t value_;
+    struct
+    {
+      unsigned MML   : 1;
+      unsigned MMWP  : 1;
+      unsigned RLB   : 1;
+      unsigned res0  : 5;
+      unsigned USEED : 1;
+      unsigned SSEED : 1;
+      unsigned res1  : 22;
+      unsigned PMM   : 2;
+      unsigned res2  : 30;
+    } bits_;
+  };
 }
