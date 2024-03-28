@@ -10000,7 +10000,7 @@ Hart<URV>::execSret(const DecodedInst* di)
   MstatusFields<URV> fields(value);
   PrivilegeMode savedMode = fields.bits_.SPP? PrivilegeMode::Supervisor : PrivilegeMode::User;
 
-  // Restore MIE.
+  // Restore SIE.
   fields.bits_.SIE = fields.bits_.SPIE;
 
   // Set SPP.
