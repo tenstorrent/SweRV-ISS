@@ -2252,6 +2252,16 @@ ExceptionCause
 Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& gPhysAddr,
 			   uint32_t& inst)
 {
+#ifdef FAST_SLOPPY
+
+  assert((virtAddr & 1) == 0);
+  physAddr = virtAddr;
+  if (not memory_.readInst(physAddr, inst))
+    return ExceptionCause::INST_ACC_FAULT;
+  return ExceptionCause::NONE;
+
+#else
+
   physAddr = virtAddr;
   assert(not triggerTripped_);
 
@@ -2341,6 +2351,8 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& gPh
 
   inst = inst | (uint32_t(upperHalf) << 16);
   return ExceptionCause::NONE;
+
+#endif
 }
 
 
