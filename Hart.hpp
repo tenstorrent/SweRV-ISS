@@ -1032,6 +1032,10 @@ namespace WdRiscv
     void enableSmnpm(bool flag)
     { enableExtension(RvExtension::Smnpm, flag); csRegs_.enableSmnpm(flag); }
 
+    /// Enable/disable zkr extension.
+    void enableZkr(bool flag)
+    { enableExtension(RvExtension::Zkr, flag); csRegs_.enableZkr(flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
