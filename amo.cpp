@@ -190,8 +190,11 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
 
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
   uint64_t gaddr1 = virtAddr, gaddr2 = virtAddr;
-  auto cause = determineLoadException(addr1, addr2, gaddr1, gaddr2,
+  auto cause = ExceptionCause::NONE;
+#ifndef FAST_SLOPPY
+  cause = determineLoadException(addr1, addr2, gaddr1, gaddr2,
                                       ldStSize_, false /*hyper*/);
+#endif
   if (cause == ExceptionCause::LOAD_ADDR_MISAL and misalAtomicCauseAccessFault_)
     cause = ExceptionCause::LOAD_ACC_FAULT;
 
