@@ -144,15 +144,18 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
 
     std::array<uint64_t, 3> opVal_;       // Operand values (count and types are in di)
 
-    // Each entry is a unified register number of a source operand and the
+    // Each entry is a global register number of a source operand and the
     // corresponding in-flight packet that produced that opernad
     typedef std::pair<unsigned, std::shared_ptr<InstrPac>> SourceProducer;
     std::array<SourceProducer, 3> sourceProducers_;
 
-    /// Universal register index of a destination register and its corresponding
-    /// value
+    /// Global register index of a destination register and its corresponding
+    /// value.
     typedef std::pair<unsigned, uint64_t> DestValue;
     std::array<DestValue, 2> destValues_;
+
+    /// Previous writer of the global destination register written by this instruction.
+    std::array<std::shared_ptr<InstrPac>, 2> prevDestWriter_;
 
     // Following applicable if instruction is a branch
     bool predicted_  : 1 = false;  // true if predicted to be a branch
@@ -268,9 +271,9 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
 
     bool checkTime(const char* caller, uint64_t time);
 
-    /// Return the unified register for the register of the given type (INT, FP, CSR,
-    /// ...)  and the given relative register number.
-    unsigned unifiedRegIx(WdRiscv::OperandType type, unsigned regNum)
+    /// Return the global register index for the local (within regiser file) inxex of the
+    /// given type (INT, FP, CSR, ...)  and the given relative register number.
+    unsigned globalRegIx(WdRiscv::OperandType type, unsigned regNum)
     {
       using OT = WdRiscv::OperandType;
       switch(type)
@@ -304,11 +307,11 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
     }
 
     /// Get from the producing packet, the value of the register with the given
-    /// unified register index.
-    uint64_t getDestValue(std::shared_ptr<InstrPac>& producer, unsigned uri)
+    /// global register index.
+    uint64_t getDestValue(std::shared_ptr<InstrPac>& producer, unsigned gri)
     {
       for (auto& p : producer->destValues_)
-	if (p.first == uri)
+	if (p.first == gri)
 	  return p.second;
       assert(0);
       return 0;
@@ -327,7 +330,7 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
     /// Map a hart index to the tag of the last retired instruction.
     std::vector<uint64_t> hartLastRetired_;
 
-    /// Map a unified register index to the in-flight instruction producing that
+    /// Map a global register index to the in-flight instruction producing that
     /// register. This is register renaming.
     typedef std::vector<std::shared_ptr<InstrPac>> RegProducers;
 
@@ -336,7 +339,7 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
 
     uint64_t time_ = 0;
 
-    /// Unified indexing for all registers.
+    /// Global indexing for all registers.
     const unsigned intRegOffset_ = 0;
     const unsigned fpRegOffset_ = 32;
     const unsigned csRegOffset_ = 64;

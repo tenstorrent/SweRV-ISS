@@ -159,11 +159,11 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
       if (mode == OM::Read or mode == OM::ReadWrite)
 	{
 	  unsigned regNum = di.ithOperand(i);
-	  unsigned uri = unifiedRegIx(di.ithOperandType(i), regNum);
-	  auto& producer = producers.at(uri);
+	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
+	  auto& producer = producers.at(gri);
 	  uint64_t value = 0;
 	  if (producer)
-	    value = getDestValue(producer, uri);
+	    value = getDestValue(producer, gri);
 	  else if (not peekRegister(hart, di.ithOperandType(i), regNum, value))
 	    assert(0);
 	  packet->opVal_.at(i) = value;
@@ -183,10 +183,12 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
       auto mode = di.ithOperandMode(i);
       if (mode == OM::Write or mode == OM::ReadWrite)
 	{
-	  unsigned uri = unifiedRegIx(di.ithOperandType(i), di.ithOperand(i));
-	  auto prevProducer = producers.at(uri);
-	  producers.at(uri) = packet;
-	  packet->destValues_.at(destIx++) = InstrPac::DestValue(uri, opValues.at(i));
+	  unsigned gri = globalRegIx(di.ithOperandType(i), di.ithOperand(i));
+	  auto prevProducer = producers.at(gri);
+	  producers.at(gri) = packet;
+	  packet->destValues_.at(destIx) = InstrPac::DestValue(gri, opValues.at(i));
+	  packet->prevDestWriter_.at(destIx)= prevProducer;
+	  destIx++;
 	}
     }
 
@@ -225,7 +227,24 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
 
   assert(0 && "implement retire");
 
+  // Undo renaming of destination registers.
+  auto& producers = hartRegProducers_.at(hartIx);
+  for (size_t i = 0; i < packet->destValues_.size(); ++i)
+    {
+      auto& prev = packet->prevDestWriter_.at(i);
+      if (prev)
+	{
+	  auto gri = packet->destValues_.at(i).first;
+	  if (producers.at(gri).get() == packet.get())
+	    producers.at(gri) = prev;
+	}
+    }
+
   packet->retired_ = true;
+
+  auto& packetMap = hartPacketMaps_.at(hartIx);
+  packetMap.erase(packet->tag());
+
   return true;
 }
 
