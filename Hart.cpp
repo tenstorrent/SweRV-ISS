@@ -386,6 +386,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableSmnpm(true);
   if (isa_.isEnabled(RvExtension::Sscofpmf))
     enableSscofpmf(true);
+  if (isa_.isEnabled(RvExtension::Zkr))
+    enableZkr(true);
 
   stimecmpActive_ = csRegs_.menvcfgStce();
   vstimecmpActive_ = csRegs_.henvcfgStce();
@@ -10180,7 +10182,8 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
   // Check if HS qualified (section 9.6.1 of privileged spec).
   bool hsq = isRvs() and csRegs_.isReadable(csr, PM::Supervisor, false /*virtMode*/);
   if (isWrite)
-    hsq = hsq and csRegs_.isWriteable(csr, PM::Supervisor, false /*virtMode*/);
+    hsq = hsq and isCsrWriteable(csr, PM::Supervisor, false /*virtMode*/);
+
   if (virtMode_)
     {
       if (csr >= CN::CYCLE and csr <= CN::HPMCOUNTER31 and not isWrite)
@@ -10199,6 +10202,11 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
 	  if (privMode_ == PM::User and (scounteren & mask) == 0)
 	    { illegalInst(di); return false; }
 	}
+      else if (csr == CN::SEED and not isWrite)
+        {
+          illegalInst(di);
+          return false;
+        }
       else if (csRegs_.isHypervisor(csr) or
 	       (privMode_ == PM::User and not csRegs_.isReadable(csr, PM::User, virtMode_)))
 	{
@@ -10250,6 +10258,27 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
         illegalInst(di);
         return false;
       }
+
+  if (csr == CN::SEED)
+    {
+      if (not isWrite)
+        {
+          illegalInst(di);
+          return false;
+        }
+      if (privMode_ != PM::Machine)
+        {
+          bool sseed, useed;
+          if (not csRegs_.mseccfgSeed(sseed, useed))
+            return false;
+          bool avail = (privMode_ == PM::User and not virtMode_)? useed : sseed;
+          if (not avail)
+            {
+              if (virtMode_ and sseed) virtualInst(di); else illegalInst(di);
+              return false;
+            }
+        }
+    }
 
   if (csRegs_.read(csr, privMode_, value))
     return true;
@@ -10384,6 +10413,14 @@ Hart<URV>::isCsrWriteable(CsrNumber csr, PrivilegeMode privMode, bool virtMode) 
           if (hvictl.bits_.VTI)
             return false;
         }
+    }
+
+  if (csr == CsrNumber::SEED and privMode != PM::Machine)
+    {
+      bool sseed, useed;
+      if (not csRegs_.mseccfgSeed(sseed, useed))
+        return false;
+      return (privMode == PM::User and not virtMode)? useed : sseed;
     }
 
   return true;

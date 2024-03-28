@@ -41,6 +41,7 @@ CsRegs<URV>::CsRegs()
   defineFpRegs();
   defineAiaRegs();
   defineStateEnableRegs();
+  defineEntropyReg();
   definePmaRegs();
 }
 
@@ -1168,6 +1169,29 @@ CsRegs<URV>::enableSmnpm(bool flag)
 
 
 template <typename URV>
+void
+CsRegs<URV>::enableZkr(bool flag)
+{
+  using CN = CsrNumber;
+
+  auto csr = findCsr(CN::SEED);
+  if (not csr)
+    {
+      std::cerr << "Error: enableZkr: CSR number 0x"
+		<< std::hex << URV(CN::SEED) << std::dec << " is not defined\n";
+      assert(0);
+    }
+  else
+    csr->setImplemented(flag);
+
+  MseccfgFields<URV> mf{regs_.at(size_t(CN::MSECCFG)).getReadMask()};
+  mf.bits_.USEED = flag;
+  mf.bits_.SSEED = flag;
+  regs_.at(size_t(CN::MSECCFG)).setReadMask(mf.value_);
+}
+
+
+template <typename URV>
 URV
 CsRegs<URV>::legalizeMstatusValue(URV value) const
 {
@@ -1866,7 +1890,6 @@ CsRegs<URV>::isReadable(CsrNumber num, PrivilegeMode pm, bool vm) const
 }
 
 
-
 template <typename URV>
 void
 CsRegs<URV>::reset()
@@ -2417,6 +2440,14 @@ CsRegs<URV>::defineMachineRegs()
     {
       menvMask = 0xc0000000;
       auto c = defineCsr("menvcfgh", Csrn::MENVCFGH, !mand, imp, 0, menvMask, menvMask);
+      c->markAsHighHalf(true);
+    }
+
+  uint32_t mseMask = 0x300;
+  defineCsr("mseccfg", Csrn::MSECCFG, !mand, imp, 0, mseMask, mseMask);
+  if (rv32_)
+    {
+      auto c = defineCsr("mseccfgh", Csrn::MSECCFGH, !mand, imp, 0, rom, rom);
       c->markAsHighHalf(true);
     }
 
@@ -3131,6 +3162,24 @@ CsRegs<URV>::defineStateEnableRegs()
       defineCsr("hstateen2h", CsrNumber::HSTATEEN2H,  !mand, !imp, 0, 0, 0);
       defineCsr("hstateen3h", CsrNumber::HSTATEEN3H,  !mand, !imp, 0, 0, 0);
     }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::defineEntropyReg()
+{
+  using CN = CsrNumber;
+
+  bool imp = false;
+  bool mand = false;
+
+  uint32_t rom = 0;
+  uint32_t pokeMask = 0xc000ffff;
+
+  // Entropy source
+  auto csr = defineCsr("seed", CN::SEED, mand, imp, 0, rom, pokeMask);
+  csr->setHypervisor(true);
 }
 
 
