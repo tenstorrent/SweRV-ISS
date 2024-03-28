@@ -207,6 +207,7 @@ struct Args
   std::optional<uint64_t> consoleIo;
   std::optional<uint64_t> instCountLim;
   std::optional<uint64_t> memorySize;
+  std::optional<uint64_t> tlbSize;
   Uint64Vec snapshotPeriods;
   std::optional<uint64_t> alarmInterval;
   std::optional<uint64_t> clint;  // Core-local-interrupt (Clint) mem mapped address
@@ -346,6 +347,13 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
     {
       auto numStr = varMap["memorysize"].as<std::string>();
       if (not parseCmdLineNumber("memorysize", numStr, args.memorySize))
+        ok = false;
+    }
+
+  if (varMap.count("tlbsize"))
+    {
+      auto numStr = varMap["tlbsize"].as<std::string>();
+      if (not parseCmdLineNumber("tlbsize", numStr, args.tlbSize))
         ok = false;
     }
 
@@ -539,6 +547,8 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 	 "Limit executed instruction count to arg. With a leading plus sign interpret the count as relative to the loaded (from a snapshot) instruction count.")
 	("memorysize", po::value<std::string>(),
 	 "Memory size (must be a multiple of 4096).")
+	("tlbsize", po::value<std::string>(),
+	 "Memory size (must be a power of 2).")
 	("interactive,i", po::bool_switch(&args.interactive),
 	 "Enable interactive mode.")
 	("traceload", po::bool_switch(&args.traceLdSt),
@@ -1179,6 +1189,18 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   if (not args.snapshotDir.empty())
     system.setSnapshotDir(args.snapshotDir);
+
+  if (args.tlbSize)
+    {
+      size_t size = *args.tlbSize;
+      if ((size & (size-1)) != 0)
+	{
+	  std::cerr << "TLB size must be a power of 2\n";
+	  errors++;
+	}
+      else
+	hart.setTlbSize(size);
+    }
 
   return errors == 0;
 }
