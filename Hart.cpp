@@ -1888,11 +1888,6 @@ inline
 bool
 Hart<URV>::fastStore(const DecodedInst* di, URV addr, STORE_TYPE storeVal)
 {
-  ldStAddr_ = addr;   // For reporting ld/st addr in trace-mode.
-  ldStPhysAddr1_ = addr;
-  ldStSize_ = sizeof(STORE_TYPE);
-  ldStData_ = storeVal;
-
   if (memory_.write(hartIx_, addr, storeVal))
     {
       ldStWrite_ = true;
@@ -1905,6 +1900,9 @@ Hart<URV>::fastStore(const DecodedInst* di, URV addr, STORE_TYPE storeVal)
 
       if (dataLineTrace_)
 	memory_.traceDataLine(addr, addr);
+
+      ldStWrite_ = true;
+      ldStData_ = storeVal;
       return true;
     }
 
@@ -1960,6 +1958,10 @@ inline
 bool
 Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal, [[maybe_unused]] bool amoLock)
 {
+  ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
+  ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
+  ldStSize_ = sizeof(STORE_TYPE);
+
 #ifdef FAST_SLOPPY
   return fastStore(di, virtAddr, storeVal);
 #else
@@ -1967,10 +1969,6 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   auto lock = (amoLock)? std::shared_lock<std::shared_mutex>(memory_.amoMutex_) :
                          std::shared_lock<std::shared_mutex>();
   std::lock_guard<std::mutex> lock2(memory_.lrMutex_);
-
-  ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
-  ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
-  ldStSize_ = sizeof(STORE_TYPE);
 
   // ld/st-address or instruction-address triggers have priority over
   // ld/st access or misaligned exceptions.

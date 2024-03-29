@@ -54,7 +54,8 @@ Hart<URV>::validateAmoAddr(uint64_t& addr, uint64_t& gaddr, unsigned accessSize)
 
 template <typename URV>
 bool
-Hart<URV>::amoLoad32(const DecodedInst* di, uint64_t virtAddr, Pma::Attrib attrib, URV& value)
+Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
+		     [[maybe_unused]] Pma::Attrib  attrib, URV& value)
 {
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr1_ = ldStAddr_;
@@ -111,7 +112,8 @@ Hart<URV>::amoLoad32(const DecodedInst* di, uint64_t virtAddr, Pma::Attrib attri
 
 template <typename URV>
 bool
-Hart<URV>::amoLoad64(const DecodedInst* di, uint64_t virtAddr, Pma::Attrib attrib, URV& value)
+Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
+		     [[maybe_unused]] Pma::Attrib attrib, URV& value)
 {
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr1_ = ldStAddr_;
@@ -189,11 +191,12 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
   using ULT = typename std::make_unsigned<LOAD_TYPE>::type;
 
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
-  uint64_t gaddr1 = virtAddr, gaddr2 = virtAddr;
+  uint64_t gaddr1 = virtAddr;
   auto cause = ExceptionCause::NONE;
 #ifndef FAST_SLOPPY
+  uint64_t gaddr2 = virtAddr;
   cause = determineLoadException(addr1, addr2, gaddr1, gaddr2,
-                                      ldStSize_, false /*hyper*/);
+				 ldStSize_, false /*hyper*/);
 #endif
   if (cause == ExceptionCause::LOAD_ADDR_MISAL and misalAtomicCauseAccessFault_)
     cause = ExceptionCause::LOAD_ACC_FAULT;
