@@ -1249,7 +1249,14 @@ Syscall<URV>::emulate()
 	uint64_t rvBuff = a1;
 
 	struct timespec tp;
-	if (clock_gettime(clk_id, &tp) != 0)
+	if (clk_id == CLOCK_MONOTONIC or clk_id == CLOCK_MONOTONIC_COARSE or
+	    clk_id == CLOCK_MONOTONIC_RAW)
+	  {
+	    // For repeatabilty. Pretend hart is running at 1 GHZ. Use instruction count.
+	    tp.tv_sec = hart_.getInstructionCount() / 1000000000;
+	    tp.tv_nsec = hart_.getInstructionCount() % 1000000000;
+	  }
+	else if (clock_gettime(clk_id, &tp) != 0)
 	  return SRV(-errno);
 	if (not hart_.pokeMemory(rvBuff, uint64_t(tp.tv_sec), true))
 	  return SRV(-1);
