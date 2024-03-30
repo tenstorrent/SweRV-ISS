@@ -10204,13 +10204,17 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
 	    assert(0);
 	  unsigned bitIx = unsigned(csr) - unsigned(CN::CYCLE);
 	  URV mask = URV(1) << bitIx;
-	  if ((hcounteren & mask) == 0)
+          if ((mcounteren & mask) == 0)
+            {
+              illegalInst(di);
+              return false;
+            }
+	  if (((hcounteren & mask) == 0) or
+              (privMode_ == PM::User and (scounteren & mask) == 0))
 	    {
-	      if ((mcounteren & mask) == 0) illegalInst(di); else virtualInst(di);
+	      virtualInst(di);
 	      return false;
 	    }
-	  if (privMode_ == PM::User and (scounteren & mask) == 0)
-	    { illegalInst(di); return false; }
 	}
       else if (csr == CN::SEED and not isWrite)
         {
