@@ -91,5 +91,6 @@ union WhisperFlags
     bool     interrupt : 1;    // true if last instruction interrupted
     bool     virt      : 1;    // virtual mode before last instruction
     bool     debug     : 1;    // true if hart is in debug mode
+    bool     load      : 1;    // true if last instructions reads data memory
   } bits;
 };

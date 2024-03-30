@@ -2253,7 +2253,7 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& gPh
 #ifdef FAST_SLOPPY
 
   assert((virtAddr & 1) == 0);
-  physAddr = virtAddr;
+  gPhysAddr = physAddr = virtAddr;
   if (not memory_.readInst(physAddr, inst))
     return ExceptionCause::INST_ACC_FAULT;
   return ExceptionCause::NONE;
