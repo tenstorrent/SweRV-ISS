@@ -211,11 +211,15 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
       return packet->predictBranch(prTaken, prTarget);
     }
 
-    /// Execute instruction with the given tag in the given hart. Return true on
-    /// success marking the instruction as executed and collect its operand
-    /// values.  Return false if the given tag has not yet been fetched or
-    /// if it has been flushed.
+    /// Execute instruction with the given tag in the given hart. Return true on success
+    /// marking the instruction as executed and collect its operand values. Return false
+    /// if the given tag has not yet been fetched or if it has been flushed.
     bool execute(unsigned hart, uint64_t time, uint64_t tag);
+
+    /// Helper to above execute: Excecute packet instrction without cahging hart state.
+    /// Poke packet source register values into hart, execute, collect dstination
+    /// values. Restore hart state.
+    bool execute(Hart64& hart, InstrPac& packet);
 
     /// Retire given instruction at the given hart. Commit all related state
     /// changes. SC/AMO instructions are executed at this stage and write memory
