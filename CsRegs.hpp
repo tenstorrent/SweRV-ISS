@@ -884,6 +884,13 @@ namespace WdRiscv
       triggers_.getLastWrittenTriggers(triggerNums);
     }
 
+    /// Return the previous (prior to last executed instructoin) value of the given csr.
+    URV lastCsrValue(CsrNumber csrn)
+    {
+      auto csr = findCsr(csrn);
+      return csr->prevValue();
+    }
+
     /// Associate an IMSIC with this register file.
     void attachImsic(std::shared_ptr<TT_IMSIC::Imsic> imsic)
     { imsic_ = imsic; }

@@ -828,6 +828,9 @@ namespace WdRiscv
     void lastCsr(std::vector<CsrNumber>& csrs) const
     { csRegs_.getLastWrittenRegs(csrs); }
 
+    URV lastCsrValue(CsrNumber csr)
+    { return csRegs_.lastCsrValue(csr); }
+
     /// Support for tracing: Fill the csrs vector with the
     /// register-numbers of the CSRs written by the execution of the
     /// last instruction. CSRs modified as a side effect (e.g. mcycle
