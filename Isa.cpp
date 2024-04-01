@@ -76,6 +76,8 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "zcmop", RvExtension::Zcmop },
   { "smrnmi", RvExtension::Smrnmi },
   { "zicsr", RvExtension::Zicsr },
+  { "zicntr", RvExtension::Zicntr },
+  { "zihpm", RvExtension::Zihpm },
   { "zifencei", RvExtension::Zifencei },
   { "zihintpause", RvExtension::Zihintpause },
   { "ssnpm", RvExtension::Ssnpm },

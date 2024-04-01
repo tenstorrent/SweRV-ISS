@@ -1566,6 +1566,12 @@ namespace WdRiscv
       regs_.at(size_t(CsrNumber::VSEPC)).setReadMask(mask);
     }
 
+    /// Enable/disable Zicntr extension.
+    void enableZicntr(bool flag);
+
+    /// Enable/disable Zihpm extension.
+    void enableZihpm(bool flag);
+
     /// Enable/disable counter-overflow extension (sscofpmf)
     void enableSscofpmf(bool flag);
 

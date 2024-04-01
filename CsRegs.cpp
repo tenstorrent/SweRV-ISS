@@ -1002,6 +1002,42 @@ CsRegs<URV>::enableSscofpmf(bool flag)
     }
 }
 
+template <typename URV>
+void
+CsRegs<URV>::enableZicntr(bool flag)
+{
+  using CN = CsrNumber;
+  for (auto csrn: { CN::CYCLE, CN::TIME, CN::INSTRET })
+    {
+      auto csr = findCsr(csrn);
+      csr->setImplemented(flag);
+    }
+  if (rv32_)
+    for (auto csrn: { CN::CYCLEH, CN::TIMEH, CN::INSTRETH })
+      {
+    auto csr = findCsr(csrn);
+    csr->setImplemented(flag);
+      }
+}
+
+template <typename URV>
+void
+CsRegs<URV>::enableZihpm(bool flag)
+{
+  using CN = CsrNumber;
+  for (unsigned i = 3; i <= 31; ++i)
+    {
+      auto csrn = advance(CN::HPMCOUNTER3, i - 3);
+      auto csr = findCsr(csrn);
+      csr->setImplemented(flag);
+      if (rv32_)
+        {
+          auto csrnh = advance(CN::HPMCOUNTER3H, i - 3);
+          auto csrh = findCsr(csrnh);
+          csrh->setImplemented(flag);
+        }
+    }
+}
 
 template <typename URV>
 void
@@ -2702,11 +2738,11 @@ CsRegs<URV>::defineUserRegs()
   using Csrn = CsrNumber;
 
   // User Counter/Timers
-  auto c = defineCsr("cycle",    Csrn::CYCLE,    !mand, imp,  0, wam, wam);
+  auto c = defineCsr("cycle", Csrn::CYCLE,    !mand, !imp,  0, wam, wam);
   c->setHypervisor(true);
-  c = defineCsr("time",     Csrn::TIME,     !mand, imp,  0, wam, wam);
+  c = defineCsr("time",     Csrn::TIME,     !mand, !imp,  0, wam, wam);
   c->setHypervisor(true);
-  c = defineCsr("instret",  Csrn::INSTRET,  !mand, imp,  0, wam, wam);
+  c = defineCsr("instret",  Csrn::INSTRET,  !mand, !imp,  0, wam, wam);
   c->setHypervisor(true);
 
   c = defineCsr("cycleh",   Csrn::CYCLEH,   !mand, !imp, 0, wam, wam);

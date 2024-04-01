@@ -1032,6 +1032,14 @@ namespace WdRiscv
     void enableSmnpm(bool flag)
     { enableExtension(RvExtension::Smnpm, flag); csRegs_.enableSmnpm(flag); }
 
+    /// Enable/disable Zicntr extension.
+    void enableZicntr(bool flag)
+    { enableExtension(RvExtension::Zicntr, flag); csRegs_.enableZicntr(flag); }
+
+    /// Enable/disable Zihpm extension.
+    void enableZihpm(bool flag)
+    { enableExtension(RvExtension::Zihpm, flag); csRegs_.enableZihpm(flag); }
+
     /// Enable/disable zkr extension.
     void enableZkr(bool flag)
     { enableExtension(RvExtension::Zkr, flag); csRegs_.enableZkr(flag); }
