@@ -409,24 +409,26 @@ namespace WdRiscv
     /// Called when pointer masking configuration changes.
     void updateTranslationPmm()
     {
+      using PM = PrivilegeMode;
+
       if (isRvSsnpm())
         {
           uint8_t pmm = csRegs_.senvcfgPmm();
           if (isRvu())
-            virtMem_.enableUserPointerMasking(VirtMem::Pmm(pmm));
+            virtMem_.enablePointerMasking(VirtMem::Pmm(pmm), PM::User, false);
 
           pmm = csRegs_.henvcfgPmm();
           if (isRvh())
-            virtMem_.enableVsPointerMasking(VirtMem::Pmm(pmm));
+            virtMem_.enablePointerMasking(VirtMem::Pmm(pmm), PM::Supervisor, true);
         }
 
       if (isRvSmnpm())
         {
           uint8_t pmm = csRegs_.menvcfgPmm();
           if (isRvs())
-            virtMem_.enablePointerMasking(VirtMem::Pmm(pmm));
+            virtMem_.enablePointerMasking(VirtMem::Pmm(pmm), PM::Supervisor, false);
           else if (isRvu())
-            virtMem_.enableUserPointerMasking(VirtMem::Pmm(pmm));
+            virtMem_.enablePointerMasking(VirtMem::Pmm(pmm), PM::User, false);
         }
     }
 
