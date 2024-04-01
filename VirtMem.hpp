@@ -359,7 +359,7 @@ namespace WdRiscv
         case Pmm::Off: return 0;
         case Pmm::Pm57: return 7;
         case Pmm::Pm48: return 16;
-        default: assert(0);
+        default: assert(0); return 0;
       }
     }
 
@@ -579,7 +579,7 @@ namespace WdRiscv
         case 0: return Pmm::Off;
         case 7: return Pmm::Pm57;
         case 16: return Pmm::Pm48;
-        default: assert(0);
+        default: assert(0); return Pmm::Off;
       }
     }
 
