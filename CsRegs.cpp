@@ -928,6 +928,12 @@ CsRegs<URV>::enableSscofpmf(bool flag)
   else
     csr->setImplemented(flag & superEnabled_);
 
+  // Add CSR fields.
+  std::vector<typename Csr<URV>::Field> hpm = {{"zero", 3}};
+  for (unsigned i = 3; i <= 31; ++i)
+    hpm.push_back({"HPM" + std::to_string(i), 1});
+  setCsrFields(csrn, hpm);
+
   // Mask/unmask LCOF bits
   for (auto csrn : {CsrNumber::MIE, CsrNumber::MIP, CsrNumber::SIE, CsrNumber::SIP})
     {
