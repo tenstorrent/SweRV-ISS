@@ -928,6 +928,12 @@ CsRegs<URV>::enableSscofpmf(bool flag)
   else
     csr->setImplemented(flag & superEnabled_);
 
+  // Add CSR fields.
+  std::vector<typename Csr<URV>::Field> hpm = {{"zero", 3}};
+  for (unsigned i = 3; i <= 31; ++i)
+    hpm.push_back({"HPM" + std::to_string(i), 1});
+  setCsrFields(csrn, hpm);
+
   // Mask/unmask LCOF bits
   for (auto csrn : {CsrNumber::MIE, CsrNumber::MIP, CsrNumber::SIE, CsrNumber::SIP})
     {
@@ -1193,6 +1199,10 @@ CsRegs<URV>::enableSsnpm(bool flag)
       HenvcfgFields<uint64_t> hf{regs_.at(size_t(CN::HENVCFG)).getReadMask()};
       hf.bits_.PMM = mask;
       regs_.at(size_t(CN::HENVCFG)).setReadMask(hf.value_);
+
+      HstatusFields<uint64_t> hs{regs_.at(size_t(CN::HSTATUS)).getReadMask()};
+      hs.bits_.HUPMM = mask;
+      regs_.at(size_t(CN::HSTATUS)).setReadMask(hs.value_);
     }
 }
 
@@ -4401,7 +4411,8 @@ CsRegs<URV>::addHypervisorFields()
       setCsrFields(Csrn::HSTATUS,
         {{"res0", 5}, {"VSBE", 1}, {"GVA", 1},   {"SPV", 1},  {"SPVP", 1},
          {"HU", 1},   {"res1", 2}, {"VGEIN", 6}, {"res2", 2}, {"VTVM", 1},
-         {"VTW", 1},  {"VTSR", 1}, {"res3", 9},  {"VSXL", 2}, {"res4", 30}});
+         {"VTW", 1},  {"VTSR", 1}, {"res3", 9},  {"VSXL", 2}, {"res4", 14},
+         {"HUPMM", 2}, {"res5", 14}});
       setCsrFields(Csrn::HENVCFG,
         {{"FIOM",  1}, {"res0", 3}, {"CBIE", 2}, {"CBCFE", 1}, {"CBZE", 1},
          {"res1", 24}, {"PMM", 2}, {"res2", 27}, {"ADUE",  1}, {"PBMTE", 1},

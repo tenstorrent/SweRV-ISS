@@ -231,7 +231,9 @@ namespace WdRiscv
       unsigned VTSR     : 1;   // Trap on sret
       unsigned res3     : 9;
       unsigned VSXL     : 2;
-      unsigned res4     : 29;
+      unsigned res4     : 14;
+      unsigned HUPMM    : 2;   // Pointer mask mode in VU-mode
+      unsigned res5     : 14;
     } bits_;
   };
 

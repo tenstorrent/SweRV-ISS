@@ -158,8 +158,8 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zihpm)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::Zifencei)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::Zihintpause)) = Info{ {{1,0}}, {1,0} };
-  infoVec_.at(extIx(RvExtension::Ssnpm)) = Info{ {{0,81}}, {0,81} };
-  infoVec_.at(extIx(RvExtension::Smnpm)) = Info{ {{0,81}}, {0,81} };
+  infoVec_.at(extIx(RvExtension::Ssnpm)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Smnpm)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Sscofpmf)) = Info{ {{0,5}}, {0,5} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.

@@ -1536,7 +1536,13 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	}
       if (pm != PM::Machine)
         {
+          bool disablePointerMask = not hyper and mstatusMprv() and mstatus_.bits_.MXR;
+          VirtMem::Pmm prevPmm = virtMem_.pmMode(pm, virt);
+          if (disablePointerMask)
+            virtMem_.enablePointerMasking(VirtMem::Pmm::Off, pm, virt);
 	  auto cause = virtMem_.translateForLoad2(va1, ldSize, pm, virt, gaddr1, addr1, gaddr2, addr2);
+          if (disablePointerMask)
+            virtMem_.enablePointerMasking(prevPmm, pm, virt);
           if (cause != EC::NONE)
 	    return cause;
         }
@@ -10539,6 +10545,24 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
             }
         }
     }
+  else if (csr == CsrNumber::HSTATUS)
+    {
+      if constexpr (sizeof(URV) == 8)
+        {
+          URV oldVal = 0;
+          if (not peekCsr(csr, oldVal))
+            oldVal = 0;
+
+          HstatusFields<uint64_t> hf{val};
+          unsigned pmm = hf.bits_.HUPMM;
+          if (not virtMem_.isPmmSupported(VirtMem::Pmm{pmm}))
+            {
+              pmm = HstatusFields<uint64_t>(oldVal).bits_.HUPMM;
+              hf.bits_.HUPMM = pmm;
+              val = hf.value_;
+            }
+        }
+    }
 
   // Update CSR.
   URV lastVal = 0;
@@ -10922,7 +10946,13 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	}
       if (pm != PM::Machine)
         {
+          bool disablePointerMask = not hyper and mstatusMprv() and mstatus_.bits_.MXR;
+          VirtMem::Pmm prevPmm = virtMem_.pmMode(pm, virt);
+          if (disablePointerMask)
+            virtMem_.enablePointerMasking(VirtMem::Pmm::Off, pm, virt);
 	  auto cause = virtMem_.translateForStore2(va1, stSize, pm, virt, gaddr1, addr1, gaddr2, addr2);
+          if (disablePointerMask)
+            virtMem_.enablePointerMasking(prevPmm, pm, virt);
           if (cause != EC::NONE)
 	    return cause;
         }
