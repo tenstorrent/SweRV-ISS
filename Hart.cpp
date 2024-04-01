@@ -384,6 +384,10 @@ Hart<URV>::processExtensions(bool verbose)
     enableSsnpm(true);
   if (isa_.isEnabled(RvExtension::Smnpm))
     enableSmnpm(true);
+  if (isa_.isEnabled(RvExtension::Zicntr))
+    enableZicntr(true);
+  if (isa_.isEnabled(RvExtension::Zihpm))
+    enableZihpm(true);
   if (isa_.isEnabled(RvExtension::Sscofpmf))
     enableSscofpmf(true);
   if (isa_.isEnabled(RvExtension::Zkr))
