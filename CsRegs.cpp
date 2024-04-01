@@ -660,8 +660,8 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 	}
     }
 
-  // Make TM bit read only zero if TIME CSR is not implemented.
-  // This is not explicitly stated in the spec but it is in the lore.
+  // Make TM bit read only zero if TIME CSR is not implemented. This is not explicitly
+  // stated in the spec but it is in the lore.
   URV mask = ~URV(0);
   if (not isImplemented(CN::TIME))
     mask &= ~URV(2);
@@ -1015,9 +1015,18 @@ CsRegs<URV>::enableZicntr(bool flag)
   if (rv32_)
     for (auto csrn: { CN::CYCLEH, CN::TIMEH, CN::INSTRETH })
       {
-    auto csr = findCsr(csrn);
-    csr->setImplemented(flag);
+	auto csr = findCsr(csrn);
+	csr->setImplemented(flag);
       }
+
+  // Make TM bit read only zero if TIME CSR is not implemented. This is not explicitly
+  // stated in the spec but it is in the lore.
+  URV mask = ~URV(0);
+  if (not flag)
+    mask &= ~URV(2);
+  regs_[unsigned(CN::MCOUNTEREN)].setReadMask(mask);
+  regs_[unsigned(CN::SCOUNTEREN)].setReadMask(mask);
+  regs_[unsigned(CN::HCOUNTEREN)].setReadMask(mask);
 }
 
 template <typename URV>

@@ -154,6 +154,8 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zcmop)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Smrnmi)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zicsr)) = Info{ {{2,0}}, {2,0} };
+  infoVec_.at(extIx(RvExtension::Zicntr)) = Info{ {{2,0}}, {2,0} };
+  infoVec_.at(extIx(RvExtension::Zihpm)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::Zifencei)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::Zihintpause)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Ssnpm)) = Info{ {{0,81}}, {0,81} };

@@ -14,11 +14,11 @@ namespace WdRiscv
                                       Zknd, Zkne, Zknh, Zbkb, Zbkx, Zksed, Zksh, Zkr,
                                       Svinval, Zicbom, Zicboz, Zicbop, Zawrs, Zmmul,
                                       Zvfh, Zvfhmin, Zvbb, Zvbc, Zvkg,
-				                      Zvkned, Zvknha, Zvknhb, Zvksed,
+				      Zvkned, Zvknha, Zvknhb, Zvksed,
                                       Zvksh, Zicond, Zcb, Zfa, Zfbfmin,
                                       Zvfbfmin, Zvfbfwma, Sstc, Svpbmt,
-				                      Smaia, Ssaia, Zacas, Zimop, Zcmop, Smrnmi,
-				                      Zicsr, Zicntr, Zihpm, Zifencei, Zihintpause,
+				      Smaia, Ssaia, Zacas, Zimop, Zcmop, Smrnmi,
+				      Zicsr, Zicntr, Zihpm, Zifencei, Zihintpause,
                                       Ssnpm, Smnpm, Sscofpmf, None };
 
   /// Model supported extensions with primary/secondary version numbers.
