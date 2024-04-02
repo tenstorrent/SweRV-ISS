@@ -2165,14 +2165,14 @@ CsRegs<URV>::configUserModePerfCounters(unsigned numCounters)
 
       CsrNumber csrNum = advance(CsrNumber::HPMCOUNTER3, i);
       bool isDebug = false;
-      if (not configCsr(csrNum, true, resetValue, mask, pokeMask, isDebug,
+      if (not configCsr(csrNum, false, resetValue, mask, pokeMask, isDebug,
                         shared))
 	errors++;
 
       if (rv32_)
          {
 	   csrNum = advance(CsrNumber::HPMCOUNTER3H, i);
-	   if (not configCsr(csrNum, true, resetValue, mask, pokeMask,
+	   if (not configCsr(csrNum, false, resetValue, mask, pokeMask,
                              isDebug, shared))
 	     errors++;
 	 }
