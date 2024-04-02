@@ -183,14 +183,14 @@ struct Args
   std::string stdinFile;                 // Redirect target program stdin to this.
   std::string dataLines;                 // Output file for data address line tracing.
   std::string instrLines;                // Output file for instruction address line tracing.
-  std::string initStateFile;             // Output file for inital state of memory lines used in run.
-  std::string kernelFile;                // Load kernel image at address.
-  std::string testSignatureFile;         // Output signature file to score riscv-arch-test tests
-  StringVec   regInits;                  // Initial values of regs
+  std::string initStateFile;             // Output: initial state of memory lines used in run.
+  std::string kernelFile;                // Input: Load kernel image at address.
+  std::string testSignatureFile;         // Output: signature to score riscv-arch-test tests.
+  StringVec   regInits;                  // Initial values of regs.
   StringVec   targets;                   // Target (ELF file) programs and associated
                                          // program options to be loaded into simulator
                                          // memory. Each target plus args is one string.
-  StringVec   isaVec;                    // Isa string split around _ with rv32/rv64 prefix removed.
+  StringVec   isaVec;                    // Extensions from isa string rv32/rv64 removed.
   std::string targetSep = " ";           // Target program argument separator.
   StringVec   pciDevs;                   // PCI device list.
 
@@ -240,7 +240,7 @@ struct Args
   bool counters = false;   // Enable performance counters when true.
   bool gdb = false;        // Enable gdb mode when true.
   std::vector<unsigned> gdbTcpPort;        // Enable gdb mode over TCP when port is positive.
-  bool abiNames = false;   // Use ABI register names in inst disassembly.
+  bool abiNames = false;   // Use ABI register names in inst dis-assembly.
   bool newlib = false;     // True if target program linked with newlib.
   bool linux = false;      // True if target program linked with Linux C-lib.
   bool raw = false;        // True if bare-metal program (no linux no newlib).
@@ -250,7 +250,7 @@ struct Args
   bool mcmca = false;      // Memory consistency checks: check all bytes of merge buffer
   bool reportub = false;         // Report used blocks with sparse memory
   bool quitOnAnyHart = false;    // True if run quits when any hart finishes.
-  bool noConInput = false;       // If true console io address is not used for input (ld).
+  bool noConInput = false;       // If true console io address is not used for input.
   bool relativeInstCount = false;
   bool tracePtw = false;   // Enable printing of page table walk info in log.
   bool shm = false;        // Enable shared memory IPC for server mode (default is socket).
@@ -462,7 +462,7 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
 
 
 /// Parse command line arguments. Place option values in args.
-/// Return true on success and false on failure. Exists program
+/// Return true on success and false on failure. Exit program
 /// if --help is used.
 static
 bool
@@ -504,7 +504,7 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 	 "Example: -b file1 -b file2:0x1040 -b file3:0x20000:u")
         ("kernel", po::value(&args.kernelFile),
          "Kernel binary file to load into simulator memory. File will be loaded at 0x400000 for "
-        "rv32 or 0x200000 for rv64 unless an explicit addresss is specified after a colon suffix "
+        "rv32 or 0x200000 for rv64 unless an explicit address is specified after a colon suffix "
         "to the file path.")
         ("testsignature", po::value(&args.testSignatureFile),
          "Produce a signature file used to score tests provided by the riscv-arch-test project.")
@@ -541,7 +541,7 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
          "console.")
 	("consoleiosym", po::value<std::string>(),
 	 "ELF symbol to use as console-io address (in the case where "
-         "consoleio is not specified on the command line). Deafult: "
+         "consoleio is not specified on the command line). Default: "
          "\"__whisper_console_io\".")
 	("maxinst,m", po::value<std::string>(),
 	 "Limit executed instruction count to arg. With a leading plus sign interpret the count as relative to the loaded (from a snapshot) instruction count.")
@@ -609,7 +609,7 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 	("initstate", po::value(&args.initStateFile),
 	 "Generate to given file the initial state of accessed memory lines.")
 	("abinames", po::bool_switch(&args.abiNames),
-	 "Use ABI register names (e.g. sp instead of x2) in instruction disassembly.")
+	 "Use ABI register names (e.g. sp instead of x2) in instruction dis-assembly.")
 	("newlib", po::bool_switch(&args.newlib),
 	 "Emulate (some) newlib system calls. Done automatically if newlib "
          "symbols are detected in the target ELF file.")
@@ -617,37 +617,23 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 	 "Emulate (some) Linux system calls. Done automatically if Linux "
          "symbols are detected in the target ELF file.")
 	("raw", po::bool_switch(&args.raw),
-	 "Bare metal mode: Disble emulation of Linux/newlib system call emulation "
+	 "Bare metal mode: Disable emulation of Linux/newlib system call emulation "
          "even if Linux/newlib symbols detected in the target ELF file.")
 	("elfisa", po::bool_switch(&args.elfisa),
 	 "Configure reset value of MISA according to the RISCV architecture tag(s) "
-         "encoded into the laoded ELF file(s) if any.")
+         "encoded into the loaded ELF file(s) if any.")
 	("unmappedelfok", po::bool_switch(&args.unmappedElfOk),
-	 "Do not flag as error ELF file sections targeting unmapped "
-         " memory.")
+	 "Do not flag as error ELF file sections targeting unmapped memory.")
 	("alarm", po::value<std::string>(),
 	 "External interrupt period in micro-seconds: Convert arg to an "
          "instruction count, n, assuming a 1ghz clock, and force an external "
          " interrupt every n instructions. No-op if arg is zero.")
-        ("softinterrupt", po::value<std::string>(),
-         "Address of memory mapped word(s) controlling software interrupts. In "
-         "an n-hart system, words at addresses a, a+4, ... a+(n-1)*4 "
-         "are associated with the n harts (\"a\" being the address "
-         "specified by this option and must be a multiple of "
-         "4). Writing 0/1 to one of these addresses (using sw) "
-         "clear/sets the software interrupt bit in the the MIP (machine "
-         "interrupt pending) CSR of the corresponding hart. If a "
-         "software interrupt is taken, it is up to interrupt handler to "
-         "write zero to the same location to clear the corresponding "
-         "bit in MIP. Writing values besides 0/1 will not affect the "
-         "MIP bit and neither will writing using sb/sh/sd or writing to "
-         "non-multiple-of-4 addresses.")
         ("clint", po::value<std::string>(),
          "Define address, a, of memory mapped area for clint (core local "
          "interruptor). In an n-hart system, words at addresses a, a+4, ... "
          "a+(n-1)*4, are  associated with the n harts. Store a 0/1 to one of "
          "these locations clears/sets the software interrupt bit in the MIP CSR "
-         "of the corresponding hart. Similary, addresses b, b+8, ... b+(n-1)*8, "
+         "of the corresponding hart. Similarly, addresses b, b+8, ... b+(n-1)*8, "
          "where b is a+0x4000, are associated with the n harts. Writing to one "
          "of these double words sets the timer-limit of the corresponding hart. "
          "A timer interrupt in such a hart becomes pending when the timer value "
@@ -667,13 +653,13 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
          "corresponding values. A zero/zero pair will indicate the end of "
          "sequence.")
 	("mcm", po::bool_switch(&args.mcm),
-	 "Enabe memory consistency checks. This is meaningful in server/interactive "
+	 "Enable memory consistency checks. This is meaningful in server/interactive "
 	 "mode.")
 	("mcmca", po::bool_switch(&args.mcmca),
 	 "Check all bytes of the memory consistency check merge buffer. If not used "
 	 "we only check the bytes inserted into the merge buffer.")
 	("mcmls", po::value<std::string>(),
-	 "Memory consitency checker merge buffer line size. If set to zero then "
+	 "Memory consistency checker merge buffer line size. If set to zero then "
 	 "write operations are not buffered and will happen as soon a received.")
 #ifdef MEM_CALLBACKS
         ("reportusedblocks", po::bool_switch(&args.reportub),
@@ -696,7 +682,7 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
          "Terminate multi-threaded run when any hart finishes (default is to wait "
          "for all harts.)")
         ("noconinput", po::bool_switch(&args.noConInput),
-         "Do not use console IO address for input. Loads from the cosole io address "
+         "Do not use console IO address for input. Loads from the console io address "
          "simply return last value stored there.")
 	("verbose,v", po::bool_switch(&args.verbose),
 	 "Be verbose.")
@@ -714,7 +700,6 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
       po::store(parsed, varMap);
       po::notify(varMap);
 
-      // auto unparsed = po::collect_unrecognized(parsed.options, po::include_positional);
 
       bool earlyExit = false;
       if (args.version)
@@ -855,7 +840,7 @@ checkForNewlibOrLinux(const Args& args, bool& newlib, bool& linux)
   if (args.raw)
     {
       if (args.newlib or args.linux)
-	std::cerr << "Raw mode not comptible with newlib/linux. Sticking"
+	std::cerr << "Raw mode not compatible with newlib/linux. Sticking"
 		  << " with raw mode.\n";
       return;
     }
@@ -880,21 +865,21 @@ checkForNewlibOrLinux(const Args& args, bool& newlib, bool& linux)
     }
 
   if (linux and args.verbose)
-    std::cerr << "Detected linux symbol in ELF\n";
+    std::cerr << "Detected Linux symbol in ELF\n";
 
   if (newlib and args. verbose)
-    std::cerr << "Detected newlib symbol in ELF\n";
+    std::cerr << "Detected Newlib symbol in ELF\n";
 
   if (newlib and linux)
     {
-      std::cerr << "Fishy: Both newlib and linux symbols present in "
-		<< "ELF file(s). Doing linux emulation.\n";
+      std::cerr << "Fishy: Both Newlib and Linux symbols present in "
+		<< "ELF file(s). Doing Linux emulation.\n";
       newlib = false;
     }
 }
 
 
-/// Set stack pointer to a reasonable value for linux/newlib.
+/// Set stack pointer to a reasonable value for Linux/Newlib.
 template<typename URV>
 static
 void
@@ -935,7 +920,7 @@ getElfFilesIsaString(const Args& args, std::string& isaString)
 
   for (const auto& tag : archTags)
     if (tag != ref)
-      std::cerr << "Warning differen ELF files have different ISA strings: "
+      std::cerr << "Warning different ELF files have different ISA strings: "
 		<< tag << " and " << ref << '\n';
 
   isaString = ref;
@@ -978,7 +963,7 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 {
   unsigned errors = 0;
 
-  if (clib)  // Linux or newlib enabled.
+  if (clib)  // Linux or Newlib enabled.
     sanitizeStackPointer(hart, args.verbose);
 
   if (args.toHostSym)
@@ -987,33 +972,32 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   if (args.consoleIoSym)
     system.setConsoleIoSymbol(*args.consoleIoSym);
 
-  // Load ELF files. Entry point of first file sets the start PC
-  // unless in raw mode.
+  // Load ELF/HEX/binary files. Entry point of first ELF file sets the start PC unless in
+  // raw mode.
   if (hart.sysHartIndex() == 0)
     {
       StringVec paths;
       for (const auto& target : args.expandedTargets)
 	paths.push_back(target.at(0));
+
       if (not system.loadElfFiles(paths, args.raw, args.verbose))
 	errors++;
-    }
 
-  // Load HEX files.
-  if (not system.loadHexFiles(args.hexFiles, args.verbose))
-    errors++;
-
-  // Load binary files
-  uint64_t offset = 0;
-  if (not system.loadBinaryFiles(args.binaryFiles, offset, args.verbose))
-    errors++;
-
-  if (not args.kernelFile.empty())
-    {
-      // Default kernel file offset. FIX: make a parameter.
-      std::vector<std::string> files{args.kernelFile};
-      offset = hart.isRv64() ? 0x80200000 : 0x80400000;
-      if (not system.loadBinaryFiles(files, offset, args.verbose))
+      if (not system.loadHexFiles(args.hexFiles, args.verbose))
 	errors++;
+
+      uint64_t offset = 0;
+      if (not system.loadBinaryFiles(args.binaryFiles, offset, args.verbose))
+	errors++;
+
+      if (not args.kernelFile.empty())
+	{
+	  // Default kernel file offset. FIX: make a parameter.
+	  std::vector<std::string> files{args.kernelFile};
+	  offset = hart.isRv64() ? 0x80200000 : 0x80400000;
+	  if (not system.loadBinaryFiles(files, offset, args.verbose))
+	    errors++;
+	}
     }
 
   if (not args.instFreqFile.empty())
@@ -1043,7 +1027,7 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
     {
       if (not args.stdoutFile.empty() or not args.stderrFile.empty() or
 	  not args.stdinFile.empty())
-	std::cerr << "Info: Options --stdin, --stdout, and --stderr are ignored with --loadfrom\n";
+	std::cerr << "Info: Options --stdin/--stdout/--stderr are ignored with --loadfrom\n";
     }
   else
     {
@@ -1564,7 +1548,7 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
   if (isa.empty() and clib)
     {
       if (args.verbose)
-        std::cerr << "No ISA specfied, using i/m/a/c/f/d/v extensions for newlib/linux\n";
+        std::cerr << "No ISA specified, using i/m/a/c/f/d/v extensions for newlib/linux\n";
       isa = "imcafdv";
     }
 
@@ -1602,7 +1586,7 @@ loadTracerLibrary(const std::string& tracerLib)
   auto* soPtr = dlopen(result[0].c_str(), RTLD_NOW);
   if (not soPtr)
     {
-      std::cerr << "Error: Failed to load shared libarary " << dlerror() << '\n';
+      std::cerr << "Error: Failed to load shared library " << dlerror() << '\n';
       return false;
     }
 
@@ -1743,7 +1727,7 @@ getPrimaryConfigParameters(const Args& args, const HartConfig& config,
   if (hartsPerCore == 0 or hartsPerCore > 32)
     {
       std::cerr << "Unsupported hart count: " << hartsPerCore;
-      std::cerr << " (1 to 32 currently suppored)\n";
+      std::cerr << " (1 to 32 currently supported)\n";
       return false;
     }
 
@@ -1753,7 +1737,7 @@ getPrimaryConfigParameters(const Args& args, const HartConfig& config,
   if (coreCount == 0 or coreCount > 32)
     {
       std::cerr << "Unsupported core count: " << coreCount;
-      std::cerr << " (1 to 32 currently suppored)\n";
+      std::cerr << " (1 to 32 currently supported)\n";
       return false;
     }
 
@@ -1777,7 +1761,7 @@ static
 bool
 session(const Args& args, const HartConfig& config)
 {
-  // Collect primary configuration paramters.
+  // Collect primary configuration parameters.
   unsigned hartsPerCore = 1;
   unsigned coreCount = 1;
   size_t pageSize = UINT64_C(4)*1024;
@@ -1915,7 +1899,7 @@ session(const Args& args, const HartConfig& config)
 }
 
 
-/// Determine regiser width (xlen) from ELF file.  Return true if
+/// Determine register width (xlen) from ELF file.  Return true if
 /// successful and false otherwise (xlen is left unmodified).
 static
 bool
