@@ -660,14 +660,22 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 	}
     }
 
-  // Make TM bit read only zero if TIME CSR is not implemented. This is not explicitly
-  // stated in the spec but it is in the lore.
-  URV mask = ~URV(0);
-  if (not isImplemented(CN::TIME))
-    mask &= ~URV(2);
-  regs_[unsigned(CN::MCOUNTEREN)].setReadMask(mask);
-  regs_[unsigned(CN::SCOUNTEREN)].setReadMask(mask);
-  regs_[unsigned(CN::HCOUNTEREN)].setReadMask(mask);
+  // Make IR/TM/CY bits read only zero in MCOUNTERNE/SCOUNTEREN/HCOUNTEREN if the
+  // RETIRED/TIME/CYCLE CSRs is not implemented. This is not explicitly stated in the spec
+  // but it is in the lore.
+  URV mask = 0;  // Least sig 3 bits of MCOUNTEREN.
+  if (regs_.at(unsigned(CN::CYCLE)).isImplemented())
+    mask |= 1;
+  if (regs_.at(unsigned(CN::TIME)).isImplemented())
+    mask |= 2;
+  if (regs_.at(unsigned(CN::INSTRET)).isImplemented())
+    mask |= 4;
+  auto& mce = regs_.at(unsigned(CN::MCOUNTEREN));
+  auto& sce = regs_.at(unsigned(CN::SCOUNTEREN));
+  auto& hce = regs_.at(unsigned(CN::SCOUNTEREN));
+  mce.setReadMask((mce.getReadMask() & ~URV(7)) | mask);
+  sce.setReadMask((sce.getReadMask() & ~URV(7)) | mask);
+  hce.setReadMask((hce.getReadMask() & ~URV(7)) | mask);
 
   updateSstc();  // To activate/deactivate STIMECMP.
   enableSscofpmf(cofEnabled_);  // To activate/deactivate SCOUNTOVF.
@@ -1025,21 +1033,29 @@ CsRegs<URV>::enableZicntr(bool flag)
 	csr->setImplemented(flag);
       }
 
-  // Make TM bit read only zero if TIME CSR is not implemented. This is not explicitly
-  // stated in the spec but it is in the lore.
-  URV mask = ~URV(0);
-  if (not flag)
-    mask &= ~URV(2);
-  regs_[unsigned(CN::MCOUNTEREN)].setReadMask(mask);
-  regs_[unsigned(CN::SCOUNTEREN)].setReadMask(mask);
-  regs_[unsigned(CN::HCOUNTEREN)].setReadMask(mask);
+  // Make IR/TM/CY bits read only zero in MCOUNTERNE/SCOUNTEREN/HCOUNTEREN if the
+  // RETIRED/TIME/CYCLE CSRs are not implemented. This is not explicitly stated in the
+  // spec but it is in the lore.
+  URV mask = 7;  // Least sig 3 bits of MCOUNTEREN.
+  auto& mce = regs_.at(unsigned(CN::MCOUNTEREN));
+  auto& sce = regs_.at(unsigned(CN::SCOUNTEREN));
+  auto& hce = regs_.at(unsigned(CN::SCOUNTEREN));
+
+  if (flag)
+    {
+      mce.setReadMask(mce.getReadMask() | mask);
+      sce.setReadMask(sce.getReadMask() | mask);
+      hce.setReadMask(hce.getReadMask() | mask);
+    }
 }
+
 
 template <typename URV>
 void
 CsRegs<URV>::enableZihpm(bool flag)
 {
   using CN = CsrNumber;
+
   for (unsigned i = 3; i <= 31; ++i)
     {
       auto csrn = advance(CN::HPMCOUNTER3, i - 3);
@@ -1052,7 +1068,27 @@ CsRegs<URV>::enableZihpm(bool flag)
           csrh->setImplemented(flag);
         }
     }
+
+  // If zihmp is disabled make bits corresponding to counters read only zero in
+  // MCOUNTEREN/SCOUNTEREN/HCOUNTEREN.
+  auto& mce = regs_.at(unsigned(CN::MCOUNTEREN));
+  auto& sce = regs_.at(unsigned(CN::SCOUNTEREN));
+  auto& hce = regs_.at(unsigned(CN::SCOUNTEREN));
+  URV mask = (~URV(0)) << 3;
+  if (flag)
+    {
+      mce.setReadMask(mce.getReadMask() | mask);
+      sce.setReadMask(sce.getReadMask() | mask);
+      hce.setReadMask(hce.getReadMask() | mask);
+    }
+  else
+    {
+      mce.setReadMask(mce.getReadMask() & ~mask);
+      sce.setReadMask(sce.getReadMask() & ~mask);
+      hce.setReadMask(hce.getReadMask() & ~mask);
+    }
 }
+
 
 template <typename URV>
 void
