@@ -2525,11 +2525,11 @@ CsRegs<URV>::defineMachineRegs()
 
   uint64_t menvMask = 0xf1;
   if (not rv32_)
-    menvMask = 0xc0000000000000f1;
+    menvMask = 0xe0000003000000f1;
   defineCsr("menvcfg", Csrn::MENVCFG, !mand, imp, 0, menvMask, menvMask);
   if (rv32_)
     {
-      menvMask = 0xc0000000;
+      menvMask = 0xe0000003;
       auto c = defineCsr("menvcfgh", Csrn::MENVCFGH, !mand, imp, 0, menvMask, menvMask);
       c->markAsHighHalf(true);
     }
