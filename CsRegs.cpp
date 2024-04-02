@@ -3450,6 +3450,14 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
 
   csr->poke(value);
 
+  if (num == CN::MENVCFG)
+    {
+      bool stce = menvcfgStce();
+      enableHenvcfgStce(stce); // MENVCFG.STCE off makes HENVCFG.STCE read-only zero.
+
+      bool pbmte = menvcfgPbmte();
+      enableHenvcfgPbmte(pbmte);
+    }
   if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
       (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
     {
