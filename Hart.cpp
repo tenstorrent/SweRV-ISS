@@ -10614,9 +10614,13 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
 
   URV next = intRegs_.read(di->op1());
 
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  // MIP read value is ored with supervisor external interrupt pin. Same for SIP if
+  // supervisor external interrupt is delegated.
+  using IC = InterruptCause;
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
 
@@ -10654,9 +10658,13 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
 
   URV next = prev | intRegs_.read(di->op1());
 
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  // MIP read value is ored with supervisor external interrupt pin. Same for SIP if
+  // supervisor external interrupt is delegated.
+  using IC = InterruptCause;
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (di->op1() == 0)
     {
@@ -10703,9 +10711,13 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
 
   URV next = prev & (~ intRegs_.read(di->op1()));
 
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  // MIP read value is ored with supervisor external interrupt pin. Same for SIP if
+  // supervisor external interrupt is delegated.
+  using IC = InterruptCause;
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (di->op1() == 0)
     {
@@ -10750,9 +10762,13 @@ Hart<URV>::execCsrrwi(const DecodedInst* di)
         return;
       }
 
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  // MIP read value is ored with supervisor external interrupt pin. Same for SIP if
+  // supervisor external interrupt is delegated.
+  using IC = InterruptCause;
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   doCsrWrite(di, csr, di->op1(), di->op0(), prev);
 
@@ -10792,9 +10808,13 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
 
   URV next = prev | imm;
 
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  // MIP read value is ored with supervisor external interrupt pin. Same for SIP if
+  // supervisor external interrupt is delegated.
+  using IC = InterruptCause;
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (imm == 0)
     {
@@ -10843,9 +10863,13 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
 
   URV next = prev & (~ imm);
 
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  // MIP read value is ored with supervisor external interrupt pin. Same for SIP if
+  // supervisor external interrupt is delegated.
+  using IC = InterruptCause;
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (imm == 0)
     {
