@@ -1640,18 +1640,7 @@ sessionRun(System<URV>& system, const Args& args, std::vector<FILE*>& traceFiles
   if (not loadTracerLibrary<URV>(args.tracerLib))
     return false;
 
-  // In server/interactive modes: enable triggers and performance counters.
   bool serverMode = not args.serverFile.empty();
-  if (serverMode or args.interactive)
-    {
-      for (unsigned i = 0; i < system.hartCount(); ++i)
-        {
-          auto& hart = *system.ithHart(i);
-          hart.enableTriggers(true);
-          hart.enablePerformanceCounters(true);
-        }
-    }
-
   if (serverMode)
     return (args.shm)? runServerShm(system, args.serverFile, traceFiles.at(0), cmdLog) :
                        runServer(system, args.serverFile, traceFiles.at(0), cmdLog);
