@@ -2118,7 +2118,10 @@ bool
 HartConfig::getXlen(unsigned& xlen) const
 {
   if (config_ -> contains("xlen"))
-    return getJsonUnsigned("xlen", config_ -> at("xlen"), xlen);
+    {
+      std::cerr << "Config file tag xlen is deprecated: xlen is obtained from the isa tag.\n";
+      return getJsonUnsigned("xlen", config_ -> at("xlen"), xlen);
+    }
   std::string isa;
   if (not getIsa(isa))
     return false;
