@@ -827,6 +827,9 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
 	mstatus = findCsr(CN::MSTATUSH);
       }
 
+    if (not flag)
+      mstatus->write(mstatus->read() & ~hyperBits);  // Clear MPV and GVA.
+
     URV mask = mstatus->getWriteMask();
     mask = flag? (mask | hyperBits) : (mask & ~hyperBits);
     mstatus->setWriteMask(mask);

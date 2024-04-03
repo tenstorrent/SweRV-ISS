@@ -121,6 +121,11 @@ namespace WdRiscv
       : value_{low, high}
     { }
 
+    uint64_t value()
+    { return value64_; }
+
+    uint64_t value64_;
+
     struct
     {
       uint32_t low_;
@@ -169,6 +174,9 @@ namespace WdRiscv
       : value_(value)
     { }
 
+    uint64_t value()
+    { return value_; }
+
     uint64_t value_;
     Mstatus64 bits_;
   };
@@ -186,6 +194,9 @@ namespace WdRiscv
     HstatusFields(uint32_t value = 0)
       : value_(value)
     { }
+
+    uint64_t value()
+    { return value_; }
 
     uint32_t value_;   // Hypervisor status register value.
     struct
@@ -213,6 +224,9 @@ namespace WdRiscv
     HstatusFields(uint64_t value = 0)
       : value_(value)
     { }
+
+    uint64_t value()
+    { return value_; }
 
     uint64_t value_;   // Machine status register value.
     struct

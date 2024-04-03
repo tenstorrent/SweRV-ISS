@@ -3243,16 +3243,6 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
   else if (csr == CN::FCSR or csr == CN::FRM or csr == CN::FFLAGS)
     markFsDirty(); // Update FS field of MSTATS if FCSR is written
 
-  // Update cached values of MSTATUS,
-  if (csr == CN::MSTATUS)
-    updateCachedMstatus();
-  else if (csr == CN::SSTATUS)
-    updateCachedSstatus();
-  else if (csr == CN::VSSTATUS)
-    updateCachedVsstatus();
-  else if (csr == CN::HSTATUS)
-    updateCachedHstatus();
-
   // Update cached value of VTYPE
   if (csr == CN::VTYPE)
     {
@@ -3299,6 +3289,17 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
             }
         }
     }
+
+  // Update cached values of M/S/VS/H STATUS.
+  if (csr == CN::SSTATUS)
+    updateCachedSstatus();
+  else if (csr == CN::VSSTATUS)
+    updateCachedSstatus();
+
+  if (csRegs_.peekMstatus() != mstatus_.value())
+    { updateCachedMstatus(); csRegs_.recordWrite(CN::MSTATUS); }
+  else if (csRegs_.peekHstatus() != hstatus_.value())
+    { updateCachedHstatus(); csRegs_.recordWrite(CN::HSTATUS); }
 
   effectiveIe_ = csRegs_.effectiveInterruptEnable();
 }
