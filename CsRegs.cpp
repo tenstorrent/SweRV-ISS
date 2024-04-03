@@ -2748,6 +2748,8 @@ CsRegs<URV>::defineSupervisorRegs()
     sip->tie(mip->valuePtr_); // Sip is a shadow if mip
 
   mask = 0xf1;
+  if constexpr (sizeof(URV) == 8)
+    mask = 0x00000003000000f1;  // PMM field writable.
   defineCsr("senvcfg",    Csrn::SENVCFG,    !mand, !imp, 0, mask, mask);
 
   mask = 0;
