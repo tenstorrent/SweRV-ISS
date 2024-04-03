@@ -10648,6 +10648,12 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
   if (preCsrInst_)
     preCsrInst_(hartIx_, csr);
 
+  if (csr == CsrNumber::SEED)
+    {
+      illegalInst(di);
+      return;
+    }
+
   URV prev = 0;
   bool isWrite = di->op1() != 0;
   if (not doCsrRead(di, csr, isWrite, prev))
@@ -10700,6 +10706,12 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
 
   if (preCsrInst_)
     preCsrInst_(hartIx_, csr);
+
+  if (csr == CsrNumber::SEED)
+    {
+      illegalInst(di);
+      return;
+    }
 
   URV prev = 0;
   bool isWrite = di->op1() != 0;
@@ -10796,6 +10808,12 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
   if (preCsrInst_)
     preCsrInst_(hartIx_, csr);
 
+  if (csr == CsrNumber::SEED)
+    {
+      illegalInst(di);
+      return;
+    }
+
   URV imm = di->op1();
 
   URV prev = 0;
@@ -10850,6 +10868,12 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
 
   if (preCsrInst_)
     preCsrInst_(hartIx_, csr);
+
+  if (csr == CsrNumber::SEED)
+    {
+      illegalInst(di);
+      return;
+    }
 
   URV imm = di->op1();
 
