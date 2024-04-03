@@ -2523,8 +2523,8 @@ CsRegs<URV>::defineMachineRegs()
       defineCsr(std::move(name), num,  !mand, imp, 0, pmpMask, pmpMask);
     }
 
-  uint64_t menvMask = 0xf1;
-  if (not rv32_)
+  URV menvMask = 0xf1;
+  if constexpr (sizeof(URV) == 8)
     menvMask = 0xe0000003000000f1;
   defineCsr("menvcfg", Csrn::MENVCFG, !mand, imp, 0, menvMask, menvMask);
   if (rv32_)
