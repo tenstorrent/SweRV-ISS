@@ -797,7 +797,7 @@ Hart<URV>::checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned 
 
 template <typename URV>
 bool
-Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
+Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal, bool isVtypeImm)
 {
   bool ma = (vtypeVal >> 7) & 1;  // Mask agnostic
   bool ta = (vtypeVal >> 6) & 1;  // Tail agnostic
@@ -812,6 +812,7 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
   vill = vill or ((vtypeVal >> 8) != 0);
 
   // Determine vl
+  bool legalizedAvl = false;
   URV elems = 0;
 
   if (gm == GroupMultiplier::Reserved)
@@ -845,7 +846,13 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
         }
 
       if (elems > vlmax)
-	vill = true;
+        {
+          legalizedAvl = isVtypeImm? vecRegs_.legalizeVsetvliAvl_ : vecRegs_.legalizeVsetvlAvl_;
+          if (legalizedAvl and vlmax != 0)
+            elems = vlmax;
+          else
+            vill = true;
+        }
     }
 
   if (vill)
@@ -857,7 +864,7 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
       elems = 0;
     }
 
-  if (vill or (rd != 0 or rs1 != 0))
+  if (vill or (rd != 0 or rs1 != 0) or legalizedAvl)
     {
       // VL is not writeable: Poke it.
       pokeCsr(CsrNumber::VL, elems);
@@ -920,7 +927,7 @@ Hart<URV>::execVsetvli(const DecodedInst* di)
   unsigned imm = di->op2();
   
   URV vtypeVal = imm;
-  if (vsetvl(rd, rs1, vtypeVal))
+  if (vsetvl(rd, rs1, vtypeVal, true /* isVtypeImm */))
     postVecSuccess();
   else
     postVecFail(di);
@@ -1011,7 +1018,7 @@ Hart<URV>::execVsetvl(const DecodedInst* di)
   unsigned rs1 = di->op1();
   URV vtypeVal = intRegs_.read(di->op2());
 
-  if (vsetvl(rd, rs1, vtypeVal))
+  if (vsetvl(rd, rs1, vtypeVal, false /* isVtypeImm */))
     postVecSuccess();
   else
     postVecFail(di);

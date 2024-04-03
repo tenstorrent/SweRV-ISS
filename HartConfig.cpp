@@ -989,6 +989,26 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         hart.configVectorFpUnorderedSumRed(flag);
     }
 
+  tag = "legalize_vsetvl_avl";
+  if (vconf.contains(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, vconf.at(tag), flag))
+        errors++;
+      else
+        hart.configVectorLegalizeVsetvlAvl(flag);
+    }
+
+  tag = "legalize_vsetvli_avl";
+  if (vconf.contains(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, vconf.at(tag), flag))
+        errors++;
+      else
+        hart.configVectorLegalizeVsetvliAvl(flag);
+    }
+
   return errors == 0;
 }
 

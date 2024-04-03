@@ -450,6 +450,16 @@ namespace WdRiscv
     void configVectorFpUnorderedSumRed(bool flag)
     { fpUnorderedSumTreeRed_ = flag; }
 
+    /// When flag is true, when VL > VLMAX reduce AVL to match VLMAX and write
+    /// to VL. This only applies to vsetvl instructions.
+    void configVectorLegalizeVsetvlAvl(bool flag)
+    { legalizeVsetvlAvl_ = flag; }
+
+    /// When flag is true, when VL > VLMAX reduce AVL to match VLMAX and write
+    /// to VL. This only applies to vsetvli instructions.
+    void configVectorLegalizeVsetvliAvl(bool flag)
+    { legalizeVsetvliAvl_ = flag; }
+
     /// Return a string representation of the given group multiplier.
     static constexpr std::string_view to_string(GroupMultiplier group)
     {
@@ -777,6 +787,8 @@ namespace WdRiscv
     bool updateWholeMask_ = false;  // True if mask instructions update whole mask reg.
     bool trapVtype_ = false; // If true trap invalid vtype; else set VTYPE.VILL.
     bool fpUnorderedSumTreeRed_ = false; // True if unordered fp reduction should use a reduction tree computation
+    bool legalizeVsetvlAvl_ = false; // If true legalize VL to VLMAX if vtype is legal (if applicable).
+    bool legalizeVsetvliAvl_ = false; // If true legalize VL to VLMAX if vtype is legal (if applicable).
 
     uint32_t groupX8_ = 8;    // Group multiplier as a number scaled by 8.
     uint32_t sewInBits_ = 8;  // SEW expressed in bits (Byte corresponds to 8).
