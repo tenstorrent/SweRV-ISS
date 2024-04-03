@@ -1844,7 +1844,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     }
 
   tag = "address_translation_pmms";
-  if ((config_ -> contains(tag))
+  if (config_ -> contains(tag))
     {
       unsigned atpErrors = 0;
       std::vector<VirtMem::Pmm> pmms;
