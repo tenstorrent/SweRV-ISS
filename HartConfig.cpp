@@ -1840,8 +1840,36 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	}
       if (not atmErrors)
 	hart.configAddressTranslationModes(modes);
-      else
-	errors += atmErrors;
+      errors += atmErrors;
+    }
+
+  tag = "address_translation_pmms";
+    {
+      unsigned atpErrors = 0;
+      std::vector<VirtMem::Pmm> pmms;
+      const auto& items = config_ -> at(tag);
+      for (const auto& item : items)
+	{
+	  if (not item.is_string())
+	    {
+	      cerr << "Error: Invalid value in config file item " << tag
+		   << " -- expecting string\n";
+	      atpErrors++;
+	      continue;
+	    }
+	  std::string_view pmmStr = item.get<std::string_view>();
+	  VirtMem::Pmm pmm;
+	  if (not VirtMem::to_pmm(pmmStr, pmm))
+	    {
+	      cerr << "Error no such address translation pmm: " << tag << '\n';
+	      atpErrors++;
+	      continue;
+	    }
+	  pmms.push_back(pmm);
+	}
+      if (not atpErrors)
+	hart.configAddressTranslationPmms(pmms);
+      errors += atpErrors;
     }
 
   tag = "enable_translation_pbmt";

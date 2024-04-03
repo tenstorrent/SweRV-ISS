@@ -373,6 +373,10 @@ namespace WdRiscv
     void configAddressTranslationModes(const std::vector<VirtMem::Mode>& modes)
     { virtMem_.setSupportedModes(modes); }
 
+    /// Configure the address translation pointer masking modes supported by this hart.
+    void configAddressTranslationPmms(const std::vector<VirtMem::Pmm>& pmms)
+    { virtMem_.setSupportedPmms(pmms); }
+
     /// Enable page based memory types.
     void enableTranslationPbmt(bool flag)
     { enableExtension(RvExtension::Svpbmt, flag); updateTranslationPbmt(); }
