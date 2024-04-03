@@ -384,9 +384,17 @@ Hart<URV>::processExtensions(bool verbose)
     enableSsnpm(true);
   if (isa_.isEnabled(RvExtension::Smnpm))
     enableSmnpm(true);
+  if (isa_.isEnabled(RvExtension::Zicntr))
+    enableZicntr(true);
+  if (isa_.isEnabled(RvExtension::Zihpm))
+    enableZihpm(true);
+  if (isa_.isEnabled(RvExtension::Sscofpmf))
+    enableSscofpmf(true);
+  if (isa_.isEnabled(RvExtension::Zkr))
+    enableZkr(true);
 
-  stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
-  vstimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::VSTIMECMP) != nullptr;
+  stimecmpActive_ = csRegs_.menvcfgStce();
+  vstimecmpActive_ = csRegs_.henvcfgStce();
 }
 
 
@@ -861,20 +869,6 @@ Hart<URV>::updateBigEndian()
 
 template <typename URV>
 bool
-Hart<URV>::setInitialStateFile(const std::string& path)
-{
-  initStateFile_ = fopen(path.c_str(), "w");
-  if (not initStateFile_)
-    {
-      std::cerr << "Failed to open '" << path << "' for output\n";
-      return false;
-    }
-  return true;
-}
-
-
-template <typename URV>
-bool
 Hart<URV>::peekMemory(uint64_t address, uint8_t& val, bool usePma) const
 {
   return memory_.peek(address, val, usePma);
@@ -1125,7 +1119,7 @@ Hart<URV>::execAddi(const DecodedInst* di)
 
 #ifdef HINT_OPS
   if (di->op0() == 0 and di->op1() == 31)
-    throw CoreException(CoreException::Snapshot, "Taking snapshot.");
+    throw CoreException(CoreException::Snapshot, "Taking snapshot from HINT.");
 #endif
 }
 
@@ -1542,7 +1536,13 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	}
       if (pm != PM::Machine)
         {
+          bool disablePointerMask = not hyper and mstatusMprv() and mstatus_.bits_.MXR;
+          VirtMem::Pmm prevPmm = virtMem_.pmMode(pm, virt);
+          if (disablePointerMask)
+            virtMem_.enablePointerMasking(VirtMem::Pmm::Off, pm, virt);
 	  auto cause = virtMem_.translateForLoad2(va1, ldSize, pm, virt, gaddr1, addr1, gaddr2, addr2);
+          if (disablePointerMask)
+            virtMem_.enablePointerMasking(prevPmm, pm, virt);
           if (cause != EC::NONE)
 	    return cause;
         }
@@ -1651,6 +1651,10 @@ Hart<URV>::fastLoad(const DecodedInst* di, uint64_t addr, uint64_t& value)
         value = uval;
       else
         value = SRV(LOAD_TYPE(uval)); // Sign extend.
+
+      if (dataLineTrace_)
+	memory_.traceDataLine(addr, addr);
+
       return true;  // Success.
     }
 
@@ -1894,11 +1898,6 @@ inline
 bool
 Hart<URV>::fastStore(const DecodedInst* di, URV addr, STORE_TYPE storeVal)
 {
-  ldStAddr_ = addr;   // For reporting ld/st addr in trace-mode.
-  ldStPhysAddr1_ = addr;
-  ldStSize_ = sizeof(STORE_TYPE);
-  ldStData_ = storeVal;
-
   if (memory_.write(hartIx_, addr, storeVal))
     {
       ldStWrite_ = true;
@@ -1908,6 +1907,12 @@ Hart<URV>::fastStore(const DecodedInst* di, URV addr, STORE_TYPE storeVal)
 	  throw CoreException(CoreException::Stop, "write to to-host",
 			      toHost_, storeVal);
 	}
+
+      if (dataLineTrace_)
+	memory_.traceDataLine(addr, addr);
+
+      ldStWrite_ = true;
+      ldStData_ = storeVal;
       return true;
     }
 
@@ -1963,6 +1968,10 @@ inline
 bool
 Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal, [[maybe_unused]] bool amoLock)
 {
+  ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
+  ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
+  ldStSize_ = sizeof(STORE_TYPE);
+
 #ifdef FAST_SLOPPY
   return fastStore(di, virtAddr, storeVal);
 #else
@@ -1970,10 +1979,6 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   auto lock = (amoLock)? std::shared_lock<std::shared_mutex>(memory_.amoMutex_) :
                          std::shared_lock<std::shared_mutex>();
   std::lock_guard<std::mutex> lock2(memory_.lrMutex_);
-
-  ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
-  ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
-  ldStSize_ = sizeof(STORE_TYPE);
 
   // ld/st-address or instruction-address triggers have priority over
   // ld/st access or misaligned exceptions.
@@ -2251,73 +2256,60 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
 
 template <typename URV>
 inline
-bool
-Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
+ExceptionCause
+Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& gPhysAddr,
+			   uint32_t& inst)
 {
+#ifdef FAST_SLOPPY
+
+  assert((virtAddr & 1) == 0);
+  gPhysAddr = physAddr = virtAddr;
+  if (not memory_.readInst(physAddr, inst))
+    return ExceptionCause::INST_ACC_FAULT;
+  return ExceptionCause::NONE;
+
+#else
+
   physAddr = virtAddr;
+  assert(not triggerTripped_);
 
   // Inst address translation and memory protection is not affected by MPRV.
 
+  gPhysAddr = 0;
   if (isRvs() and privMode_ != PrivilegeMode::Machine)
     {
-      if (triggerTripped_)
-        return false;
-
-      uint64_t gPhysAddr = virtAddr;
+      gPhysAddr = virtAddr;
       auto cause = virtMem_.translateForFetch(virtAddr, privMode_, virtMode_, gPhysAddr, physAddr);
       if (cause != ExceptionCause::NONE)
-        {
-          initiateException(cause, virtAddr, virtAddr, gPhysAddr);
-          return false;
-        }
+	return cause;
     }
 
   if (virtAddr & 1)
-    {
-      if (triggerTripped_)
-        return false;
-      initiateException(ExceptionCause::INST_ADDR_MISAL, virtAddr, virtAddr);
-      return false;
-    }
+    return ExceptionCause::INST_ADDR_MISAL;
 
   if ((physAddr & 3) == 0 and not mcm_)   // Word aligned
     {
       if (not memory_.readInst(physAddr, inst))
-        {
-          if (triggerTripped_)
-            return false;
-          initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr);
-          return false;
-        }
+	return ExceptionCause::INST_ACC_FAULT;
 
       if (pmpEnabled_)
         {
           Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
           if (not pmp.isExec(privMode_))
-            {
-              if (triggerTripped_)
-                return false;
-              initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr);
-              return false;
-            }
+	    return ExceptionCause::INST_ACC_FAULT;
         }
 
       if (initStateFile_)
 	dumpInitState("fetch", virtAddr, physAddr);
 
-      return true;
+      return ExceptionCause::NONE;
     }
 
   if (pmpEnabled_)
     {
       Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
       if (not pmp.isExec(privMode_))
-        {
-          if (triggerTripped_)
-            return false;
-          initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr);
-          return false;
-        }
+	return ExceptionCause::INST_ACC_FAULT;
     }
 
   uint16_t half = 0;
@@ -2326,45 +2318,32 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
     done = readInstFromFetchCache(physAddr, half);
 
   if (not done and not memory_.readInst(physAddr, half))
-    {
-      if (triggerTripped_)
-        return false;
-      initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr);
-      return false;
-    }
+    return ExceptionCause::INST_ACC_FAULT;
 
   if (initStateFile_)
     dumpInitState("fetch", virtAddr, physAddr);
   inst = half;
   if (isCompressedInst(inst))
-    return true;
+    return ExceptionCause::NONE;
 
   // If we cross page boundary, translate address of other page.
   uint64_t physAddr2 = physAddr + 2;
-  uint64_t gPhysAddr2 = physAddr2;
+  gPhysAddr = physAddr2;
   if (memory_.getPageIx(physAddr) != memory_.getPageIx(physAddr2))
     if (isRvs() and privMode_ != PrivilegeMode::Machine)
       {
-	auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, virtMode_, gPhysAddr2, physAddr2);
+	virtAddr += 2;
+	auto cause = virtMem_.translateForFetch(virtAddr, privMode_, virtMode_, gPhysAddr,
+						physAddr2);
 	if (cause != ExceptionCause::NONE)
-	  {
-	    if (triggerTripped_)
-	      return false;
-	    initiateException(cause, virtAddr, virtAddr+2, gPhysAddr2);
-	    return false;
-	  }
+	  return cause;
       }
 
   if (pmpEnabled_)
     {
       Pmp pmp2 = pmpManager_.accessPmp(physAddr2, PmpManager::AccessReason::Fetch);
       if (not pmp2.isExec(privMode_))
-        {
-          if (triggerTripped_)
-            return false;
-          initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr + 2);
-          return false;
-        }
+	return ExceptionCause::INST_ACC_FAULT;
     }
 
   uint16_t upperHalf = 0;
@@ -2373,17 +2352,33 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
     done = readInstFromFetchCache(physAddr2, upperHalf);
 
   if (not done and not memory_.readInst(physAddr2, upperHalf))
-    {
-      if (triggerTripped_)
-        return false;
-      initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr + 2);
-      return false;
-    }
+    return ExceptionCause::INST_ACC_FAULT;
 
   if (initStateFile_)
     dumpInitState("fetch", virtAddr, physAddr2);
 
   inst = inst | (uint32_t(upperHalf) << 16);
+  return ExceptionCause::NONE;
+
+#endif
+}
+
+
+template <typename URV>
+inline
+bool
+Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
+{
+  uint64_t gPhysAddr = 0, va = virtAddr;
+
+  // If a trap occurs on a page crossing fetch, va is updated with the
+  // portion of the access that caused the trap.
+  auto cause = fetchInstNoTrap(va, physAddr, gPhysAddr, inst);
+  if (cause != ExceptionCause::NONE)
+    {
+      initiateException(cause, virtAddr, va, gPhysAddr);
+      return false;
+    }
   return true;
 }
 
@@ -5250,7 +5245,13 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	  if (time_ >= (vstimecmp_ - htimedelta_ + timeShift_))
 	    mipVal = mipVal | (URV(1) << URV(IC::VS_TIMER));
 	  else
-	    mipVal = mipVal & ~(URV(1) << URV(IC::VS_TIMER));
+	    {
+	      mipVal = mipVal & ~(URV(1) << URV(IC::VS_TIMER));
+	      // Bits HIP.VSTIP (alias of MIP.VSTIP) is the logical-OR
+	      // of HVIP.VSTIP and the timer interrupt signal
+	      // resulting from vstimecmp. Section 9.2.3 of priv sepc.
+	      mipVal |= csRegs_.peekHvip() & (URV(1) << URV(IC::VS_TIMER));
+	    }
 	}
 
       if (mipVal != prev)
@@ -5592,6 +5593,10 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::fence:
+      execFence(di);
+      return;
+
+    case InstId::pause:
       execFence(di);
       return;
 
@@ -9625,7 +9630,8 @@ Hart<URV>::execFence_tso(const DecodedInst* di)
        not di->isFenceSuccOutput() )
     return;
 
-  illegalInst(di);
+  // Spec says that reserved configurations should be treated as normal FENCE.
+  // We do not take an exception.
 }
 
 
@@ -10016,7 +10022,7 @@ Hart<URV>::execSret(const DecodedInst* di)
   MstatusFields<URV> fields(value);
   PrivilegeMode savedMode = fields.bits_.SPP? PrivilegeMode::Supervisor : PrivilegeMode::User;
 
-  // Restore MIE.
+  // Restore SIE.
   fields.bits_.SIE = fields.bits_.SPIE;
 
   // Set SPP.
@@ -10196,19 +10202,42 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
   // Check if HS qualified (section 9.6.1 of privileged spec).
   bool hsq = isRvs() and csRegs_.isReadable(csr, PM::Supervisor, false /*virtMode*/);
   if (isWrite)
-    hsq = hsq and csRegs_.isWriteable(csr, PM::Supervisor, false /*virtMode*/);
+    hsq = hsq and isCsrWriteable(csr, PM::Supervisor, false /*virtMode*/);
+
   if (virtMode_)
     {
-      if (csRegs_.isHypervisor(csr) or
-	  (privMode_ == PM::User and not csRegs_.isReadable(csr, PM::User, virtMode_)))
-	{
-	  if (not csRegs_.isHighHalf(csr))
+      if (csr >= CN::CYCLE and csr <= CN::HPMCOUNTER31 and not isWrite)
+	{       // Section 9.2.6 of privileged spec.
+	  URV hcounteren = 0, mcounteren = 0, scounteren = 0;
+	  if (not peekCsr(CN::MCOUNTEREN, mcounteren) or not peekCsr(CN::HCOUNTEREN, hcounteren) or
+	      not peekCsr(CN::SCOUNTEREN, scounteren))
+	    assert(0);
+	  unsigned bitIx = unsigned(csr) - unsigned(CN::CYCLE);
+	  URV mask = URV(1) << bitIx;
+          if ((mcounteren & mask) == 0)
+            {
+              illegalInst(di);
+              return false;
+            }
+	  if (((hcounteren & mask) == 0) or
+              (privMode_ == PM::User and (scounteren & mask) == 0))
 	    {
-	      if (hsq) virtualInst(di); else illegalInst(di);
+	      virtualInst(di);
+	      return false;
 	    }
-          else if (sizeof(URV) == 4 and hsq)
-            virtualInst(di);
-          else
+	}
+      else if (csr == CN::SEED and not isWrite)
+        {
+          illegalInst(di);
+          return false;
+        }
+      else if (csRegs_.isHypervisor(csr) or
+	       (privMode_ == PM::User and not csRegs_.isReadable(csr, PM::User, virtMode_)))
+	{
+	  assert(not csRegs_.isHighHalf(csr) or sizeof(URV) == 4);
+	  if (hsq)
+	    virtualInst(di);
+	  else
 	    illegalInst(di);
 	  return false;
         }
@@ -10253,6 +10282,27 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
         illegalInst(di);
         return false;
       }
+
+  if (csr == CN::SEED)
+    {
+      if (not isWrite)
+        {
+          illegalInst(di);
+          return false;
+        }
+      if (privMode_ != PM::Machine)
+        {
+          bool sseed, useed;
+          if (not csRegs_.mseccfgSeed(sseed, useed))
+            return false;
+          bool avail = (privMode_ == PM::User and not virtMode_)? useed : sseed;
+          if (not avail)
+            {
+              if (virtMode_ and sseed) virtualInst(di); else illegalInst(di);
+              return false;
+            }
+        }
+    }
 
   if (csRegs_.read(csr, privMode_, value))
     return true;
@@ -10389,6 +10439,14 @@ Hart<URV>::isCsrWriteable(CsrNumber csr, PrivilegeMode privMode, bool virtMode) 
         }
     }
 
+  if (csr == CsrNumber::SEED and privMode != PM::Machine)
+    {
+      bool sseed, useed;
+      if (not csRegs_.mseccfgSeed(sseed, useed))
+        return false;
+      return (privMode == PM::User and not virtMode)? useed : sseed;
+    }
+
   return true;
 }
 
@@ -10468,6 +10526,43 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
       if (not virtMem_.isModeSupported(mode))
 	return;  // Unsupported mode: Write has no effect.
     }
+  else if (csr == CsrNumber::MENVCFG or csr == CsrNumber::SENVCFG or
+            csr == CsrNumber::HENVCFG)
+    {
+      if constexpr (sizeof(URV) == 8)
+        {
+          URV oldVal = 0;
+          if (not peekCsr(csr, oldVal))
+            oldVal = 0;
+
+          HenvcfgFields<uint64_t> hf{val};
+          unsigned pmm = hf.bits_.PMM;
+          if (not virtMem_.isPmmSupported(VirtMem::Pmm{pmm}))
+            {
+              pmm = HenvcfgFields<uint64_t>(oldVal).bits_.PMM;
+              hf.bits_.PMM = pmm;
+              val = hf.value_;
+            }
+        }
+    }
+  else if (csr == CsrNumber::HSTATUS)
+    {
+      if constexpr (sizeof(URV) == 8)
+        {
+          URV oldVal = 0;
+          if (not peekCsr(csr, oldVal))
+            oldVal = 0;
+
+          HstatusFields<uint64_t> hf{val};
+          unsigned pmm = hf.bits_.HUPMM;
+          if (not virtMem_.isPmmSupported(VirtMem::Pmm{pmm}))
+            {
+              pmm = HstatusFields<uint64_t>(oldVal).bits_.HUPMM;
+              hf.bits_.HUPMM = pmm;
+              val = hf.value_;
+            }
+        }
+    }
 
   // Update CSR.
   URV lastVal = 0;
@@ -10519,9 +10614,13 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
 
   URV next = intRegs_.read(di->op1());
 
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  // MIP read value is ored with supervisor external interrupt pin. Same for SIP if
+  // supervisor external interrupt is delegated.
+  using IC = InterruptCause;
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
 
@@ -10559,9 +10658,13 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
 
   URV next = prev | intRegs_.read(di->op1());
 
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  // MIP read value is ored with supervisor external interrupt pin. Same for SIP if
+  // supervisor external interrupt is delegated.
+  using IC = InterruptCause;
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (di->op1() == 0)
     {
@@ -10608,9 +10711,13 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
 
   URV next = prev & (~ intRegs_.read(di->op1()));
 
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  // MIP read value is ored with supervisor external interrupt pin. Same for SIP if
+  // supervisor external interrupt is delegated.
+  using IC = InterruptCause;
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (di->op1() == 0)
     {
@@ -10655,9 +10762,13 @@ Hart<URV>::execCsrrwi(const DecodedInst* di)
         return;
       }
 
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  // MIP read value is ored with supervisor external interrupt pin. Same for SIP if
+  // supervisor external interrupt is delegated.
+  using IC = InterruptCause;
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   doCsrWrite(di, csr, di->op1(), di->op0(), prev);
 
@@ -10697,9 +10808,13 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
 
   URV next = prev | imm;
 
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  // MIP read value is ored with supervisor external interrupt pin. Same for SIP if
+  // supervisor external interrupt is delegated.
+  using IC = InterruptCause;
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (imm == 0)
     {
@@ -10748,9 +10863,13 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
 
   URV next = prev & (~ imm);
 
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  // MIP read value is ored with supervisor external interrupt pin. Same for SIP if
+  // supervisor external interrupt is delegated.
+  using IC = InterruptCause;
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+    prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (imm == 0)
     {
@@ -10851,7 +10970,13 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	}
       if (pm != PM::Machine)
         {
+          bool disablePointerMask = not hyper and mstatusMprv() and mstatus_.bits_.MXR;
+          VirtMem::Pmm prevPmm = virtMem_.pmMode(pm, virt);
+          if (disablePointerMask)
+            virtMem_.enablePointerMasking(VirtMem::Pmm::Off, pm, virt);
 	  auto cause = virtMem_.translateForStore2(va1, stSize, pm, virt, gaddr1, addr1, gaddr2, addr2);
+          if (disablePointerMask)
+            virtMem_.enablePointerMasking(prevPmm, pm, virt);
           if (cause != EC::NONE)
 	    return cause;
         }
@@ -11731,7 +11856,7 @@ Hart<URV>::execCmop(const DecodedInst* di)
         return;
       }
     URV value = 0;
-    intRegs_.write(di->op0(), value);
+    intRegs_.write(RegX0, value);
 }
 
 template

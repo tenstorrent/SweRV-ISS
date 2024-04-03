@@ -979,6 +979,16 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         hart.configVectorTrapVtype(flag);
     }
 
+  tag = "fp_unordered_sum_tree_reduction";
+  if (vconf.contains(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, vconf.at(tag), flag))
+        errors++;
+      else
+        hart.configVectorFpUnorderedSumRed(flag);
+    }
+
   return errors == 0;
 }
 
@@ -1489,15 +1499,23 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	cerr << "Config file tag \"" << etag << "\" is no longer supported.\n";
     }
 
+  // Counter overflow: sscofpmf extension
+  std::string isa;
+  bool cof = getIsa(isa) and isa.find("sscofpmf") != std::string::npos;
+
   tag = "enable_counter_overflow";
-  bool cof = false;  // Counter overflow: sscofpmf extension
   if (config_ ->contains(tag))
-    getJsonBoolean(tag, config_ ->at(tag), cof) or errors++;
+    {
+      cerr << "Config file tag \"enable_counter_overflow\" deprecated: "
+	   << " Add extension string \"ssofpmf\" to \"isa\" tag instread.\n";
+      getJsonBoolean(tag, config_ ->at(tag), cof) or errors++;
+    }
 
   applyPerfEvents(hart, *config_, userMode, cof, verbose) or errors++;
   applyCsrConfig(hart, *config_, verbose) or errors++;
   applyTriggerConfig(hart, *config_) or errors++;
 
+  // No longer needed here. Remove once enable_counter_overflow is removed.
   hart.enableSscofpmf(cof);
 
   tag = "trap_non_zero_vstart";
@@ -1852,6 +1870,9 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_svinval";
   if (config_ -> contains(tag))
     {
+      if (hart.sysHartIndex() == 0)
+	cerr << "Warning: Config tag " << tag << " is deprecated. "
+	     << "Use sstc with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableSvinval(flag);
     }
@@ -1859,7 +1880,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_supervisor_time_compare";
   if (config_ -> contains(tag))
     {
-      if (hart.sysHartIndex() == 0 and hart.sysHartIndex() == 0)
+      if (hart.sysHartIndex() == 0)
 	cerr << "Warning: Config tag " << tag << " is deprecated. "
 	     << "Use sstc with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
@@ -2097,7 +2118,10 @@ bool
 HartConfig::getXlen(unsigned& xlen) const
 {
   if (config_ -> contains("xlen"))
-    return getJsonUnsigned("xlen", config_ -> at("xlen"), xlen);
+    {
+      std::cerr << "Config file tag xlen is deprecated: xlen is obtained from the isa tag.\n";
+      return getJsonUnsigned("xlen", config_ -> at("xlen"), xlen);
+    }
   std::string isa;
   if (not getIsa(isa))
     return false;

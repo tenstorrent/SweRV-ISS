@@ -2144,7 +2144,8 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 
   if (instrB.isCanceled())
     {
-      cerr << "Mcm::ppoRule5: B instruction canceled tag=" << instrB.tag_ << '\n';
+      cerr << "Mcm::ppoRule5: hart-id=" << hart.hartId() << " B instruction canceled tag="
+	   << instrB.tag_ << '\n';
       return false;
     }
 
@@ -2153,6 +2154,8 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 
   if (instrB.memOps_.empty())
     return true;
+
+  auto timeB = effectiveReadTime(instrB);
 
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
@@ -2164,7 +2167,8 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 	continue;
       if (not instrA.isRetired() or not instrA.di_.isValid())
 	{
-	  cerr << "Mcm::ppoRule5: Instruction A invalid/not-retired\n";
+	  cerr << "Mcm::ppoRule5: hart-id=" << hart.hartId()
+	       << " Instruction A invalid/not-retired\n";
 	  assert(0 && "Mcm::ppoRule5: Instruction A invalid/not-retired");
 	}
 
@@ -2182,7 +2186,6 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 	fail  = true; // Incomplete store might finish after B
       else
 	{
-	  auto timeB = earliestOpTime(instrB);
 	  auto timeA = latestOpTime(instrA);
 	  if (timeB <= timeA)
 	    {

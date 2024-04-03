@@ -240,6 +240,61 @@ System<URV>::loadHexFiles(const std::vector<std::string>& files, bool verbose)
 }
 
 
+static bool
+binaryFileParams(std::string spec, uint64_t defOffset, std::string& filename, uint64_t &offset, bool &update)
+{
+  using std::cerr;
+  // Split filespec around colons. Spec format: <file>,
+  // <file>:<offset>, or <file>:<offset>:u
+  std::vector<std::string> parts;
+  boost::split(parts, spec, boost::is_any_of(":"));
+
+  filename = parts.at(0);
+  offset = defOffset;
+  update = false;
+
+  if (parts.empty())
+    {
+      std::cerr << "Error: Empty binary file name\n";
+      return false;
+    }
+
+  filename = parts.at(0);
+
+  if (parts.size() > 1)
+    {
+      std::string offsStr = parts.at(1);
+      if (offsStr.empty())
+	cerr << "Warning: Empty binary file offset: " << spec << '\n';
+      else
+	{
+	  char* tail = nullptr;
+	  offset = strtoull(offsStr.c_str(), &tail, 0);
+	  if (tail and *tail)
+	    {
+	      cerr << "Error: Invalid binary file offset: " << spec << '\n';
+	      return false;
+	    }
+	}
+    }
+  else
+    cerr << "Binary file " << filename << " does not have an address, will use address 0x"
+	 << std::hex << offset << std::dec << '\n';
+
+  if (parts.size() > 2)
+    {
+      if (parts.at(2) != "u")
+	{
+	  cerr << "Error: Invalid binary file attribute: " << spec << '\n';
+	  return false;
+	}
+      update = true;
+    }
+
+  return true;
+}
+
+
 template <typename URV>
 bool
 System<URV>::loadBinaryFiles(const std::vector<std::string>& fileSpecs,
@@ -250,53 +305,16 @@ System<URV>::loadBinaryFiles(const std::vector<std::string>& fileSpecs,
 
   for (const auto& spec : fileSpecs)
     {
-      // Split filespec around colons. Spec format: <file>,
-      // <file>:<offset>, or <file>:<offset>:u
-      std::vector<std::string> parts;
-      boost::split(parts, spec, boost::is_any_of(":"));
 
-      if (parts.empty())
-	{
-	  std::cerr << "Error: Empty binary file name\n";
+      std::string filename;
+      uint64_t offset;
+      bool update;
+
+      if (!binaryFileParams(spec, defOffset, filename, offset, update))
+        {
 	  errors++;
 	  continue;
-	}
-
-      std::string filename = parts.at(0);
-      uint64_t offset = defOffset;
-
-      if (parts.size() > 1)
-        {
-          std::string offsStr = parts.at(1);
-	  if (offsStr.empty())
-	    cerr << "Warning: Empty binary file offset: " << spec << '\n';
-	  else
-	    {
-	      char* tail = nullptr;
-	      offset = strtoull(offsStr.c_str(), &tail, 0);
-	      if (tail and *tail)
-		{
-		  cerr << "Error: Invalid binary file offset: " << spec << '\n';
-		  errors++;
-		  continue;
-		}
-	    }
         }
-      else
-        cerr << "Binary file " << filename << " does not have an address, will use address 0x"
-	     << std::hex << offset << std::dec << '\n';
-
-      bool update = false;
-      if (parts.size() > 2)
-	{
-	  if (parts.at(2) != "u")
-	    {
-	      cerr << "Error: Invalid binary file attribute: " << spec << '\n';
-	      errors++;
-	      continue;
-	    }
-	  update = true;
-	}
 
       if (verbose)
 	cerr << "Loading binary " << filename << " at address 0x" << std::hex
@@ -318,6 +336,57 @@ System<URV>::loadBinaryFiles(const std::vector<std::string>& fileSpecs,
 
   return errors == 0;
 }
+
+
+#ifdef LZ4_COMPRESS
+template <typename URV>
+bool
+System<URV>::loadLz4Files(const std::vector<std::string>& fileSpecs,
+			  uint64_t defOffset, bool verbose)
+{
+  using std::cerr;
+  unsigned errors = 0;
+
+  for (const auto& spec : fileSpecs)
+    {
+      std::string filename;
+      uint64_t offset;
+      bool update;
+
+      if (!binaryFileParams(spec, defOffset, filename, offset, update))
+        {
+	  errors++;
+	  continue;
+        }
+
+      if (update)
+	{
+	  cerr << "Updating not supported on lz4 files, ignoring " << filename << '\n';
+	  errors++;
+	  continue;
+	}
+
+      if (verbose)
+	cerr << "Loading lz4 compressed file " << filename << " at address 0x" << std::hex
+	     << offset << std::dec << '\n';
+
+      if (not memory_->loadLz4File(filename, offset))
+	{
+	  errors++;
+	  continue;
+	}
+
+      if (update)
+	{
+	  uint64_t size = Filesystem::file_size(filename);
+	  BinaryFile bf = { filename, offset, size };
+	  binaryFiles_.push_back(bf);
+	}
+    }
+
+  return errors == 0;
+}
+#endif
 
 
 static
@@ -366,6 +435,7 @@ System<URV>::saveSnapshot(const std::string& dir)
 	return false;
       }
 
+  uint64_t minSp = ~uint64_t(0);
   for (auto hartPtr : sysHarts_)
     {
       std::string name = "registers";
@@ -374,6 +444,11 @@ System<URV>::saveSnapshot(const std::string& dir)
       Filesystem::path regPath = dirPath / name;
       if (not hartPtr->saveSnapshotRegs(regPath.string()))
 	return false;
+
+      URV sp = 0;
+      if (not hartPtr->peekIntReg(IntRegNumber::RegSp, sp))
+	assert(0);
+      minSp = std::min(minSp, uint64_t(sp));
     }
 
   auto& hart0 = *ithHart(0);
@@ -384,7 +459,7 @@ System<URV>::saveSnapshot(const std::string& dir)
   if (sparseMem_)
     sparseMem_->getUsedBlocks(usedBlocks);
   else
-    syscall.getUsedMemBlocks(usedBlocks);
+    syscall.getUsedMemBlocks(minSp, usedBlocks);
 
   if (not saveUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
     return false;
@@ -842,9 +917,7 @@ template <typename URV>
 bool
 System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t stepWindow)
 {
-  bool progSnapshot = false;
-  auto forceSnapshotAndClear = [this, &progSnapshot]() -> void {
-      progSnapshot = false;
+  auto forceSnapshot = [this]() -> void {
       uint64_t tag = ++snapIx_;
       std::string pathStr = snapDir_ + std::to_string(tag);
       Filesystem::path path = pathStr;
@@ -867,6 +940,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
 
   while (true)
     {
+      bool progSnapshot = false;
       std::atomic<bool> result = true;
 
       if (hartCount() == 1)
@@ -936,7 +1010,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
             finished += hptr->hasTargetProgramFinished();
 
           while ((waitAll and finished != hartCount()) or
-                 (not waitAll and finished != 0))
+                 (not waitAll and finished == 0))
             {
               for (auto hptr : sysHarts_)
                 {
@@ -964,7 +1038,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
         }
 
       if (progSnapshot)
-        forceSnapshotAndClear();
+        forceSnapshot();
       else
         return result;
     }
@@ -1036,8 +1110,18 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::vector<uint6
 	}
     }
 
+  // Incremental branch traces are in snapshot directories. Turn off
+  // branch tracing to prevent top-level branch tracing file from
+  // being generated since the data will be for the last snapshot and
+  // not for the whole run. Same is done for instruction and data line
+  // tracing.
   for (auto hartPtr : sysHarts_)
-    hartPtr->traceBranches(std::string(), 0);  // Turn off branch tracing.
+    {
+      hartPtr->traceBranches(std::string(), 0);
+      std::string emptyPath;
+      memory_->enableDataLineTrace(emptyPath);
+      memory_->enableInstructionLineTrace(emptyPath);
+    }
 
   return true;
 }
@@ -1128,8 +1212,6 @@ System<URV>::loadSnapshot(const std::string& snapDir)
   Filesystem::path fdPath = dirPath / "fd";
   return syscall.loadFileDescriptors(fdPath.string());
 }
-
-
 
 
 template class WdRiscv::System<uint32_t>;

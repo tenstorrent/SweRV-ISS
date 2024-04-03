@@ -41,6 +41,7 @@ CsRegs<URV>::CsRegs()
   defineFpRegs();
   defineAiaRegs();
   defineStateEnableRegs();
+  defineEntropyReg();
   definePmaRegs();
 }
 
@@ -659,14 +660,22 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 	}
     }
 
-  // Make TM bit read only zero if TIME CSR is not implemented.
-  // This is not explicitly stated in the spec but it is in the lore.
-  URV mask = ~URV(0);
-  if (not isImplemented(CN::TIME))
-    mask &= ~URV(2);
-  regs_[unsigned(CN::MCOUNTEREN)].setReadMask(mask);
-  regs_[unsigned(CN::SCOUNTEREN)].setReadMask(mask);
-  regs_[unsigned(CN::HCOUNTEREN)].setReadMask(mask);
+  // Make IR/TM/CY bits read only zero in MCOUNTERNE/SCOUNTEREN/HCOUNTEREN if the
+  // RETIRED/TIME/CYCLE CSRs is not implemented. This is not explicitly stated in the spec
+  // but it is in the lore.
+  URV mask = 0;  // Least sig 3 bits of MCOUNTEREN.
+  if (regs_.at(unsigned(CN::CYCLE)).isImplemented())
+    mask |= 1;
+  if (regs_.at(unsigned(CN::TIME)).isImplemented())
+    mask |= 2;
+  if (regs_.at(unsigned(CN::INSTRET)).isImplemented())
+    mask |= 4;
+  auto& mce = regs_.at(unsigned(CN::MCOUNTEREN));
+  auto& sce = regs_.at(unsigned(CN::SCOUNTEREN));
+  auto& hce = regs_.at(unsigned(CN::SCOUNTEREN));
+  mce.setReadMask((mce.getReadMask() & ~URV(7)) | mask);
+  sce.setReadMask((sce.getReadMask() & ~URV(7)) | mask);
+  hce.setReadMask((hce.getReadMask() & ~URV(7)) | mask);
 
   updateSstc();  // To activate/deactivate STIMECMP.
   enableSscofpmf(cofEnabled_);  // To activate/deactivate SCOUNTOVF.
@@ -927,19 +936,30 @@ CsRegs<URV>::enableSscofpmf(bool flag)
   else
     csr->setImplemented(flag & superEnabled_);
 
-  // un-mask LCOF bits
-  if (flag)
+  // Add CSR fields.
+  std::vector<typename Csr<URV>::Field> hpm = {{"zero", 3}};
+  for (unsigned i = 3; i <= 31; ++i)
+    hpm.push_back({"HPM" + std::to_string(i), 1});
+  setCsrFields(csrn, hpm);
+
+  // Mask/unmask LCOF bits
+  for (auto csrn : {CsrNumber::MIE, CsrNumber::MIP, CsrNumber::SIE, CsrNumber::SIP})
     {
-      for (auto csrn : {CsrNumber::MIE, CsrNumber::MIP, CsrNumber::SIE, CsrNumber::SIP})
-        {
-          auto csr = findCsr(csrn);
-          if (csr)
-            {
-              auto lcof = 1 << URV(InterruptCause::LCOF);
-              csr->setWriteMask(csr->getWriteMask() | lcof);
-              csr->setPokeMask(csr->getPokeMask() | lcof);
-            }
-        }
+      auto csr = findCsr(csrn);
+      if (csr)
+	{
+	  auto lcof = URV(1) << URV(InterruptCause::LCOF);
+	  if (flag)
+	    {
+	      csr->setWriteMask(csr->getWriteMask() | lcof);
+	      csr->setReadMask(csr->getReadMask() | lcof);
+	    }
+	  else
+	    {
+	      csr->setWriteMask(csr->getWriteMask() & ~lcof);
+	      csr->setReadMask(csr->getReadMask() & ~lcof);
+	    }
+	}
     }
 
   mPerfRegs_.enableOverflow(flag);
@@ -993,6 +1013,79 @@ CsRegs<URV>::enableSscofpmf(bool flag)
 	    recordWrite(CsrNumber::MIP);
 	  }
       };
+    }
+}
+
+template <typename URV>
+void
+CsRegs<URV>::enableZicntr(bool flag)
+{
+  using CN = CsrNumber;
+  for (auto csrn: { CN::CYCLE, CN::TIME, CN::INSTRET })
+    {
+      auto csr = findCsr(csrn);
+      csr->setImplemented(flag);
+    }
+  if (rv32_)
+    for (auto csrn: { CN::CYCLEH, CN::TIMEH, CN::INSTRETH })
+      {
+	auto csr = findCsr(csrn);
+	csr->setImplemented(flag);
+      }
+
+  // Make IR/TM/CY bits read only zero in MCOUNTERNE/SCOUNTEREN/HCOUNTEREN if the
+  // RETIRED/TIME/CYCLE CSRs are not implemented. This is not explicitly stated in the
+  // spec but it is in the lore.
+  URV mask = 7;  // Least sig 3 bits of MCOUNTEREN.
+  auto& mce = regs_.at(unsigned(CN::MCOUNTEREN));
+  auto& sce = regs_.at(unsigned(CN::SCOUNTEREN));
+  auto& hce = regs_.at(unsigned(CN::SCOUNTEREN));
+
+  if (flag)
+    {
+      mce.setReadMask(mce.getReadMask() | mask);
+      sce.setReadMask(sce.getReadMask() | mask);
+      hce.setReadMask(hce.getReadMask() | mask);
+    }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableZihpm(bool flag)
+{
+  using CN = CsrNumber;
+
+  for (unsigned i = 3; i <= 31; ++i)
+    {
+      auto csrn = advance(CN::HPMCOUNTER3, i - 3);
+      auto csr = findCsr(csrn);
+      csr->setImplemented(flag);
+      if (rv32_)
+        {
+          auto csrnh = advance(CN::HPMCOUNTER3H, i - 3);
+          auto csrh = findCsr(csrnh);
+          csrh->setImplemented(flag);
+        }
+    }
+
+  // If zihmp is disabled make bits corresponding to counters read only zero in
+  // MCOUNTEREN/SCOUNTEREN/HCOUNTEREN.
+  auto& mce = regs_.at(unsigned(CN::MCOUNTEREN));
+  auto& sce = regs_.at(unsigned(CN::SCOUNTEREN));
+  auto& hce = regs_.at(unsigned(CN::SCOUNTEREN));
+  URV mask = (~URV(0)) << 3;
+  if (flag)
+    {
+      mce.setReadMask(mce.getReadMask() | mask);
+      sce.setReadMask(sce.getReadMask() | mask);
+      hce.setReadMask(hce.getReadMask() | mask);
+    }
+  else
+    {
+      mce.setReadMask(mce.getReadMask() & ~mask);
+      sce.setReadMask(sce.getReadMask() & ~mask);
+      hce.setReadMask(hce.getReadMask() & ~mask);
     }
 }
 
@@ -1142,6 +1235,10 @@ CsRegs<URV>::enableSsnpm(bool flag)
       HenvcfgFields<uint64_t> hf{regs_.at(size_t(CN::HENVCFG)).getReadMask()};
       hf.bits_.PMM = mask;
       regs_.at(size_t(CN::HENVCFG)).setReadMask(hf.value_);
+
+      HstatusFields<uint64_t> hs{regs_.at(size_t(CN::HSTATUS)).getReadMask()};
+      hs.bits_.HUPMM = mask;
+      regs_.at(size_t(CN::HSTATUS)).setReadMask(hs.value_);
     }
 }
 
@@ -1159,6 +1256,29 @@ CsRegs<URV>::enableSmnpm(bool flag)
       hf.bits_.PMM = mask;
       regs_.at(size_t(CN::MENVCFG)).setReadMask(hf.value_);
     }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableZkr(bool flag)
+{
+  using CN = CsrNumber;
+
+  auto csr = findCsr(CN::SEED);
+  if (not csr)
+    {
+      std::cerr << "Error: enableZkr: CSR number 0x"
+		<< std::hex << URV(CN::SEED) << std::dec << " is not defined\n";
+      assert(0);
+    }
+  else
+    csr->setImplemented(flag);
+
+  MseccfgFields<URV> mf{regs_.at(size_t(CN::MSECCFG)).getReadMask()};
+  mf.bits_.USEED = flag;
+  mf.bits_.SSEED = flag;
+  regs_.at(size_t(CN::MSECCFG)).setReadMask(mf.value_);
 }
 
 
@@ -1789,13 +1909,6 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
 	}
     }
 
-  if (num == CN::MENVCFG or num == CN::SENVCFG or num == CN::HENVCFG)
-    {
-      URV prev = 0;
-      peek(num, prev);
-      value = legalizeEnvcfgValue(prev, value);
-    }
-
   csr->write(value);
   recordWrite(csrn);
 
@@ -1866,7 +1979,6 @@ CsRegs<URV>::isReadable(CsrNumber num, PrivilegeMode pm, bool vm) const
 
   return true;
 }
-
 
 
 template <typename URV>
@@ -2053,14 +2165,14 @@ CsRegs<URV>::configUserModePerfCounters(unsigned numCounters)
 
       CsrNumber csrNum = advance(CsrNumber::HPMCOUNTER3, i);
       bool isDebug = false;
-      if (not configCsr(csrNum, true, resetValue, mask, pokeMask, isDebug,
+      if (not configCsr(csrNum, false, resetValue, mask, pokeMask, isDebug,
                         shared))
 	errors++;
 
       if (rv32_)
          {
 	   csrNum = advance(CsrNumber::HPMCOUNTER3H, i);
-	   if (not configCsr(csrNum, true, resetValue, mask, pokeMask,
+	   if (not configCsr(csrNum, false, resetValue, mask, pokeMask,
                              isDebug, shared))
 	     errors++;
 	 }
@@ -2422,6 +2534,14 @@ CsRegs<URV>::defineMachineRegs()
       c->markAsHighHalf(true);
     }
 
+  uint32_t mseMask = 0x300;
+  defineCsr("mseccfg", Csrn::MSECCFG, !mand, imp, 0, mseMask, mseMask);
+  if (rv32_)
+    {
+      auto c = defineCsr("mseccfgh", Csrn::MSECCFGH, !mand, imp, 0, rom, rom);
+      c->markAsHighHalf(true);
+    }
+
   // Machine Counter/Timers.
   defineCsr("mcycle",    Csrn::MCYCLE,    mand, imp, 0, wam, wam);
   defineCsr("minstret",  Csrn::MINSTRET,  mand, imp, 0, wam, wam);
@@ -2609,9 +2729,9 @@ CsRegs<URV>::defineSupervisorRegs()
   defineCsr("scause",     Csrn::SCAUSE,     !mand, !imp, 0, wam, wam);
   defineCsr("stval",      Csrn::STVAL,      !mand, !imp, 0, wam, wam);
 
-  // Bits of SIE appear hardwired to zreo unless delegated. By default
-  // only ssie, stie, and seie are writeable.
-  mask = 0x222;
+  // Bits of SIE appear hardwired to zreo unless delegated. By default only bit LOCFIE,
+  // SSIE, STIE, and SEIE are writeable when delegated.
+  mask = 0x2222;
   defineCsr("sie",        Csrn::SIE,        !mand, !imp, 0, mask, mask);
   auto sie = findCsr(Csrn::SIE);
   auto mie = findCsr(Csrn::MIE);
@@ -2619,7 +2739,7 @@ CsRegs<URV>::defineSupervisorRegs()
     sie->tie(mie->valuePtr_);
 
   // Bits of SIP appear hardwired to zreo unless delegated.
-  mask = 0x2;  // Only ssip bit writable (when delegated)
+  mask = 0x2002;  // Only bits LCOFIP and SSIP bit writable (when delegated)
   defineCsr("sip",        Csrn::SIP,        !mand, !imp, 0, mask, mask);
 
   auto sip = findCsr(Csrn::SIP);
@@ -2673,11 +2793,11 @@ CsRegs<URV>::defineUserRegs()
   using Csrn = CsrNumber;
 
   // User Counter/Timers
-  auto c = defineCsr("cycle",    Csrn::CYCLE,    !mand, imp,  0, wam, wam);
+  auto c = defineCsr("cycle", Csrn::CYCLE,    !mand, !imp,  0, wam, wam);
   c->setHypervisor(true);
-  c = defineCsr("time",     Csrn::TIME,     !mand, imp,  0, wam, wam);
+  c = defineCsr("time",     Csrn::TIME,     !mand, !imp,  0, wam, wam);
   c->setHypervisor(true);
-  c = defineCsr("instret",  Csrn::INSTRET,  !mand, imp,  0, wam, wam);
+  c = defineCsr("instret",  Csrn::INSTRET,  !mand, !imp,  0, wam, wam);
   c->setHypervisor(true);
 
   c = defineCsr("cycleh",   Csrn::CYCLEH,   !mand, !imp, 0, wam, wam);
@@ -3138,6 +3258,24 @@ CsRegs<URV>::defineStateEnableRegs()
 
 template <typename URV>
 void
+CsRegs<URV>::defineEntropyReg()
+{
+  using CN = CsrNumber;
+
+  bool imp = false;
+  bool mand = false;
+
+  uint32_t rom = 0;
+  uint32_t pokeMask = 0xc000ffff;
+
+  // Entropy source
+  auto csr = defineCsr("seed", CN::SEED, mand, imp, 0, rom, pokeMask);
+  csr->setHypervisor(true);
+}
+
+
+template <typename URV>
+void
 CsRegs<URV>::definePmaRegs()
 {
   using CN = CsrNumber;
@@ -3310,15 +3448,16 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
       value = legalizeMstatusValue(value);
     }
 
-  if (num == CN::MENVCFG or num == CN::SENVCFG or num == CN::HENVCFG)
-    {
-      URV prev = 0;
-      peek(num, prev);
-      value = legalizeEnvcfgValue(prev, value);
-    }
-
   csr->poke(value);
 
+  if (num == CN::MENVCFG)
+    {
+      bool stce = menvcfgStce();
+      enableHenvcfgStce(stce); // MENVCFG.STCE off makes HENVCFG.STCE read-only zero.
+
+      bool pbmte = menvcfgPbmte();
+      enableHenvcfgPbmte(pbmte);
+    }
   if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
       (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
     {
@@ -3741,25 +3880,6 @@ CsRegs<URV>::updateScountovfValue(CsrNumber mhpm, uint64_t value)
   URV mask = ~ (1 << ix);
   URV prev = csr->read() & mask;
   csr->poke(of << ix | prev);
-}
-
-
-template <typename URV>
-URV
-CsRegs<URV>::legalizeEnvcfgValue(URV current, URV value) const
-{
-  if constexpr (sizeof(URV) == 8)
-    {
-      HenvcfgFields<uint64_t> hf{value};
-      unsigned pmm = hf.bits_.PMM;
-      if (pmm == 0x1) // 1 is reserved encoding for PMM
-        {
-          pmm = HenvcfgFields<uint64_t>(current).bits_.PMM;
-          hf.bits_.PMM = pmm;
-          value = hf.value_;
-        }
-    }
-  return value;
 }
 
 
@@ -4335,7 +4455,8 @@ CsRegs<URV>::addHypervisorFields()
       setCsrFields(Csrn::HSTATUS,
         {{"res0", 5}, {"VSBE", 1}, {"GVA", 1},   {"SPV", 1},  {"SPVP", 1},
          {"HU", 1},   {"res1", 2}, {"VGEIN", 6}, {"res2", 2}, {"VTVM", 1},
-         {"VTW", 1},  {"VTSR", 1}, {"res3", 9},  {"VSXL", 2}, {"res4", 30}});
+         {"VTW", 1},  {"VTSR", 1}, {"res3", 9},  {"VSXL", 2}, {"res4", 14},
+         {"HUPMM", 2}, {"res5", 14}});
       setCsrFields(Csrn::HENVCFG,
         {{"FIOM",  1}, {"res0", 3}, {"CBIE", 2}, {"CBCFE", 1}, {"CBZE", 1},
          {"res1", 24}, {"PMM", 2}, {"res2", 27}, {"ADUE",  1}, {"PBMTE", 1},

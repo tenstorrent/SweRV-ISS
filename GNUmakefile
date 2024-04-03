@@ -57,6 +57,12 @@ ifdef FAST_SLOPPY
   override CPPFLAGS += -DFAST_SLOPPY
 endif
 
+ifdef LZ4_COMPRESS
+  override CPPFLAGS += -DLZ4_COMPRESS
+  EXTRA_LIBS += -llz4
+endif
+
+
 # Add External Library location paths here
 LINK_DIRS := $(addprefix -L,$(BOOST_LIB_DIR))
 
@@ -134,7 +140,7 @@ RVCORE_SRCS := IntRegs.cpp CsRegs.cpp FpRegs.cpp instforms.cpp \
 	    amo.cpp SparseMem.cpp InstProfile.cpp Isa.cpp Mcm.cpp \
 	    crypto.cpp Decoder.cpp Trace.cpp cbo.cpp Uart8250.cpp \
 	    Uartsf.cpp hypervisor.cpp vector-crypto.cpp WhisperMessage.cpp \
-	    Imsic.cpp
+	    Imsic.cpp PerfModel.cpp Args.cpp
 
 # List of All CPP Sources for the project
 SRCS_CXX += $(RVCORE_SRCS) whisper.cpp

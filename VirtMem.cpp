@@ -230,7 +230,7 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
     }
   else
     {
-      va = exec? va : applyPointerMaskVa(va, priv, false);
+      va = (exec or xForR_)? va : applyPointerMaskVa(va, priv, false);
       pa = va;
     }
 
@@ -445,12 +445,12 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 
   if (vsMode_ == Mode::Bare)
     {
-      va = exec? va : applyPointerMaskPa(va, priv, true);
+      va = (exec or xForR_)? va : applyPointerMaskPa(va, priv, true);
       gpa = pa = va;
     }
   else
     {
-      va = exec? va : applyPointerMaskVa(va, priv, true);
+      va = (exec or xForR_)? va : applyPointerMaskVa(va, priv, true);
       gpa = pa = va;
 
       // Lookup virtual page number in TLB.

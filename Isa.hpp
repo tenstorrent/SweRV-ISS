@@ -11,15 +11,15 @@ namespace WdRiscv
   enum class RvExtension : unsigned { A, B, C, D, E, F, H, I, M, N, S, U, V,
                                       Zba, Zbb, Zbc, Zbe, Zbf, Zbm, Zbp,
                                       Zbr, Zbs, Zbt, Zfh, Zfhmin, Zlsseg,
-                                      Zknd, Zkne, Zknh, Zbkb, Zbkx, Zksed, Zksh,
+                                      Zknd, Zkne, Zknh, Zbkb, Zbkx, Zksed, Zksh, Zkr,
                                       Svinval, Zicbom, Zicboz, Zicbop, Zawrs, Zmmul,
                                       Zvfh, Zvfhmin, Zvbb, Zvbc, Zvkg,
 				      Zvkned, Zvknha, Zvknhb, Zvksed,
                                       Zvksh, Zicond, Zcb, Zfa, Zfbfmin,
                                       Zvfbfmin, Zvfbfwma, Sstc, Svpbmt,
 				      Smaia, Ssaia, Zacas, Zimop, Zcmop, Smrnmi,
-				      Zicsr, Zifencei, Zihintpause,
-                                      Ssnpm, Smnpm, None };
+				      Zicsr, Zicntr, Zihpm, Zifencei, Zihintpause,
+                                      Ssnpm, Smnpm, Sscofpmf, None };
 
   /// Model supported extensions with primary/secondary version numbers.
   class Isa

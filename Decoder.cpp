@@ -2307,7 +2307,15 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
             if (funct3 == 0)
               {
 		if (iform.top4() == 0)
-		  return instTable_.getEntry(InstId::fence);
+                  {
+                    unsigned pred = iform.pred();
+                    unsigned succ = iform.succ();
+                    unsigned rd = iform.fields.rd;
+                    unsigned rs1 = iform.fields.rs1;
+                    if (pred == 1 and succ == 0 and rd == 0 and rs1 == 0)
+                      return instTable_.getEntry(InstId::pause);
+                    return instTable_.getEntry(InstId::fence);
+                  }
 		if (iform.top4() == 8)
 		  return instTable_.getEntry(InstId::fence_tso);
 		// Spec says that reserved sfence.fm field values should be treated as zero.

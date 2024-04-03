@@ -73,8 +73,11 @@ namespace WdRiscv
       MCYCLECFGH = 0x721,
       MINSTRETCFGH = 0x722,
 
+      // Machine configuration.
       MENVCFG = 0x30a,
       MENVCFGH = 0x31a,
+      MSECCFG = 0x747,
+      MSECCFGH = 0x757,
 
       // Non maskable interrupts
       MNSCRATCH = 0x740,
@@ -416,6 +419,9 @@ namespace WdRiscv
       HSTATEEN1H  = 0x61d,
       HSTATEEN2H  = 0x61e,
       HSTATEEN3H  = 0x61f,
+
+      // Entropy source
+      SEED     = 0x015,
 
       // Tenstorrent Ascalon CSRs
       PMACFG0  = 0x7e0,   // Physical memory protection
@@ -878,6 +884,13 @@ namespace WdRiscv
       triggers_.getLastWrittenTriggers(triggerNums);
     }
 
+    /// Return the previous (prior to last executed instructoin) value of the given csr.
+    URV lastCsrValue(CsrNumber csrn)
+    {
+      auto csr = findCsr(csrn);
+      return csr->prevValue();
+    }
+
     /// Associate an IMSIC with this register file.
     void attachImsic(std::shared_ptr<TT_IMSIC::Imsic> imsic)
     { imsic_ = imsic; }
@@ -1163,6 +1176,9 @@ namespace WdRiscv
     /// Helper to construtor. Define Mstateen extension CSRs
     void defineStateEnableRegs();
 
+    /// Helper to constructor. Define SEED CSR.
+    void defineEntropyReg();
+
     /// Helper to constructor. Define PMA CSRs.
     void definePmaRegs();
 
@@ -1278,6 +1294,13 @@ namespace WdRiscv
     URV peekMstatus() const
     {
       const auto& csr = regs_.at(size_t(CsrNumber::MSTATUS));
+      return csr.read();
+    }
+
+    /// Fast peek method for HVIP
+    URV peekHvip() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::HVIP));
       return csr.read();
     }
 
@@ -1488,9 +1511,6 @@ namespace WdRiscv
     /// Legalize scountovf, matching OF bit of given mhpmevent.
     void updateScountovfValue(CsrNumber mhpm, uint64_t value);
 
-    /// Legalize menvcfg/senvcfg/henvcfg. Changes pmm bits if necessary.
-    URV legalizeEnvcfgValue(URV current, URV value) const;
-
     /// Return true if given CSR number is a PMPADDR register and if
     /// that register is locked.  Return false otherwise.
     bool isPmpaddrLocked(CsrNumber csrn) const;
@@ -1553,6 +1573,12 @@ namespace WdRiscv
       regs_.at(size_t(CsrNumber::VSEPC)).setReadMask(mask);
     }
 
+    /// Enable/disable Zicntr extension.
+    void enableZicntr(bool flag);
+
+    /// Enable/disable Zihpm extension.
+    void enableZihpm(bool flag);
+
     /// Enable/disable counter-overflow extension (sscofpmf)
     void enableSscofpmf(bool flag);
 
@@ -1581,6 +1607,10 @@ namespace WdRiscv
     /// Enable/disable smnpm extension. Sets menvcfg.PMM to
     /// read-only zero if false.
     void enableSmnpm(bool flag);
+
+    /// Enable/disable zkr extension. Sets mseccfg.sseed/useed to
+    /// read-only zero if false.
+    void enableZkr(bool flag);
 
     /// Enable/disable virtual supervisor. When enabled, the trap-related
     /// CSRs point to their virtual counterpars (e.g. reading writing sstatus will
@@ -1784,6 +1814,20 @@ namespace WdRiscv
           HenvcfgFields<uint64_t> fields(value);
           return fields.bits_.PMM;
         }
+    }
+
+    /// Return the SSEED and USEED bits of the MSECCFG CSR.
+    /// Returns false if not implemented.
+    bool mseccfgSeed(bool& sseed, bool& useed) const
+    {
+      auto csr = getImplementedCsr(CsrNumber::MSECCFG);
+      if (not csr)
+        return false;
+      URV value = csr->read();
+      MseccfgFields<URV> fields(value);
+      sseed = fields.bits_.SSEED;
+      useed = fields.bits_.USEED;
+      return true;
     }
 
     /// Set ix to the counter index corresponding to the given

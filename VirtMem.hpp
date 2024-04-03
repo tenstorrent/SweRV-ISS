@@ -351,6 +351,18 @@ namespace WdRiscv
     Pbmt lastVsPbmt() const
     { return vsPbmt_; }
 
+    /// Pointer mask bits associated with each mode.
+    static constexpr unsigned pointerMaskBits(Pmm pmm)
+    {
+      switch(pmm)
+      {
+        case Pmm::Off: return 0;
+        case Pmm::Pm57: return 7;
+        case Pmm::Pm48: return 16;
+        default: assert(0); return 0;
+      }
+    }
+
   protected:
 
     /// Return current big-endian mode of implicit memory read/write
@@ -541,39 +553,33 @@ namespace WdRiscv
     void enableNapot(bool flag)
     { napotEnabled_ = flag; }
 
-    /// Enable/disable pointer masking for HS mode.
-    void enablePointerMasking(Pmm pmm)
+    /// Enable/disable pointer masking for corresponding mode.
+    void enablePointerMasking(Pmm pmm, PrivilegeMode priv, bool twoStage)
     {
-      switch(pmm)
-      {
-        case Pmm::Off: sPmBits_ = 0; break;
-        case Pmm::Pm57: sPmBits_ = 7; break;
-        case Pmm::Pm48: sPmBits_ = 16; break;
-        default: assert(0);
-      }
+      if (priv == PrivilegeMode::Supervisor and not twoStage)
+        sPmBits_ = pointerMaskBits(pmm);
+      if (priv == PrivilegeMode::Supervisor and twoStage)
+        vsPmBits_ = pointerMaskBits(pmm);
+      if (priv == PrivilegeMode::User)
+        uPmBits_ = pointerMaskBits(pmm);
     }
 
-    /// Enable/disable pointer masking for VS mode.
-    void enableVsPointerMasking(Pmm pmm)
+    Pmm pmMode(PrivilegeMode priv, bool twoStage) const
     {
-      switch(pmm)
-      {
-        case Pmm::Off: vsPmBits_ = 0; break;
-        case Pmm::Pm57: vsPmBits_ = 7; break;
-        case Pmm::Pm48: vsPmBits_ = 16; break;
-        default: assert(0);
-      }
-    }
+      unsigned bits = 0;
+      if (priv == PrivilegeMode::Supervisor and not twoStage)
+        bits = sPmBits_;
+      if (priv == PrivilegeMode::Supervisor and twoStage)
+        bits = vsPmBits_;
+      if (priv == PrivilegeMode::User)
+        bits = uPmBits_;
 
-    /// Enable/disable pointer masking for U/VU mode.
-    void enableUserPointerMasking(Pmm pmm)
-    {
-      switch(pmm)
+      switch(bits)
       {
-        case Pmm::Off: uPmBits_ = 0; break;
-        case Pmm::Pm57: uPmBits_ = 7; break;
-        case Pmm::Pm48: uPmBits_ = 16; break;
-        default: assert(0);
+        case 0: return Pmm::Off;
+        case 7: return Pmm::Pm57;
+        case 16: return Pmm::Pm48;
+        default: assert(0); return Pmm::Off;
       }
     }
 
@@ -581,8 +587,7 @@ namespace WdRiscv
     /// only necessary for the effective address for load/stores.
     uint64_t applyPointerMaskVa(uint64_t va, PrivilegeMode priv, bool twoStage) const
     {
-      int64_t transformed;
-      memcpy(&transformed, &va, sizeof(uint64_t));
+      int64_t transformed = std::bit_cast<int64_t>(va);
 
       if (sPmBits_ and priv == PrivilegeMode::Supervisor and not twoStage)
         transformed = (transformed << sPmBits_) >> sPmBits_;
@@ -591,12 +596,12 @@ namespace WdRiscv
       if (uPmBits_ and priv == PrivilegeMode::User)
         transformed = (transformed << uPmBits_) >> uPmBits_;
 
-      memcpy(&va, &transformed, sizeof(uint64_t));
+      va = std::bit_cast<uint64_t>(transformed);
       return va;
     }
 
     /// Transform physical address by appropriate pointer masking mode. This
-    /// also applies to GPAs (see section 2.2 of v0.8.1 of the spec).
+    /// also applies to GPAs (see section 3.5 of the spec).
     uint64_t applyPointerMaskPa(uint64_t pa, PrivilegeMode priv, bool twoStage) const
     {
       if (sPmBits_ and priv == PrivilegeMode::Supervisor and not twoStage)

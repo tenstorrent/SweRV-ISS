@@ -917,7 +917,7 @@ Hart<URV>::logStop(const CoreException& ce, uint64_t counter, FILE* traceFile)
     else if (ce.type() == CoreException::Exit)
       cerr << "Target program exited with code " << ce.value() << '\n';
     else if (ce.type() == CoreException::Snapshot)
-      cerr << "Attempting to snapshot from HINT\n";
+      cerr << "Attempting to snapshot\n";
     else
       cerr << "Stopped -- unexpected exception\n";
   }

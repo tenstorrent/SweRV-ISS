@@ -87,7 +87,7 @@ namespace WdRiscv
       if (entry)
         {
           ++entry->counter_;
-          entry->counter_ = std::clamp(entry->counter_, 0UL, 3UL);
+          entry->counter_ &= 3;
         }
       return entry;
     }
@@ -102,7 +102,7 @@ namespace WdRiscv
       if (entry)
         {
           ++entry->counter_;
-          entry->counter_ = std::clamp(entry->counter_, 0UL, 3UL);
+          entry->counter_ &= 3;
         }
       return entry;
     }

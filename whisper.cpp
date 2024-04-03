@@ -41,8 +41,8 @@
 #include "System.hpp"
 #include "Server.hpp"
 #include "Interactive.hpp"
+#include "Args.hpp"
 #include "third_party/nlohmann/json.hpp"
-#include "Filesystem.hpp"
 
 
 #if !defined(SOL_TCP) && defined(IPPROTO_TCP)
@@ -53,225 +53,7 @@
 using namespace WdRiscv;
 
 
-/// Return format string suitable for printing an integer of type URV
-/// in hexadecimal form.
-template <typename URV>
-static constexpr
-const char*
-getHexForm()
-{
-  if constexpr (sizeof(URV) == 4)
-    return "0x%08x";
-  if constexpr (sizeof(URV) == 8)
-    return "0x%016x";
-  if constexpr (sizeof(URV) == 16)
-    return "0x%032x";
-  return "0x%x";
-}
-
-
-/// Convert the command line string numberStr to a number using
-/// strotull and a base of zero (prefixes 0 and 0x are
-/// honored). Return true on success and false on failure (string does
-/// not represent a number). TYPE is an integer type (e.g
-/// uint32_t). Option is the command line option associated with the
-/// string and is used for diagnostic messages.
-template <typename TYPE>
-static
-bool
-parseCmdLineNumber(const std::string& option,
-		   const std::string& numberStr,
-		   TYPE& number)
-{
-  std::string str = numberStr;
-  bool good = not str.empty();
-  uint64_t scale = 1;
-  if (good)
-    {
-      char suffix = str.back();
-      if (suffix == 'k')
-        scale = UINT64_C(1024);
-      else if (suffix == 'm')
-        scale = UINT64_C(1024)*1024U;
-      else if (suffix == 'g')
-        scale = UINT64_C(1024)*1024U*1024U;
-      if (scale != 1)
-        {
-          str = str.substr(0, str.length() - 1);
-          if (str.empty())
-            good = false;
-        }
-    }
-
-  if (good)
-    {
-      using STYPE = typename std::make_signed_t<TYPE>;
-
-      char* end = nullptr;
-      
-      bool bad = false;
-
-      if (std::is_same<TYPE, STYPE>::value)
-        {
-          int64_t val = strtoll(str.c_str(), &end, 0) * static_cast<int64_t>(scale);
-          number = static_cast<TYPE>(val);
-          bad = val != number;
-        }
-      else
-        {
-          uint64_t val = strtoull(str.c_str(), &end, 0) * scale;
-          number = static_cast<TYPE>(val);
-          bad = val != number;
-        }
-
-      if (bad)
-	{
-	  std::cerr << "parseCmdLineNumber: Number too large: " << numberStr
-		    << '\n';
-	  return false;
-	}
-      if (end and *end)
-	good = false;  // Part of the string are non parseable.
-    }
-
-  if (not good)
-    std::cerr << "Invalid command line " << option << " value: " << numberStr
-	      << '\n';
-  return good;
-}
-
-
-/// Adapter for the parseCmdLineNumber for optionals.
-template <typename TYPE>
-static
-bool
-parseCmdLineNumber(const std::string& option,
-		   const std::string& numberStr,
-		   std::optional<TYPE>& number)
-{
-  TYPE n;
-  if (not parseCmdLineNumber(option, numberStr, n))
-    return false;
-  number = n;
-  return true;
-}
-
-
 using StringVec = std::vector<std::string>;
-using Uint64Vec = std::vector<uint64_t>;
-
-
-/// Hold values provided on the command line.
-struct Args
-{
-  StringVec   hexFiles;                  // Hex files to be loaded into simulator memory.
-  StringVec   binaryFiles;               // Binary files to be loaded into simulator memory.
-  std::string traceFile;                 // Log of state change after each instruction.
-  std::string commandLogFile;            // Log of interactive or socket commands.
-  std::string consoleOutFile;            // Console io output file.
-  std::string serverFile;                // File in which to write server host and port.
-  std::string instFreqFile;              // Instruction frequency file.
-  std::string configFile;                // Configuration (JSON) file.
-  std::string bblockFile;                // Basci block file.
-  std::string branchTraceFile;           // Branch trace file.
-  std::string tracerLib;                 // Path to tracer extension shared library.
-  std::string isa;
-  std::string snapshotDir = "snapshot";  // Dir prefix for saving snapshots
-  std::string loadFrom;                  // Directory for loading a snapshot
-  std::string stdoutFile;                // Redirect target program stdout to this.
-  std::string stderrFile;                // Redirect target program stderr to this.
-  std::string stdinFile;                 // Redirect target program stdin to this.
-  std::string dataLines;                 // Output file for data address line tracing.
-  std::string instrLines;                // Output file for instruction address line tracing.
-  std::string initStateFile;             // Output file for inital state of memory lines used in run.
-  std::string kernelFile;                // Load kernel image at address.
-  std::string testSignatureFile;         // Output signature file to score riscv-arch-test tests
-  StringVec   regInits;                  // Initial values of regs
-  StringVec   targets;                   // Target (ELF file) programs and associated
-                                         // program options to be loaded into simulator
-                                         // memory. Each target plus args is one string.
-  StringVec   isaVec;                    // Isa string split around _ with rv32/rv64 prefix removed.
-  std::string targetSep = " ";           // Target program argument separator.
-  StringVec   pciDevs;                   // PCI device list.
-
-  std::optional<std::string> toHostSym;
-  std::optional<std::string> consoleIoSym;
-
-  // Ith item is a vector of strings representing ith target and its args.
-  std::vector<StringVec> expandedTargets;
-
-  std::optional<uint64_t> startPc;
-  std::optional<uint64_t> endPc;
-  std::optional<uint64_t> toHost;
-  std::optional<uint64_t> fromHost;
-  std::optional<uint64_t> consoleIo;
-  std::optional<uint64_t> instCountLim;
-  std::optional<uint64_t> memorySize;
-  Uint64Vec snapshotPeriods;
-  std::optional<uint64_t> alarmInterval;
-  std::optional<uint64_t> clint;  // Core-local-interrupt (Clint) mem mapped address
-  std::optional<uint64_t> interruptor; // Interrupt generator mem mapped address
-  std::optional<uint64_t> syscallSlam;
-  std::optional<uint64_t> instCounter;
-  std::optional<uint64_t> branchWindow;
-  std::optional<uint64_t> logStart;
-  std::optional<unsigned> mcmls;
-  std::optional<uint64_t> deterministic;
-  std::optional<unsigned> seed;
-
-  unsigned regWidth = 32;
-  unsigned harts = 1;
-  unsigned cores = 1;
-  unsigned pageSize = 4U*1024;
-  uint64_t bblockInsts = ~uint64_t(0);
-
-  bool help = false;
-  bool hasRegWidth = false;
-  bool hasHarts = false;
-  bool hasCores = false;
-  bool trace = false;
-  bool interactive = false;
-  bool verbose = false;
-  bool version = false;
-  bool traceLdSt = false;  // Trace ld/st data address if true.
-  bool csv = false;        // Log files in CSV format when true.
-  bool triggers = false;   // Enable debug triggers when true.
-  bool counters = false;   // Enable performance counters when true.
-  bool gdb = false;        // Enable gdb mode when true.
-  std::vector<unsigned> gdbTcpPort;        // Enable gdb mode over TCP when port is positive.
-  bool abiNames = false;   // Use ABI register names in inst disassembly.
-  bool newlib = false;     // True if target program linked with newlib.
-  bool linux = false;      // True if target program linked with Linux C-lib.
-  bool raw = false;        // True if bare-metal program (no linux no newlib).
-  bool elfisa = false;     // Use ELF file RISCV architecture tags to set MISA if true.
-  bool unmappedElfOk = false;
-  bool mcm = false;        // Memory consistency checks
-  bool mcmca = false;      // Memory consistency checks: check all bytes of merge buffer
-  bool reportub = false;         // Report used blocks with sparse memory
-  bool quitOnAnyHart = false;    // True if run quits when any hart finishes.
-  bool noConInput = false;       // If true console io address is not used for input (ld).
-  bool relativeInstCount = false;
-  bool tracePtw = false;   // Enable printing of page table walk info in log.
-  bool shm = false;        // Enable shared memory IPC for server mode (default is socket).
-  bool logPerHart = false; // Enable separate log files for each hart.
-
-  // Expand each target program string into program name and args.
-  void expandTargets();
-};
-
-
-void
-Args::expandTargets()
-{
-  this->expandedTargets.clear();
-  for (const auto& target : this->targets)
-    {
-      StringVec tokens;
-      boost::split(tokens, target, boost::is_any_of(this->targetSep),
-		   boost::token_compress_on);
-      this->expandedTargets.push_back(tokens);
-    }
-}
 
 
 static
@@ -279,7 +61,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 838;
+  unsigned subversion = 840;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 #ifdef GIT_SHA
@@ -292,462 +74,7 @@ printVersion()
 }
 
 
-static
-bool
-collectCommandLineValues(const boost::program_options::variables_map& varMap,
-			 Args& args)
-{
-  bool ok = true;
-
-  if (varMap.count("startpc"))
-    {
-      auto numStr = varMap["startpc"].as<std::string>();
-      if (not parseCmdLineNumber("startpc", numStr, args.startPc))
-	ok = false;
-    }
-
-  if (varMap.count("endpc"))
-    {
-      auto numStr = varMap["endpc"].as<std::string>();
-      if (not parseCmdLineNumber("endpc", numStr, args.endPc))
-	ok = false;
-    }
-
-  if (varMap.count("tohost"))
-    {
-      auto numStr = varMap["tohost"].as<std::string>();
-      if (not parseCmdLineNumber("tohost", numStr, args.toHost))
-	ok = false;
-    }
-
-  if (varMap.count("fromhost"))
-    {
-      auto numStr = varMap["fromhost"].as<std::string>();
-      if (not parseCmdLineNumber("fromhost", numStr, args.fromHost))
-	ok = false;
-    }
-
-  if (varMap.count("consoleio"))
-    {
-      auto numStr = varMap["consoleio"].as<std::string>();
-      if (not parseCmdLineNumber("consoleio", numStr, args.consoleIo))
-	ok = false;
-    }
-
-  if (varMap.count("maxinst"))
-    {
-      auto numStr = varMap["maxinst"].as<std::string>();
-      if (not parseCmdLineNumber("maxinst", numStr, args.instCountLim))
-	ok = false;
-      args.relativeInstCount = not numStr.empty() and numStr.at(0) == '+';
-    }
-
-  if (varMap.count("memorysize"))
-    {
-      auto numStr = varMap["memorysize"].as<std::string>();
-      if (not parseCmdLineNumber("memorysize", numStr, args.memorySize))
-        ok = false;
-    }
-
-  if (varMap.count("tohostsym"))
-    args.toHostSym = varMap["tohostsym"].as<std::string>();
-
-  if (varMap.count("consoleiosym"))
-    args.consoleIoSym = varMap["consoleiosym"].as<std::string>();
-
-  if (varMap.count("xlen"))
-    args.hasRegWidth = true;
-
-  if (varMap.count("cores"))
-    args.hasCores = true;
-
-  if (varMap.count("harts"))
-    args.hasHarts = true;
-
-  if (varMap.count("alarm"))
-    {
-      auto numStr = varMap["alarm"].as<std::string>();
-      if (not parseCmdLineNumber("alarm", numStr, args.alarmInterval))
-        ok = false;
-      else if (args.alarmInterval.has_value() and *args.alarmInterval == 0)
-        std::cerr << "Warning: Zero alarm period ignored.\n";
-    }
-
-  if (varMap.count("branchwindow"))
-    {
-      auto numStr = varMap["branchwindow"].as<std::string>();
-      if (not parseCmdLineNumber("branchwindow", numStr, args.branchWindow))
-        ok = false;
-    }
-
-  if (varMap.count("clint"))
-    {
-      auto numStr = varMap["clint"].as<std::string>();
-      if (not parseCmdLineNumber("clint", numStr, args.clint))
-        ok = false;
-      else if (args.clint.has_value() and (*args.clint & 7) != 0)
-        {
-          std::cerr << "Error: clint address must be a multiple of 8\n";
-          ok = false;
-        }
-    }
-
-  if (varMap.count("interruptor"))
-    {
-      auto numStr = varMap["interruptor"].as<std::string>();
-      if (not parseCmdLineNumber("interruptor", numStr, args.interruptor))
-        ok = false;
-      else if (args.interruptor.has_value() and (*args.interruptor & 7) != 0)
-        {
-          std::cerr << "Error: interruptor address must be a multiple of 8\n";
-          ok = false;
-        }
-    }
-
-  if (varMap.count("syscallslam"))
-    {
-      auto numStr = varMap["syscallslam"].as<std::string>();
-      if (not parseCmdLineNumber("syscallslam", numStr, args.syscallSlam))
-        ok = false;
-    }
-
-  if (varMap.count("mcmls"))
-    {
-      auto numStr = varMap["mcmls"].as<std::string>();
-      if (not parseCmdLineNumber("mcmls", numStr, args.mcmls))
-        ok = false;
-    }
-
-  if (varMap.count("instcounter"))
-    {
-      auto numStr = varMap["instcounter"].as<std::string>();
-      if (not parseCmdLineNumber("instcounter", numStr, args.instCounter))
-        ok = false;
-    }
-
-  if (varMap.count("logstart"))
-    {
-      auto numStr = varMap["logstart"].as<std::string>();
-      if (not parseCmdLineNumber("logstart", numStr, args.logStart))
-        ok = false;
-    }
-
-  if (varMap.count("deterministic"))
-    {
-      auto numStr = varMap["deterministic"].as<std::string>();
-      if (not parseCmdLineNumber("deterministic", numStr, args.deterministic))
-	ok = false;
-    }
-
-  if (varMap.count("seed"))
-    {
-      auto numStr = varMap["seed"].as<std::string>();
-      if (not parseCmdLineNumber("seed", numStr, args.seed))
-	ok = false;
-    }
-
-  if (args.interactive)
-    args.trace = true;  // Enable instruction tracing in interactive mode.
-
-  return ok;
-}
-
-
-/// Parse command line arguments. Place option values in args.
-/// Return true on success and false on failure. Exists program
-/// if --help is used.
-static
-bool
-parseCmdLineArgs(std::span<char*> argv, Args& args)
-{
-  try
-    {
-      // Define command line options.
-      namespace po = boost::program_options;
-      po::options_description desc("options");
-      desc.add_options()
-	("help,h", po::bool_switch(&args.help),
-	 "Produce this message.")
-	("log,l", po::bool_switch(&args.trace),
-	 "Enable tracing to standard output of executed instructions.")
-	("isa", po::value(&args.isa),
-	 "Specify instruction set extensions to enable. Supported extensions "
-	 "are a, c, d, f, i, m, s and u. Default is imc.")
-	("xlen", po::value(&args.regWidth),
-	 "Specify register width (32 or 64), defaults to 32")
-	("harts", po::value(&args.harts),
-	 "Specify number of hardware threads per core (default=1).")
-	("cores", po::value(&args.cores),
-	 "Specify number of core per system (default=1).")
-	("pagesize", po::value(&args.pageSize),
-	 "Specify memory page size.")
-	("target,t", po::value(&args.targets)->multitoken(),
-	 "Target program (ELF file) to load into simulator memory. In "
-	 "newlib/Linux emulation mode, program options may follow program name.")
-	("targetsep", po::value(&args.targetSep),
-	 "Target program argument separator.")
-	("hex,x", po::value(&args.hexFiles)->multitoken(),
-	 "HEX file to load into simulator memory.")
-	("binary,b", po::value(&args.binaryFiles)->multitoken(),
-	 "Binary file to load into simulator memory. File path may be suffixed with a colon followed "
-	 "by an address (integer) in which case data will be loaded at address as opposed to zero. "
-	 "An addional suffix of :u may be added to write back the file with the contents of memory "
-	 "at the end of the run. "
-	 "Example: -b file1 -b file2:0x1040 -b file3:0x20000:u")
-        ("kernel", po::value(&args.kernelFile),
-         "Kernel binary file to load into simulator memory. File will be loaded at 0x400000 for "
-        "rv32 or 0x200000 for rv64 unless an explicit addresss is specified after a colon suffix "
-        "to the file path.")
-        ("testsignature", po::value(&args.testSignatureFile),
-         "Produce a signature file used to score tests provided by the riscv-arch-test project.")
-	("logfile,f", po::value(&args.traceFile),
-	 "Enable tracing to given file of executed instructions. Output is compressed (with /usr/bin/gzip) if file name ends with \".gz\".")
-	("csvlog", po::bool_switch(&args.csv),
-	 "Enable CSV format for log file.")
-	("consoleoutfile", po::value(&args.consoleOutFile),
-	 "Redirect console output to given file.")
-	("commandlog", po::value(&args.commandLogFile),
-	 "Enable logging of interactive/socket commands to the given file.")
-	("server", po::value(&args.serverFile),
-	 "Interactive server mode. Put server hostname and port in file. If shared memory "
-         "is enabled, file is memory mapped filename")
-        ("shm", po::bool_switch(&args.shm),
-         "Enable shared memory IPC for server mode (default mode uses socket).")
-	("startpc,s", po::value<std::string>(),
-	 "Set program entry point. If not specified, use entry point of the "
-	 "most recently loaded ELF file.")
-	("endpc,e", po::value<std::string>(),
-	 "Set stop program counter. Simulator will stop once instruction at "
-	 "the stop program counter is executed.")
-	("tohost", po::value<std::string>(),
-	 "Memory address for host target interface (HTIF).")
-	("tohostsym", po::value<std::string>(),
-	 "ELF symbol to use for setting tohost from ELF file (in the case "
-	 "where tohost is not specified on the command line). Default: "
-	 "\"tohost\".")
-	("fromhost", po::value<std::string>(),
-	 "Memory address for host target interface (HTIF).")
-	("consoleio", po::value<std::string>(),
-	 "Memory address corresponding to console io. Reading/writing "
-	 "(lw/lh/lb sw/sh/sb) from given address reads/writes a byte from the "
-         "console.")
-	("consoleiosym", po::value<std::string>(),
-	 "ELF symbol to use as console-io address (in the case where "
-         "consoleio is not specified on the command line). Deafult: "
-         "\"__whisper_console_io\".")
-	("maxinst,m", po::value<std::string>(),
-	 "Limit executed instruction count to arg. With a leading plus sign interpret the count as relative to the loaded (from a snapshot) instruction count.")
-	("memorysize", po::value<std::string>(),
-	 "Memory size (must be a multiple of 4096).")
-	("interactive,i", po::bool_switch(&args.interactive),
-	 "Enable interactive mode.")
-	("traceload", po::bool_switch(&args.traceLdSt),
-	 "Enable tracing of load/store instruction data address (deprecated -- now always on).")
-	("traceptw", po::bool_switch(&args.tracePtw),
-	 "Enable printing of page table walk information in log.")
-	("triggers", po::bool_switch(&args.triggers),
-	 "Enable debug triggers (triggers are on in interactive and server modes)")
-	("counters", po::bool_switch(&args.counters),
-	 "Enable performance counters")
-	("gdb", po::bool_switch(&args.gdb),
-	 "Run in gdb mode enabling remote debugging from gdb (this requires gdb version"
-         "8.2 or higher).")
-	("gdb-tcp-port", po::value(&args.gdbTcpPort)->multitoken(),
-	 	 "TCP port number for gdb; If port num is negative,"
-			" gdb will work with stdio (default -1).")
-	("profileinst", po::value(&args.instFreqFile),
-	 "Report instruction frequency to file.")
-        ("tracebranch", po::value(&args.branchTraceFile),
-         "Trace branch instructions to the given file.")
-        ("branchwindow", po::value<std::string>(),
-         "Trace branches in the last n instructions.")
-        ("tracerlib", po::value(&args.tracerLib),
-         "Path to tracer extension shared library which should provide C symbol tracerExtension32 or tracerExtension64."
-         "Optionally include arguments after a colon to be exposed to the shared library "
-         "as C symbol tracerExtensionArgs (ex. tracer.so or tracer.so:hello42).")
-	("logstart", po::value<std::string>(),
-	 "Start logging at given instruction rank.")
-	("logperhart", po::bool_switch(&args.logPerHart),
-	 "Use a separate log per hart. This allows a faster trace by reducing lock contention on the logfile.")
-	("setreg", po::value(&args.regInits)->multitoken(),
-	 "Initialize registers. Apply to all harts unless specific prefix "
-	 "present (hart is 1 in 1:x3=0xabc). Example: --setreg x1=4 x2=0xff "
-	 "1:x3=0xabc")
-	("configfile", po::value(&args.configFile),
-	 "Configuration file (JSON file defining system features).")
-	("bblockfile", po::value(&args.bblockFile),
-	 "Basic blocks output stats file.")
-	("bblockinterval", po::value(&args.bblockInsts),
-	 "Basic block stats are reported even mulitples of given instruction counts and once at end of run.")
-	("snapshotdir", po::value(&args.snapshotDir),
-	 "Directory prefix for saving snapshots.")
-	("snapshotperiod", po::value(&args.snapshotPeriods)->multitoken(),
-	 "Snapshot period: Save snapshot using snapshotdir every so many instructions. "
-         "Specifying multiple periods will only save a snapshot on first instance (not periodic).")
-	("loadfrom", po::value(&args.loadFrom),
-	 "Snapshot directory from which to restore a previously saved (snapshot) state.")
-	("stdout", po::value(&args.stdoutFile),
-	 "Redirect standard output of newlib/Linux target program to this.")
-	("stderr", po::value(&args.stderrFile),
-	 "Redirect standard error of newlib/Linux target program to this.")
-	("stdin", po::value(&args.stdinFile),
-	 "Redirect standard input of newlib/Linux target program to this.")
-	("datalines", po::value(&args.dataLines),
-	 "Generate data line address trace to the given file.")
-	("instrlines", po::value(&args.instrLines),
-	 "Generate instruction line address trace to the given file.")
-	("initstate", po::value(&args.initStateFile),
-	 "Generate to given file the initial state of accessed memory lines.")
-	("abinames", po::bool_switch(&args.abiNames),
-	 "Use ABI register names (e.g. sp instead of x2) in instruction disassembly.")
-	("newlib", po::bool_switch(&args.newlib),
-	 "Emulate (some) newlib system calls. Done automatically if newlib "
-         "symbols are detected in the target ELF file.")
-	("linux", po::bool_switch(&args.linux),
-	 "Emulate (some) Linux system calls. Done automatically if Linux "
-         "symbols are detected in the target ELF file.")
-	("raw", po::bool_switch(&args.raw),
-	 "Bare metal mode: Disble emulation of Linux/newlib system call emulation "
-         "even if Linux/newlib symbols detected in the target ELF file.")
-	("elfisa", po::bool_switch(&args.elfisa),
-	 "Configure reset value of MISA according to the RISCV architecture tag(s) "
-         "encoded into the laoded ELF file(s) if any.")
-	("unmappedelfok", po::bool_switch(&args.unmappedElfOk),
-	 "Do not flag as error ELF file sections targeting unmapped "
-         " memory.")
-	("alarm", po::value<std::string>(),
-	 "External interrupt period in micro-seconds: Convert arg to an "
-         "instruction count, n, assuming a 1ghz clock, and force an external "
-         " interrupt every n instructions. No-op if arg is zero.")
-        ("softinterrupt", po::value<std::string>(),
-         "Address of memory mapped word(s) controlling software interrupts. In "
-         "an n-hart system, words at addresses a, a+4, ... a+(n-1)*4 "
-         "are associated with the n harts (\"a\" being the address "
-         "specified by this option and must be a multiple of "
-         "4). Writing 0/1 to one of these addresses (using sw) "
-         "clear/sets the software interrupt bit in the the MIP (machine "
-         "interrupt pending) CSR of the corresponding hart. If a "
-         "software interrupt is taken, it is up to interrupt handler to "
-         "write zero to the same location to clear the corresponding "
-         "bit in MIP. Writing values besides 0/1 will not affect the "
-         "MIP bit and neither will writing using sb/sh/sd or writing to "
-         "non-multiple-of-4 addresses.")
-        ("clint", po::value<std::string>(),
-         "Define address, a, of memory mapped area for clint (core local "
-         "interruptor). In an n-hart system, words at addresses a, a+4, ... "
-         "a+(n-1)*4, are  associated with the n harts. Store a 0/1 to one of "
-         "these locations clears/sets the software interrupt bit in the MIP CSR "
-         "of the corresponding hart. Similary, addresses b, b+8, ... b+(n-1)*8, "
-         "where b is a+0x4000, are associated with the n harts. Writing to one "
-         "of these double words sets the timer-limit of the corresponding hart. "
-         "A timer interrupt in such a hart becomes pending when the timer value "
-         "equals or exceeds the timer limit.")
-        ("interruptor", po::value<std::string>(),
-         "Define address, z, of a memory mapped interrupt agent. Storing a word in z,"
-	 "using a sw instruction, will set/clear a bit in the MIP CSR of a hart"
-	 "in the system. The stored word should have the hart index in bits 0 to 11,"
-	 "the interrupt id (bit number of MIP) in bits 12 to 19, and the interrupt"
-	 "value in bits 20 to 31 (0 to clear, non-zero to set).")
-        ("syscallslam", po::value<std::string>(),
-         "Define address, a, of a non-cached memory area in which the "
-         "memory changes of an emulated system call will be slammed. This "
-         "is used in server mode to relay the effects of a system call "
-         "to the RTL simulator. The memory area at location a will be filled "
-         "with a sequence of pairs of double words designating addresses and "
-         "corresponding values. A zero/zero pair will indicate the end of "
-         "sequence.")
-	("mcm", po::bool_switch(&args.mcm),
-	 "Enabe memory consistency checks. This is meaningful in server/interactive "
-	 "mode.")
-	("mcmca", po::bool_switch(&args.mcmca),
-	 "Check all bytes of the memory consistency check merge buffer. If not used "
-	 "we only check the bytes inserted into the merge buffer.")
-	("mcmls", po::value<std::string>(),
-	 "Memory consitency checker merge buffer line size. If set to zero then "
-	 "write operations are not buffered and will happen as soon a received.")
-#ifdef MEM_CALLBACKS
-        ("reportusedblocks", po::bool_switch(&args.reportub),
-         "Report used blocks with sparse memory. Useful for finding memory footprint of program")
-#endif
-        ("pcidev", po::value(&args.pciDevs)->multitoken(),
-         "Add PCI device to simulation. Format is <device>:<bus>:<slot>:<device-specific>. "
-         "This should be combined with the pci option to declare a memory region for these devices. "
-         "Currently only supports virtio-blk, which requires a file")
-        ("deterministic", po::value<std::string>(),
-         "Used for deterministic multi-hart runs. Define a window size for the amount of instructions "
-         "a hart will execute before switching to the next hart (a value of 0 turns this off). The "
-         "actual amount of instructions is determined by corresponding seed value.")
-        ("seed", po::value<std::string>(),
-         "Corresponding seed for deterministic runs. If this is not specified, but `deterministic` is, whisper will "
-         "generate a seed value based on current time.")
-	("instcounter", po::value<std::string>(),
-	 "Set instruction counter to given value.")
-        ("quitany", po::bool_switch(&args.quitOnAnyHart),
-         "Terminate multi-threaded run when any hart finishes (default is to wait "
-         "for all harts.)")
-        ("noconinput", po::bool_switch(&args.noConInput),
-         "Do not use console IO address for input. Loads from the cosole io address "
-         "simply return last value stored there.")
-	("verbose,v", po::bool_switch(&args.verbose),
-	 "Be verbose.")
-	("version", po::bool_switch(&args.version),
-	 "Print version.");
-
-      // Define positional options.
-      po::positional_options_description pdesc;
-      pdesc.add("target", -1);
-
-      // Parse command line options.
-      po::variables_map varMap;
-      po::command_line_parser parser(static_cast<int>(argv.size()), argv.data());
-      auto parsed = parser.options(desc).positional(pdesc).run();
-      po::store(parsed, varMap);
-      po::notify(varMap);
-
-      // auto unparsed = po::collect_unrecognized(parsed.options, po::include_positional);
-
-      bool earlyExit = false;
-      if (args.version)
-        {
-          printVersion();
-          earlyExit = true;
-        }
-
-      if (args.help)
-	{
-	  std::cout <<
-	    "Simulate a RISCV system running the program specified by the given ELF\n"
-	    "and/or HEX file. With --newlib/--linux, the ELF file is a newlib/linux linked\n"
-	    "program and may be followed by corresponding command line arguments.\n"
-	    "All numeric arguments are interpreted as hexadecimal numbers when prefixed"
-	    " with 0x."
-	    "Examples:\n"
-	    "  whisper --target prog --log\n"
-	    "  whisper --target prog --setreg sp=0xffffff00\n"
-	    "  whisper --newlib --log --target \"prog -x -y\"\n"
-	    "  whisper --linux --log --targetsep ':' --target \"prog:-x:-y\"\n\n";
-	  std::cout << desc;
-          earlyExit = true;
-	}
-
-      if (earlyExit)
-        return true;
-
-      if (not collectCommandLineValues(varMap, args))
-	return false;
-    }
-
-  catch (std::exception& exp)
-    {
-      std::cerr << "Failed to parse command line args: " << exp.what() << '\n';
-      return false;
-    }
-
-  return true;
-}
-
-
-/// Apply register initializations specified on the command line.
+/// Apply register initialization specified on the command line.
 template<typename URV>
 static
 bool
@@ -759,15 +86,12 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
 
   for (const auto& regInit : args.regInits)
     {
-      // Each register initialization is a string of the form reg=val
-      // or hart:reg=val
+      // Each register initialization is a string of the form reg=val or hart:reg=val
       std::vector<std::string> tokens;
-      boost::split(tokens, regInit, boost::is_any_of("="),
-		   boost::token_compress_on);
+      boost::split(tokens, regInit, boost::is_any_of("="), boost::token_compress_on);
       if (tokens.size() != 2)
 	{
-	  std::cerr << "Invalid command line register initialization: "
-		    << regInit << '\n';
+	  std::cerr << "Invalid command line register initialization: " << regInit << '\n';
 	  ok = false;
 	  continue;
 	}
@@ -782,10 +106,9 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
 	{
 	  std::string hartStr = regName.substr(0, colonIx);
 	  regName = regName.substr(colonIx + 1);
-	  if (not parseCmdLineNumber("hart", hartStr, ix))
+	  if (not Args::parseCmdLineNumber("hart", hartStr, ix))
 	    {
-	      std::cerr << "Invalid command line register initialization: "
-			<< regInit << '\n';
+	      std::cerr << "Invalid command line register initialization: " << regInit << '\n';
 	      ok = false;
 	      continue;
 	    }
@@ -793,7 +116,7 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
 	}
 
       URV val = 0;
-      if (not parseCmdLineNumber("register", regVal, val))
+      if (not Args::parseCmdLineNumber("register", regVal, val))
 	{
 	  ok = false;
 	  continue;
@@ -802,36 +125,25 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
       if (specificHart and ix != hartIx)
 	continue;
 
-      if (unsigned reg = 0; hart.findIntReg(regName, reg))
+      unsigned reg = 0;
+      Csr<URV>* csr = nullptr;
+
+      if (hart.findIntReg(regName, reg))
+	hart.pokeIntReg(reg, val);
+      else if (hart.findFpReg(regName, reg))
+	hart.pokeFpReg(reg, val);
+      else if ((csr = hart.findCsr(regName)) != nullptr)
+	hart.pokeCsr(csr->getNumber(), val);
+      else
 	{
-	  if (args.verbose)
-	    std::cerr << "Setting register " << regName << " to command line "
-		      << "value 0x" << std::hex << val << std::dec << '\n';
-	  hart.pokeIntReg(reg, val);
+	  std::cerr << "Invalid --setreg register: " << regName << '\n';
+	  ok = false;
 	  continue;
 	}
 
-      if (unsigned reg = 0; hart.findFpReg(regName, reg))
-	{
-	  if (args.verbose)
-	    std::cerr << "Setting register " << regName << " to command line "
-		      << "value 0x" << std::hex << val << std::dec << '\n';
-	  hart.pokeFpReg(reg, val);
-	  continue;
-	}
-
-      auto csr = hart.findCsr(regName);
-      if (csr)
-	{
-	  if (args.verbose)
-	    std::cerr << "Setting register " << regName << " to command line "
-		      << "value 0x" << std::hex << val << std::dec << '\n';
-	  hart.pokeCsr(csr->getNumber(), val);
-	  continue;
-	}
-
-      std::cerr << "No such RISCV register: " << regName << '\n';
-      ok = false;
+      if (args.verbose)
+	std::cerr << "Setting register " << regName << " to command line "
+		  << "value 0x" << std::hex << val << std::dec << '\n';
     }
 
   return ok;
@@ -845,7 +157,7 @@ checkForNewlibOrLinux(const Args& args, bool& newlib, bool& linux)
   if (args.raw)
     {
       if (args.newlib or args.linux)
-	std::cerr << "Raw mode not comptible with newlib/linux. Sticking"
+	std::cerr << "Raw mode not compatible with newlib/linux. Sticking"
 		  << " with raw mode.\n";
       return;
     }
@@ -870,21 +182,21 @@ checkForNewlibOrLinux(const Args& args, bool& newlib, bool& linux)
     }
 
   if (linux and args.verbose)
-    std::cerr << "Detected linux symbol in ELF\n";
+    std::cerr << "Detected Linux symbol in ELF\n";
 
   if (newlib and args. verbose)
-    std::cerr << "Detected newlib symbol in ELF\n";
+    std::cerr << "Detected Newlib symbol in ELF\n";
 
   if (newlib and linux)
     {
-      std::cerr << "Fishy: Both newlib and linux symbols present in "
-		<< "ELF file(s). Doing linux emulation.\n";
+      std::cerr << "Fishy: Both Newlib and Linux symbols present in "
+		<< "ELF file(s). Doing Linux emulation.\n";
       newlib = false;
     }
 }
 
 
-/// Set stack pointer to a reasonable value for linux/newlib.
+/// Set stack pointer to a reasonable value for Linux/Newlib.
 template<typename URV>
 static
 void
@@ -925,7 +237,7 @@ getElfFilesIsaString(const Args& args, std::string& isaString)
 
   for (const auto& tag : archTags)
     if (tag != ref)
-      std::cerr << "Warning differen ELF files have different ISA strings: "
+      std::cerr << "Warning different ELF files have different ISA strings: "
 		<< tag << " and " << ref << '\n';
 
   isaString = ref;
@@ -934,27 +246,6 @@ getElfFilesIsaString(const Args& args, std::string& isaString)
     std::cerr << "ISA string from ELF file(s): " << isaString << '\n';
 
   return errors == 0;
-}
-
-
-/// Return the string representing the current contents of the MISA CSR.
-template<typename URV>
-static
-std::string
-getIsaStringFromCsr(const Hart<URV>& hart)
-{
-  std::string res;
-
-  URV val;
-  if (not hart.peekCsr(CsrNumber::MISA, val))
-    return res;
-
-  URV mask = 1;
-  for (char c = 'a'; c <= 'z'; ++c, mask <<= 1)
-    if (val & mask)
-      res += c;
-
-  return res;
 }
 
 
@@ -968,7 +259,7 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 {
   unsigned errors = 0;
 
-  if (clib)  // Linux or newlib enabled.
+  if (clib)  // Linux or Newlib enabled.
     sanitizeStackPointer(hart, args.verbose);
 
   if (args.toHostSym)
@@ -977,33 +268,32 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   if (args.consoleIoSym)
     system.setConsoleIoSymbol(*args.consoleIoSym);
 
-  // Load ELF files. Entry point of first file sets the start PC
-  // unless in raw mode.
+  // Load ELF/HEX/binary files. Entry point of first ELF file sets the start PC unless in
+  // raw mode.
   if (hart.sysHartIndex() == 0)
     {
       StringVec paths;
       for (const auto& target : args.expandedTargets)
 	paths.push_back(target.at(0));
+
       if (not system.loadElfFiles(paths, args.raw, args.verbose))
 	errors++;
-    }
 
-  // Load HEX files.
-  if (not system.loadHexFiles(args.hexFiles, args.verbose))
-    errors++;
-
-  // Load binary files
-  uint64_t offset = 0;
-  if (not system.loadBinaryFiles(args.binaryFiles, offset, args.verbose))
-    errors++;
-
-  if (not args.kernelFile.empty())
-    {
-      // Default kernel file offset. FIX: make a parameter.
-      std::vector<std::string> files{args.kernelFile};
-      offset = hart.isRv64() ? 0x80200000 : 0x80400000;
-      if (not system.loadBinaryFiles(files, offset, args.verbose))
+      if (not system.loadHexFiles(args.hexFiles, args.verbose))
 	errors++;
+
+      uint64_t offset = 0;
+      if (not system.loadBinaryFiles(args.binaryFiles, offset, args.verbose))
+	errors++;
+
+      if (not args.kernelFile.empty())
+	{
+	  // Default kernel file offset. FIX: make a parameter.
+	  std::vector<std::string> files{args.kernelFile};
+	  offset = hart.isRv64() ? 0x80200000 : 0x80400000;
+	  if (not system.loadBinaryFiles(files, offset, args.verbose))
+	    errors++;
+	}
     }
 
   if (not args.instFreqFile.empty())
@@ -1033,7 +323,7 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
     {
       if (not args.stdoutFile.empty() or not args.stderrFile.empty() or
 	  not args.stdinFile.empty())
-	std::cerr << "Info: Options --stdin, --stdout, and --stderr are ignored with --loadfrom\n";
+	std::cerr << "Info: Options --stdin/--stdout/--stderr are ignored with --loadfrom\n";
     }
   else
     {
@@ -1180,6 +470,18 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   if (not args.snapshotDir.empty())
     system.setSnapshotDir(args.snapshotDir);
 
+  if (args.tlbSize)
+    {
+      size_t size = *args.tlbSize;
+      if ((size & (size-1)) != 0)
+	{
+	  std::cerr << "TLB size must be a power of 2\n";
+	  errors++;
+	}
+      else
+	hart.setTlbSize(size);
+    }
+
   return errors == 0;
 }
 
@@ -1292,7 +594,7 @@ template <typename URV>
 static
 bool
 runServerShm(System<URV>& system, const std::string& serverFile,
-	  FILE* traceFile, FILE* commandLog)
+	     FILE* traceFile, FILE* commandLog)
 {
   std::string path = "/" + serverFile;
   int fd = shm_open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
@@ -1372,7 +674,7 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
 static
 bool
 openUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandLog,
-	      FILE*& consoleOut, FILE*& bblockFile)
+	      FILE*& consoleOut, FILE*& bblockFile, FILE*& initStateFile)
 {
   unsigned ix = 0;
   for (auto& traceFile : traceFiles)
@@ -1450,6 +752,17 @@ openUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandLo
 	}
     }
 
+  if (not args.initStateFile.empty())
+    {
+      initStateFile = fopen(args.initStateFile.c_str(), "w");
+      if (not initStateFile)
+	{
+	  std::cerr << "Failed to open init state file '"
+		    << args.initStateFile << "' for output\n";
+	  return false;
+	}
+    }
+
   return true;
 }
 
@@ -1458,7 +771,7 @@ openUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandLo
 static
 void
 closeUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandLog,
-	       FILE*& consoleOut, FILE*& bblockFile)
+	       FILE*& consoleOut, FILE*& bblockFile, FILE*& initStateFile)
 {
   if (consoleOut and consoleOut != stdout)
     fclose(consoleOut);
@@ -1491,6 +804,10 @@ closeUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandL
   if (bblockFile and bblockFile != stdout)
     fclose(bblockFile);
   bblockFile = nullptr;
+
+  if (initStateFile and initStateFile != stdout)
+    fclose(initStateFile);
+  initStateFile = nullptr;
 }
 
 
@@ -1527,7 +844,7 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
   if (isa.empty() and clib)
     {
       if (args.verbose)
-        std::cerr << "No ISA specfied, using i/m/a/c/f/d/v extensions for newlib/linux\n";
+        std::cerr << "No ISA specified, using i/m/a/c/f/d/v extensions for newlib/linux\n";
       isa = "imcafdv";
     }
 
@@ -1565,7 +882,7 @@ loadTracerLibrary(const std::string& tracerLib)
   auto* soPtr = dlopen(result[0].c_str(), RTLD_NOW);
   if (not soPtr)
     {
-      std::cerr << "Error: Failed to load shared libarary " << dlerror() << '\n';
+      std::cerr << "Error: Failed to load shared library " << dlerror() << '\n';
       return false;
     }
 
@@ -1603,18 +920,7 @@ sessionRun(System<URV>& system, const Args& args, std::vector<FILE*>& traceFiles
   if (not loadTracerLibrary<URV>(args.tracerLib))
     return false;
 
-  // In server/interactive modes: enable triggers and performance counters.
   bool serverMode = not args.serverFile.empty();
-  if (serverMode or args.interactive)
-    {
-      for (unsigned i = 0; i < system.hartCount(); ++i)
-        {
-          auto& hart = *system.ithHart(i);
-          hart.enableTriggers(true);
-          hart.enablePerformanceCounters(true);
-        }
-    }
-
   if (serverMode)
     return (args.shm)? runServerShm(system, args.serverFile, traceFiles.at(0), cmdLog) :
                        runServer(system, args.serverFile, traceFiles.at(0), cmdLog);
@@ -1717,7 +1023,7 @@ getPrimaryConfigParameters(const Args& args, const HartConfig& config,
   if (hartsPerCore == 0 or hartsPerCore > 32)
     {
       std::cerr << "Unsupported hart count: " << hartsPerCore;
-      std::cerr << " (1 to 32 currently suppored)\n";
+      std::cerr << " (1 to 32 currently supported)\n";
       return false;
     }
 
@@ -1727,7 +1033,7 @@ getPrimaryConfigParameters(const Args& args, const HartConfig& config,
   if (coreCount == 0 or coreCount > 32)
     {
       std::cerr << "Unsupported core count: " << coreCount;
-      std::cerr << " (1 to 32 currently suppored)\n";
+      std::cerr << " (1 to 32 currently supported)\n";
       return false;
     }
 
@@ -1751,7 +1057,7 @@ static
 bool
 session(const Args& args, const HartConfig& config)
 {
-  // Collect primary configuration paramters.
+  // Collect primary configuration parameters.
   unsigned hartsPerCore = 1;
   unsigned coreCount = 1;
   size_t pageSize = UINT64_C(4)*1024;
@@ -1762,6 +1068,14 @@ session(const Args& args, const HartConfig& config)
     return false;
 
   checkAndRepairMemoryParams(memorySize, pageSize);
+
+  if (args.hexFiles.empty() and args.expandedTargets.empty()
+      and args.binaryFiles.empty() and args.kernelFile.empty()
+      and not args.interactive)
+    {
+      std::cerr << "No program file specified.\n";
+      return false;
+    }
 
   // Create cores & harts.
   unsigned hartIdOffset = hartsPerCore;
@@ -1795,19 +1109,12 @@ session(const Args& args, const HartConfig& config)
   if (not args.instrLines.empty())
     system.enableInstructionLineTrace(args.instrLines);
 
-  if (args.hexFiles.empty() and args.expandedTargets.empty()
-      and args.binaryFiles.empty() and args.kernelFile.empty()
-      and not args.interactive)
-    {
-      std::cerr << "No program file specified.\n";
-      return false;
-    }
-
   std::vector<FILE*> traceFiles(system.hartCount(), nullptr);
   FILE* commandLog = nullptr;
   FILE* consoleOut = stdout;
   FILE* bblockFile = nullptr;
-  if (not openUserFiles(args, traceFiles, commandLog, consoleOut, bblockFile))
+  FILE* initStateFile = nullptr;
+  if (not openUserFiles(args, traceFiles, commandLog, consoleOut, bblockFile, initStateFile))
     return false;
 
   bool newlib = false, linux = false;
@@ -1859,8 +1166,7 @@ session(const Args& args, const HartConfig& config)
 	  return false;
 	}
       auto& hart0 = *system.ithHart(0);
-      if (not hart0.setInitialStateFile(args.initStateFile))
-	return false;
+      hart0.setInitialStateFile(initStateFile);
     }
 
   bool result = sessionRun(system, args, traceFiles, commandLog);
@@ -1883,15 +1189,12 @@ session(const Args& args, const HartConfig& config)
       std::cout << "Used blocks: 0x" << std::hex << bytes << std::endl;
     }
 
-  closeUserFiles(args, traceFiles, commandLog, consoleOut, bblockFile);
+  closeUserFiles(args, traceFiles, commandLog, consoleOut, bblockFile, initStateFile);
 
   return result;
 }
 
 
-/// Determine regiser width (xlen) from ELF file.  Return true if
-/// successful and false otherwise (xlen is left unmodified).
-static
 bool
 getXlenFromElfFile(const Args& args, unsigned& xlen)
 {
@@ -1909,25 +1212,20 @@ getXlenFromElfFile(const Args& args, unsigned& xlen)
 
   if (is32 and is64)
     {
-      std::cerr << "Error: ELF file '" << elfPath << "' has both"
-		<< " 32  and 64-bit calss\n";
+      std::cerr << "Error: ELF file '" << elfPath << "' has both 32 and 64-bit class\n";
       return false;
     }
 
-  if (is32)
-    xlen = 32;
-  else
-    xlen = 64;
+  xlen = is32 ? 32 : 64;
 
   if (args.verbose)
-    std::cerr << "Setting xlen to " << xlen << " based on ELF file "
-	      <<  elfPath << '\n';
+    std::cerr << "Setting xlen to " << xlen << " based on ELF file " <<  elfPath << '\n';
   return true;
 }
 
 
-/// Obtain integer-register width (xlen). Command line has top
-/// priority, then config file, then ELF file.
+/// Obtain integer-register width (xlen). Command line has top priority, then config
+/// file, then ELF file.
 static
 unsigned
 determineRegisterWidth(const Args& args, const HartConfig& config)
@@ -1939,24 +1237,11 @@ determineRegisterWidth(const Args& args, const HartConfig& config)
 	isaLen = 32;
       else if (args.isa.starts_with("rv64"))
 	isaLen = 64;
+      else
+	std::cerr << "Command line --isa tag does not start with rv32/rv64\n";
     }
 
-  // 1. If --xlen used, go with that.
-  if (args.hasRegWidth)
-    {
-      unsigned xlen = args.regWidth;
-      if (args.verbose)
-	std::cerr << "Setting xlen from --xlen: " << xlen << "\n";
-      if (isaLen and xlen != isaLen)
-	{
-	  std::cerr << "Xlen value from --xlen (" << xlen
-		    << ") different from --isa (" << args.isa
-		    << "), using: " << xlen << "\n";
-	}
-      return xlen;
-    }
-
-  // 2. If --isa specifies xlen, go with that.
+  // 1. If --isa specifies xlen, go with that.
   if (isaLen)
     {
       if (args.verbose)
@@ -1964,7 +1249,7 @@ determineRegisterWidth(const Args& args, const HartConfig& config)
       return isaLen;
     }
 
-  // 3. If config file specifies xlen, go with that.
+  // 2. If config file has isa tag, go with that.
   unsigned xlen = 32;
   if (config.getXlen(xlen))
     {
@@ -1973,13 +1258,15 @@ determineRegisterWidth(const Args& args, const HartConfig& config)
       return xlen;
     }
 
-  // 4. Get xlen from ELF file.
+  // 3. Get xlen from ELF file.
   if (getXlenFromElfFile(args, xlen))
     {
       if (args.verbose)
 	std::cerr << "Setting xlen from ELF file: " << xlen << "\n";
+      return xlen;
     }
-  else if (args.verbose)
+
+  if (args.verbose)
     std::cerr << "Using default for xlen: " << xlen << "\n";
   
   return xlen;
@@ -2010,13 +1297,15 @@ main(int argc, char* argv[])
   try
     {
       Args args;
-      if (not parseCmdLineArgs(std::span(argv, argc), args))
+      if (not args.parseCmdLineArgs(std::span(argv, argc)))
         return 1;
-      if (args.help or args.version)
+      if (args.help)
         return 0;
-
-      // Expand each target program string into program name and args.
-      args.expandTargets();
+      if (args.version)
+	{
+	  printVersion();
+	  return 0;
+	}
 
       // Load configuration file.
       HartConfig config;

@@ -86,9 +86,11 @@ union WhisperFlags
   {
     unsigned privMode  : 2;    // privilege mode
     unsigned fpFlags   : 4;    // floating point flags from last instruction
-    unsigned trap      : 1;    // true if last instruction trapped
-    unsigned stop      : 1;    // true if target program stopped
-    unsigned interrupt : 1;    // true if last instruction interrupted
-    unsigned virt      : 1;    // virtual mode before last instruction
+    bool     trap      : 1;    // true if last instruction trapped
+    bool     stop      : 1;    // true if target program stopped
+    bool     interrupt : 1;    // true if last instruction interrupted
+    bool     virt      : 1;    // virtual mode before last instruction
+    bool     debug     : 1;    // true if hart is in debug mode
+    bool     load      : 1;    // true if last instructions reads data memory
   } bits;
 };

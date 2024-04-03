@@ -215,6 +215,34 @@ Hart<URV>::checkVecFpInst(const DecodedInst* di, bool wide,
 }
 
 
+template <typename URV>
+bool
+Hart<URV>::checkVecLdStInst(const DecodedInst* di)
+{
+  // Dest register (vd) cannot overlap mask register v0 and data source (vs3)
+  // cannot overlap mask register v0.
+  if (di->isMasked() and di->op0() == 0)
+    {
+      postVecFail(di);
+      return false;
+    }
+
+  // None of the vector source registers can overlap mask regiser v0.
+  // This is only applicable to vector indexed ld/st.
+  // Section 5.2 of vector spec version 1.1.
+  if (di->isMasked())
+    {
+      for (unsigned i = 1; i < di->operandCount(); ++i)
+	if (di->ithOperand(i) == 0 and di->ithOperandType(i) == OperandType::VecReg)
+	  {
+	    postVecFail(di);
+	    return false;
+	  }
+    }
+
+  return true;
+}
+
 
 template <typename URV>
 bool
@@ -742,6 +770,27 @@ Hart<URV>::checkVecFpMaskInst(const DecodedInst* di, unsigned dest,
   if (not ok)
     postVecFail(di);
 
+  return ok;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned vi,
+                                    unsigned offsetWidth, unsigned offsetGroupX8)
+{
+  if (not checkVecLdStInst(di))
+    return false;
+
+  unsigned sew = vecRegs_.elemWidthInBits();
+  uint32_t groupX8 = vecRegs_.groupMultiplierX8();
+
+  bool ok = (di->ithOperandMode(0) == OperandMode::Write)?
+    checkDestSourceOverlap(vd, sew, groupX8, vi, offsetWidth, offsetGroupX8) :
+    checkSourceOverlap(vd, sew, groupX8, vi, offsetWidth, offsetGroupX8);
+
+  if (not ok)
+    postVecFail(di);
   return ok;
 }
 
@@ -4420,9 +4469,11 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
       if (found or not input)
 	continue;
 
-      found = true;
       if (active)
-	vecRegs_.writeMaskRegister(vd, ix, true);
+	{
+	  found = true;
+	  vecRegs_.writeMaskRegister(vd, ix, true);
+	}
     }
 
   vecRegs_.touchMask(vd);  // In case nothing was written
@@ -10869,6 +10920,9 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 {
+  if (not checkVecLdStInst(di))
+    return false;
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -11027,6 +11081,9 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 {
+  if (not checkVecLdStInst(di))
+    return false;
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -11257,17 +11314,19 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
     {
       auto cause = ExceptionCause::NONE;
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
-      uint64_t gpa1 = addr, gpa2 = addr;
+      uint64_t gpa1 = addr;
 
       ELEM_TYPE elem = 0;
+
 #ifndef FAST_SLOPPY
-      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem),
-                                     false /*hyper*/);
+      uint64_t gpa2 = addr;
+      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem), false /*hyper*/);
 #endif
       if (cause == ExceptionCause::NONE)
-	memRead(pa1, pa2, elem);
-
-      if (cause != ExceptionCause::NONE)
+	{
+	  memRead(pa1, pa2, elem);
+	}
+      else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           initiateLoadException(di, cause, pa1, gpa1);
@@ -11524,6 +11583,9 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 {
+  if (not checkVecLdStInst(di))
+    return false;
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -11573,11 +11635,11 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
       auto cause = ExceptionCause::NONE;
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
-      uint64_t gpa1 = addr, gpa2 = addr;
+      uint64_t gpa1 = addr;
 
 #ifndef FAST_SLOPPY
-      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem),
-                                     false /*hyper*/);
+      uint64_t gpa2 = addr;
+      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem), false /*hyper*/);
 #endif
       if (cause == ExceptionCause::NONE)
         {
@@ -11675,6 +11737,9 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 {
+  if (not checkVecLdStInst(di))
+    return false;
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -11841,6 +11906,9 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
     return false;
 
+  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8))
+    return false;
+
   uint64_t addr = intRegs_.read(rs1);
 
   unsigned start = csRegs_.peekVstart();
@@ -11870,12 +11938,13 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	}
 
       uint64_t pa1 = vaddr, pa2 = vaddr; // Physical addresses or faulting virtual addresses.
-      uint64_t gpa1 = vaddr, gpa2 = vaddr;
+      uint64_t gpa1 = vaddr;
 
       auto cause = ExceptionCause::NONE;
+
 #ifndef FAST_SLOPPY
-      cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize,
-				     false /*hyper*/);
+      uint64_t gpa2 = vaddr;
+      cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/);
 #endif
       if (cause == ExceptionCause::NONE)
 	{
@@ -12038,6 +12107,9 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
   if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+    return false;
+
+  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8))
     return false;
 
   uint64_t addr = intRegs_.read(rs1);
@@ -12250,6 +12322,9 @@ bool
 Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 			 unsigned fieldCount, uint64_t stride, bool faultFirst)
 {
+  if (not checkVecLdStInst(di))
+    return false;
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -12309,12 +12384,13 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	    }
 
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
-          uint64_t gpa1 = faddr, gpa2 = faddr;
+          uint64_t gpa1 = faddr;
 
 	  auto cause = ExceptionCause::NONE;
+
 #ifndef FAST_SLOPPY
-	  cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem),
-					 false /*hyper*/);
+	  uint64_t gpa2 = faddr;
+	  cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem), false /*hyper*/);
 #endif
 	  if (cause == ExceptionCause::NONE)
             {
@@ -12423,6 +12499,9 @@ bool
 Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 			  unsigned fieldCount, uint64_t stride)
 {
+  if (not checkVecLdStInst(di))
+    return false;
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -12764,7 +12843,10 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8))
+  if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+    return false;
+
+  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8))
     return false;
 
   uint64_t addr = intRegs_.read(rs1);
@@ -12808,12 +12890,13 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    }
 
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
-          uint64_t gpa1 = faddr, gpa2 = faddr;
+          uint64_t gpa1 = faddr;
 
 	  auto cause = ExceptionCause::NONE;
+
 #ifndef FAST_SLOPPY
-          cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize,
-					 false /*hyper*/);
+	  uint64_t gpa2 = faddr;
+          cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/);
 #endif
 	  if (cause == ExceptionCause::NONE)
 	    {
@@ -12921,7 +13004,10 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8))
+  if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+    return false;
+
+  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8))
     return false;
 
   uint64_t addr = intRegs_.read(rs1);
@@ -18597,6 +18683,63 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
 
 
 template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::doVecFpRedSumGroup(std::vector<ELEM_TYPE>& elems, ElementWidth eew, unsigned groupX8)
+{
+  // No reduction needed, LMUL <= 1.
+  if (groupX8 <= 8)
+    return;
+
+  const unsigned group = groupX8 >> 3;
+  const unsigned numGroupRed = group >> 1;
+  const unsigned elemsPerVec = vecRegs_.singleMax(eew);
+
+  for (unsigned gn = 0; gn < numGroupRed; gn++)
+    {
+      for (unsigned ix = 0; ix < elemsPerVec; ix++)
+        {
+          unsigned elemIx = gn*elemsPerVec + ix;
+          unsigned oelemIx = (gn + numGroupRed)*elemsPerVec + ix;
+
+          ELEM_TYPE e1 = elems.at(elemIx);
+          ELEM_TYPE e2 = elems.at(oelemIx);
+
+          ELEM_TYPE result = doFadd(e1, e2);
+          elems.at(elemIx) = result;
+          URV incFlags = activeSimulatorFpFlags();
+          vecRegs_.fpFlags_.push_back(incFlags);
+        }
+    }
+
+  return doVecFpRedSumGroup(elems, eew, numGroupRed * 8);
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::doVecFpRedSumAdjacent(std::vector<ELEM_TYPE>& elems, unsigned numElems, unsigned numResult)
+{
+  if (numElems <= numResult)
+    return;
+
+  for (unsigned ix = 0; ix < numElems; ix+=2)
+    {
+      ELEM_TYPE e1 = elems.at(ix);
+      ELEM_TYPE e2 = elems.at(ix + 1);
+
+      ELEM_TYPE result = doFadd(e1, e2);
+      elems.at(ix >> 1) = result;
+      URV incFlags = activeSimulatorFpFlags();
+      vecRegs_.fpFlags_.push_back(incFlags);
+    }
+
+  return doVecFpRedSumAdjacent(elems, numElems >> 1, numResult);
+}
+
+
+template <typename URV>
 template<typename ELEM_TYPE>
 void
 Hart<URV>::vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
@@ -18611,18 +18754,55 @@ Hart<URV>::vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   bool anyActive = false;
 
-  for (unsigned ix = start; ix < elems; ++ix)
+  if (not vecRegs_.fpUnorderedSumTreeRed_)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      for (unsigned ix = start; ix < elems; ++ix)
         {
-          vecRegs_.fpFlags_.push_back(0);
-          continue;
-        }
+          if (masked and not vecRegs_.isActive(0, ix))
+            {
+              vecRegs_.fpFlags_.push_back(0);
+              continue;
+            }
 
-      anyActive = true;
-      vecRegs_.read(vs1, ix, group, e1);
-      result = doFadd(result, e1);
+          anyActive = true;
+          vecRegs_.read(vs1, ix, group, e1);
+          result = doFadd(result, e1);
+          URV incFlags = activeSimulatorFpFlags();
+          vecRegs_.fpFlags_.push_back(incFlags);
+        }
+    }
+  else
+    {
+      std::vector<ELEM_TYPE> tree(vecRegs_.elemMax());
+      bool roundDown = getFpRoundingMode() == RoundingMode::Down;
+
+      // Replace inactive elements with additive identity.
+      for (unsigned ix = start; ix < vecRegs_.elemMax(); ix++)
+        if ((ix >= elems) or
+            (masked and not vecRegs_.isActive(0, ix)))
+          tree.at(ix) = roundDown? ELEM_TYPE{0} : -ELEM_TYPE{0};
+        else
+          {
+            vecRegs_.read(vs1, ix, group, e1);
+            tree.at(ix) = e1;
+            anyActive = true;
+          }
+
+      // Perform group-wise reduction first.
+      if (group)
+        doVecFpRedSumGroup(tree, vecRegs_.elemWidth(), group);
+
+      // Perform adjacent vec register reduce.
+      doVecFpRedSumAdjacent(tree, vecRegs_.singleMax(vecRegs_.elemWidth()), 2);
+
+      // scalar operand in second-to-last step.
+      result = doFadd(tree.at(0), e2);
       URV incFlags = activeSimulatorFpFlags();
+      vecRegs_.fpFlags_.push_back(incFlags);
+
+      // remaining operand in last step.
+      result = doFadd(tree.at(1), result);
+      incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
     }
 
@@ -18913,19 +19093,66 @@ Hart<URV>::vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
 
   bool anyActive = false;
 
-  for (unsigned ix = start; ix < elems; ++ix)
+  if (not vecRegs_.fpUnorderedSumTreeRed_)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      for (unsigned ix = start; ix < elems; ++ix)
         {
-          vecRegs_.fpFlags_.push_back(0);
-          continue;
+          if (masked and not vecRegs_.isActive(0, ix))
+            {
+              vecRegs_.fpFlags_.push_back(0);
+              continue;
+            }
+
+          anyActive = true;
+          vecRegs_.read(vs1, ix, group, e1);
+          ELEM_TYPE2X e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+          result           = doFadd(result, e1dw);
+          URV incFlags = activeSimulatorFpFlags();
+          vecRegs_.fpFlags_.push_back(incFlags);
+        }
+    }
+  else
+    {
+      std::vector<ELEM_TYPE2X> tree(vecRegs_.elemMax());
+      bool roundDown = getFpRoundingMode() == RoundingMode::Down;
+
+      // Replace inactive elements with additive identity.
+      for (unsigned ix = start; ix < vecRegs_.elemMax(); ix++)
+        {
+          if ((ix >= elems) or
+              (masked and not vecRegs_.isActive(0, ix)))
+            tree.at(ix) = roundDown? ELEM_TYPE2X{0} : -ELEM_TYPE2X{0};
+          else
+            {
+              vecRegs_.read(vs1, ix, group, e1);
+              ELEM_TYPE2X e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+              tree.at(ix) = e1dw;
+              anyActive = true;
+            }
         }
 
-      anyActive = true;
-      vecRegs_.read(vs1, ix, group, e1);
-      ELEM_TYPE2X e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-      result           = doFadd(result, e1dw);
+      // Perform reduction first for double-wide on register group.
+      doVecFpRedSumAdjacent(tree, vecRegs_.elemMax(), vecRegs_.elemMax() / 2);
+
+      ElementWidth dsew = vecRegs_.elemWidth();
+      if (not vecRegs_.doubleSew(vecRegs_.elemWidth(), dsew))
+	assert(0);
+
+      // Perform group-wise reduction.
+      if (group > 8)
+        doVecFpRedSumGroup(tree, dsew, group);
+
+      // Perform adjacent vec register elements reduce.
+      doVecFpRedSumAdjacent(tree, vecRegs_.singleMax(dsew), 2);
+
+      // scalar operand in second-to-last step.
+      result = doFadd(tree.at(0), result);
       URV incFlags = activeSimulatorFpFlags();
+      vecRegs_.fpFlags_.push_back(incFlags);
+
+      // remaining operand in last step.
+      result = doFadd(tree.at(1), result);
+      incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
     }
 

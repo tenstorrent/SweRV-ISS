@@ -125,14 +125,14 @@ namespace WdRiscv
     void enableDataLineTrace(const std::string& path)
     {
       memory_->enableDataLineTrace(path);
-      for (auto hart : sysHarts_)  hart->enableDataLineTrace();
+      for (auto hart : sysHarts_)  hart->enableDataLineTrace(true);
     }
 
     /// Similar to enableDataLineTrace but for instructions.
     void enableInstructionLineTrace(const std::string& path)
     {
       memory_->enableInstructionLineTrace(path);
-      for (auto hart : sysHarts_)  hart->enableInstructionLineTrace();
+      for (auto hart : sysHarts_)  hart->enableInstructionLineTrace(true);
     }
 
     /// Define read memory callback. This (along with
@@ -201,6 +201,16 @@ namespace WdRiscv
     /// name will be <path> and the load addres will be <value>.
     bool loadBinaryFiles(const std::vector<std::string>& files,
 			 uint64_t defOffset, bool verbose);
+
+    /// Load the lz4 compressed binary files and set memory locations
+    /// accordingly.
+    /// Return true on success. Return false if file does not exist,
+    /// or cannot be opened. A file is loaded at the given default
+    /// offset unless the filename has the form <path>:<value>
+    /// where value is an integer in which case the effective file
+    /// name will be <path> and the load addres will be <value>.
+    bool loadLz4Files(const std::vector<std::string>& files,
+		      uint64_t defOffset, bool verbose);
 
     /// Save snapshot (registers, memory etc) into given directory
     /// which should alread exist. Return true on success.
