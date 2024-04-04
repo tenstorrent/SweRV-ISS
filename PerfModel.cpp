@@ -194,6 +194,8 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
     }
 
   packet->executed_ = true;
+  packet->execTime_ = time;
+
   return false;
 }
 
@@ -322,7 +324,6 @@ PerfApi::execute(Hart64& hart, InstrPac& packet)
     }
   
   hart.pokePc(prevPc);
-  packet->execTime_ = time;
 
   return true;
 }
