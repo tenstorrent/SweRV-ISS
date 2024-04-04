@@ -1527,7 +1527,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   if (config_ ->contains(tag))
     {
       cerr << "Config file tag \"enable_counter_overflow\" deprecated: "
-	   << " Add extension string \"ssofpmf\" to \"isa\" tag instread.\n";
+	   << " Add extension string \"sscofpmf\" to \"isa\" tag instread.\n";
       getJsonBoolean(tag, config_ ->at(tag), cof) or errors++;
     }
 
