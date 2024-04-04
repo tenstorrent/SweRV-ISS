@@ -237,6 +237,8 @@ Args::parseCmdLineArgs(std::span<char*> argv)
 	("isa", po::value(&this->isa),
 	 "Specify instruction set extensions to enable. Supported extensions "
 	 "are a, c, d, f, i, m, s and u. Default is imc.")
+	("xlen", po::value(&this->regWidth),
+	 "Specify register width (32 or 64), defaults to 32")
 	("harts", po::value(&this->harts),
 	 "Specify number of hardware threads per core (default=1).")
 	("cores", po::value(&this->cores),
