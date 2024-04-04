@@ -246,7 +246,7 @@ namespace WdRiscv
     bool peekCsReg(CsrNumber number, URV& value) const
     { return hart_->peekCsr(number, value); }
 
-    void peekMemory( uint64_t addr_, uint64_t &val, bool use_pma) {
+    void peekMemory(uint64_t addr_, uint64_t &val, bool use_pma) {
       hart_->peekMemory(addr_, val, use_pma);
     };
     /// TODO: modified regs
