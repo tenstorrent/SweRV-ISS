@@ -354,7 +354,17 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
       return false;
     }
 
-  assert(0 && "implement retire");
+  if (packet->instrVa() != hart->peekPc())
+    {
+      std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag << std::hex
+		<< " Wrong pc: 0x" << packet->instrVa() << " expecting "
+		<< hart->peekPc() << '\n' << std::dec;
+      return false;
+    }
+
+  hart->setInstructionCount(tag);
+  hart->singleStep();   // TBD FIX : Make sure load calls getLoadData and store is no-op.
+  assert(0 && "Implement single step load-store");
 
   // Undo renaming of destination registers.
   auto& producers = hartRegProducers_.at(hartIx);
@@ -418,7 +428,7 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
   if (not hart)
     return false;
 
-  auto packet = checkTag("drain-store", hartIx, tag);
+  auto packet = checkTag("Drain-store", hartIx, tag);
   if (not packet)
     return false;
 
@@ -428,8 +438,56 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
       return false;
     }
 
-  assert(0 && "Implement retire");
+  if (packet->drained())
+    {
+      std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag
+		<< " Instruction drained more than once\n";
+      return false;
+    }
 
-  packet->retired_ = true;
+  assert(0 && "Implement drainStore");
+
+  packet->drained_ = true;
+  return true;
+}
+
+
+bool
+PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t& data)
+{
+
+  auto hart = checkHart("Get-load-data", hartIx);
+  if (not hart)
+    {
+      assert(0 && "getLoadData: bad hart ix");
+      return false;
+    }
+
+  auto packet = checkTag("Get-load-Data", hartIx, tag);
+  if (not packet)
+    {
+      assert(0 && "getLoadData: bad tag");
+      return false;
+    }
+
+  if (not packet->executed())
+    {
+      assert(0 && "getLoadData: non-executed instruction");
+      return false;
+    }
+
+  if (not packet->di_.isLoad())
+    {
+      assert(0 && "getLoadData: not a load");
+      return false;
+    }
+
+  if (packet->trapped())
+    {
+      assert(0 && "getLoadData: trapped instruction");
+      return false;
+    }
+
+  data = packet->destValues_.at(0).second;
   return true;
 }
