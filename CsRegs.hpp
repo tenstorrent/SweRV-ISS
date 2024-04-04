@@ -1297,6 +1297,13 @@ namespace WdRiscv
       return csr.read();
     }
 
+    /// Fast peek method for HSTATUS
+    URV peekHstatus() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::HSTATUS));
+      return csr.read();
+    }
+
     /// Fast peek method for HVIP
     URV peekHvip() const
     {

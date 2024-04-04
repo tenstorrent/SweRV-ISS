@@ -42,7 +42,7 @@ namespace WdRiscv
 
     enum class Pbmt : uint32_t { None = 0, Nc = 1, Io = 2, Reserved = 3 };
 
-    enum class Pmm : uint32_t { Off = 0, Reserved = 1, Pm57 = 2, Pm48 = 3 };
+    enum class Pmm : uint32_t { Off = 0, Reserved = 1, Pm57 = 2, Pm48 = 3, Limit_ = 4 };
 
     VirtMem(unsigned hartIx, Memory& memory, unsigned pageSize,
             PmpManager& pmpMgr, unsigned tlbSize);
@@ -175,9 +175,27 @@ namespace WdRiscv
       return ix < supportedModes_.size() ? supportedModes_.at(ix) : false;
     }
 
+    /// Mark items in the pmms array as supported PMM modes.
+    void setSupportedPmms(const std::vector<Pmm>& pmms)
+    {
+      std::fill(supportedPmms_.begin(), supportedPmms_.end(), false);
+      for (auto pmm : pmms)
+	{
+	  if (pmm != Pmm::Reserved)
+	    {
+	      unsigned ix = unsigned(pmm);
+	      if (ix < supportedPmms_.size())
+		supportedPmms_.at(ix) = true;
+	    }
+	}
+    }
+
     /// Return true if PMM is supported.
     bool isPmmSupported(Pmm pmm)
-    { return pmm != Pmm::Reserved; }
+    {
+      unsigned ix = unsigned(pmm);
+      return ix < supportedPmms_.size() ? supportedPmms_.at(ix) : false;
+    }
 
     uint64_t applyPointerMask(uint64_t addr, PrivilegeMode priv, bool twoStage) const
     {
@@ -302,9 +320,9 @@ namespace WdRiscv
       return size_t(mode) < vec.size()? vec.at(size_t(mode)) : "sv?";
     }
 
-    /// Set mode to the translation mode corresponding to modeStr
-    /// returning true if successful. Return false leaving mode
-    /// unmodified if modeStr does not correspond to a mode.
+    /// Set mode to the translation mode corresponding to modeStr returning true if
+    /// successful. Return false leaving mode unmodified if modeStr does not correspond to
+    /// a mode.
     static bool to_mode(std::string_view modeStr, Mode& mode)
     {
       static const std::unordered_map<std::string_view, Mode> map(
@@ -314,6 +332,31 @@ namespace WdRiscv
       if (iter != map.end())
 	{
 	  mode = iter->second;
+	  return true;
+	}
+      return false;
+    }
+
+    /// Return string representing pointer masking mode. Example: Pm57 yields "pm57".
+    static constexpr std::string_view to_string(Pmm pmm)
+    {
+      using namespace std::string_view_literals;
+      constexpr auto vec =
+        std::array{"off"sv, "reserved"sv, "pm57"sv, "pm48"sv};
+      return size_t(pmm) < vec.size()? vec.at(size_t(pmm)) : "pm?";
+    }
+
+    /// Set pmm to the translation pointer masking mode corresponding to pmmStr returning
+    /// true if successful. Return false leaving pmm unmodified if pmmStr does not
+    /// correspond to a pmm.
+    static bool to_pmm(std::string_view pmmStr, Pmm& pmm)
+    {
+      static const std::unordered_map<std::string_view, Pmm> map(
+        { {"off", Pmm::Off }, {"pm57", Pmm::Pm57 }, {"pm48", Pmm::Pm48 } });
+      auto iter = map.find(pmmStr);
+      if (iter != map.end())
+	{
+	  pmm = iter->second;
 	  return true;
 	}
       return false;
@@ -537,9 +580,13 @@ namespace WdRiscv
     { sum_ = flag; }
 
     /// Allow supervisor-mode code to access user-mode pages (supports SUM
-    /// bit in MSTATUS).
+    /// bit in VSTATUS).
     void setVsSum(bool flag)
     { vsSum_ = flag; }
+
+    /// Return the Vs SUM bit (as set by setVsSum).
+    bool vsSum() const
+    { return vsSum_; }
 
     /// Enable/disable page-based-memory types.
     void enablePbmt(bool flag)
@@ -758,6 +805,7 @@ namespace WdRiscv
     bool xForR_ = false;   // True for hlvx.hu and hlvx.wu instructions: use exec for read
 
     std::vector<bool> supportedModes_; // Indexed by Mode.
+    std::vector<bool> supportedPmms_;  // Indexed by Pmm.
 
     // Addresses of PTEs used in most recent insruction an data translations.
     using Walk = std::vector<WalkEntry>;

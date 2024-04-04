@@ -713,6 +713,8 @@ The vector configuration is an object with the following fields:
 * update_whole_mask: when true, compute all the elements of the desitnation mask register for mask-logical and mask-manipulation instructions regardless of VL.
 * trap_invalid_vtype: when true, trap on invalid/unsupported vtype configurations, when false set vtype.vill instead.
 * fp_unordered_sum_tree_reduction: when true, enables tree reduction-style fredusum/vfwredusum, when false uses ordered version of those instructions.
+* legalize_vsetvl_avl: when true, legalize VL to VLMAX if it would be greater than VLMAX after a vsetvl instruction.
+* legalize_vsetvli_avl: when true, legalize VL to VLMAX if it would be greater than VLMAX after a vsetvli instruction.
 
 Example:
 ```

@@ -827,6 +827,9 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
 	mstatus = findCsr(CN::MSTATUSH);
       }
 
+    if (not flag)
+      mstatus->write(mstatus->read() & ~hyperBits);  // Clear MPV and GVA.
+
     URV mask = mstatus->getWriteMask();
     mask = flag? (mask | hyperBits) : (mask & ~hyperBits);
     mstatus->setWriteMask(mask);
@@ -2523,13 +2526,13 @@ CsRegs<URV>::defineMachineRegs()
       defineCsr(std::move(name), num,  !mand, imp, 0, pmpMask, pmpMask);
     }
 
-  uint64_t menvMask = 0xf1;
-  if (not rv32_)
-    menvMask = 0xc0000000000000f1;
+  URV menvMask = 0xf1;
+  if constexpr (sizeof(URV) == 8)
+    menvMask = 0xe0000003000000f1;
   defineCsr("menvcfg", Csrn::MENVCFG, !mand, imp, 0, menvMask, menvMask);
   if (rv32_)
     {
-      menvMask = 0xc0000000;
+      menvMask = 0xe0000003;
       auto c = defineCsr("menvcfgh", Csrn::MENVCFGH, !mand, imp, 0, menvMask, menvMask);
       c->markAsHighHalf(true);
     }
@@ -2748,6 +2751,8 @@ CsRegs<URV>::defineSupervisorRegs()
     sip->tie(mip->valuePtr_); // Sip is a shadow if mip
 
   mask = 0xf1;
+  if constexpr (sizeof(URV) == 8)
+    mask = 0x00000003000000f1;  // PMM field writable.
   defineCsr("senvcfg",    Csrn::SENVCFG,    !mand, !imp, 0, mask, mask);
 
   mask = 0;

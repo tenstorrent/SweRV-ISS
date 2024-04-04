@@ -1,6 +1,10 @@
 #include "PerfModel.hpp"
 
+<<<<<<< HEAD
 using namespace TT_WPA;
+=======
+using namespace TT_PERFA;
+>>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
 
 
 std::shared_ptr<Hart64>
@@ -134,7 +138,12 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
       // Instruction is being re-executed. Must be load/store. Every instruction that
       // depends on it must be re-executed.
       auto& di = packet->decodedInst();
+<<<<<<< HEAD
       assert(di.isLoad() or di.isStore());
+=======
+      if (not di.isLoad() and not di.isStore())
+	assert(0);
+>>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
       auto& packetMap = hartPacketMaps_.at(hartIx);
       auto iter = packetMap.find(packet->tag());
       assert(iter != packetMap.end());
@@ -193,6 +202,11 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
     }
 
   packet->executed_ = true;
+<<<<<<< HEAD
+=======
+  packet->execTime_ = time;
+
+>>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
   return false;
 }
 
@@ -354,7 +368,21 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
       return false;
     }
 
+<<<<<<< HEAD
   assert(0 && "implement retire");
+=======
+  if (packet->instrVa() != hart->peekPc())
+    {
+      std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag << std::hex
+		<< " Wrong pc: 0x" << packet->instrVa() << " expecting "
+		<< hart->peekPc() << '\n' << std::dec;
+      return false;
+    }
+
+  hart->setInstructionCount(tag);
+  hart->singleStep();   // TBD FIX : Make sure load calls getLoadData and store is no-op.
+  assert(0 && "Implement single step load-store");
+>>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
 
   // Undo renaming of destination registers.
   auto& producers = hartRegProducers_.at(hartIx);
@@ -418,7 +446,11 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
   if (not hart)
     return false;
 
+<<<<<<< HEAD
   auto packet = checkTag("drain-store", hartIx, tag);
+=======
+  auto packet = checkTag("Drain-store", hartIx, tag);
+>>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
   if (not packet)
     return false;
 
@@ -428,8 +460,62 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
       return false;
     }
 
+<<<<<<< HEAD
   assert(0 && "Implement retire");
 
   packet->retired_ = true;
+=======
+  if (packet->drained())
+    {
+      std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag
+		<< " Instruction drained more than once\n";
+      return false;
+    }
+
+  assert(0 && "Implement drainStore");
+
+  packet->drained_ = true;
+  return true;
+}
+
+
+bool
+PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t& data)
+{
+
+  auto hart = checkHart("Get-load-data", hartIx);
+  if (not hart)
+    {
+      assert(0 && "getLoadData: bad hart ix");
+      return false;
+    }
+
+  auto packet = checkTag("Get-load-Data", hartIx, tag);
+  if (not packet)
+    {
+      assert(0 && "getLoadData: bad tag");
+      return false;
+    }
+
+  if (not packet->executed())
+    {
+      assert(0 && "getLoadData: non-executed instruction");
+      return false;
+    }
+
+  if (not packet->di_.isLoad())
+    {
+      assert(0 && "getLoadData: not a load");
+      return false;
+    }
+
+  if (packet->trapped())
+    {
+      assert(0 && "getLoadData: trapped instruction");
+      return false;
+    }
+
+  data = packet->destValues_.at(0).second;
+>>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
   return true;
 }

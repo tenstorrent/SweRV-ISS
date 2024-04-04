@@ -373,6 +373,10 @@ namespace WdRiscv
     void configAddressTranslationModes(const std::vector<VirtMem::Mode>& modes)
     { virtMem_.setSupportedModes(modes); }
 
+    /// Configure the address translation pointer masking modes supported by this hart.
+    void configAddressTranslationPmms(const std::vector<VirtMem::Pmm>& pmms)
+    { virtMem_.setSupportedPmms(pmms); }
+
     /// Enable page based memory types.
     void enableTranslationPbmt(bool flag)
     { enableExtension(RvExtension::Svpbmt, flag); updateTranslationPbmt(); }
@@ -828,6 +832,10 @@ namespace WdRiscv
     void lastCsr(std::vector<CsrNumber>& csrs) const
     { csRegs_.getLastWrittenRegs(csrs); }
 
+<<<<<<< HEAD
+=======
+    /// Return the CSR value produced by the last executed instruction.
+>>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
     URV lastCsrValue(CsrNumber csr)
     { return csRegs_.lastCsrValue(csr); }
 
@@ -2005,6 +2013,14 @@ namespace WdRiscv
     /// When flag is true, use binary tree reduction for vfredusum and vfwredusum.
     void configVectorFpUnorderedSumRed(bool flag)
     { vecRegs_.configVectorFpUnorderedSumRed(flag); }
+
+    /// When flag is true, when VL > VLMAX reduce AVL to match VLMAX and write
+    /// to VL. This only applies to vsetvl/vsetvli instructions.
+    void configVectorLegalizeVsetvlAvl(bool flag)
+    { vecRegs_.configVectorLegalizeVsetvlAvl(flag); }
+
+    void configVectorLegalizeVsetvliAvl(bool flag)
+    { vecRegs_.configVectorLegalizeVsetvliAvl(flag); }
 
     bool readInstFromFetchCache(uint64_t addr, uint16_t& inst) const
     { return fetchCache_.read(addr, inst); }
@@ -3289,7 +3305,7 @@ namespace WdRiscv
 
     /// Code common to execVsetvli, and execVsetvl. Return true on success and false if an
     /// illegal instruction trap must be taken.
-    bool vsetvl(unsigned rd, unsigned rs1, URV vtypeVal);
+    bool vsetvl(unsigned rd, unsigned rs1, URV vtypeVal, bool isVtypeImm);
 
     void execVsetvli(const DecodedInst*);
     void execVsetivli(const DecodedInst*);

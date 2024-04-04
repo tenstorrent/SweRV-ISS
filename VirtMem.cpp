@@ -15,6 +15,9 @@ VirtMem::VirtMem(unsigned hartIx, Memory& memory, unsigned pageSize,
   supportedModes_.resize(unsigned(Mode::Limit_));
   setSupportedModes({Mode::Bare, Mode::Sv32, Mode::Sv39, Mode::Sv48, Mode::Sv57, Mode::Sv64});
 
+  supportedPmms_.resize(unsigned(Pmm::Limit_));
+  setSupportedPmms({Pmm::Off, Pmm::Pm57, Pmm::Pm48});
+
   pageBits_ = static_cast<unsigned>(std::log2(pageSize_));
   unsigned p2PageSize =  unsigned(1) << pageBits_;
   (void)p2PageSize;

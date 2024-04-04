@@ -19,7 +19,11 @@
 #include "Hart.hpp"
 #include "DecodedInst.hpp"
 
+<<<<<<< HEAD
 namespace TT_WPA         // Tenstorrent Whisper Performance Model API
+=======
+namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
+>>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
 {
 
   using System64 = WdRiscv::System<uint64_t>;
@@ -123,6 +127,12 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
     bool retired() const
     { return executed_; }
 
+<<<<<<< HEAD
+=======
+    bool drained() const
+    { return drained_; }
+
+>>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
     uint64_t tag() const
     { return tag_; }
 
@@ -165,6 +175,10 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
     bool decoded_    : 1 = false;  // true if instruction decoded
     bool executed_   : 1 = false;  // true if instruction executed
     bool retired_    : 1 = false;  // true if instruction retired (committed)
+<<<<<<< HEAD
+=======
+    bool drained_    : 1 = false;  // true if a store that has been drained
+>>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
     bool trap_       : 1 = false;  // true if instruction trapped
   };
 
@@ -255,6 +269,14 @@ namespace TT_WPA         // Tenstorrent Whisper Performance Model API
     /// an error for a store to be drained before it is retired.
     bool drainStore(unsigned hart, uint64_t time, uint64_t tag);
 
+<<<<<<< HEAD
+=======
+    /// Set data to the load value of the given instruction tag and return true on
+    /// success. Return false on failure leaving data unmodified: tag is not valid or
+    /// corresponding instruction is not executed or is not a load.
+    bool getLoadData(unsigned hart, uint64_t tag, uint64_t& data);
+
+>>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
     /// Return a pointer of the hart having the given index or null if no such hart.
     std::shared_ptr<Hart64> getHart(unsigned hartIx)
     {

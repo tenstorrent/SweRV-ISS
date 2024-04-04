@@ -380,10 +380,6 @@ Hart<URV>::processExtensions(bool verbose)
     enableTranslationPbmt(true);
   if (isa_.isEnabled(RvExtension::Smrnmi))
     enableSmrnmi(true);
-  if (isa_.isEnabled(RvExtension::Ssnpm))
-    enableSsnpm(true);
-  if (isa_.isEnabled(RvExtension::Smnpm))
-    enableSmnpm(true);
   if (isa_.isEnabled(RvExtension::Zicntr))
     enableZicntr(true);
   if (isa_.isEnabled(RvExtension::Zihpm))
@@ -392,6 +388,9 @@ Hart<URV>::processExtensions(bool verbose)
     enableSscofpmf(true);
   if (isa_.isEnabled(RvExtension::Zkr))
     enableZkr(true);
+
+  enableSsnpm(isa_.isEnabled(RvExtension::Ssnpm));
+  enableSmnpm(isa_.isEnabled(RvExtension::Smnpm));
 
   stimecmpActive_ = csRegs_.menvcfgStce();
   vstimecmpActive_ = csRegs_.henvcfgStce();
@@ -3243,16 +3242,6 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
   else if (csr == CN::FCSR or csr == CN::FRM or csr == CN::FFLAGS)
     markFsDirty(); // Update FS field of MSTATS if FCSR is written
 
-  // Update cached values of MSTATUS,
-  if (csr == CN::MSTATUS)
-    updateCachedMstatus();
-  else if (csr == CN::SSTATUS)
-    updateCachedSstatus();
-  else if (csr == CN::VSSTATUS)
-    updateCachedVsstatus();
-  else if (csr == CN::HSTATUS)
-    updateCachedHstatus();
-
   // Update cached value of VTYPE
   if (csr == CN::VTYPE)
     {
@@ -3299,6 +3288,17 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
             }
         }
     }
+
+  // Update cached values of M/S/VS/H STATUS.
+  if (csr == CN::SSTATUS)
+    updateCachedSstatus();
+  else if (csr == CN::VSSTATUS)
+    updateCachedVsstatus();
+
+  if (csRegs_.peekMstatus() != mstatus_.value())
+    { updateCachedMstatus(); csRegs_.recordWrite(CN::MSTATUS); }
+  else if (isRvh() and csRegs_.peekHstatus() != hstatus_.value())
+    { updateCachedHstatus(); csRegs_.recordWrite(CN::HSTATUS); }
 
   effectiveIe_ = csRegs_.effectiveInterruptEnable();
 }
@@ -10647,6 +10647,12 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
   if (preCsrInst_)
     preCsrInst_(hartIx_, csr);
 
+  if (csr == CsrNumber::SEED)
+    {
+      illegalInst(di);
+      return;
+    }
+
   URV prev = 0;
   bool isWrite = di->op1() != 0;
   if (not doCsrRead(di, csr, isWrite, prev))
@@ -10699,6 +10705,12 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
 
   if (preCsrInst_)
     preCsrInst_(hartIx_, csr);
+
+  if (csr == CsrNumber::SEED)
+    {
+      illegalInst(di);
+      return;
+    }
 
   URV prev = 0;
   bool isWrite = di->op1() != 0;
@@ -10795,6 +10807,12 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
   if (preCsrInst_)
     preCsrInst_(hartIx_, csr);
 
+  if (csr == CsrNumber::SEED)
+    {
+      illegalInst(di);
+      return;
+    }
+
   URV imm = di->op1();
 
   URV prev = 0;
@@ -10849,6 +10867,12 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
 
   if (preCsrInst_)
     preCsrInst_(hartIx_, csr);
+
+  if (csr == CsrNumber::SEED)
+    {
+      illegalInst(di);
+      return;
+    }
 
   URV imm = di->op1();
 

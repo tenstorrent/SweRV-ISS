@@ -20,6 +20,27 @@
 using namespace WdRiscv;
 
 
+<<<<<<< HEAD
+=======
+static
+void
+printVersion()
+{
+  unsigned version = 1;
+  unsigned subversion = 840;
+  std::cout << "Version " << version << "." << subversion << " compiled on "
+	    << __DATE__ << " at " << __TIME__ << '\n';
+#ifdef GIT_SHA
+  #define xstr(x) str(x)
+  #define str(x) #x
+  std::cout << "Git SHA: " << xstr(GIT_SHA) << '\n';
+  #undef str
+  #undef xstr
+#endif
+}
+
+
+>>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
 void
 Args::expandTargets()
 {
@@ -219,6 +240,11 @@ Args::parseCmdLineArgs(std::span<char*> argv)
 	("isa", po::value(&this->isa),
 	 "Specify instruction set extensions to enable. Supported extensions "
 	 "are a, c, d, f, i, m, s and u. Default is imc.")
+<<<<<<< HEAD
+=======
+	("xlen", po::value(&this->regWidth),
+	 "Specify register width (32 or 64), defaults to 32")
+>>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
 	("harts", po::value(&this->harts),
 	 "Specify number of hardware threads per core (default=1).")
 	("cores", po::value(&this->cores),
@@ -439,7 +465,14 @@ Args::parseCmdLineArgs(std::span<char*> argv)
 
       bool earlyExit = false;
       if (this->version)
+<<<<<<< HEAD
 	earlyExit = true;
+=======
+	{
+	  printVersion();
+	  earlyExit = true;
+	}
+>>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
 
       if (this->help)
 	{

@@ -25,6 +25,13 @@
 #include "pci/Pci.hpp"
 #include "pci/virtio/Blk.hpp"
 
+
+namespace TT_PERFA
+{
+  class PerfApi;
+}
+
+
 namespace WdRiscv
 {
 
@@ -380,6 +387,7 @@ namespace WdRiscv
     std::shared_ptr<Memory> memory_;
     std::unique_ptr<SparseMem> sparseMem_;
     std::shared_ptr<Mcm<URV>> mcm_;
+    std::shared_ptr<TT_PERFA::PerfApi> perfApi_;
     unsigned mbSize_ = 64;  // Merge buffer size.
     std::string toHostSym_ = "tohost";   // ELF symbol to use as "tohost" addr.
     std::string fromHostSym_ = "fromhost";
