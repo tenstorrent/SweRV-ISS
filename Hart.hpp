@@ -832,10 +832,7 @@ namespace WdRiscv
     void lastCsr(std::vector<CsrNumber>& csrs) const
     { csRegs_.getLastWrittenRegs(csrs); }
 
-<<<<<<< HEAD
-=======
     /// Return the CSR value produced by the last executed instruction.
->>>>>>> f4a7d13e20320ff2868c8458f272d73c19caeb24
     URV lastCsrValue(CsrNumber csr)
     { return csRegs_.lastCsrValue(csr); }
 
