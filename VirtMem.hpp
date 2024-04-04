@@ -580,9 +580,13 @@ namespace WdRiscv
     { sum_ = flag; }
 
     /// Allow supervisor-mode code to access user-mode pages (supports SUM
-    /// bit in MSTATUS).
+    /// bit in VSTATUS).
     void setVsSum(bool flag)
     { vsSum_ = flag; }
+
+    /// Return the Vs SUM bit (as set by setVsSum).
+    bool vsSum() const
+    { return vsSum_; }
 
     /// Enable/disable page-based-memory types.
     void enablePbmt(bool flag)

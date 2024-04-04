@@ -3293,7 +3293,7 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
   if (csr == CN::SSTATUS)
     updateCachedSstatus();
   else if (csr == CN::VSSTATUS)
-    updateCachedSstatus();
+    updateCachedVsstatus();
 
   if (csRegs_.peekMstatus() != mstatus_.value())
     { updateCachedMstatus(); csRegs_.recordWrite(CN::MSTATUS); }

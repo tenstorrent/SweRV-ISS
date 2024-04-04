@@ -158,9 +158,13 @@ Hart<URV>::hyperLoad(const DecodedInst* di)
   // Use VS mode big-endian/make-exec-readbale for translation.
   bool prevTbe = virtMem_.bigEndian();  // Previous translation big endian.
   bool prevMxr = virtMem_.stage1ExecReadable();  // Previous stage1 MXR.
+  bool prevVsSum = virtMem_.vsSum();
+
   VirtMem::Pmm prevPmm = virtMem_.pmMode(PrivilegeMode::User, true /* twoStage */);
   virtMem_.setBigEndian(hstatus_.bits_.VSBE);
   virtMem_.setStage1ExecReadable(vsstatus_.bits_.MXR);
+  virtMem_.setVsSum(vsstatus_.bits_.SUM);
+
   if constexpr (isRv64())
     virtMem_.enablePointerMasking(VirtMem::Pmm(hstatus_.bits_.HUPMM),
                                       PrivilegeMode::User, true);
@@ -174,6 +178,8 @@ Hart<URV>::hyperLoad(const DecodedInst* di)
   hyperLs_ = false;
   virtMem_.setBigEndian(prevTbe);            // Restore big endian mod.
   virtMem_.setStage1ExecReadable(prevMxr);   // Restore stage1 MXR.
+  virtMem_.setVsSum(prevVsSum);
+
   if constexpr (isRv64())
     virtMem_.enablePointerMasking(prevPmm, PrivilegeMode::User, true);
 }
@@ -281,8 +287,12 @@ Hart<URV>::hyperStore(const DecodedInst* di)
   // Use VS mode big-endian for translation.
   bool prevTbe = virtMem_.bigEndian();  // Previous translation big endian.
   bool prevMxr = virtMem_.stage1ExecReadable();  // Previous stage1 MXR.
+  bool prevVsSum = virtMem_.vsSum();
+
   VirtMem::Pmm prevPmm = virtMem_.pmMode(PrivilegeMode::User, true /* twoStage */);
   virtMem_.setBigEndian(hstatus_.bits_.VSBE);
+  virtMem_.setVsSum(vsstatus_.bits_.SUM);
+
   if constexpr (isRv64())
     virtMem_.enablePointerMasking(VirtMem::Pmm(hstatus_.bits_.HUPMM),
                                   PrivilegeMode::User, true);
@@ -296,6 +306,8 @@ Hart<URV>::hyperStore(const DecodedInst* di)
   hyperLs_ = false;
   virtMem_.setBigEndian(prevTbe);            // Restore big endian mod.
   virtMem_.setStage1ExecReadable(prevMxr);   // Restore stage1 MXR.
+  virtMem_.setVsSum(prevVsSum);
+
   if constexpr (isRv64())
     virtMem_.enablePointerMasking(prevPmm, PrivilegeMode::User, true);
 }
