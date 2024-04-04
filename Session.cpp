@@ -2,7 +2,7 @@
 #include "HartConfig.hpp"
 
 using namespace WdRiscv;
-
+using StringVec = std::vector<std::string>;
 
 template <typename URV>
 Session<URV>::Session()
@@ -46,8 +46,8 @@ Session<URV>::defineSystem(const Args& args, const HartConfig& config)
 
   system_ = std::make_shared<System<URV>> (coreCount, hartsPerCore, hartIdOffset,
 					   memorySize, pageSize);
-  assert(system_ ->hartCount() == coreCount*hartsPerCore);
-  assert(system_ ->hartCount() > 0);
+  assert(system_ -> hartCount() == coreCount*hartsPerCore);
+  assert(system_ -> hartCount() > 0);
 
   return system_;
 }
@@ -60,24 +60,26 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
   if (not system_)
     return false;
 
+  auto& system = *system_;
+
   // Configure harts. Define callbacks for non-standard CSRs.
   bool userMode = args.isa.find_first_of("uU") != std::string::npos;
-  if (not config.configHarts(*system_, userMode, args.verbose))
+  if (not config.configHarts(system, userMode, args.verbose))
     if (not args.interactive)
       return false;
 
   // Configure memory.
-  if (not config.configMemory(*system_, args.unmappedElfOk))
+  if (not config.configMemory(system, args.unmappedElfOk))
     return false;
 
   if (not args.pciDevs.empty())
-    if (not system_ ->addPciDevices(args.pciDevs))
+    if (not system.addPciDevices(args.pciDevs))
       return false;
 
   if (not args.dataLines.empty())
-    system_ ->enableDataLineTrace(args.dataLines);
+    system.enableDataLineTrace(args.dataLines);
   if (not args.instrLines.empty())
-    system_ ->enableInstructionLineTrace(args.instrLines);
+    system.enableInstructionLineTrace(args.instrLines);
 
   bool newlib = false, linux = false;
   checkForNewlibOrLinux(args, newlib, linux);
@@ -90,6 +92,49 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
 
   if (not openUserFiles())
     return false; 
+
+  for (unsigned i = 0; i < system.hartCount(); ++i)
+    {
+      auto& hart = *(system_ -> ithHart(i));
+      hart.setConsoleOutput(consoleOut_);
+      hart.enableBasicBlocks(args.bblockFile, args.bblockInsts);
+      hart.enableNewlib(newlib);
+      hart.enableLinux(linux);
+      if (not isa.empty())
+	if (not hart.configIsa(isa, updateMisa))
+	  return false;
+      hart.reset();
+    }
+
+  for (unsigned i = 0; i < system.hartCount(); ++i)
+    if (not applyCmdLineArgs(args, system.thHart(i), config, clib))
+      if (not args.interactive)
+	return false;
+
+  if (not args.loadFrom.empty())
+    if (not system.loadSnapshot(args.loadFrom))
+      return false;
+
+  // Set instruction count limit.
+  if (args.instCountLim)
+    for (unsigned i = 0; i < system.hartCount(); ++i)
+      {
+	auto& hart = *system.ithHart(i);
+	uint64_t count = args.relativeInstCount? hart.getInstructionCount() : 0;
+	count += *args.instCountLim;
+	hart.setInstructionCountLimit(count);
+      }
+
+  if (not args.initStateFile.empty())
+    {
+      if (system.hartCount() > 1)
+	{
+	  std::cerr << "Initial line-state report (--initstate) valid only when hart count is 1\n";
+	  return false;
+	}
+      auto& hart0 = *system.ithHart(0);
+      hart0.setInitialStateFile(args.initStateFile);
+    }
 
   return true;
 }
@@ -414,7 +459,7 @@ template<typename URV>
 bool
 getElfFilesIsaString(const Args& args, std::string& isaString)
 {
-  std::vector<std::string> archTags;
+  StringVec archTags;
 
   unsigned errors = 0;
   
@@ -439,6 +484,242 @@ getElfFilesIsaString(const Args& args, std::string& isaString)
 
   if (args.verbose)
     std::cerr << "ISA string from ELF file(s): " << isaString << '\n';
+
+  return errors == 0;
+}
+
+
+template<typename URV>
+bool
+Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
+			       const HartConfig& config, bool clib)
+{
+  unsigned errors = 0;
+
+  auto& system = *system_;
+
+  if (clib)  // Linux or Newlib enabled.
+    sanitizeStackPointer(hart, args.verbose);
+
+  if (args.toHostSym)
+    system.setTohostSymbol(*args.toHostSym);
+
+  if (args.consoleIoSym)
+    system.setConsoleIoSymbol(*args.consoleIoSym);
+
+  // Load ELF/HEX/binary files. Entry point of first ELF file sets the start PC unless in
+  // raw mode.
+  if (hart.sysHartIndex() == 0)
+    {
+      StringVec paths;
+      for (const auto& target : args.expandedTargets)
+	paths.push_back(target.at(0));
+
+      if (not system.loadElfFiles(paths, args.raw, args.verbose))
+	errors++;
+
+      if (not system.loadHexFiles(args.hexFiles, args.verbose))
+	errors++;
+
+      uint64_t offset = 0;
+      if (not system.loadBinaryFiles(args.binaryFiles, offset, args.verbose))
+	errors++;
+
+      if (not args.kernelFile.empty())
+	{
+	  // Default kernel file offset. FIX: make a parameter.
+	  StringVec files{args.kernelFile};
+	  offset = hart.isRv64() ? 0x80200000 : 0x80400000;
+	  if (not system.loadBinaryFiles(files, offset, args.verbose))
+	    errors++;
+	}
+    }
+
+  if (not args.instFreqFile.empty())
+    hart.enableInstructionFrequency(true);
+
+  if (args.clint)
+    {
+      uint64_t swAddr = *args.clint;
+      uint64_t timerAddr = swAddr + 0x4000;
+      uint64_t clintEnd = swAddr + 0xc000;
+      config.configClint(system, hart, swAddr, clintEnd, timerAddr);
+    }
+
+  uint64_t window = 1000000;
+  if (args.branchWindow)
+    window = *args.branchWindow;
+  if (not args.branchTraceFile.empty())
+    hart.traceBranches(args.branchTraceFile, window);
+
+  if (args.logStart)
+    hart.setLogStart(*args.logStart);
+
+  if (args.logPerHart or (system.hartCount() == 1))
+    hart.setOwnTrace(args.logPerHart or (system.hartCount() == 1));
+
+  if (not args.loadFrom.empty())
+    {
+      if (not args.stdoutFile.empty() or not args.stderrFile.empty() or
+	  not args.stdinFile.empty())
+	std::cerr << "Info: Options --stdin/--stdout/--stderr are ignored with --loadfrom\n";
+    }
+  else
+    {
+      if (not args.stdoutFile.empty())
+	if (not hart.redirectOutputDescriptor(STDOUT_FILENO, args.stdoutFile))
+	  errors++;
+
+      if (not args.stderrFile.empty())
+	if (not hart.redirectOutputDescriptor(STDERR_FILENO, args.stderrFile))
+	  errors++;
+
+      if (not args.stdinFile.empty())
+	if (not hart.redirectInputDescriptor(STDIN_FILENO, args.stdinFile))
+	  errors++;
+    }
+
+  if (args.instCounter)
+    hart.setInstructionCount(*args.instCounter);
+
+  // Command line to-host overrides that of ELF and config file.
+  if (args.toHost)
+    hart.setToHostAddress(*args.toHost);
+  if (args.fromHost)
+    hart.setFromHostAddress(*args.fromHost);
+
+  // Command-line entry point overrides that of ELF.
+  if (args.startPc)
+    {
+      hart.defineResetPc(*args.startPc);
+      hart.pokePc(URV(*args.startPc));
+    }
+
+  // Command-line exit point overrides that of ELF.
+  if (args.endPc)
+    hart.setStopAddress(URV(*args.endPc));
+
+  // Command-line console io address overrides config file.
+  if (args.consoleIo)
+    hart.setConsoleIo(URV(*args.consoleIo));
+
+  hart.enableConsoleInput(! args.noConInput);
+
+  if (args.interruptor)
+    {
+      uint64_t addr = *args.interruptor;
+      config.configInterruptor(system, hart, addr);
+    }
+
+  if (args.syscallSlam)
+    hart.defineSyscallSlam(*args.syscallSlam);
+
+  if (args.tracePtw)
+    hart.tracePtw(true);
+
+  // Setup periodic external interrupts.
+  if (args.alarmInterval)
+    {
+      // Convert from micro-seconds to processor ticks. Assume a 1
+      // ghz-processor.
+      uint64_t ticks = (*args.alarmInterval)*1000;
+      hart.setupPeriodicTimerInterrupts(ticks);
+    }
+
+  if (args.triggers)
+    hart.enableTriggers(args.triggers);
+  hart.enableGdb(args.gdb);
+  if (args.gdbTcpPort.size()>hart.sysHartIndex())
+    hart.setGdbTcpPort(args.gdbTcpPort[hart.sysHartIndex()]);
+  if (args.counters)
+    hart.enablePerformanceCounters(args.counters);
+  if (args.abiNames)
+    hart.enableAbiNames(args.abiNames);
+
+  // Apply register initialization.
+  if (not applyCmdLineRegInit(args, hart))
+    errors++;
+
+  // Setup target program arguments.
+  if (not args.expandedTargets.empty())
+    {
+      if (clib)
+	{
+	  if (args.loadFrom.empty())
+	    if (not hart.setTargetProgramArgs(args.expandedTargets.front()))
+	      {
+		size_t memSize = hart.memorySize();
+		size_t suggestedStack = memSize - 4;
+
+		std::cerr << "Failed to setup target program arguments -- stack "
+			  << "is not writable\n"
+			  << "Try using --setreg sp=<val> to set the stack pointer "
+			  << "to a\nwritable region of memory (e.g. --setreg "
+			  << "sp=0x" << std::hex << suggestedStack << '\n'
+			  << std::dec;
+		errors++;
+	      }
+	}
+      else if (args.expandedTargets.front().size() > 1)
+	{
+	  std::cerr << "Warning: Target program options present which requires\n"
+		    << "         the use of --newlib/--linux. Options ignored.\n";
+	}
+    }
+
+  if (args.csv)
+    hart.enableCsvLog(args.csv);
+
+  if (args.logStart)
+    hart.setLogStart(*args.logStart);
+
+  if (args.mcm)
+    {
+      unsigned mcmLineSize = 64;
+      config.getMcmLineSize(mcmLineSize);
+      if (args.mcmls)
+	mcmLineSize = *args.mcmls;
+      bool checkAll = false;
+      config.getMcmCheckAll(checkAll);
+      if (args.mcmca)
+	checkAll = true;
+      if (not system.enableMcm(mcmLineSize, checkAll))
+	errors++;
+    }
+
+  if (not args.snapshotPeriods.empty())
+    {
+      auto periods = args.snapshotPeriods;
+      std::sort(periods.begin(), periods.end());
+      if (std::find(periods.begin(), periods.end(), 0)
+                      != periods.end())
+        {
+          std::cerr << "Snapshot periods of 0 are ignored\n";
+          periods.erase(std::remove(periods.begin(), periods.end(), 0), periods.end());
+        }
+
+      auto it = std::unique(periods.begin(), periods.end());
+      if (it != periods.end())
+        {
+          periods.erase(it, periods.end());
+          std::cerr << "Duplicate snapshot periods not supported, removed duplicates\n";
+        }
+    }
+
+  if (not args.snapshotDir.empty())
+    system.setSnapshotDir(args.snapshotDir);
+
+  if (args.tlbSize)
+    {
+      size_t size = *args.tlbSize;
+      if ((size & (size-1)) != 0)
+	{
+	  std::cerr << "TLB size must be a power of 2\n";
+	  errors++;
+	}
+      else
+	hart.setTlbSize(size);
+    }
 
   return errors == 0;
 }

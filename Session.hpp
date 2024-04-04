@@ -76,6 +76,9 @@ namespace WdRiscv
 
     bool getElfFilesIsaString(const Args& args, std::string& isaString);
 
+    bool applyCmdLineArgs(const Args& args, Hart<URV>& hart, const HartConfig& config,
+			  bool clib);
+
   private:
 
     std::vector<FILE*> traceFiles_;
