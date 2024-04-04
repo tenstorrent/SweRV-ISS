@@ -44,8 +44,14 @@
 
 #include "Session.hpp"
 #include "HartConfig.hpp"
+#include "Hart.hpp"
 #include "Server.hpp"
 #include "Interactive.hpp"
+
+
+#if !defined(SOL_TCP) && defined(IPPROTO_TCP)
+#define SOL_TCP IPPROTO_TCP
+#endif
 
 
 using namespace WdRiscv;
@@ -137,14 +143,14 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
   if (not determineIsa(config, args, clib, isa))
     return false;
 
-  if (not openUserFiles())
+  if (not openUserFiles(args))
     return false; 
 
   for (unsigned i = 0; i < system.hartCount(); ++i)
     {
       auto& hart = *(system_ -> ithHart(i));
       hart.setConsoleOutput(consoleOut_);
-      hart.enableBasicBlocks(args.bblockFile, args.bblockInsts);
+      hart.enableBasicBlocks(bblockFile_, args.bblockInsts);
       hart.enableNewlib(newlib);
       hart.enableLinux(linux);
       if (not isa.empty())
@@ -154,7 +160,7 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
     }
 
   for (unsigned i = 0; i < system.hartCount(); ++i)
-    if (not applyCmdLineArgs(args, system.thHart(i), config, clib))
+    if (not applyCmdLineArgs(args, *system.ithHart(i), config, clib))
       if (not args.interactive)
 	return false;
 
@@ -180,7 +186,7 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
 	  return false;
 	}
       auto& hart0 = *system.ithHart(0);
-      hart0.setInitialStateFile(args.initStateFile);
+      hart0.setInitialStateFile(initStateFile_);
     }
 
   return true;
@@ -386,7 +392,6 @@ Session<URV>::closeUserFiles()
     fclose(consoleOut_);
   consoleOut_ = nullptr;
 
-  unsigned ix = 0;
   FILE* prev = nullptr;
   for (auto& traceFile : traceFiles_)
     {
@@ -504,7 +509,7 @@ Session<URV>::determineIsa(const HartConfig& config, const Args& args, bool clib
 
 template<typename URV>
 bool
-getElfFilesIsaString(const Args& args, std::string& isaString)
+Session<URV>::getElfFilesIsaString(const Args& args, std::string& isaString)
 {
   StringVec archTags;
 
@@ -533,6 +538,101 @@ getElfFilesIsaString(const Args& args, std::string& isaString)
     std::cerr << "ISA string from ELF file(s): " << isaString << '\n';
 
   return errors == 0;
+}
+
+
+/// Set stack pointer to a reasonable value for Linux/Newlib.
+template<typename URV>
+static
+void
+sanitizeStackPointer(Hart<URV>& hart, bool verbose)
+{
+  // Set stack pointer to the 128 bytes below end of memory.
+  size_t memSize = hart.getMemorySize();
+  if (memSize > 128)
+    {
+      size_t spValue = memSize - 128;
+      if (verbose)
+	std::cerr << "Setting stack pointer to 0x" << std::hex << spValue
+		  << std::dec << " for newlib/linux\n";
+      hart.pokeIntReg(IntRegNumber::RegSp, spValue);
+    }
+}
+
+
+/// Apply register initialization specified on the command line.
+template<typename URV>
+static
+bool
+applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
+{
+  bool ok = true;
+
+  URV hartIx = hart.sysHartIndex();
+
+  for (const auto& regInit : args.regInits)
+    {
+      // Each register initialization is a string of the form reg=val or hart:reg=val
+      std::vector<std::string> tokens;
+      boost::split(tokens, regInit, boost::is_any_of("="), boost::token_compress_on);
+      if (tokens.size() != 2)
+	{
+	  std::cerr << "Invalid command line register initialization: " << regInit << '\n';
+	  ok = false;
+	  continue;
+	}
+
+      std::string regName = tokens.at(0);
+      const std::string& regVal = tokens.at(1);
+
+      bool specificHart = false;
+      unsigned ix = 0;
+      size_t colonIx = regName.find(':');
+      if (colonIx != std::string::npos)
+	{
+	  std::string hartStr = regName.substr(0, colonIx);
+	  regName = regName.substr(colonIx + 1);
+	  if (not Args::parseCmdLineNumber("hart", hartStr, ix))
+	    {
+	      std::cerr << "Invalid command line register initialization: " << regInit << '\n';
+	      ok = false;
+	      continue;
+	    }
+	  specificHart = true;
+	}
+
+      URV val = 0;
+      if (not Args::parseCmdLineNumber("register", regVal, val))
+	{
+	  ok = false;
+	  continue;
+	}
+
+      if (specificHart and ix != hartIx)
+	continue;
+
+      unsigned reg = 0;
+      Csr<URV>* csr = nullptr;
+
+      if (hart.findIntReg(regName, reg))
+	hart.pokeIntReg(reg, val);
+      else if (hart.findFpReg(regName, reg))
+	hart.pokeFpReg(reg, val);
+      else if ((csr = hart.findCsr(regName)) != nullptr)
+	hart.pokeCsr(csr->getNumber(), val);
+      else
+	{
+	  std::cerr << "Invalid --setreg register: " << regName << '\n';
+	  ok = false;
+	  continue;
+	}
+
+      if (args.verbose)
+	std::cerr << "Setting register " << regName << " to command line "
+		  << "value 0x" << std::hex << val << std::dec << '\n';
+    }
+
+  return ok;
 }
 
 
@@ -951,8 +1051,59 @@ Session<URV>::runInteractive()
   newAction.sa_handler = kbdInterruptHandler;
   sigaction(SIGINT, &newAction, nullptr);
 
-  Interactive interactive(system);
+  Interactive interactive(*system_);
   return interactive.interact(traceFiles_.at(0), commandLog_);
+}
+
+
+//NOLINTBEGIN(bugprone-reserved-identifier, cppcoreguidelines-avoid-non-const-global-variables)
+extern void (*__tracerExtension)(void*);
+void (*__tracerExtensionInit)() = nullptr;
+extern "C" {
+  std::string tracerExtensionArgs;
+}
+//NOLINTEND(bugprone-reserved-identifier, cppcoreguidelines-avoid-non-const-global-variables)
+
+template <typename URV>
+static
+bool
+loadTracerLibrary(const std::string& tracerLib)
+{
+  if (tracerLib.empty())
+    return true;
+
+  std::vector<std::string> result;
+  boost::split(result, tracerLib, boost::is_any_of(":"));
+  assert(not result.empty());
+
+  auto* soPtr = dlopen(result[0].c_str(), RTLD_NOW);
+  if (not soPtr)
+    {
+      std::cerr << "Error: Failed to load shared library " << dlerror() << '\n';
+      return false;
+    }
+
+  if (result.size() == 2)
+    tracerExtensionArgs = result[1];
+
+  std::string entry("tracerExtension");
+  entry += sizeof(URV) == 4 ? "32" : "64";
+
+  __tracerExtension = reinterpret_cast<void (*)(void*)>(dlsym(soPtr, entry.c_str()));
+  if (not __tracerExtension)
+    {
+      std::cerr << "Error: Could not find symbol tracerExtension in " << tracerLib << '\n';
+      return false;
+    }
+
+  entry = "tracerExtensionInit";
+  entry += sizeof(URV) == 4 ? "32" : "64";
+
+  __tracerExtensionInit = reinterpret_cast<void (*)()>(dlsym(soPtr, entry.c_str()));
+  if (__tracerExtensionInit)
+    __tracerExtensionInit();
+
+  return true;
 }
 
 
@@ -969,8 +1120,8 @@ Session<URV>::run(const Args& args)
   if (serverMode)
     {
       if (args.shm)
-	return runServerShm(system, args.serverFile, traceFiles_.at(0), commandLog_);
-      return runServer(system, args.serverFile, traceFiles_.at(0), commandLog_);
+	return runServerShm(args.serverFile);
+      return runServer(args.serverFile);
     }
 
   if (args.interactive)
@@ -990,3 +1141,83 @@ Session<URV>::run(const Args& args)
 
   return system.batchRun(traceFiles_, waitAll, stepWindow);
 }
+
+
+static bool
+getXlenFromElfFile(const Args& args, unsigned& xlen)
+{
+  if (args.expandedTargets.empty())
+    return false;
+
+  // Get the length from the first target.
+  const auto& elfPath = args.expandedTargets.front().front();
+  bool is32 = false, is64 = false, isRiscv = false;
+  if (not Memory::checkElfFile(elfPath, is32, is64, isRiscv))
+    return false;  // ELF does not exist.
+
+  if (not is32 and not is64)
+    return false;
+
+  if (is32 and is64)
+    {
+      std::cerr << "Error: ELF file '" << elfPath << "' has both 32 and 64-bit class\n";
+      return false;
+    }
+
+  xlen = is32 ? 32 : 64;
+
+  if (args.verbose)
+    std::cerr << "Setting xlen to " << xlen << " based on ELF file " <<  elfPath << '\n';
+  return true;
+}
+
+
+template<typename URV>
+unsigned
+Session<URV>::determineRegisterWidth(const Args& args, const HartConfig& config)
+{
+  unsigned isaLen = 0;
+  if (not args.isa.empty())
+    {
+      if (args.isa.starts_with("rv32"))
+	isaLen = 32;
+      else if (args.isa.starts_with("rv64"))
+	isaLen = 64;
+      else
+	std::cerr << "Command line --isa tag does not start with rv32/rv64\n";
+    }
+
+  // 1. If --isa specifies xlen, go with that.
+  if (isaLen)
+    {
+      if (args.verbose)
+        std::cerr << "Setting xlen from --isa: " << isaLen << "\n";
+      return isaLen;
+    }
+
+  // 2. If config file has isa tag, go with that.
+  unsigned xlen = 32;
+  if (config.getXlen(xlen))
+    {
+      if (args.verbose)
+	std::cerr << "Setting xlen from config file: " << xlen << "\n";
+      return xlen;
+    }
+
+  // 3. Get xlen from ELF file.
+  if (getXlenFromElfFile(args, xlen))
+    {
+      if (args.verbose)
+	std::cerr << "Setting xlen from ELF file: " << xlen << "\n";
+      return xlen;
+    }
+
+  if (args.verbose)
+    std::cerr << "Using default for xlen: " << xlen << "\n";
+  
+  return xlen;
+}
+
+
+template class WdRiscv::Session<uint32_t>;
+template class WdRiscv::Session<uint64_t>;

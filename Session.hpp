@@ -49,6 +49,13 @@ namespace WdRiscv
 
     bool configureSystem(const Args& args, const HartConfig& config);
 
+    bool run(const Args& args);
+
+    /// Obtain integer-register width (xlen). Command line has top priority, then config
+    /// file, then ELF file.
+    static
+    unsigned determineRegisterWidth(const Args& args, const HartConfig& config);
+
   protected:
 
     bool getPrimaryConfigParameters(const Args& args, const HartConfig& config,
@@ -89,8 +96,6 @@ namespace WdRiscv
     bool runServerShm(const std::string& serverFile);
 
     bool runInteractive();
-
-    bool run(const Args& args);
 
   private:
 
