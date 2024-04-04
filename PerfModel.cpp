@@ -134,7 +134,8 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
       // Instruction is being re-executed. Must be load/store. Every instruction that
       // depends on it must be re-executed.
       auto& di = packet->decodedInst();
-      assert(di.isLoad() or di.isStore());
+      if (not di.isLoad() and not di.isStore())
+	assert(0);
       auto& packetMap = hartPacketMaps_.at(hartIx);
       auto iter = packetMap.find(packet->tag());
       assert(iter != packetMap.end());
@@ -321,6 +322,7 @@ PerfApi::execute(Hart64& hart, InstrPac& packet)
     }
   
   hart.pokePc(prevPc);
+  packet->execTime_ = time;
 
   return true;
 }
