@@ -1555,8 +1555,8 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
   if (isa.empty() and not args.raw)
     {
       if (args.verbose)
-	std::cerr << "No ISA specified: Defaulting to imac\n";
-      isa = "imac";
+	std::cerr << "No ISA specified: Defaulting to imacfd\n";
+      isa = "imacfd";
     }
 
   return true;
