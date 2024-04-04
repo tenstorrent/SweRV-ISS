@@ -86,15 +86,12 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
 
   for (const auto& regInit : args.regInits)
     {
-      // Each register initialization is a string of the form reg=val
-      // or hart:reg=val
+      // Each register initialization is a string of the form reg=val or hart:reg=val
       std::vector<std::string> tokens;
-      boost::split(tokens, regInit, boost::is_any_of("="),
-		   boost::token_compress_on);
+      boost::split(tokens, regInit, boost::is_any_of("="), boost::token_compress_on);
       if (tokens.size() != 2)
 	{
-	  std::cerr << "Invalid command line register initialization: "
-		    << regInit << '\n';
+	  std::cerr << "Invalid command line register initialization: " << regInit << '\n';
 	  ok = false;
 	  continue;
 	}
@@ -111,8 +108,7 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
 	  regName = regName.substr(colonIx + 1);
 	  if (not Args::parseCmdLineNumber("hart", hartStr, ix))
 	    {
-	      std::cerr << "Invalid command line register initialization: "
-			<< regInit << '\n';
+	      std::cerr << "Invalid command line register initialization: " << regInit << '\n';
 	      ok = false;
 	      continue;
 	    }
@@ -129,36 +125,25 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
       if (specificHart and ix != hartIx)
 	continue;
 
-      if (unsigned reg = 0; hart.findIntReg(regName, reg))
+      unsigned reg = 0;
+      Csr<URV>* csr = nullptr;
+
+      if (hart.findIntReg(regName, reg))
+	hart.pokeIntReg(reg, val);
+      else if (hart.findFpReg(regName, reg))
+	hart.pokeFpReg(reg, val);
+      else if ((csr = hart.findCsr(regName)) != nullptr)
+	hart.pokeCsr(csr->getNumber(), val);
+      else
 	{
-	  if (args.verbose)
-	    std::cerr << "Setting register " << regName << " to command line "
-		      << "value 0x" << std::hex << val << std::dec << '\n';
-	  hart.pokeIntReg(reg, val);
+	  std::cerr << "Invalid --setreg register: " << regName << '\n';
+	  ok = false;
 	  continue;
 	}
 
-      if (unsigned reg = 0; hart.findFpReg(regName, reg))
-	{
-	  if (args.verbose)
-	    std::cerr << "Setting register " << regName << " to command line "
-		      << "value 0x" << std::hex << val << std::dec << '\n';
-	  hart.pokeFpReg(reg, val);
-	  continue;
-	}
-
-      auto csr = hart.findCsr(regName);
-      if (csr)
-	{
-	  if (args.verbose)
-	    std::cerr << "Setting register " << regName << " to command line "
-		      << "value 0x" << std::hex << val << std::dec << '\n';
-	  hart.pokeCsr(csr->getNumber(), val);
-	  continue;
-	}
-
-      std::cerr << "No such RISCV register: " << regName << '\n';
-      ok = false;
+      if (args.verbose)
+	std::cerr << "Setting register " << regName << " to command line "
+		  << "value 0x" << std::hex << val << std::dec << '\n';
     }
 
   return ok;
@@ -609,7 +594,7 @@ template <typename URV>
 static
 bool
 runServerShm(System<URV>& system, const std::string& serverFile,
-	  FILE* traceFile, FILE* commandLog)
+	     FILE* traceFile, FILE* commandLog)
 {
   std::string path = "/" + serverFile;
   int fd = shm_open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
@@ -1084,6 +1069,14 @@ session(const Args& args, const HartConfig& config)
 
   checkAndRepairMemoryParams(memorySize, pageSize);
 
+  if (args.hexFiles.empty() and args.expandedTargets.empty()
+      and args.binaryFiles.empty() and args.kernelFile.empty()
+      and not args.interactive)
+    {
+      std::cerr << "No program file specified.\n";
+      return false;
+    }
+
   // Create cores & harts.
   unsigned hartIdOffset = hartsPerCore;
   config.getHartIdOffset(hartIdOffset);
@@ -1116,22 +1109,6 @@ session(const Args& args, const HartConfig& config)
   if (not args.instrLines.empty())
     system.enableInstructionLineTrace(args.instrLines);
 
-  if (args.hexFiles.empty() and args.expandedTargets.empty()
-      and args.binaryFiles.empty() and args.kernelFile.empty()
-      and not args.interactive)
-    {
-      std::cerr << "No program file specified.\n";
-      return false;
-    }
-
-  std::vector<FILE*> traceFiles(system.hartCount(), nullptr);
-  FILE* commandLog = nullptr;
-  FILE* consoleOut = stdout;
-  FILE* bblockFile = nullptr;
-  FILE* initStateFile = nullptr;
-  if (not openUserFiles(args, traceFiles, commandLog, consoleOut, bblockFile, initStateFile))
-    return false;
-
   bool newlib = false, linux = false;
   checkForNewlibOrLinux(args, newlib, linux);
   bool clib = newlib or linux;
@@ -1139,6 +1116,14 @@ session(const Args& args, const HartConfig& config)
 
   std::string isa;
   if (not determineIsa(config, args, clib, isa))
+    return false;
+
+  std::vector<FILE*> traceFiles(system.hartCount(), nullptr);
+  FILE* commandLog = nullptr;
+  FILE* consoleOut = stdout;
+  FILE* bblockFile = nullptr;
+  FILE* initStateFile = nullptr;
+  if (not openUserFiles(args, traceFiles, commandLog, consoleOut, bblockFile, initStateFile))
     return false;
 
   for (unsigned i = 0; i < system.hartCount(); ++i)
@@ -1312,7 +1297,7 @@ main(int argc, char* argv[])
   try
     {
       Args args;
-      if (args.parseCmdLineArgs(std::span(argv, argc)))
+      if (not args.parseCmdLineArgs(std::span(argv, argc)))
         return 1;
       if (args.help)
         return 0;
