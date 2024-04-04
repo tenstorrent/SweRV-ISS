@@ -360,7 +360,6 @@ Hart<URV>::processExtensions(bool verbose)
   enableExtension(RvExtension::Zvknha,   isa_.isEnabled(RvExtension::Zvknha));
   enableExtension(RvExtension::Zvknhb,   isa_.isEnabled(RvExtension::Zvknhb));
   enableExtension(RvExtension::Zvksed,   isa_.isEnabled(RvExtension::Zvksed));
-  enableExtension(RvExtension::Zkr,      isa_.isEnabled(RvExtension::Zkr));
   enableExtension(RvExtension::Zvksh,    isa_.isEnabled(RvExtension::Zvksh));
   enableExtension(RvExtension::Zicond,   isa_.isEnabled(RvExtension::Zicond));
   enableExtension(RvExtension::Zcb,      isa_.isEnabled(RvExtension::Zcb));
@@ -372,8 +371,6 @@ Hart<URV>::processExtensions(bool verbose)
   enableExtension(RvExtension::Ssaia,    isa_.isEnabled(RvExtension::Ssaia));
   enableExtension(RvExtension::Zicsr,    true /*isa_.isEnabled(RvExtension::Zicsr)*/);
   enableExtension(RvExtension::Zifencei, true /*isa_.isEnabled(RvExtension::Zifencei)*/);
-  enableExtension(RvExtension::Ssnpm,    isa_.isEnabled(RvExtension::Ssnpm));
-  enableExtension(RvExtension::Smnpm,    isa_.isEnabled(RvExtension::Smnpm));
 
   if (isa_.isEnabled(RvExtension::Sstc))
     enableRvsstc(true);
@@ -389,6 +386,11 @@ Hart<URV>::processExtensions(bool verbose)
     enableZihpm(true);
   if (isa_.isEnabled(RvExtension::Sscofpmf))
     enableSscofpmf(true);
+  if (isa_.isEnabled(RvExtension::Zkr))
+    enableZkr(true);
+
+  enableSsnpm(isa_.isEnabled(RvExtension::Ssnpm));
+  enableSmnpm(isa_.isEnabled(RvExtension::Smnpm));
 
   stimecmpActive_ = csRegs_.menvcfgStce();
   vstimecmpActive_ = csRegs_.henvcfgStce();
