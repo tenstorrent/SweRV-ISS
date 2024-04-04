@@ -79,6 +79,19 @@ namespace WdRiscv
     bool applyCmdLineArgs(const Args& args, Hart<URV>& hart, const HartConfig& config,
 			  bool clib);
 
+    /// Open a server socket and put opened socket information (hostname and port number)
+    /// in the given server file. Wait for one connection. Service connection. Return true
+    /// on success and false on failure.
+    bool runServer(const std::string& serverFile);
+
+    /// Open a shared memory region and write name to given server file. Return true on
+    /// success and false on failure.
+    bool runServerShm(const std::string& serverFile);
+
+    bool runInteractive();
+
+    bool run(const Args& args);
+
   private:
 
     std::vector<FILE*> traceFiles_;

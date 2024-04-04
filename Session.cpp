@@ -1,5 +1,52 @@
+// Copyright 2020 Western Digital Corporation or its affiliates.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Copyright 2024 Tenstorrent Corporation or its affiliates.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+
+#include <fstream>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <sys/mman.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <unistd.h>
+#include <dlfcn.h>
+#include <csignal>
+
 #include "Session.hpp"
 #include "HartConfig.hpp"
+#include "Server.hpp"
+#include "Interactive.hpp"
+
 
 using namespace WdRiscv;
 using StringVec = std::vector<std::string>;
@@ -722,4 +769,224 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
     }
 
   return errors == 0;
+}
+
+
+template<typename URV>
+bool
+Session<URV>::runServer(const std::string& serverFile)
+{
+  auto& system = *system_;
+  auto traceFile = traceFiles_.at(0);
+  auto commandLog = commandLog_;
+
+  std::array<char, 1024> hostName = {};
+  if (gethostname(hostName.data(), hostName.size()) != 0)
+    {
+      std::cerr << "Failed to obtain name of this computer\n";
+      return false;
+    }
+
+  int soc = socket(AF_INET, SOCK_STREAM, 0);
+  if (soc < 0)
+    {
+      std::array<char, 512> buffer;
+      char* p = buffer.data();
+#ifdef __APPLE__
+      strerror_r(errno, buffer.data(), buffer.size());
+#else
+      p = strerror_r(errno, buffer.data(), buffer.size());
+#endif
+      std::cerr << "Failed to create socket: " << p << '\n';
+      return -1;
+    }
+
+  int one = 1;
+  setsockopt(soc, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
+
+  sockaddr_in serverAddr;
+  memset(&serverAddr, 0, sizeof(serverAddr));
+  serverAddr.sin_family = AF_INET;
+  serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  serverAddr.sin_port = htons(0);
+
+  if (bind(soc, (sockaddr*) &serverAddr, sizeof(serverAddr)) < 0)
+    {
+      perror("Socket bind failed");
+      return false;
+    }
+
+  if (listen(soc, 1) < 0)
+    {
+      perror("Socket listen failed");
+      return false;
+    }
+
+  sockaddr_in socAddr;
+  socklen_t socAddrSize = sizeof(socAddr);
+  socAddr.sin_family = AF_INET;
+  socAddr.sin_port = 0;
+  if (getsockname(soc, (sockaddr*) &socAddr,  &socAddrSize) == -1)
+    {
+      perror("Failed to obtain socket information");
+      return false;
+    }
+
+  {
+    std::ofstream out(serverFile);
+    if (not out.good())
+      {
+	std::cerr << "Failed to open file '" << serverFile << "' for output\n";
+	return false;
+      }
+    out << hostName.data() << ' ' << ntohs(socAddr.sin_port) << std::endl;
+  }
+
+  sockaddr_in clientAddr;
+  socklen_t clientAddrSize = sizeof(clientAddr);
+  int newSoc = accept(soc, (sockaddr*) & clientAddr, &clientAddrSize);
+  if (newSoc < 0)
+    {
+      perror("Socket accept failed");
+      return false;
+    }
+
+  one = 1;
+  setsockopt(newSoc, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
+
+  bool ok = true;
+
+  try
+    {
+      Server<URV> server(system);
+      ok = server.interact(newSoc, traceFile, commandLog);
+    }
+  catch(...)
+    {
+      ok = false;
+    }
+
+  close(newSoc);
+  close(soc);
+
+  return ok;
+}
+
+
+template<typename URV>
+bool
+Session<URV>::runServerShm(const std::string& serverFile)
+{
+  auto& system = *system_;
+  auto traceFile = traceFiles_.at(0);
+  auto commandLog = commandLog_;
+
+  std::string path = "/" + serverFile;
+  int fd = shm_open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+  if (fd < 0)
+    {
+      perror("Failed to open shared memory file");
+      return false;
+    }
+  if (ftruncate(fd, 4096) < 0)
+    {
+      perror("Failed ftruncate on shared memory file");
+      return false;
+    }
+
+  char* shm = (char*) mmap(nullptr, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (shm == MAP_FAILED)
+    {
+      perror("Failed mmap");
+      return false;
+    }
+
+  bool ok = true;
+
+  try
+    {
+      Server<URV> server(system);
+      ok = server.interact(std::span<char>(shm, 4096), traceFile, commandLog);
+    }
+  catch(...)
+    {
+      ok = false;
+    }
+
+  if (munmap(shm, 4096) < 0)
+    {
+      perror("Failed to unmap");
+      return false;
+    }
+
+  close(fd);
+
+  if (shm_unlink(path.c_str()) < 0)
+    {
+      perror("Failed shm unlink");
+      return false;
+    }
+  return ok;
+}
+
+
+// In interactive mode, keyboard interrupts (typically control-c) are
+// ignored.
+static void
+kbdInterruptHandler(int)
+{
+  std::cerr << "keyboard interrupt\n";
+}
+
+
+template<typename URV>
+bool
+Session<URV>::runInteractive()
+{
+  // Ignore keyboard interrupt for most commands. Long running
+  // commands will enable keyboard interrupts while they run.
+  struct sigaction newAction;
+  sigemptyset(&newAction.sa_mask);
+  newAction.sa_flags = 0;
+  newAction.sa_handler = kbdInterruptHandler;
+  sigaction(SIGINT, &newAction, nullptr);
+
+  Interactive interactive(system);
+  return interactive.interact(traceFiles_.at(0), commandLog_);
+}
+
+
+template<typename URV>
+bool
+Session<URV>::run(const Args& args)
+{
+  auto& system = *system_;
+
+  if (not loadTracerLibrary<URV>(args.tracerLib))
+    return false;
+
+  bool serverMode = not args.serverFile.empty();
+  if (serverMode)
+    {
+      if (args.shm)
+	return runServerShm(system, args.serverFile, traceFiles_.at(0), commandLog_);
+      return runServer(system, args.serverFile, traceFiles_.at(0), commandLog_);
+    }
+
+  if (args.interactive)
+    return runInteractive();
+
+  if (not args.snapshotPeriods.empty())
+    return system.snapshotRun(traceFiles_, args.snapshotPeriods);
+
+  bool waitAll = not args.quitOnAnyHart;
+  uint64_t stepWindow = args.deterministic.value_or(0);
+  unsigned seed = args.seed.value_or(time(NULL));
+  srand(seed);
+
+  if (stepWindow)
+    std::cout << "Deterministic multi-hart run with seed: " << seed
+	      << " and steps distribution between 1 and " << stepWindow << "\n";
+
+  return system.batchRun(traceFiles_, waitAll, stepWindow);
 }
