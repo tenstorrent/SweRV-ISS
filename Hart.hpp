@@ -1693,10 +1693,6 @@ namespace WdRiscv
     {
       walks.clear();
       walks = isInstr? virtMem_.getFetchWalks() : virtMem_.getDataWalks();
-      for (auto& i : walks)
-        for (auto& entry: i)
-            if (entry.type_ == VirtMem::WalkEntry::Type::PA)
-                peekMemory(entry.addr_, entry.addr_, true);
     }
 
     /// Return PMP manager associated with this hart.

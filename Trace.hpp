@@ -246,6 +246,10 @@ namespace WdRiscv
     bool peekCsReg(CsrNumber number, URV& value) const
     { return hart_->peekCsr(number, value); }
 
+    void peekMemory(uint64_t addr, uint64_t &val, bool usePma) {
+      hart_->peekMemory(addr, val, usePma);
+    };
+
     /// TODO: modified regs
     /// Return the list of CSR address-value pairs modified after last executed instruction.
     using CVP = std::pair<URV, URV>;  // CSR-value pair
