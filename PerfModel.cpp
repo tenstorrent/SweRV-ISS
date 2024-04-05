@@ -428,16 +428,11 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
     return false;
 
   auto hart = checkHart("Drain-store", hartIx);
-  if (not hart)
-    return false;
-
   auto packet = checkTag("Drain-store", hartIx, tag);
-  if (not packet)
-    return false;
 
-  if (not packet->retired())
+  if (not hart or not packet or not packet->retired())
     {
-      assert(0 && "Draining non-rertired tag");
+      assert(0);
       return false;
     }
 
@@ -460,34 +455,12 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t& data)
 {
 
   auto hart = checkHart("Get-load-data", hartIx);
-  if (not hart)
-    {
-      assert(0 && "getLoadData: bad hart ix");
-      return false;
-    }
-
   auto packet = checkTag("Get-load-Data", hartIx, tag);
-  if (not packet)
-    {
-      assert(0 && "getLoadData: bad tag");
-      return false;
-    }
 
-  if (not packet->executed())
+  if (not hart or not packet or not packet->executed() or not packet->di_.isLoad()
+      or packet->trapped())
     {
-      assert(0 && "getLoadData: non-executed instruction");
-      return false;
-    }
-
-  if (not packet->di_.isLoad())
-    {
-      assert(0 && "getLoadData: not a load");
-      return false;
-    }
-
-  if (packet->trapped())
-    {
-      assert(0 && "getLoadData: trapped instruction");
+      assert(0);
       return false;
     }
 
