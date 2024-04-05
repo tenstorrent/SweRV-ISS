@@ -392,21 +392,18 @@ namespace WdRiscv
       return gm8*bytesPerReg_/eewInBits;
     }
 
-    /// Return the number of elements in a vector register given
-    /// an EEW.
+    /// Return the number of elements in a vector register given an EEW.
     uint32_t singleMax(ElementWidth eew) const
     {
       uint32_t eewInBits = elemWidthInBits(eew);
       return 8*bytesPerReg_/eewInBits;
     }
 
-    /// Return the maximum of the VLMAX and VLEN/EEW for tail elements
-    /// when LMUL < 1.
+    /// Return the maximum of the VLMAX and VLEN/EEW for tail elements when LMUL < 1.
     uint32_t elemMax(ElementWidth eew) const
     { return std::max(vlmax(), singleMax(eew)); }
 
-    /// Return the maximum of the VLMAX and VLEN/SEW for tail elements
-    /// when LMUL < 1.
+    /// Return the maximum of the VLMAX and VLEN/SEW for tail elements when LMUL < 1.
     uint32_t elemMax() const
     { return elemMax(sew_); }
 
@@ -418,13 +415,21 @@ namespace WdRiscv
     bool isTailAgnosticOnes() const
     { return tailAgnOnes_; }
 
-    /// Return true if mask-producing instructions should update the
-    /// whole destination register.
+    /// Return true if mask-agnostic is set.
+    bool isMaskAgnostic() const
+    { return maskAgn_; }
+
+    /// Return true if mask-agnostic-policy is set to all-ones.
+    bool isMaskAgnosticOnes() const
+    { return maskAgnOnes_; }
+
+    /// Return true if mask-producing instructions should update the whole destination
+    /// register.
     bool updateWholeMask() const
     { return updateWholeMask_; }
 
-    /// Return true if mask-producing instructions should update the
-    /// whole destination register.
+    /// Return true if mask-producing instructions should update the whole destination
+    /// register.
     void configUpdateWholeMask(bool flag)
     { updateWholeMask_ = flag; }
 

@@ -4459,6 +4459,9 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
       return;
     }
 
+  // True if masked-off elements should be set to 1.
+  bool ones = vecRegs_.isMaskAgnostic() and vecRegs_.isMaskAgnosticOnes();
+
   bool found = false;  // true if set bit is found in vs1
 
   for (uint32_t ix = start; ix < elemCount; ++ix)
@@ -4467,20 +4470,19 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
       bool active = vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag);
 
       bool input = false;
-      if (ix < vecRegs_.elemCount())
+      if (ix < vecRegs_.elemCount() and active)
 	vecRegs_.readMaskRegister(vs1, ix, input);
 
       if (active)
 	vecRegs_.writeMaskRegister(vd, ix, false);
+      else if (ones)
+	vecRegs_.writeMaskRegister(vd, ix, true);
 
       if (found or not input)
 	continue;
 
-      if (active)
-	{
-	  found = true;
-	  vecRegs_.writeMaskRegister(vd, ix, true);
-	}
+      found = true;
+      vecRegs_.writeMaskRegister(vd, ix, true);
     }
 
   vecRegs_.touchMask(vd);  // In case nothing was written
