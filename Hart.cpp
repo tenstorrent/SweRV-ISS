@@ -1560,7 +1560,9 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	  addr1 = va1;  // To report virtual address in MTVAL.
 	  return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
 	}
-      pma = getPma(addr2);
+      uint64_t aligned = addr1 & ~alignMask;
+      uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
+      pma = getPma(next);
       if (not pma.isRead())
 	{
 	  addr1 = va2;
@@ -11019,7 +11021,9 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	  addr1 = va1;  // To report virtual address in MTVAL.
 	  return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
 	}
-      pma = getPma(addr2);
+      uint64_t aligned = addr1 & ~alignMask;
+      uint64_t next = addr1 == addr2? aligned + stSize : addr2;
+      pma = getPma(next);
       if (not pma.isWrite())
 	{
 	  addr1 = va2;
