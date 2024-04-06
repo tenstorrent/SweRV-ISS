@@ -1928,26 +1928,16 @@ namespace WdRiscv
         });
 
       imsic_->attachGInterrupt([this] (bool flag, unsigned guest) {
-          URV mipVal = csRegs_.peekMip();
-          URV prev = mipVal;
-
-	  URV gip;
-          csRegs_.peek(CsrNumber::HGEIP, gip);
-
-          if (flag)
-            gip |= (URV(1) << guest);
-          else
-            gip &= ~(URV(1) << guest);
-
+	  URV gip = csRegs_.peekHgeip();
+	  gip = flag ? (gip | (URV(1) << guest)) :  (gip & ~(URV(1) << guest));
 	  csRegs_.poke(CsrNumber::HGEIP, gip);
-	  URV gie = csRegs_.peekHgeie();
-          if (gip & gie)
-	    mipVal = mipVal | (URV(1) << URV(IC::G_EXTERNAL));
-	  else
-	    mipVal = mipVal & ~(URV(1) << URV(IC::G_EXTERNAL));
 
-          if (mipVal != prev)
-            csRegs_.poke(CsrNumber::MIP, mipVal);
+	  URV gie = csRegs_.peekHgeie();
+	  URV gmask = URV(1) << URV(IC::G_EXTERNAL);
+	  URV mipVal = csRegs_.peekMip();
+          mipVal = (gip & gie) ? (mipVal | gmask) : (mipVal & ~gmask);
+
+	  csRegs_.poke(CsrNumber::MIP, mipVal);
         });
     }
 
