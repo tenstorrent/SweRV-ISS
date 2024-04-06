@@ -499,7 +499,7 @@ Session<URV>::determineIsa(const HartConfig& config, const Args& args, bool clib
     {
       if (args.verbose)
 	std::cerr << "No ISA specified: Defaulting to imac\n";
-      isa = "imac";
+      isa = "imacfd";
     }
 
   return true;
