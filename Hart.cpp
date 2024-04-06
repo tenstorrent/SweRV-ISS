@@ -1691,6 +1691,9 @@ Hart<URV>::dumpInitState(const char* tag, uint64_t vaddr, uint64_t paddr)
       virtMem_.getPrevByte(byteAddr, byte); // Get PTE value before PTE update.
       fprintf(initStateFile_, "%02x", unsigned(byte));
     }
+
+  bool cacheable = memory_.pmaMgr_.getPma(paddr).isCacheable();
+  fprintf(initStateFile_, ",%d", cacheable);
   fprintf(initStateFile_, "\n");
 }
 
