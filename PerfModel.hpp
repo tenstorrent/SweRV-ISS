@@ -33,8 +33,11 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
 
     friend class PerfApi;
 
-    InstrPac(uint64_t tag, uint64_t iva, uint64_t ipa)
-      : tag_(tag), iva_(iva), ipa_(ipa)
+    /// Constructor: iva/ipa are the instruction virtual/physical addresses.  For
+    /// instruction crossing page boundary, ipa2 is the phusical address of the other
+    /// page. I nto crossing page boundary ipa2 is same as ipa.
+    InstrPac(uint64_t tag, uint64_t iva, uint64_t ipa, uint64_t ipa2)
+      : tag_(tag), iva_(iva), ipa_(ipa), ipa2_(ipa2)
     { }
 
     /// This must be called by the performance model after a call to execute. If it
@@ -56,6 +59,11 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     uint64_t instrPa() const
     { return ipa_; }
 
+    /// For non-page crossing fetch return the same value as instrPa. For page-crossing
+    /// return the physical address of the other page.
+    uint64_t instrPa2() const
+    { return ipa_; }
+
     /// Return the data virtual address of a load/store instruction. Return 0 if
     /// instruction is not load/store.
     uint64_t dataVa() const
@@ -65,6 +73,10 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     /// instruction is not load/store.
     uint64_t dataPa() const
     { return dpa_; }
+
+    /// Return the size of the instrution (2 or 4 bytes). Instruction must be fetched.
+    uint64_t instrSize() const
+    { assert(fetched_); return di_.instSize(); }
 
     /// Return the data size of a load/store instruction. Return 0 if instruction
     /// is not load/store.
@@ -134,6 +146,7 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     uint64_t tag_ = 0;
     uint64_t iva_ = 0;        // instruction virtual address
     uint64_t ipa_ = 0;        // instruction physical address
+    uint64_t ipa2_ = 0;       // instruction physical address on other page
     uint64_t nextIva_ = 0;    // virtual address of subsequent instruction in prog order
 
     uint64_t dva_ = 0;        // ld/st data virtual address

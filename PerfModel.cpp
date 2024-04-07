@@ -65,14 +65,14 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
 	prev->predictBranch(true /*taken*/, vpc);
     }
 
-  uint64_t ppc = 0;  // Physical pc.
+  uint64_t ppc = 0, ppc2 = 0;  // Physical pc.
   uint32_t opcode = 0;
   uint64_t gpc = 0; // Guest physical pc.
-  cause = hart->fetchInstNoTrap(vpc, ppc, gpc, opcode);
+  cause = hart->fetchInstNoTrap(vpc, ppc, ppc2, gpc, opcode);
 
   if (cause == ExceptionCause::NONE)
     {
-      packet = std::make_shared<InstrPac>(tag, vpc, ppc);
+      packet = std::make_shared<InstrPac>(tag, vpc, ppc, ppc2);
       assert(packet);
       packet->fetched_ = true;
       insertPacket(hartIx, tag, packet);

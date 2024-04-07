@@ -2043,13 +2043,13 @@ namespace WdRiscv
 	clintAlarm_ = value;
     }
 
-    /// Fetch an instruction from the given virtual address. Return
-    /// ExceptionCause::None on success. Return exception cause on
-    /// fail. If successful set pysAddr to the physical address
-    /// corresponding to the given virtual address, gPhysAddr to the
-    /// guest physical address (0 if not in VS/VU mode), and
-    /// instr to the fetched instruction.
-    ExceptionCause fetchInstNoTrap(uint64_t& virAddr, uint64_t& physAddr,
+    /// Fetch an instruction from the given virtual address. Return ExceptionCause::None
+    /// on success. Return exception cause on fail. If successful set pysAddr to the
+    /// physical address corresponding to the given virtual address, gPhysAddr to the
+    /// guest physical address (0 if not in VS/VU mode), and instr to the fetched
+    /// instruction. If a fetch crosses a page boundary then physAddr2 will be the address
+    /// of the other paget, otherwise physAddr2 will be the same as physAddr.
+    ExceptionCause fetchInstNoTrap(uint64_t& virAddr, uint64_t& physAddr, uint64_t& physAddr2,
 				   uint64_t& gPhysAddr, uint32_t& instr);
 
   protected:
