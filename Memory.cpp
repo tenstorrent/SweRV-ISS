@@ -253,34 +253,20 @@ Memory::loadBinaryFile(const std::string& fileName, uint64_t addr)
 }
 
 #ifdef LZ4_COMPRESS
-void *Memory::mmap_file(const std::string& filename, size_t& length)
-  {
-    int fd;
-    struct stat sbuf;
-    void *src;
+std::vector<uint8_t>
+Memory::loadFile(const std::string& filename)
+{
+  std::streampos length;
+  std::ifstream f(filename, std::ios::binary);
 
-    fd = open(filename.c_str(), O_RDONLY);
-    if (fd == -1)
-      {
-	throw std::runtime_error("Couldn't open " + filename);
-      }
+  f.seekg(0, std::ios::end);
+  length = f.tellg();
+  f.seekg(0, std::ios::beg);
 
-  if (fstat(fd, &sbuf) == -1)
-    {
-      throw std::runtime_error("Couldn't fstat " + filename);
-    }
-  length = sbuf.st_size;
+  std::vector<uint8_t> data(length);
+  f.read((char *)&data[0], length);
 
-  src = mmap(0, length, PROT_READ, MAP_SHARED, fd, 0);
-  if (src == MAP_FAILED)
-    {
-      close(fd);
-      throw std::runtime_error("Couldn't mmap " + filename);
-    }
-
-  close(fd);
-
-  return src;
+  return data;
 }
 
 #define BLOCK_SIZE (4*1024*1024)
@@ -289,30 +275,17 @@ bool
 Memory::loadLz4File(const std::string& fileName, uint64_t addr)
 {
   LZ4F_dctx *dctx;
-  LZ4F_errorCode_t ret;
-  uint8_t *src;
-  uint8_t *dst;
-  size_t src_size;
-  size_t dst_size;
-
-  src = (uint8_t *)mmap_file(fileName, src_size);
-  if (src == (uint8_t *)MAP_FAILED)
-    {
-      throw std::runtime_error("Out of memory");
-    }
-
-  dst_size = BLOCK_SIZE;
-  dst = (uint8_t *)malloc(dst_size);
-  if (!dst)
-    {
-      throw std::runtime_error("Out of memory");
-    }
-
-  ret = LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
+  LZ4F_errorCode_t ret = LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
   if (LZ4F_isError(ret))
     {
       throw std::runtime_error("Couldn't initialize LZ4 context");
     }
+
+  std::vector<uint8_t> src = loadFile(fileName);
+  size_t src_size = src.size();
+  size_t dst_size = BLOCK_SIZE;
+  std::vector<uint8_t> dst(dst_size);
+  size_t src_offset = 0;
 
   // unmapped and out of bounds addresses
   size_t unmappedCount = 0, oob = 0, num = 0;
@@ -322,7 +295,7 @@ Memory::loadLz4File(const std::string& fileName, uint64_t addr)
       size_t src_bytes_read = src_size;
       size_t dst_bytes_written = dst_size;
 
-      size_t ret = LZ4F_decompress(dctx, dst, &dst_bytes_written, src, &src_bytes_read, NULL);
+      size_t ret = LZ4F_decompress(dctx, dst.data(), &dst_bytes_written, &src.data()[src_offset], &src_bytes_read, NULL);
       if (LZ4F_isError(ret))
 	{
 	  throw std::runtime_error("LZ4F_decompress failed");
@@ -358,12 +331,9 @@ Memory::loadLz4File(const std::string& fileName, uint64_t addr)
 	  num++;
 	}
 
-      src = src + src_bytes_read;
+      src_offset = src_offset + src_bytes_read;
       src_size = src_size - src_bytes_read;
     }
-
-  munmap(src, src_size);
-  free(dst);
 
   if (oob > 1)
     std::cerr << "File " << fileName << ": Warning: File contained "
