@@ -81,6 +81,9 @@ Session<URV>::defineSystem(const Args& args, const HartConfig& config)
 
   if (args.hexFiles.empty() and args.expandedTargets.empty()
       and args.binaryFiles.empty() and args.kernelFile.empty()
+#ifdef LZ4_COMPRESS
+      and args.lz4Files.empty()
+#endif
       and not args.interactive)
     {
       std::cerr << "No program file specified.\n";
@@ -671,6 +674,11 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
       uint64_t offset = 0;
       if (not system.loadBinaryFiles(args.binaryFiles, offset, args.verbose))
 	errors++;
+
+#ifdef LZ4_COMPRESS
+      if (not system.loadLz4Files(args.lz4Files, offset, args.verbose))
+	errors++;
+#endif
 
       if (not args.kernelFile.empty())
 	{

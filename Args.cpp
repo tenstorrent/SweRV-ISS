@@ -258,6 +258,10 @@ Args::parseCmdLineArgs(std::span<char*> argv)
 	 "An addional suffix of :u may be added to write back the file with the contents of memory "
 	 "at the end of the run. "
 	 "Example: -b file1 -b file2:0x1040 -b file3:0x20000:u")
+#ifdef LZ4_COMPRESS
+	("lz4", po::value(&this->lz4Files)->multitoken(),
+	 "LZ4 file to load into simulator memory.")
+#endif
         ("kernel", po::value(&this->kernelFile),
          "Kernel binary file to load into simulator memory. File will be loaded at 0x400000 for "
         "rv32 or 0x200000 for rv64 unless an explicit address is specified after a colon suffix "

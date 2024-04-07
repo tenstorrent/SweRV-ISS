@@ -49,6 +49,9 @@ namespace WdRiscv
 
     StringVec   hexFiles;                  // Hex files to be loaded into simulator memory.
     StringVec   binaryFiles;               // Binary files to be loaded into simulator memory.
+#ifdef LZ4_COMPRESS
+    StringVec   lz4Files;                  // LZ4 files to be loaded into simulator memory.
+#endif
     std::string traceFile;                 // Log of state change after each instruction.
     std::string commandLogFile;            // Log of interactive or socket commands.
     std::string consoleOutFile;            // Console io output file.
