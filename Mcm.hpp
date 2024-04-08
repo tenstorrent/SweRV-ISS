@@ -232,6 +232,11 @@ namespace WdRiscv
     /// SFENCE.INVAL.IR and the most recent SINVAL.VMA instruction.
     bool checkSfenceInvalIr(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// The SFENCE.W.INVAL instruction guarantees that any previous stores already visible
+    /// to the current RISC-V hart are ordered before subsequent SINVAL.VMA instructions
+    /// executed by the same hart.
+    bool checkSfenceWInval(Hart<URV>& hart, const McmInstr& instr) const;
+
     /// If given instruction is a fence add it to the set of pending
     /// fences. If oldest pending fence instruction is within window,
     /// then remove it from pending set and check rule 4 on it.

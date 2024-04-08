@@ -520,6 +520,9 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   if (instr->di_.instId() == InstId::sfence_inval_ir)
     return checkSfenceInvalIr(hart, *instr);
+  if (instr->di_.instId() == InstId::sfence_w_inval)
+    return checkSfenceWInval(hart, *instr);
+
 
   // If instruction is a store, save address, size, and written data.
   bool ok = retireStore(hart, *instr);
@@ -2590,6 +2593,24 @@ Mcm<URV>::checkSfenceInvalIr(Hart<URV>& hart, const McmInstr& instr) const
 
   return true;
 }  
+
+
+template <typename URV>
+bool
+Mcm<URV>::checkSfenceWInval(Hart<URV>& hart, const McmInstr& instr) const
+{
+  // This is very crude: Check that there are no pending stores (stores in the
+  // store/merge buffer) when the sfence.w.inval is retired.
+
+  unsigned hartIx = hart.sysHartIndex();
+  auto& pendingWrites = hartPendingWrites_.at(hartIx);
+  if (pendingWrites.empty())
+    return true;
+
+  cerr << "Error: Hart-id=" << hart.hartId() << "sfence.w.inval tag=" << instr.tag_
+       << " retired while there are pending stores in the store/merge buffer.\n";
+  return false;
+}
 
 
 template class WdRiscv::Mcm<uint32_t>;
