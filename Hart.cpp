@@ -2331,12 +2331,12 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& phy
     return ExceptionCause::NONE;
 
   // If we cross page boundary, translate address of other page.
+  virtAddr += 2;
   physAddr2 = physAddr + 2;
   gPhysAddr = physAddr2;
   if (memory_.getPageIx(physAddr) != memory_.getPageIx(physAddr2))
     if (isRvs() and privMode_ != PrivilegeMode::Machine)
       {
-	virtAddr += 2;
 	auto cause = virtMem_.translateForFetch(virtAddr, privMode_, virtMode_, gPhysAddr,
 						physAddr2);
 	if (cause != ExceptionCause::NONE)
@@ -2359,7 +2359,7 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& phy
     return ExceptionCause::INST_ACC_FAULT;
 
   if (initStateFile_)
-    dumpInitState("fetch", virtAddr, physAddr2);
+    dumpInitState("fetch", virtAddr - 2, physAddr2);
 
   inst = inst | (uint32_t(upperHalf) << 16);
   return ExceptionCause::NONE;
