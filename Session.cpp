@@ -189,6 +189,9 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
       hart0.setInitialStateFile(initStateFile_);
     }
 
+  if (not args.testSignatureFile.empty())
+    result = system.produceTestSignatureFile(args.testSignatureFile) and result;
+
   return true;
 }
 
