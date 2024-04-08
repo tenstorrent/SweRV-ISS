@@ -68,7 +68,7 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     /// instruction is not load/store.
     uint64_t dataVa() const
     { return dva_; }
-    
+
     /// Return the data physical address of a load/store instruction. Return 0 if
     /// instruction is not load/store.
     uint64_t dataPa() const
@@ -146,7 +146,7 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     uint64_t tag_ = 0;
     uint64_t iva_ = 0;        // instruction virtual address
     uint64_t ipa_ = 0;        // instruction physical address
-    uint64_t ipa2_ = 0;       // instruction physical address on other page
+    [[maybe_unused]] uint64_t ipa2_ = 0;       // instruction physical address on other page
     uint64_t nextIva_ = 0;    // virtual address of subsequent instruction in prog order
 
     uint64_t dva_ = 0;        // ld/st data virtual address
@@ -324,7 +324,7 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
 	case OT::IntReg: return hart->peekIntReg(regNum, value);
 	case OT::FpReg:  return hart->peekFpReg(regNum, value);
 	case OT::CsReg:  return hart->peekCsr(WdRiscv::CsrNumber(regNum), value);
-	case OT::VecReg: 
+	case OT::VecReg:
 	case OT::Imm:
 	case OT::None:   assert(0); return ~unsigned(0);
 	}
