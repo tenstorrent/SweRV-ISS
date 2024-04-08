@@ -51,6 +51,8 @@ namespace WdRiscv
 
     bool run(const Args& args);
 
+    bool cleanup(const Args& args);
+
     /// Obtain integer-register width (xlen). Command line has top priority, then config
     /// file, then ELF file.
     static
