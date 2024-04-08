@@ -3597,9 +3597,11 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
     mip |= URV(1) << URV(IC::S_EXTERNAL);
 
   auto mie = getImplementedCsr(CsrNumber::MIE)->read();
-  auto mideleg = getImplementedCsr(CsrNumber::MIDELEG)->read();
 
-  uint8_t iidShift = 16;
+  auto mideleg = getImplementedCsr(CsrNumber::MIDELEG);
+  URV midelegMask = mideleg? mideleg->read() : 0;
+
+  const uint8_t iidShift = 16;
   auto highest_prio = [](uint64_t bits) -> unsigned {
     using IC = InterruptCause;
 
@@ -3620,7 +3622,7 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
   if (number == CsrNumber::MTOPI)
     {
       // We can set IPRIO=1 for read-only zero iprio arrays
-      unsigned iid = highest_prio(mip & mie & ~mideleg);
+      unsigned iid = highest_prio(mip & mie & ~midelegMask);
       if (iid)
         value = (iid << iidShift) | 1;
       return true;
@@ -3628,21 +3630,21 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
 
   if (number == CsrNumber::STOPI or number == CsrNumber::VSTOPI)
     {
-      auto csr = getImplementedCsr(CsrNumber::HIDELEG);
-      URV hideleg = (csr)? csr->read() : 0;
+      auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
+      URV hidelegMask = hideleg? hideleg->read() : 0;
 
       if (not virtMode_)
         {
-          unsigned iid = highest_prio(mip & mie & mideleg & ~hideleg);
+          unsigned iid = highest_prio(mip & mie & midelegMask & ~hidelegMask);
           if (iid)
             value = (iid << iidShift) | 1;
           return true;
         }
 
-      auto vs = mip & mie & mideleg & hideleg & ~(URV(1) << unsigned(IC::G_EXTERNAL));
+      auto vs = mip & mie & midelegMask & hidelegMask & ~(URV(1) << unsigned(IC::G_EXTERNAL));
       bool external = (vs & (URV(1) << unsigned(IC::VS_EXTERNAL))) != 0;
 
-      csr = getImplementedCsr(CsrNumber::HVICTL);
+      auto csr = getImplementedCsr(CsrNumber::HVICTL);
       HvictlFields hvictl(csr->read());
       unsigned iprio = hvictl.bits_.IPRIO;
       unsigned dpr = hvictl.bits_.DPR;

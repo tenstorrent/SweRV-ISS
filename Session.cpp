@@ -499,7 +499,7 @@ Session<URV>::determineIsa(const HartConfig& config, const Args& args, bool clib
     {
       if (args.verbose)
 	std::cerr << "No ISA specified: Defaulting to imac\n";
-      isa = "imac";
+      isa = "imacfd";
     }
 
   return true;
@@ -1216,6 +1216,58 @@ Session<URV>::determineRegisterWidth(const Args& args, const HartConfig& config)
     std::cerr << "Using default for xlen: " << xlen << "\n";
   
   return xlen;
+}
+
+
+template <typename URV>
+static
+bool
+reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
+{
+  FILE* outFile = fopen(outPath.c_str(), "w");
+  if (not outFile)
+    {
+      std::cerr << "Failed to open instruction frequency file '" << outPath
+		<< "' for output.\n";
+      return false;
+    }
+
+  hart.reportInstructionFrequency(outFile);
+  hart.reportTrapStat(outFile);
+  fprintf(outFile, "\n");
+  hart.reportLrScStat(outFile);
+
+  fclose(outFile);
+  return true;
+}
+
+
+template <typename URV>
+bool
+Session<URV>::cleanup(const Args& args)
+{
+  bool result = true;
+
+  auto& hart0 = *system_->ithHart(0);
+  if (not args.instFreqFile.empty())
+    result = reportInstructionFrequency(hart0, args.instFreqFile) and result;
+
+  if (not args.testSignatureFile.empty())
+    result = system_->produceTestSignatureFile(args.testSignatureFile) and result;
+
+  if (args.reportub)
+    {
+      uint64_t bytes = 0;
+      std::vector<std::pair<uint64_t, uint64_t>> blocks;
+      if (not system_->getSparseMemUsedBlocks(blocks))
+        assert(false && "Not compiled with sparse memory");
+      for (const auto& [_, size] : blocks)
+        bytes += size;
+      std::cerr << "Used blocks: 0x" << std::hex << bytes << std::endl;
+    }
+
+  closeUserFiles();
+  return result;
 }
 
 
