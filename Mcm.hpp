@@ -226,6 +226,12 @@ namespace WdRiscv
 
     bool ppoRule12(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check that previous SINVAL.VMA instructions are executed before subsequent
+    /// implicit references to the memory-management data structures. Return true on
+    /// success and false if there are translations between the the current
+    /// SFENCE.INVAL.IR and the most recent SINVAL.VMA instruction.
+    bool checkSfenceInvalIr(Hart<URV>& hart, const McmInstr& instr) const;
+
     /// If given instruction is a fence add it to the set of pending
     /// fences. If oldest pending fence instruction is within window,
     /// then remove it from pending set and check rule 4 on it.
@@ -462,6 +468,8 @@ namespace WdRiscv
     std::vector<MemoryOpVec> hartPendingWrites_; // One vector per hart.
 
     uint64_t time_ = 0;
+    uint64_t sinvalVmaTime_ = 0;
+    uint64_t sinvalVmaTag_ = 0;
     unsigned pageSize_ = 4096;
     unsigned lineSize_ = 64; // Merge buffer line size.
     unsigned windowSize_ = 1000;

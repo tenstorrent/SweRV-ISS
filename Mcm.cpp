@@ -512,6 +512,14 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   instr->retired_ = true;
   instr->di_ = di;
+  if (instr->di_.instId() == InstId::sfence_vma)
+    {
+      sinvalVmaTime_ = time;
+      sinvalVmaTag_ = tag;
+    }
+
+  if (instr->di_.instId() == InstId::sfence_inval_ir)
+    return checkSfenceInvalIr(hart, *instr);
 
   // If instruction is a store, save address, size, and written data.
   bool ok = retireStore(hart, *instr);
@@ -2547,6 +2555,41 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 
   return true;
 }
+
+
+template <typename URV>
+bool
+Mcm<URV>::checkSfenceInvalIr(Hart<URV>& hart, const McmInstr& instr) const
+{
+  // This is very crude. We are using retire time of sinval.vma, we should be using
+  // execution time. We are using read/write times of ld/store instructions, we should be
+  // using translation times. Required times are currently not available. We do not
+  // consider instruction address translation.
+
+  if (sinvalVmaTag_ == 0)
+    return true;   // No sinval.vma was retired
+
+  unsigned hartIx = hart.sysHartIndex();
+
+  for (size_t ix = sysMemOps_.size(); ix > 0; --ix)
+    {
+      const auto& op = sysMemOps_.at(ix-1);
+      if (op.canceled_ or op.hartIx_ != hartIx)
+	continue;
+      if (op.instrTag_ < instr.tag_)
+	break;
+      if (op.time_ < sinvalVmaTime_)
+	{
+	  cerr << "Error: Hart-id=" << hart.hartId() << "implicit memory access for "
+	       << "translation of instruction at tag=" << op.instrTag_ << " is out of order "
+	       << "with respect to sinval.vma instruction with tag=" << sinvalVmaTag_
+	       << " and sfence.inval.ir with tag=" << instr.tag_ << '\n';
+	  return false;
+	}
+    }
+
+  return true;
+}  
 
 
 template class WdRiscv::Mcm<uint32_t>;
