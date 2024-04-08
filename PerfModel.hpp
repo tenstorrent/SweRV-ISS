@@ -62,7 +62,7 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     /// For non-page crossing fetch return the same value as instrPa. For page-crossing
     /// return the physical address of the other page.
     uint64_t instrPa2() const
-    { return ipa_; }
+    { return ipa2_; }
 
     /// Return the data virtual address of a load/store instruction. Return 0 if
     /// instruction is not load/store.
@@ -146,7 +146,7 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     uint64_t tag_ = 0;
     uint64_t iva_ = 0;        // instruction virtual address
     uint64_t ipa_ = 0;        // instruction physical address
-    [[maybe_unused]] uint64_t ipa2_ = 0;       // instruction physical address on other page
+    uint64_t ipa2_ = 0;       // instruction physical address on other page
     uint64_t nextIva_ = 0;    // virtual address of subsequent instruction in prog order
 
     uint64_t dva_ = 0;        // ld/st data virtual address
