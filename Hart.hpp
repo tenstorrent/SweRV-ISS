@@ -2193,6 +2193,9 @@ namespace WdRiscv
 	  value |= LOAD_TYPE(byte) << 8*destIx;
     }
 
+    /// Get the data value for an out of order read (mcm or perfApi).
+    bool getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
+			 uint64_t& value);
 
     /// Set current privilege mode.
     void setPrivilegeMode(PrivilegeMode m)
@@ -5165,7 +5168,8 @@ namespace WdRiscv
     };
     boost::circular_buffer<BranchRecord> branchBuffer_;
 
-    std::shared_ptr<Mcm<URV>> mcm_;
+    std::shared_ptr<Mcm<URV>> mcm_;  // Memory consistency model.
+    bool ooo_ = false;               // Out of order execution (mcm or perfApi).
 
     FILE* initStateFile_ = nullptr;
     std::unordered_set<uint64_t> initInstrLines_;
