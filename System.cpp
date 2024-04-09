@@ -23,6 +23,7 @@
 #include "SparseMem.hpp"
 #include "System.hpp"
 #include "Mcm.hpp"
+#include "PerfModel.hpp"
 #include "Uart8250.hpp"
 #include "Uartsf.hpp"
 #include "pci/virtio/Blk.hpp"
@@ -746,6 +747,22 @@ System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll)
 
   for (auto& hart :  sysHarts_)
     hart->setMcm(mcm_);
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+System<URV>::enablePerfApi()
+{
+  if constexpr (sizeof(URV) == 4)
+    {
+      std::cerr << "Performance model API is not supported for RV32\n";
+      return false;
+    }
+  else
+    perfApi_ = std::make_shared<TT_PERF::PerfApi>(*this);
 
   return true;
 }

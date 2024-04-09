@@ -834,6 +834,10 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
 	errors++;
     }
 
+  if (args.perfApi)
+    if (not system.enablePerfApi())
+      errors++;
+
   if (not args.snapshotPeriods.empty())
     {
       auto periods = args.snapshotPeriods;

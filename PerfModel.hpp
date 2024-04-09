@@ -19,7 +19,7 @@
 #include "Hart.hpp"
 #include "DecodedInst.hpp"
 
-namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
+namespace TT_PERF         // Tenstorrent Whisper Performance Model API
 {
 
   using System64 = WdRiscv::System<uint64_t>;

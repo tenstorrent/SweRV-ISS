@@ -1,6 +1,6 @@
 #include "PerfModel.hpp"
 
-using namespace TT_PERFA;
+using namespace TT_PERF;
 
 
 std::shared_ptr<Hart64>

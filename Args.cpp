@@ -409,14 +409,15 @@ Args::parseCmdLineArgs(std::span<char*> argv)
          "corresponding values. A zero/zero pair will indicate the end of "
          "sequence.")
 	("mcm", po::bool_switch(&this->mcm),
-	 "Enable memory consistency checks. This is meaningful in server/interactive "
-	 "mode.")
+	 "Enable memory consistency checks. This is meaningful in server/interactive mode.")
 	("mcmca", po::bool_switch(&this->mcmca),
 	 "Check all bytes of the memory consistency check merge buffer. If not used "
 	 "we only check the bytes inserted into the merge buffer.")
 	("mcmls", po::value<std::string>(),
 	 "Memory consistency checker merge buffer line size. If set to zero then "
 	 "write operations are not buffered and will happen as soon a received.")
+	("perfapi", po::bool_switch(&this->perfApi),
+	 "Enable performance mode API.")
 #ifdef MEM_CALLBACKS
         ("reportusedblocks", po::bool_switch(&this->reportub),
          "Report used blocks with sparse memory. Useful for finding memory footprint of program")
