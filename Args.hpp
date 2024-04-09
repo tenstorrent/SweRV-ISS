@@ -122,16 +122,17 @@ namespace WdRiscv
     bool triggers = false;   // Enable debug triggers when true.
     bool counters = false;   // Enable performance counters when true.
     bool gdb = false;        // Enable gdb mode when true.
-    std::vector<unsigned> gdbTcpPort;        // Enable gdb mode over TCP when port is positive.
+    std::vector<unsigned> gdbTcpPort;   // Enable gdb mode over TCP when port is positive.
     bool abiNames = false;   // Use ABI register names in inst dis-assembly.
     bool newlib = false;     // True if target program linked with newlib.
     bool linux = false;      // True if target program linked with Linux C-lib.
     bool raw = false;        // True if bare-metal program (no linux no newlib).
     bool elfisa = false;     // Use ELF file RISCV architecture tags to set MISA if true.
     bool unmappedElfOk = false;
-    bool mcm = false;        // Memory consistency checks
-    bool mcmca = false;      // Memory consistency checks: check all bytes of merge buffer
-    bool reportub = false;         // Report used blocks with sparse memory
+    bool mcm = false;        // Memory consistency checks.
+    bool mcmca = false;      // Memory consistency checks: check all bytes of merge buffer.
+    bool perfApi = false;    // Performance model API.
+    bool reportub = false;         // Report used blocks with sparse memory.
     bool quitOnAnyHart = false;    // True if run quits when any hart finishes.
     bool noConInput = false;       // If true console io address is not used for input.
     bool relativeInstCount = false;

@@ -26,7 +26,7 @@
 #include "pci/virtio/Blk.hpp"
 
 
-namespace TT_PERFA
+namespace TT_PERF
 {
   class PerfApi;
 }
@@ -273,13 +273,15 @@ namespace WdRiscv
 		     unsigned guests, unsigned ids,
                      bool trace);
 
-    /// Enable memory consistency model. This is relevant in
-    /// server/interactive where RTL monitor or interactive command
-    /// may initiate out of order memory transactions. Behavior is
-    /// undefined if used in non-server/non-interactive mode or if
-    /// used after execution has started. The mergeBuffserSize is
-    /// the merge buffer line size in bytes.
+    /// Enable memory consistency model. This is relevant in server/interactive where RTL
+    /// monitor or interactive command may initiate out of order memory
+    /// transactions. Behavior is undefined if used in non-server/non-interactive mode or
+    /// if used after execution has started. The mergeBuffserSize is the merge buffer line
+    /// size in bytes.
     bool enableMcm(unsigned mergeBufferSize, bool mbLineCheckAll);
+
+    /// Enable the performance mode API.
+    bool enablePerfApi();
 
     /// Enable/disable total-store-order: Valid only if mcm is enabled.
     void enableTso(bool);
@@ -387,7 +389,7 @@ namespace WdRiscv
     std::shared_ptr<Memory> memory_;
     std::unique_ptr<SparseMem> sparseMem_;
     std::shared_ptr<Mcm<URV>> mcm_;
-    std::shared_ptr<TT_PERFA::PerfApi> perfApi_;
+    std::shared_ptr<TT_PERF::PerfApi> perfApi_;
     unsigned mbSize_ = 64;  // Merge buffer size.
     std::string toHostSym_ = "tohost";   // ELF symbol to use as "tohost" addr.
     std::string fromHostSym_ = "fromhost";

@@ -43,6 +43,7 @@
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
 #include "Mcm.hpp"
+#include "PerfModel.hpp"
 #include "wideint.hpp"
 
 
@@ -1749,6 +1750,22 @@ readCharNonBlocking(int fd)
 
 
 template <typename URV>
+bool
+Hart<URV>::getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
+			   uint64_t& value)
+{
+  if (not ooo_)
+    return false;
+  if (mcm_)
+    return mcm_->getCurrentLoadValue(*this, va, pa1, pa2, size, value);
+  if (perfApi_)
+    return perfApi_->getLoadData(hartIx_, instCounter_, value);
+  assert(0);
+  return false;
+}
+
+
+template <typename URV>
 template <typename LOAD_TYPE>
 inline
 bool
@@ -1824,17 +1841,15 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
     }
   else
     {
-      bool hasMcmVal = false;
-      if (mcm_)
+      bool hasOooVal = false;
+      if (ooo_)   // Out of order execution (mcm or perfApi)
 	{
-	  uint64_t mcmVal = 0;
-	  if (mcm_->getCurrentLoadValue(*this, virtAddr, addr1, addr2, ldStSize_, mcmVal))
-	    {
-	      narrow = mcmVal;
-	      hasMcmVal = true;
-	    }
+	  uint64_t oooVal = 0;
+	  hasOooVal = getOooLoadValue(virtAddr, addr1, addr2, ldStSize_, oooVal);
+	  if (hasOooVal)
+	    narrow = oooVal;
 	}
-      if (not hasMcmVal)
+      if (not hasOooVal)
 	memRead(addr1, addr2, narrow);
     }
 
@@ -2044,7 +2059,7 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
 
   invalidateDecodeCache(virtAddr, ldStSize_);
 
-  if (mcm_)
+  if (ooo_)
     return true;  // Memory updated & lr-canceled when merge buffer is written.
 
   memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
@@ -5058,8 +5073,24 @@ Hart<URV>::setMcm(std::shared_ptr<Mcm<URV>> mcm)
   mcm_ = std::move(mcm);
 
   // We cannot match the RTL timer value: We skip checking it.
-  if (hasClint())
+  if (mcm_ and hasClint())
     mcm_->skipReadCheck(clintStart_ + 0xbff8);
+
+  ooo_ = mcm_ != nullptr or perfApi_ != nullptr;
+}
+
+
+template <typename URV>
+void
+Hart<URV>::setPerfApi(std::shared_ptr<TT_PERF::PerfApi> perfApi)
+{
+  if constexpr (sizeof(URV) == 4)
+    assert(0 && "Perf-api not supported in RV32");
+  else
+    {
+      perfApi_ = std::move(perfApi);
+      ooo_ = mcm_ != nullptr or perfApi_ != nullptr;
+    }
 }
 
 
