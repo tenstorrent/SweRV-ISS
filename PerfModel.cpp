@@ -173,10 +173,11 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
     }
 
   // Execute the instruction: Poke source register values, execute, recover destination
-  // values, restore poked registers and destination registers.
-  if (not execute(*hart, *packet))
+  // values.
+  auto& pac = *packet;
+  auto& ht = *hart;
+  if (not execute(ht, pac))
     assert(0);
-  std::array<uint64_t, 3> opValues;   // Operand values of executed instruction.
 
   // Mark this insruction as the producer of each of its destination registers (at most 2:
   // one register and one csr). Record the values of the dstination register.
@@ -186,17 +187,21 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
       auto mode = di.ithOperandMode(i);
       if (mode == OM::Write or mode == OM::ReadWrite)
 	{
-	  unsigned gri = globalRegIx(di.ithOperandType(i), di.ithOperand(i));
+	  unsigned regNum = di.ithOperand(i);
+	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
 	  auto prevProducer = producers.at(gri);
 	  producers.at(gri) = packet;
-	  packet->destValues_.at(destIx) = InstrPac::DestValue(gri, opValues.at(i));
-	  packet->prevDestWriter_.at(destIx)= prevProducer;
+	  uint64_t destVal = 0;
+	  if (not peekRegister(hart, di.ithOperandType(i), regNum, destVal))
+	    assert(0);
+	  pac.destValues_.at(destIx) = InstrPac::DestValue(gri, destVal);
+	  pac.prevDestWriter_.at(destIx)= prevProducer;
 	  destIx++;
 	}
     }
 
-  packet->executed_ = true;
-  packet->execTime_ = time;
+  pac.executed_ = true;
+  pac.execTime_ = time;
 
   return false;
 }
@@ -220,7 +225,7 @@ PerfApi::execute(Hart64& hart, InstrPac& packet)
       auto type = packet.di_.ithOperandType(i);
       uint32_t operand = packet.di_.ithOperand(i);
       uint64_t val = packet.opVal_.at(i);
-      if (mode != OM::None)
+      if (mode == OM::None)
 	continue;
 
       switch (type)
@@ -300,7 +305,7 @@ PerfApi::execute(Hart64& hart, InstrPac& packet)
       auto mode = packet.di_.ithOperandMode(i);
       auto type = packet.di_.ithOperandType(i);
       uint32_t operand = packet.di_.ithOperand(i);
-      uint64_t prev = packet.opVal_.at(i);
+      uint64_t prev = prevVal.at(i);
       if (mode == OM::None)
 	continue;
 
