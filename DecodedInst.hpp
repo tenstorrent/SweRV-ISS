@@ -299,6 +299,16 @@ namespace WdRiscv
     bool isSc() const
     { return entry_ and entry_->isSc(); }
 
+    /// Return the data size in bytes of a load instruction. Return
+    /// zero for a non-load instruction.
+    unsigned loadSize() const
+    { return entry_ ? entry_->loadSize() : 0; }
+
+    /// Return the data size in bytes of a store instruction. Return
+    /// zero for a non-store instruction.
+    unsigned storeSize() const
+    { return entry_ ? entry_->storeSize() : 0; }
+
     /// Return true if this is a branch instruction.
     bool isBranch() const
     { return entry_ and entry_->isBranch(); }

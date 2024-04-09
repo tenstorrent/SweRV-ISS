@@ -366,8 +366,12 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
     }
 
   hart->setInstructionCount(tag);
-  hart->singleStep();   // TBD FIX : Make sure load calls getLoadData and store is no-op.
-  assert(0 && "Implement single step load-store");
+  hart->singleStep();
+
+  if (packet->di_.isLoad())
+    packet->dsize_ = packet->di_.loadSize();
+  else if (packet->di_.isStore())
+    packet->dsize_ = packet->di_.storeSize();
 
   // Undo renaming of destination registers.
   auto& producers = hartRegProducers_.at(hartIx);
@@ -443,7 +447,41 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
       return false;
     }
 
-  assert(0 && "Implement drainStore");
+  if (not packet->di_.isStore())
+    {
+      std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag
+		<< " Draining a non-store instruction\n";
+      return false;
+    }
+
+  uint64_t value = packet->opVal_.at(0);
+  uint64_t addr = packet->dpa_;    // FIX TODO : Handle page crossing store.
+
+  switch (packet->dsize_)
+    {
+    case 1:
+      if (not hart->pokeMemory(addr, uint8_t(value), true))
+	assert(0);
+      break;
+
+    case 2:
+      if (not hart->pokeMemory(addr, uint16_t(value), true))
+	assert(0);
+      break;
+
+    case 4:
+      if (not hart->pokeMemory(addr, uint32_t(value), true))
+	assert(0);
+      break;
+
+    case 8:
+      if (not hart->pokeMemory(addr, value, true))
+	assert(0);
+      break;
+
+    default:
+      assert(0);
+    }
 
   packet->drained_ = true;
   return true;
