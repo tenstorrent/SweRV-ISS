@@ -59,7 +59,7 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
     return false;   // Tag already fetched.
 
   auto prev = this->prevFetch_;
-  if (prev)
+  if (prev and prev->executed())
     {
       if (prev->nextPc() != vpc and not prev->trapped() and not prev->predicted())
 	prev->predictBranch(true /*taken*/, vpc);
@@ -196,6 +196,8 @@ PerfApi::execute(unsigned hartIx, std::shared_ptr<InstrPac>& pacPtr)
   using OT = WdRiscv::OperandType;
 
   uint64_t prevPc = hart.peekPc();
+  hart.pokePc(packet.instrVa());
+
   std::array<uint64_t, 3> prevVal;  // Previous operand values
 
   // Poke packet operands into hart saving previous values of packed registers.
