@@ -133,7 +133,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     { return executed_; }
 
     bool retired() const
-    { return executed_; }
+    { return retired_; }
 
     bool drained() const
     { return drained_; }

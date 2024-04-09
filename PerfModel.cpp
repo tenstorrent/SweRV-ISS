@@ -111,6 +111,8 @@ PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode)
     return true;
 
   hart->decode(packet->instrVa(), packet->instrPa(), opcode, packet->di_);
+  packet->decoded_ = true;
+
   return true;
 }
 
@@ -243,6 +245,8 @@ PerfApi::execute(Hart64& hart, InstrPac& packet)
 	  break;
 	case OT::VecReg:
 	  assert(0);
+	  break;
+	case OT::Imm:
 	  break;
 	default:
 	  assert(0);
