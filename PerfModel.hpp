@@ -242,7 +242,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// changes. SC/AMO instructions are executed at this stage and write memory
     /// without going through the store/merge buffer. Return true on success and
     /// false on failure (instruction was not executed or was flushed).
-    bool retire(unsigned hart, uint64_t time, uint64_t tag);
+    bool retire(unsigned hart, uint64_t time, uint64_t tag, FILE* traceFile);
 
     /// Return a pointer to the instruction packet with the given tag in the given
     /// hart. Return a null pointer if the given tag has not yet been fetched.

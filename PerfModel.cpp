@@ -154,7 +154,7 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   using OM = WdRiscv::OperandMode;
   auto& producers = hartRegProducers_.at(hartIx);
   WdRiscv::DecodedInst& di = packet->di_;
-  assert(di.operandCount() < packet->opVal_.size());
+  assert(di.operandCount() <= packet->opVal_.size());
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
       auto mode = di.ithOperandMode(i);
@@ -328,13 +328,14 @@ PerfApi::execute(Hart64& hart, InstrPac& packet)
     }
   
   hart.pokePc(prevPc);
+  hart.setInstructionCount(hart.getInstructionCount() - 1);
 
   return true;
 }
 
 
 bool
-PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
+PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag, FILE* traceFile)
 {
   if (not checkTime("Retire", time))
     return false;
@@ -369,8 +370,8 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
       return false;
     }
 
-  hart->setInstructionCount(tag);
-  hart->singleStep();
+  hart->setInstructionCount(tag - 1);
+  hart->singleStep(traceFile);
 
   if (packet->di_.isLoad())
     packet->dsize_ = packet->di_.loadSize();
