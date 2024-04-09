@@ -43,6 +43,7 @@
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
 #include "Mcm.hpp"
+#include "PerfModel.hpp"
 #include "wideint.hpp"
 
 
@@ -1752,6 +1753,8 @@ Hart<URV>::getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned siz
     return false;
   if (mcm_)
     return mcm_->getCurrentLoadValue(*this, va, pa1, pa2, size, value);
+  if (perfApi_)
+    return perfApi_->getLoadData(hartIx_, instCounter_, value);
   assert(0);
   return false;
 }
@@ -5068,7 +5071,21 @@ Hart<URV>::setMcm(std::shared_ptr<Mcm<URV>> mcm)
   if (mcm_ and hasClint())
     mcm_->skipReadCheck(clintStart_ + 0xbff8);
 
-  ooo_ = mcm_ != nullptr;
+  ooo_ = mcm_ != nullptr or perfApi_ != nullptr;
+}
+
+
+template <typename URV>
+void
+Hart<URV>::setPerfApi(std::shared_ptr<TT_PERF::PerfApi> perfApi)
+{
+  if constexpr (sizeof(URV) == 4)
+    assert(0 && "Perf-api not supported in RV32");
+  else
+    {
+      perfApi_ = std::move(perfApi);
+      ooo_ = mcm_ != nullptr or perfApi_ != nullptr;
+    }
 }
 
 

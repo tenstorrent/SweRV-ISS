@@ -44,11 +44,18 @@
 #include "Stee.hpp"
 
 
+namespace TT_PERF
+{
+  class PerfApi;
+}
+
+
 namespace WdRiscv
 {
 
   template <typename URV>
   class Mcm;
+  
 
   class DecodedInst;
   class InstEntry;
@@ -123,8 +130,8 @@ namespace WdRiscv
   {
   public:
 
-    // Alias the template parameter to allow it to be used outside this
-    // template.
+    /// Alias the template parameter to allow it to be used outside this
+    /// template.
     using URV = URV_;
 
     /// Signed register type corresponding to URV. For example, if URV
@@ -1823,6 +1830,11 @@ namespace WdRiscv
 
     /// Enable memory consistency model.
     void setMcm(std::shared_ptr<Mcm<URV>> mcm);
+
+    typedef TT_PERF::PerfApi PerfApi;
+
+    /// Enable performance model API.
+    void setPerfApi(std::shared_ptr<PerfApi> perfApi);
 
     /// Enable instruction line address tracing.
     void enableInstructionLineTrace(bool flag)
@@ -5168,8 +5180,9 @@ namespace WdRiscv
     };
     boost::circular_buffer<BranchRecord> branchBuffer_;
 
-    std::shared_ptr<Mcm<URV>> mcm_;  // Memory consistency model.
-    bool ooo_ = false;               // Out of order execution (mcm or perfApi).
+    std::shared_ptr<Mcm<URV>> mcm_;    // Memory consistency model.
+    std::shared_ptr<PerfApi> perfApi_; // Memory consistency model.
+    bool ooo_ = false;                 // Out of order execution (mcm or perfApi).
 
     FILE* initStateFile_ = nullptr;
     std::unordered_set<uint64_t> initInstrLines_;

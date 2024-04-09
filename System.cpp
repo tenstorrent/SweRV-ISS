@@ -762,7 +762,11 @@ System<URV>::enablePerfApi()
       return false;
     }
   else
-    perfApi_ = std::make_shared<TT_PERF::PerfApi>(*this);
+    {
+      perfApi_ = std::make_shared<TT_PERF::PerfApi>(*this);
+      for (auto& hart : sysHarts_)
+	hart->setPerfApi(perfApi_);
+    }
 
   return true;
 }
