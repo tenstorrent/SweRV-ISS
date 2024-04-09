@@ -236,7 +236,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// Helper to above execute: Excecute packet instrction without cahging hart state.
     /// Poke packet source register values into hart, execute, collect dstination
     /// values. Restore hart state.
-    bool execute(Hart64& hart, InstrPac& packet);
+    bool execute(unsigned hartIx, std::shared_ptr<InstrPac>& pacPtr);
 
     /// Retire given instruction at the given hart. Commit all related state
     /// changes. SC/AMO instructions are executed at this stage and write memory
@@ -315,15 +315,15 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
       return ~unsigned(0);
     }
 
-    bool peekRegister(std::shared_ptr<Hart64>& hart, WdRiscv::OperandType type,
-		      unsigned regNum, uint64_t& value)
+    bool peekRegister(Hart64& hart, WdRiscv::OperandType type, unsigned regNum,
+		      uint64_t& value)
     {
       using OT = WdRiscv::OperandType;
       switch(type)
 	{
-	case OT::IntReg: return hart->peekIntReg(regNum, value);
-	case OT::FpReg:  return hart->peekFpReg(regNum, value);
-	case OT::CsReg:  return hart->peekCsr(WdRiscv::CsrNumber(regNum), value);
+	case OT::IntReg: return hart.peekIntReg(regNum, value);
+	case OT::FpReg:  return hart.peekFpReg(regNum, value);
+	case OT::CsReg:  return hart.peekCsr(WdRiscv::CsrNumber(regNum), value);
 	case OT::VecReg:
 	case OT::Imm:
 	case OT::None:   assert(0); return ~unsigned(0);

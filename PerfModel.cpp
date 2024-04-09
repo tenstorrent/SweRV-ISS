@@ -131,11 +131,12 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   if (not packet)
     return false;
 
+  auto& di = packet->decodedInst();
+
   if (packet->executed())
     {
       // Instruction is being re-executed. Must be load/store. Every instruction that
       // depends on it must be re-executed.
-      auto& di = packet->decodedInst();
       if (not di.isLoad() and not di.isStore())
 	assert(0);
       auto& packetMap = hartPacketMaps_.at(hartIx);
@@ -151,66 +152,45 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
 
   // Collect register operand values. Remeber the in-flight instructions producing
   // these values.
-  using OM = WdRiscv::OperandMode;
   auto& producers = hartRegProducers_.at(hartIx);
-  WdRiscv::DecodedInst& di = packet->di_;
   assert(di.operandCount() <= packet->opVal_.size());
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
-      auto mode = di.ithOperandMode(i);
-      if (mode == OM::Read or mode == OM::ReadWrite)
-	{
-	  unsigned regNum = di.ithOperand(i);
-	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
-	  auto& producer = producers.at(gri);
-	  uint64_t value = 0;
-	  if (producer)
-	    value = getDestValue(producer, gri);
-	  else if (not peekRegister(hart, di.ithOperandType(i), regNum, value))
-	    assert(0);
-	  packet->opVal_.at(i) = value;
-	}
+      if (di.ithOperandMode(i) == WdRiscv::OperandMode::None)
+	continue;
+      unsigned regNum = di.ithOperand(i);
+      unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
+      auto& producer = producers.at(gri);
+      uint64_t value = 0;
+      if (producer)
+	value = getDestValue(producer, gri);
+      else if (not peekRegister(*hart, di.ithOperandType(i), regNum, value))
+	assert(0);
+      packet->opVal_.at(i) = value;
     }
 
   // Execute the instruction: Poke source register values, execute, recover destination
   // values.
-  auto& pac = *packet;
-  auto& ht = *hart;
-  if (not execute(ht, pac))
+  if (not execute(hartIx, packet))
     assert(0);
 
-  // Mark this insruction as the producer of each of its destination registers (at most 2:
-  // one register and one csr). Record the values of the dstination register.
-  unsigned destIx = 0;
-  for (unsigned i = 0; i < di.operandCount(); ++i)
-    {
-      auto mode = di.ithOperandMode(i);
-      if (mode == OM::Write or mode == OM::ReadWrite)
-	{
-	  unsigned regNum = di.ithOperand(i);
-	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
-	  auto prevProducer = producers.at(gri);
-	  producers.at(gri) = packet;
-	  uint64_t destVal = 0;
-	  if (not peekRegister(hart, di.ithOperandType(i), regNum, destVal))
-	    assert(0);
-	  pac.destValues_.at(destIx) = InstrPac::DestValue(gri, destVal);
-	  pac.prevDestWriter_.at(destIx)= prevProducer;
-	  destIx++;
-	}
-    }
+  packet->executed_ = true;
+  packet->execTime_ = time;
 
-  pac.executed_ = true;
-  pac.execTime_ = time;
-
-  return false;
+  return true;
 }
 
   
 bool
-PerfApi::execute(Hart64& hart, InstrPac& packet)
+PerfApi::execute(unsigned hartIx, std::shared_ptr<InstrPac>& pacPtr)
 {
+  assert(pacPtr);
+  auto& packet = *pacPtr;
   assert(packet.decoded());
+
+  auto hartPtr = getHart(hartIx);
+  assert(hartPtr);
+  auto& hart = *hartPtr;
 
   using OM = WdRiscv::OperandMode;
   using OT = WdRiscv::OperandType;
@@ -260,6 +240,29 @@ PerfApi::execute(Hart64& hart, InstrPac& packet)
     }
 
   hart.singleStep();
+
+  // Mark this insruction as the producer of each of its destination registers (at most 2:
+  // one register and one csr). Record the values of the dstination register.
+  auto& di = packet.decodedInst();
+  unsigned destIx = 0;
+  auto& producers = hartRegProducers_.at(hart.sysHartIndex());
+  for (unsigned i = 0; i < di.operandCount(); ++i)
+    {
+      auto mode = di.ithOperandMode(i);
+      if (mode == OM::Write or mode == OM::ReadWrite)
+	{
+	  unsigned regNum = di.ithOperand(i);
+	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
+	  auto prevProducer = producers.at(gri);
+	  producers.at(gri) = pacPtr;
+	  uint64_t destVal = 0;
+	  if (not peekRegister(hart, di.ithOperandType(i), regNum, destVal))
+	    assert(0);
+	  packet.destValues_.at(destIx) = InstrPac::DestValue(gri, destVal);
+	  packet.prevDestWriter_.at(destIx)= prevProducer;
+	  destIx++;
+	}
+    }
 
   // Restore changed memory.
   uint64_t maddr = 0, mval = 0;
@@ -388,12 +391,9 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag, FILE* traceFile)
   for (size_t i = 0; i < packet->destValues_.size(); ++i)
     {
       auto& prev = packet->prevDestWriter_.at(i);
-      if (prev)
-	{
-	  auto gri = packet->destValues_.at(i).first;
-	  if (producers.at(gri).get() == packet.get())
-	    producers.at(gri) = prev;
-	}
+      auto gri = packet->destValues_.at(i).first;
+      if (producers.at(gri).get() == packet.get())
+	producers.at(gri) = prev;
     }
 
   packet->retired_ = true;
