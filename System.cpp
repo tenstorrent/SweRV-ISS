@@ -27,6 +27,7 @@
 #include "Uart8250.hpp"
 #include "Uartsf.hpp"
 #include "pci/virtio/Blk.hpp"
+#include "PerfModel.hpp"
 
 
 using namespace WdRiscv;
@@ -863,6 +864,68 @@ System<URV>::mcmSetCurrentInstruction(Hart<URV>& hart, uint64_t tag)
   if (not mcm_)
     return false;
   return mcm_->setCurrentInstruction(hart, tag);
+}
+
+
+template <typename URV>
+void
+System<URV>::perfApiCommandLog(FILE* log)
+{
+  if (not perfApi_)
+    return;
+  perfApi_->enableCommandLog(log);
+}
+
+
+template <typename URV>
+bool
+System<URV>::perfApiFetch(unsigned hart, uint64_t time, uint64_t tag, uint64_t vpc)
+{
+  if (not perfApi_)
+    return false;
+
+  bool trap; ExceptionCause cause; uint64_t trapPc;
+  return perfApi_->fetch(hart, time, tag, vpc, trap, cause, trapPc);
+}
+
+
+template <typename URV>
+bool
+System<URV>::perfApiDecode(unsigned hart, uint64_t time, uint64_t tag, uint32_t opcode)
+{
+  if (not perfApi_)
+    return false;
+  return perfApi_->decode(hart, time, tag, opcode);
+}
+
+
+template <typename URV>
+bool
+System<URV>::perfApiExecute(unsigned hart, uint64_t time, uint64_t tag)
+{
+  if (not perfApi_)
+    return false;
+  return perfApi_->execute(hart, time, tag);
+}
+
+
+template <typename URV>
+bool
+System<URV>::perfApiRetire(unsigned hart, uint64_t time, uint64_t tag, FILE* traceFile)
+{
+  if (not perfApi_)
+    return false;
+  return perfApi_->retire(hart, time, tag, traceFile);
+}
+
+
+template <typename URV>
+bool
+System<URV>::perfApiDrainStore(unsigned hart, uint64_t time, uint64_t tag)
+{
+  if (not perfApi_)
+    return false;
+  return perfApi_->drainStore(hart, time, tag);
 }
 
 
