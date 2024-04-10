@@ -146,32 +146,34 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   if (not hart)
     return false;
 
-  auto packet = checkTag("execute", hartIx, tag);
-  if (not packet)
+  auto pacPtr = checkTag("execute", hartIx, tag);
+  if (not pacPtr)
     return false;
 
-  auto& di = packet->decodedInst();
+  auto& packet = *pacPtr;
 
-  if (packet->executed())
+  auto& di = packet.decodedInst();
+
+  if (packet.executed())
     {
       // Instruction is being re-executed. Must be load/store. Every instruction that
       // depends on it must be re-executed.
       if (not di.isLoad() and not di.isStore())
 	assert(0);
       auto& packetMap = hartPacketMaps_.at(hartIx);
-      auto iter = packetMap.find(packet->tag());
+      auto iter = packetMap.find(packet.tag());
       assert(iter != packetMap.end());
       for ( ; iter != packetMap.end(); ++iter)
 	{
 	  auto succ = iter->second;   // Successor packet
-	  if (succ->dependsOn(*packet))
+	  if (succ->dependsOn(packet))
 	    succ->executed_ = false;
 	}
     }
 
   // Collect register operand values.
   auto& producers = hartRegProducers_.at(hartIx);
-  assert(di.operandCount() <= packet->opVal_.size());
+  assert(di.operandCount() <= packet.opVal_.size());
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
       if (di.ithOperandMode(i) == WdRiscv::OperandMode::None)
@@ -180,11 +182,11 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
       unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
       auto& producer = producers.at(gri);
       uint64_t value = 0;
-      if (producer and producer.get() != packet.get())
-	value = getDestValue(producer, gri);
+      if (producer and producer->tag() != packet.tag())
+	value = getDestValue(*producer, gri);
       else if (not peekRegister(*hart, di.ithOperandType(i), regNum, value))
 	assert(0);
-      packet->opVal_.at(i) = value;
+      packet.opVal_.at(i) = value;
     }
 
   // Execute the instruction: Poke source register values, execute, recover destination
@@ -192,18 +194,16 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   if (not execute(hartIx, packet))
     assert(0);
 
-  packet->executed_ = true;
-  packet->execTime_ = time;
+  packet.executed_ = true;
+  packet.execTime_ = time;
 
   return true;
 }
 
   
 bool
-PerfApi::execute(unsigned hartIx, std::shared_ptr<InstrPac>& pacPtr)
+PerfApi::execute(unsigned hartIx, InstrPac& packet)
 {
-  assert(pacPtr);
-  auto& packet = *pacPtr;
   assert(packet.decoded());
 
   auto hartPtr = getHart(hartIx);
