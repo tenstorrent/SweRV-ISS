@@ -1011,12 +1011,76 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
   perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
   perfApi_->decode(hartIx, time++, tag, opcode);
 
-  perfApi_->execute(hartIx, time++, 11);
+  perfApi_->execute(hartIx, time++, 11); // Execute #11 out of order
   perfApi_->execute(hartIx, time++, 10);
 
   perfApi_->retire(hartIx, time++, 10, traceFiles.at(0));
   perfApi_->retire(hartIx, time++, 11, traceFiles.at(0));
 
+  pc = 0x10166;   opcode = 0xed79de3; tag++;  // #12
+  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
+  perfApi_->decode(hartIx, time++, tag, opcode);
+  perfApi_->execute(hartIx, time++, tag);
+  perfApi_->retire(hartIx, time++, tag, traceFiles.at(0));
+  
+  pc = 0x10160;   opcode = 0xc31c; tag++;  // #13  this will not execute for a while
+  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
+  perfApi_->decode(hartIx, time++, tag, opcode);
+
+  pc = 0x10162;   opcode = 0x2785; tag++;  // #14
+  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
+  perfApi_->decode(hartIx, time++, tag, opcode);
+  perfApi_->execute(hartIx, time++, tag);
+
+  pc = 0x10164;   opcode = 0x0711; tag++;  // #15
+  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
+  perfApi_->decode(hartIx, time++, tag, opcode);
+  perfApi_->execute(hartIx, time++, tag);
+
+  pc = 0x10166;   opcode = 0xfed79de3; tag++;  // #16
+  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
+  perfApi_->decode(hartIx, time++, tag, opcode);
+  perfApi_->execute(hartIx, time++, tag);
+
+  pc = 0x10160;   opcode = 0xc31c; tag++;  // #17
+  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
+  perfApi_->decode(hartIx, time++, tag, opcode);
+  perfApi_->execute(hartIx, time++, tag);
+
+  pc = 0x10162;   opcode = 0x2785; tag++;  // #18
+  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
+  perfApi_->decode(hartIx, time++, tag, opcode);
+  perfApi_->execute(hartIx, time++, tag);
+
+  pc = 0x10164;   opcode = 0x0711; tag++;  // #19
+  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
+  perfApi_->decode(hartIx, time++, tag, opcode);
+  perfApi_->execute(hartIx, time++, tag);
+
+  pc = 0x10166;   opcode = 0xfed79de3; tag++; // #20
+  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
+  perfApi_->decode(hartIx, time++, tag, opcode);
+  perfApi_->execute(hartIx, time++, tag);
+
+  pc = 0x10160;   opcode = 0xc31c; tag++;  // #21
+  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
+  perfApi_->decode(hartIx, time++, tag, opcode);
+  perfApi_->execute(hartIx, time++, tag);
+
+
+  perfApi_->execute(hartIx, time++, 13);  // Execute 13
+
+  // retire 14 to 21
+  perfApi_->retire(hartIx, time++, 13, traceFiles.at(0));
+  perfApi_->retire(hartIx, time++, 14, traceFiles.at(0));
+  perfApi_->retire(hartIx, time++, 15, traceFiles.at(0));
+  perfApi_->retire(hartIx, time++, 16, traceFiles.at(0));
+  perfApi_->retire(hartIx, time++, 17, traceFiles.at(0));
+  perfApi_->retire(hartIx, time++, 18, traceFiles.at(0));
+  perfApi_->retire(hartIx, time++, 19, traceFiles.at(0));
+  perfApi_->retire(hartIx, time++, 20, traceFiles.at(0));
+  perfApi_->retire(hartIx, time++, 21, traceFiles.at(0));
+  
   exit(0);
 #endif
 
