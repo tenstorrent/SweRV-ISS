@@ -94,6 +94,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     {
       if (not decoded_ or not isBranch())
 	return false;
+      predicted_ = true;
       prTaken_ = taken;
       prTarget_ = target;
       return true;

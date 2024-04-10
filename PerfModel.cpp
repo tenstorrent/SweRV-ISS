@@ -285,6 +285,9 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   hart.singleStep();
 
+  if (packet.isBranch())
+    packet.nextIva_ = hart.peekPc();
+
   // Record the values of the dstination register.
   auto& di = packet.decodedInst();
   unsigned destIx = 0;
