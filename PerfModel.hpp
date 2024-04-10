@@ -236,7 +236,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// Helper to above execute: Excecute packet instrction without cahging hart state.
     /// Poke packet source register values into hart, execute, collect dstination
     /// values. Restore hart state.
-    bool execute(unsigned hartIx, std::shared_ptr<InstrPac>& pacPtr);
+    bool execute(unsigned hartIx, InstrPac& packet);
 
     /// Retire given instruction at the given hart. Commit all related state
     /// changes. SC/AMO instructions are executed at this stage and write memory
@@ -334,9 +334,9 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
 
     /// Get from the producing packet, the value of the register with the given
     /// global register index.
-    uint64_t getDestValue(std::shared_ptr<InstrPac>& producer, unsigned gri)
+    uint64_t getDestValue(const InstrPac& producer, unsigned gri) const
     {
-      for (auto& p : producer->destValues_)
+      for (auto& p : producer.destValues_)
 	if (p.first == gri)
 	  return p.second;
       assert(0);
