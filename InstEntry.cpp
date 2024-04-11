@@ -6346,7 +6346,7 @@ InstTable::setupInstVec()
         RvExtension::Zvbb, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
-        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
       { "vbrev.v", InstId::vbrev_v,
@@ -6412,7 +6412,7 @@ InstTable::setupInstVec()
         RvExtension::Zvbb, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
-        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
       { "vror.vv", InstId::vror_vv,
@@ -6430,7 +6430,7 @@ InstTable::setupInstVec()
         RvExtension::Zvbb, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
-        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
       { "vror.vi", InstId::vror_vi,
@@ -6457,7 +6457,7 @@ InstTable::setupInstVec()
         RvExtension::Zvbb, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
-        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
       { "vwsll.vi", InstId::vwsll_vi,
@@ -6521,7 +6521,7 @@ InstTable::setupInstVec()
         RvExtension::Zvbc, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
-        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
       { "vclmulh.vv", InstId::vclmulh_vv,
@@ -6539,7 +6539,7 @@ InstTable::setupInstVec()
         RvExtension::Zvbc, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
-        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
       // Vector crypto (zvkg)

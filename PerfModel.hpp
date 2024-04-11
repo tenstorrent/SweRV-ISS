@@ -94,6 +94,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     {
       if (not decoded_ or not isBranch())
 	return false;
+      predicted_ = true;
       prTaken_ = taken;
       prTarget_ = target;
       return true;
@@ -285,6 +286,10 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
       return system_.ithHart(hartIx);
     }
 
+    /// Enable command log, contains API call information for replay.
+    void enableCommandLog(FILE* log)
+    { commandLog_ = log; }
+
   protected:
 
     void insertPacket(unsigned hartIx, uint64_t tag, std::shared_ptr<InstrPac> ptr)
@@ -367,6 +372,8 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     std::vector<RegProducers> hartRegProducers_;
 
     uint64_t time_ = 0;
+
+    FILE* commandLog_ = nullptr;
 
     /// Global indexing for all registers.
     const unsigned intRegOffset_ = 0;

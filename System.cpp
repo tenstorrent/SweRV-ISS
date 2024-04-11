@@ -27,6 +27,7 @@
 #include "Uart8250.hpp"
 #include "Uartsf.hpp"
 #include "pci/virtio/Blk.hpp"
+#include "PerfModel.hpp"
 
 
 using namespace WdRiscv;
@@ -867,6 +868,68 @@ System<URV>::mcmSetCurrentInstruction(Hart<URV>& hart, uint64_t tag)
 
 
 template <typename URV>
+void
+System<URV>::perfApiCommandLog(FILE* log)
+{
+  if (not perfApi_)
+    return;
+  perfApi_->enableCommandLog(log);
+}
+
+
+template <typename URV>
+bool
+System<URV>::perfApiFetch(unsigned hart, uint64_t time, uint64_t tag, uint64_t vpc)
+{
+  if (not perfApi_)
+    return false;
+
+  bool trap; ExceptionCause cause; uint64_t trapPc;
+  return perfApi_->fetch(hart, time, tag, vpc, trap, cause, trapPc);
+}
+
+
+template <typename URV>
+bool
+System<URV>::perfApiDecode(unsigned hart, uint64_t time, uint64_t tag, uint32_t opcode)
+{
+  if (not perfApi_)
+    return false;
+  return perfApi_->decode(hart, time, tag, opcode);
+}
+
+
+template <typename URV>
+bool
+System<URV>::perfApiExecute(unsigned hart, uint64_t time, uint64_t tag)
+{
+  if (not perfApi_)
+    return false;
+  return perfApi_->execute(hart, time, tag);
+}
+
+
+template <typename URV>
+bool
+System<URV>::perfApiRetire(unsigned hart, uint64_t time, uint64_t tag, FILE* traceFile)
+{
+  if (not perfApi_)
+    return false;
+  return perfApi_->retire(hart, time, tag, traceFile);
+}
+
+
+template <typename URV>
+bool
+System<URV>::perfApiDrainStore(unsigned hart, uint64_t time, uint64_t tag)
+{
+  if (not perfApi_)
+    return false;
+  return perfApi_->drainStore(hart, time, tag);
+}
+
+
+template <typename URV>
 bool
 System<URV>::produceTestSignatureFile(std::string_view outPath) const
 {
@@ -1080,7 +1143,35 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
   perfApi_->retire(hartIx, time++, 19, traceFiles.at(0));
   perfApi_->retire(hartIx, time++, 20, traceFiles.at(0));
   perfApi_->retire(hartIx, time++, 21, traceFiles.at(0));
-  
+
+  pc = 0x10162;   opcode = 0x2785; tag++; time++;  // #22
+  perfApi_->fetch(hartIx, time, tag, pc, trap, cause, trapPc);
+  pc = 0x10164;   opcode = 0x0711; tag++;  // #23
+  perfApi_->fetch(hartIx, time, tag, pc, trap, cause, trapPc);
+
+  time++;
+  perfApi_->decode(hartIx, time, 22, opcode);
+  perfApi_->decode(hartIx, time, 23, opcode);
+  time++;
+  perfApi_->execute(hartIx, time, 22);
+  perfApi_->execute(hartIx, time, 23);
+  time++;
+  perfApi_->retire(hartIx, time, 22, traceFiles.at(0));
+  perfApi_->retire(hartIx, time, 23, traceFiles.at(0));
+
+  pc = 0x10166;   opcode = 0xfed79de3; tag++; // #24
+  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
+  perfApi_->decode(hartIx, time++, tag, opcode);
+  pc = 0x1016a;   opcode = 0x4501; tag++; // #25, wrong fetch
+  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
+  perfApi_->decode(hartIx, time++, tag, opcode);
+
+  perfApi_->execute(hartIx, time++, 24);
+  auto packet = perfApi_->getInstructionPacket(hartIx, 24);
+  packet->predictBranch(false, 0x1016a);
+  assert(packet->shouldFlush());
+
+  perfApi_->retire(hartIx, time++, 24, traceFiles.at(0));
   exit(0);
 #endif
 

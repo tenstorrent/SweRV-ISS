@@ -1,3 +1,4 @@
+#include <cinttypes>
 #include "PerfModel.hpp"
 
 using namespace TT_PERF;
@@ -47,6 +48,10 @@ bool
 PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
 	       bool& trap, ExceptionCause& cause, uint64_t& trapPc)
 {
+  if (commandLog_)
+    fprintf(commandLog_, "hart=%" PRIu32 " time=%" PRIu64 " perf_model_fetch %" PRIu64 " 0x%" PRIx64 "\n",
+            hartIx, time, tag, vpc);
+
   auto hart = checkHart("Fetch", hartIx);
   if (not hart)
     return false;
@@ -96,6 +101,10 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
 bool
 PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode)
 {
+  if (commandLog_)
+    fprintf(commandLog_, "hart=%" PRIu32 " time=%" PRIu64 " perf_model_decode %" PRIu64 " 0x%" PRIx32 "\n",
+            hartIx, time, tag, opcode);
+
   if (not checkTime("Decode", time))
     return false;
 
@@ -150,6 +159,10 @@ PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode)
 bool
 PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
 {
+  if (commandLog_)
+    fprintf(commandLog_, "hart=%" PRIu32 " time=%" PRIu64 " perf_model_execute %" PRIu64 "\n",
+            hartIx, time, tag);
+
   if (not checkTime("Execute", time))
     return false;
 
@@ -211,7 +224,7 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   return true;
 }
 
-  
+
 bool
 PerfApi::execute(unsigned hartIx, InstrPac& packet)
 {
@@ -299,6 +312,9 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
     }
 
   hart.singleStep();
+
+  if (packet.isBranch())
+    packet.nextIva_ = hart.peekPc();
 
   // Record the values of the dstination register.
   auto& di = packet.decodedInst();
@@ -388,7 +404,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 	  break;
 	}
     }
-  
+
   hart.pokePc(prevPc);
   hart.setInstructionCount(hart.getInstructionCount() - 1);
 
@@ -399,6 +415,10 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 bool
 PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag, FILE* traceFile)
 {
+  if (commandLog_)
+    fprintf(commandLog_, "hart=%" PRIu32 " time=%" PRIu64 " perf_model_retire %" PRIu64 "\n",
+            hartIx, time, tag);
+
   if (not checkTime("Retire", time))
     return false;
 
@@ -491,6 +511,10 @@ PerfApi::translateStoreAddr(unsigned hartIx, uint64_t iva, uint64_t& ipa)
 bool
 PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
 {
+  if (commandLog_)
+    fprintf(commandLog_, "hart=%" PRIu32 " time=%" PRIu64 " perf_model_drain_store %" PRIu64 "\n",
+            hartIx, time, tag);
+
   if (not checkTime("Drain-store", time))
     return false;
 
@@ -554,7 +578,6 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
 bool
 PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t& data)
 {
-
   auto hart = checkHart("Get-load-data", hartIx);
   auto packet = checkTag("Get-load-Data", hartIx, tag);
 

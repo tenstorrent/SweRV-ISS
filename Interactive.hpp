@@ -153,6 +153,22 @@ namespace WdRiscv
     bool pmaCommand(Hart<URV>& hart, const std::string& line,
 		    const std::vector<std::string>& tokens);
 
+    bool perfModelFetchCommand(const std::string& line,
+		               const std::vector<std::string>& tokens);
+
+    bool perfModelDecodeCommand(const std::string& line,
+		                const std::vector<std::string>& tokens);
+
+    bool perfModelExecuteCommand(const std::string& line,
+		                 const std::vector<std::string>& tokens);
+
+    bool perfModelRetireCommand(const std::string& line,
+		                const std::vector<std::string>& tokens,
+                                FILE* traceFile);
+
+    bool perfModelDrainStoreCommand(const std::string& line,
+		                    const std::vector<std::string>& tokens);
+
     static void peekAllFpRegs(Hart<URV>& hart, std::ostream& out);
     static void peekAllIntRegs(Hart<URV>& hart, std::ostream& out);
     static void peekAllVecRegs(Hart<URV>& hart, std::ostream& out);

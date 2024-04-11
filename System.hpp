@@ -350,6 +350,20 @@ namespace WdRiscv
 
     bool mcmSetCurrentInstruction(Hart<URV>& hart, uint64_t tag);
 
+
+    /// Perf model APIs.
+    void perfApiCommandLog(FILE* log);
+
+    bool perfApiFetch(unsigned hart, uint64_t time, uint64_t tag, uint64_t vpc);
+
+    bool perfApiDecode(unsigned hart, uint64_t time, uint64_t tag, uint32_t opcode);
+
+    bool perfApiExecute(unsigned hart, uint64_t time, uint64_t tag);
+
+    bool perfApiRetire(unsigned hart, uint64_t time, uint64_t tag, FILE* traceFile);
+
+    bool perfApiDrainStore(unsigned hart, uint64_t time, uint64_t tag);
+
     /// Produce a signature file used to score tests from the
     /// riscv-arch-tests project.  The file is written to the
     // path specified in the parameter.
