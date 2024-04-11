@@ -10235,7 +10235,7 @@ Hart<URV>::execDret(const DecodedInst* di)
 
 template <typename URV>
 bool
-Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& value)
+Hart<URV>::checkCsrAccess(const DecodedInst* di, CsrNumber csr, bool isWrite)
 {
   using PM = PrivilegeMode;
   using CN = CsrNumber;
@@ -10283,6 +10283,25 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
 	  return false;
         }
     }
+
+  if (isWrite and not isCsrWriteable(csr, privMode_, virtMode_))
+    {
+      if (virtMode_)
+	{
+	  if (csr == CsrNumber::SATP)
+	    virtualInst(di);
+	  else
+	    {
+	      if (csRegs_.isHighHalf(csr) and sizeof(URV) > 4)
+		hsq = false;
+	      if (hsq) virtualInst(di); else illegalInst(di);
+	    }
+	}
+      else
+	illegalInst(di);
+      return false;
+    }
+
 
   // Section 2.3 of AIA, lower priority than stateen. Doesn't follow normal hs-qualified rules.
   if (not imsicAccessible(di, csr, privMode_, virtMode_))
@@ -10345,8 +10364,25 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
         }
     }
 
+  return true;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& value)
+{
+  if (not checkCsrAccess(di, csr, isWrite))
+    return false;
+
   if (csRegs_.read(csr, privMode_, value))
     return true;
+
+  // Check if HS qualified (section 9.6.1 of privileged spec).
+  using PM = PrivilegeMode;
+  bool hsq = isRvs() and csRegs_.isReadable(csr, PM::Supervisor, false /*virtMode*/);
+  if (isWrite)
+    hsq = hsq and isCsrWriteable(csr, PM::Supervisor, false /*virtMode*/);
 
   if (virtMode_ and hsq )
     virtualInst(di);  // HS qualified 
@@ -10497,29 +10533,7 @@ void
 Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
                       unsigned intReg, URV intRegVal)
 {
-  using PM = PrivilegeMode;
-
-  if (not isCsrWriteable(csr, privMode_, virtMode_))
-    {
-      if (virtMode_)
-	{
-	  if (csr == CsrNumber::SATP)
-	    virtualInst(di);
-	  else
-	    {
-	      bool hsq = isRvs() and isCsrWriteable(csr, PM::Supervisor, false); // HS qualified
-	      if (csRegs_.isHighHalf(csr) and sizeof(URV) > 4)
-		hsq = false;
-	      if (hsq) virtualInst(di); else illegalInst(di);
-	    }
-	}
-      else
-	illegalInst(di);
-      return;
-    }
-
-  // Section 2.3 of AIA, lower priority than stateen. Doesn't follow normal hs-qualified rules.
-  if (not imsicAccessible(di, csr, privMode_, virtMode_))
+  if (not checkCsrAccess(di, csr, true /* isWrite */))
     return;
 
   // Make auto-increment happen before CSR write for minstret and cycle.

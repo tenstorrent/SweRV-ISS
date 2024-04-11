@@ -2570,22 +2570,22 @@ namespace WdRiscv
     /// false otherwise.
     bool imsicAccessible(const DecodedInst* di, CsrNumber csr, PrivilegeMode mode, bool virtMode);
 
-    /// Helper to CSR instructions: return true if given CSR is
-    /// writebale in the given privielge level and virtual (V) mode
-    /// and false otherwise.
+    /// Helper to CSR instructions: return true if given CSR is writebale in the given
+    /// privielge level and virtual (V) mode and false otherwise.
     bool isCsrWriteable(CsrNumber csr, PrivilegeMode mode, bool virtMode) const;
 
-    /// Helper to CSR instructions: Write csr and integer register if csr
-    /// is writeable.
+    /// Helper to CSR instructions: Write csr and integer register if csr is writeable.
     void doCsrWrite(const DecodedInst* di, CsrNumber csr, URV csrVal,
                     unsigned intReg, URV intRegVal);
 
-    /// Helper to CSR instructions: Read CSR register returning true
-    /// on success and false on failure (CSR does not exist or is not
-    /// accessible). The isWrite flags should be set to true if
-    /// doCsrRead is called from a CSR instruction that would write
-    /// the CSR register when the read is successful.
+    /// Helper to CSR instructions: Read CSR register returning true on success and false
+    /// on failure (CSR does not exist or is not accessible). The isWrite flags should be
+    /// set to true if doCsrRead is called from a CSR instruction that would write the CSR
+    /// register when the read is successful.
     bool doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& csrVal);
+
+    /// Helper to doCsrWrite/doCsrRead.
+    bool checkCsrAccess(const DecodedInst* di, CsrNumber csr, bool isWrite);
 
     /// This is called after a csr is written/poked to update the
     /// procerssor state as a side effect to the csr change.
