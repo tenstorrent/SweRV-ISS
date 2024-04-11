@@ -865,14 +865,17 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
       csr->setReadMask(mask);
     }
 
+  // Re-enable once RTL is ready.
+#if 0
   // Enable/disable hypervisor related exceptions (bits 23:20 in MEDELEG).
   csr = findCsr(CN::MEDELEG);
   if (csr)
-  {
-    URV bits = URV(0xf) << 20;  // Bits 23:20
-    auto mask = csr->getReadMask();
-    csr->setReadMask(flag ? (mask | bits) : (mask & ~bits));
-  }
+    {
+      URV bits = URV(0xf) << 20;  // Bits 23:20
+      auto mask = csr->getReadMask();
+      csr->setReadMask(flag ? (mask | bits) : (mask & ~bits));
+    }
+#endif
 
   // Bit MIP.VSSIP is writeable if hypervisor is enabled, otherwise it is not
   csr = findCsr(CN::MIP);
