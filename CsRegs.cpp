@@ -865,23 +865,31 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
       csr->setReadMask(mask);
     }
 
+  // Enable/disable hypervisor related exceptions (bits 23:20 in MEDELEG).
+  csr = findCsr(CN::MEDELEG);
+  if (csr)
+  {
+    URV bits = URV(0xf) << 20;  // Bits 23:20
+    auto mask = csr->getReadMask();
+    csr->setReadMask(flag ? (mask | bits) : (mask & ~bits));
+  }
+
   // Bit MIP.VSSIP is writeable if hypervisor is enabled, otherwise it is not
   csr = findCsr(CN::MIP);
   if (csr)
     {
+      URV bit = 4;
       auto mask = csr->getWriteMask();
-      mask = flag? mask | URV(4) : mask & ~URV(4);
-      csr->setWriteMask(mask);
+      csr->setWriteMask(flag ? (mask | bit) : (mask & ~bit));
     }
 
+  // In MIE, bits VSEIE, VSTIE, VSSIE, and SGEIE become read-only zero if no hypervisor.
   csr = findCsr(CN::MIE);
   if (csr)
     {
-      // Bits VSEIE, VSTIE, VSSIE and SGEIE become read-only zero if no hypervisor.
-      if (flag)
-	csr->setReadMask(csr->getReadMask() | URV(0x1444)); // Enable reading.
-      else
-	csr->setReadMask(csr->getReadMask() & ~URV(0x1444)); // Read-only-zero.
+      URV bits = 0x1444;
+      auto mask = csr->getReadMask();
+      csr->setReadMask(flag ? (mask | bits) : (mask & ~bits));
     }
 
   updateSstc();  // To activate/deactivate VSTIMECMP.
