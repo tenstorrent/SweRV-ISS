@@ -411,6 +411,10 @@ namespace WdRiscv
     bool isTailAgnostic() const
     { return tailAgn_; }
 
+    /// Set tail-agnostic to the given flag.
+    void setTailAgnostic(bool flag)
+    { tailAgn_ = flag; }
+
     /// Return true if tail-agnostic-policy is set to all-ones.
     bool isTailAgnosticOnes() const
     { return tailAgnOnes_; }

@@ -11241,21 +11241,29 @@ Hart<URV>::execVlm_v(const DecodedInst* di)
       return;
     }
 
-  // Change element count to byte count, elem width to byte, and emul to 1.
-  uint32_t elems = vecRegs_.elemCount();
-  uint32_t bytes = (elems + 7) / 8;
+  // Record element count, element width, group multiplier, and tail-agnostic
+  // setting.
   ElementWidth ew = vecRegs_.elemWidth();
+  uint32_t elems = vecRegs_.elemCount();
   GroupMultiplier gm = vecRegs_.groupMultiplier();
+  bool tailAgnostic = vecRegs_.isTailAgnostic();
+
+  // Change element count to byte count, element width to byte, and emul to 1.
+  // Change tail-agnostic to true.
+  uint32_t bytes = (elems + 7) / 8;
   vecRegs_.elemCount(bytes);
   vecRegs_.elemWidth(ElementWidth::Byte);
   vecRegs_.groupMultiplier(GroupMultiplier::One);
+  vecRegs_.setTailAgnostic(true);
 
   // Do load bytes.
   bool ok = vectorLoad<uint8_t>(di, ElementWidth::Byte, false);
 
-  vecRegs_.elemCount(elems); // Restore elem count.
-  vecRegs_.elemWidth(ew); // Restore elem width.
-  vecRegs_.groupMultiplier(gm); // Restore group multiplier
+  // Restore elem count, elem width, emul, and tail-agnostic.
+  vecRegs_.elemCount(elems);
+  vecRegs_.elemWidth(ew);
+  vecRegs_.groupMultiplier(gm);
+  vecRegs_.setTailAgnostic(tailAgnostic);
 
   if (not ok)
     return;
@@ -11273,21 +11281,29 @@ Hart<URV>::execVsm_v(const DecodedInst* di)
       return;
     }
 
-  // Change element count to byte count, element width to byte, and emul to 1.
-  uint32_t elems = vecRegs_.elemCount();
-  uint32_t bytes = (elems + 7) / 8;
+  // Record element count, element width, group multiplier, and tail-agnostic
+  // setting.
   ElementWidth ew = vecRegs_.elemWidth();
+  uint32_t elems = vecRegs_.elemCount();
   GroupMultiplier gm = vecRegs_.groupMultiplier();
+  bool tailAgnostic = vecRegs_.isTailAgnostic();
+
+  // Change element count to byte count, element width to byte, and emul to 1.
+  // Change tail-agnostic to true.
+  uint32_t bytes = (elems + 7) / 8;
   vecRegs_.elemCount(bytes);
   vecRegs_.elemWidth(ElementWidth::Byte);
   vecRegs_.groupMultiplier(GroupMultiplier::One);
-  
+  vecRegs_.setTailAgnostic(true);
+
   // Do store bytes.
   bool ok = vectorStore<uint8_t>(di, ElementWidth::Byte);
 
-  vecRegs_.elemCount(elems); // Restore elem count.
-  vecRegs_.elemWidth(ew); // Restore elem width.
-  vecRegs_.groupMultiplier(gm); // Restore group multiplier
+  // Restore elem count, elem width, emul, and tail-agnostic.
+  vecRegs_.elemCount(elems);
+  vecRegs_.elemWidth(ew);
+  vecRegs_.groupMultiplier(gm);
+  vecRegs_.setTailAgnostic(tailAgnostic);
 
   if (not ok)
     return;
