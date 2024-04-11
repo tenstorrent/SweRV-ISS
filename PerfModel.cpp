@@ -426,9 +426,10 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag, FILE* traceFile)
   if (not hart)
     return false;
 
-  auto packet = checkTag("Retire", hartIx, tag);
-  if (not packet)
+  auto pacPtr = checkTag("Retire", hartIx, tag);
+  if (not pacPtr)
     return false;
+  auto& packet = *pacPtr;
 
   if (tag <= hartLastRetired_.at(hartIx))
     {
@@ -437,17 +438,17 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag, FILE* traceFile)
       return false;
     }
 
-  if (packet->retired())
+  if (packet.retired())
     {
       std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag
 		<< " Tag retired more than once\n";
       return false;
     }
 
-  if (packet->instrVa() != hart->peekPc())
+  if (packet.instrVa() != hart->peekPc())
     {
       std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag << std::hex
-		<< " Wrong pc: 0x" << packet->instrVa() << " expecting "
+		<< " Wrong pc: 0x" << packet.instrVa() << " expecting "
 		<< hart->peekPc() << '\n' << std::dec;
       return false;
     }
@@ -455,24 +456,30 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag, FILE* traceFile)
   hart->setInstructionCount(tag - 1);
   hart->singleStep(traceFile);
 
-  if (packet->di_.isLoad())
-    packet->dsize_ = packet->di_.loadSize();
-  else if (packet->di_.isStore())
-    packet->dsize_ = packet->di_.storeSize();
+  auto& di = packet.decodedInst();
+  if (di.isLoad())
+    packet.dsize_ = di.loadSize();
+  else if (di.isStore())
+    packet.dsize_ = di.storeSize();
 
   // Undo renaming of destination registers.
   auto& producers = hartRegProducers_.at(hartIx);
-  for (size_t i = 0; i < packet->destValues_.size(); ++i)
+  for (size_t i = 0; i < packet.destValues_.size(); ++i)
     {
-      auto gri = packet->destValues_.at(i).first;
-      if (producers.at(gri).get() == packet.get())
+      auto gri = packet.destValues_.at(i).first;
+      auto& producer = producers.at(gri);
+      if (producer and producer->tag() == packet.tag())
 	producers.at(gri) = nullptr;
     }
 
-  packet->retired_ = true;
+  packet.retired_ = true;
 
-  auto& packetMap = hartPacketMaps_.at(hartIx);
-  packetMap.erase(packet->tag());
+  // Stores erased at drain time.
+  if (not packet.decodedInst().isStore())
+    {
+      auto& packetMap = hartPacketMaps_.at(hartIx);
+      packetMap.erase(packet.tag());
+    }
 
   return true;
 }
@@ -571,6 +578,9 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
     }
 
   packet->drained_ = true;
+  auto& packetMap = hartPacketMaps_.at(hartIx);
+  packetMap.erase(packet->tag());
+
   return true;
 }
 

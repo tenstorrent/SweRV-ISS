@@ -40,6 +40,9 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
       : tag_(tag), iva_(iva), ipa_(ipa), ipa2_(ipa2)
     { }
 
+    ~InstrPac()
+    { }
+
     /// This must be called by the performance model after a call to execute. If it
     /// returns true, then the performance model subsequent call must be a flush to cause
     /// whisper to flush.
