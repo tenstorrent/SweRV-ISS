@@ -4,6 +4,21 @@
 using namespace TT_PERF;
 
 
+PerfApi::PerfApi(System64& system)
+  : system_(system)
+{
+  unsigned n = system.hartCount();
+
+  hartPacketMaps_.resize(n);
+  hartStoreMaps_.resize(n);
+  hartLastRetired_.resize(n);
+  hartRegProducers_.resize(n);
+
+  for (auto& producers : hartRegProducers_)
+    producers.resize(totalRegCount_);
+}
+
+
 std::shared_ptr<Hart64>
 PerfApi::checkHart(const char* caller, unsigned hartIx)
 {
@@ -313,11 +328,27 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   hart.singleStep();
 
-  if (packet.isBranch())
+  auto& di = packet.decodedInst();
+  if (di.isLoad())
+    packet.dsize_ = di.loadSize();
+  else if (di.isStore())
+    {
+      uint64_t sva = 0, spa1 = 0, spa2 = 0, sval = 0;
+      unsigned ssize = hart.lastStore(sva, spa1, spa2, sval);
+      if (ssize == 0)
+	assert(0);
+
+      packet.dva_ = sva;
+      packet.dsize_ = di.storeSize();
+      assert(ssize = packet.dsize_);
+
+      auto& storeMap =  hartStoreMaps_.at(hartIx);
+      storeMap[packet.tag()] = getInstructionPacket(hartIx, packet.tag());
+    }
+  else if (packet.isBranch())
     packet.nextIva_ = hart.peekPc();
 
   // Record the values of the dstination register.
-  auto& di = packet.decodedInst();
   unsigned destIx = 0;
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
@@ -334,33 +365,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 	}
     }
 
-  // Restore changed memory.
-  uint64_t maddr = 0, mval = 0;
-  unsigned stSize = hart.lastStore(maddr, mval);
-  bool usePma = true;
-  switch (stSize)
-    {
-    case 0:
-      break;
-    case 1:
-      if (not hart.pokeMemory(maddr, uint8_t(mval), usePma))
-	assert(0);
-      break;
-    case 2:
-      if (not hart.pokeMemory(maddr, uint16_t(mval), usePma))
-	assert(0);
-      break;
-    case 4:
-      if (not hart.pokeMemory(maddr, uint32_t(mval), usePma))
-	assert(0);
-      break;
-    case 8:
-      if (not hart.pokeMemory(maddr, uint64_t(mval), usePma))
-	assert(0);
-      break;
-    default:
-      assert(0);
-    }
+  // Memory should not have changed.
 
   // Restore additional CSRs modified by the execution (in case of a trap).
   std::vector<WdRiscv::CsrNumber> csrns;
@@ -456,12 +461,6 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag, FILE* traceFile)
   hart->setInstructionCount(tag - 1);
   hart->singleStep(traceFile);
 
-  auto& di = packet.decodedInst();
-  if (di.isLoad())
-    packet.dsize_ = di.loadSize();
-  else if (di.isStore())
-    packet.dsize_ = di.storeSize();
-
   // Undo renaming of destination registers.
   auto& producers = hartRegProducers_.at(hartIx);
   for (size_t i = 0; i < packet.destValues_.size(); ++i)
@@ -526,32 +525,34 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
     return false;
 
   auto hart = checkHart("Drain-store", hartIx);
-  auto packet = checkTag("Drain-store", hartIx, tag);
+  auto pacPtr = checkTag("Drain-store", hartIx, tag);
 
-  if (not hart or not packet or not packet->retired())
+  if (not hart or not pacPtr or not pacPtr->retired())
     {
       assert(0);
       return false;
     }
 
-  if (packet->drained())
+  auto& packet = *pacPtr;
+
+  if (packet.drained())
     {
       std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag
 		<< " Instruction drained more than once\n";
       return false;
     }
 
-  if (not packet->di_.isStore())
+  if (not packet.di_.isStore())
     {
       std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag
 		<< " Draining a non-store instruction\n";
       return false;
     }
 
-  uint64_t value = packet->opVal_.at(0);
-  uint64_t addr = packet->dpa_;    // FIX TODO : Handle page crossing store.
+  uint64_t value = packet.opVal_.at(0);
+  uint64_t addr = packet.dpa_;    // FIX TODO : Handle page crossing store.
 
-  switch (packet->dsize_)
+  switch (packet.dsize_)
     {
     case 1:
       if (not hart->pokeMemory(addr, uint8_t(value), true))
@@ -577,27 +578,56 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
       assert(0);
     }
 
-  packet->drained_ = true;
+  packet.drained_ = true;
+
   auto& packetMap = hartPacketMaps_.at(hartIx);
-  packetMap.erase(packet->tag());
+  packetMap.erase(packet.tag());
+
+  auto& storeMap = hartStoreMaps_.at(hartIx);
+  storeMap.erase(packet.tag());
 
   return true;
 }
 
 
 bool
-PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t& data)
+PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned size, uint64_t& data)
 {
   auto hart = checkHart("Get-load-data", hartIx);
   auto packet = checkTag("Get-load-Data", hartIx, tag);
 
-  if (not hart or not packet or not packet->executed() or not packet->di_.isLoad()
-      or packet->trapped())
+  if (not hart or not packet or not packet->di_.isLoad() or packet->trapped())
     {
       assert(0);
       return false;
     }
 
-  data = packet->destValues_.at(0).second;
-  return true;
+  if (packet->executed())
+    {
+      assert(size == packet->dataSize());
+      data = packet->destValues_.at(0).second;
+      return true;
+    }
+
+  auto& storeMap =  hartStoreMaps_.at(hartIx);
+
+  static bool firstTime = true;
+  if (firstTime)
+    {
+      std::cerr << "Fix PerApi::getLoadData to handle forwarding from multiple sources.\n";
+      std::cerr << "Fix PerApi::getLoadData to handle page crosses.\n";
+      firstTime = false;
+    }
+
+  for (auto& kv : storeMap)
+    {
+      auto stTag = kv.first;
+      auto& stPac = kv.second;
+      if (stTag < tag and stPac->executed() and stPac->dataVa() == vaddr and
+	  stPac->dataSize() == size)
+	data = stPac->opVal_.at(0);
+      return true;
+    }
+
+  return false;
 }

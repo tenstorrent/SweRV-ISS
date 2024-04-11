@@ -196,16 +196,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
   {
   public:
 
-    PerfApi(System64& system)
-      : system_(system)
-    {
-      unsigned n = system.hartCount();
-      hartPacketMaps_.resize(n);
-      hartLastRetired_.resize(n);
-      hartRegProducers_.resize(n);
-      for (auto& producers : hartRegProducers_)
-	producers.resize(totalRegCount_);
-    }
+    PerfApi(System64& system);
 
     /// Called by the performance model to affect a fetch in whisper. The
     /// instruction tag must be monotonically increasing for a particular
@@ -281,7 +272,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// Set data to the load value of the given instruction tag and return true on
     /// success. Return false on failure leaving data unmodified: tag is not valid or
     /// corresponding instruction is not executed or is not a load.
-    bool getLoadData(unsigned hart, uint64_t tag, uint64_t& data);
+    bool getLoadData(unsigned hart, uint64_t tag, uint64_t vaddr, unsigned size, uint64_t& data);
 
     /// Return a pointer of the hart having the given index or null if no such hart.
     std::shared_ptr<Hart64> getHart(unsigned hartIx)
@@ -356,22 +347,26 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
 
   private:
 
+    /// Map an instruction tag to corresponding packet.
     typedef std::map<uint64_t, std::shared_ptr<InstrPac>> PacketMap;
-
-    System64& system_;
-    std::shared_ptr<InstrPac> prevFetch_;
-
-    /// Map a hart index to the corresponding instruction packet map.
-    std::vector<PacketMap> hartPacketMaps_;
-
-    /// Map a hart index to the tag of the last retired instruction.
-    std::vector<uint64_t> hartLastRetired_;
 
     /// Map a global register index to the in-flight instruction producing that
     /// register. This is register renaming.
     typedef std::vector<std::shared_ptr<InstrPac>> RegProducers;
 
-    /// Map a hart index to the register renaming-table.
+    System64& system_;
+    std::shared_ptr<InstrPac> prevFetch_;
+
+    /// Per-hart map of in flight instruction packets.
+    std::vector<PacketMap> hartPacketMaps_;
+
+    /// Per-hart map of in flight executed store packets.
+    std::vector<PacketMap> hartStoreMaps_;
+
+    /// Per-hart index tag the last retired instruction.
+    std::vector<uint64_t> hartLastRetired_;
+
+    /// Per-hart register renaming table (indexed by global register index).
     std::vector<RegProducers> hartRegProducers_;
 
     uint64_t time_ = 0;
