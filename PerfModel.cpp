@@ -113,11 +113,23 @@ PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode)
   hart->decode(packet->instrVa(), packet->instrPa(), opcode, packet->di_);
   packet->decoded_ = true;
 
-  // Mark this insruction as the producer of each of its destination registers (at most 2:
-  // one register and one csr).
+  // Collect producers of operands of this instruction.
   auto& di = packet->decodedInst();
-  unsigned destIx = 0;
   auto& producers = hartRegProducers_.at(hartIx);
+  for (unsigned i = 0; i < di.operandCount(); ++i)
+    {
+      using OM = WdRiscv::OperandMode;
+
+      auto mode = di.ithOperandMode(i);
+      if (mode != OM::None)
+	{
+	  unsigned regNum = di.ithOperand(i);
+	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
+	  packet->opProducers_.at(i) = producers.at(gri);
+	}
+    }
+
+  // Mark this insruction as the producer of each of its destination registers.
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
       using OM = WdRiscv::OperandMode;
@@ -127,7 +139,6 @@ PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode)
 	{
 	  unsigned regNum = di.ithOperand(i);
 	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
-	  packet->prevDestWriter_.at(destIx)= producers.at(gri);
 	  producers.at(gri) = packet;
 	}
     }
@@ -172,7 +183,6 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
     }
 
   // Collect register operand values.
-  auto& producers = hartRegProducers_.at(hartIx);
   assert(di.operandCount() <= packet.opVal_.size());
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
@@ -180,9 +190,10 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
 	continue;
       unsigned regNum = di.ithOperand(i);
       unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
-      auto& producer = producers.at(gri);
       uint64_t value = 0;
-      if (producer and producer->tag() != packet.tag())
+
+      auto& producer = packet.opProducers_.at(i);
+      if (producer)
 	value = getDestValue(*producer, gri);
       else if (not peekRegister(*hart, di.ithOperandType(i), regNum, value))
 	assert(0);
@@ -218,7 +229,41 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   std::array<uint64_t, 3> prevVal;  // Previous operand values
 
-  // Poke packet operands into hart saving previous values of packed registers.
+  // Save prev value of poperands.
+  for (unsigned i = 0; i < packet.di_.operandCount(); ++i)
+    {
+      auto mode = packet.di_.ithOperandMode(i);
+      auto type = packet.di_.ithOperandType(i);
+      uint32_t operand = packet.di_.ithOperand(i);
+      if (mode == OM::None)
+	continue;
+
+      switch (type)
+	{
+	case OT::IntReg:
+	  if (not hart.peekIntReg(operand, prevVal.at(i)))
+	    assert(0);
+	  break;
+	case OT::FpReg:
+	  if (not hart.peekFpReg(operand, prevVal.at(i)))
+	    assert(0);
+	  break;
+	case OT::CsReg:
+	  if (not hart.peekCsr(WdRiscv::CsrNumber(operand), prevVal.at(i)))
+	    assert(0);
+	  break;
+	case OT::VecReg:
+	  assert(0);
+	  break;
+	case OT::Imm:
+	  break;
+	default:
+	  assert(0);
+	  break;
+	}
+    }
+
+  // Poke packet operands into hart.
   for (unsigned i = 0; i < packet.di_.operandCount(); ++i)
     {
       auto mode = packet.di_.ithOperandMode(i);
@@ -231,20 +276,14 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
       switch (type)
 	{
 	case OT::IntReg:
-	  if (not hart.peekIntReg(operand, prevVal.at(i)))
-	    assert(0);
 	  if (not hart.pokeIntReg(operand, val))
 	    assert(0);
 	  break;
 	case OT::FpReg:
-	  if (not hart.peekFpReg(operand, prevVal.at(i)))
-	    assert(0);
 	  if (not hart.pokeFpReg(operand, val))
 	    assert(0);
 	  break;
 	case OT::CsReg:
-	  if (not hart.peekCsr(WdRiscv::CsrNumber(operand), prevVal.at(i)))
-	    assert(0);
 	  if (not hart.pokeCsr(WdRiscv::CsrNumber(operand), val))
 	    assert(0);
 	  break;
@@ -405,10 +444,9 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag, FILE* traceFile)
   auto& producers = hartRegProducers_.at(hartIx);
   for (size_t i = 0; i < packet->destValues_.size(); ++i)
     {
-      auto& prev = packet->prevDestWriter_.at(i);
       auto gri = packet->destValues_.at(i).first;
       if (producers.at(gri).get() == packet.get())
-	producers.at(gri) = prev;
+	producers.at(gri) = nullptr;
     }
 
   packet->retired_ = true;

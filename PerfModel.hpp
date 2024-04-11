@@ -102,11 +102,18 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// Return true if this instruction depends on the given instruction.
     bool dependsOn(const InstrPac& other) const
     {
-      for (auto& sp : sourceProducers_)
+      assert(decoded_);
+      for (unsigned i = 0; i < di_.operandCount(); ++i)
 	{
-	  auto producer = sp.second;
-	  if (producer and producer->tag_ == other.tag_)
-	    return true;
+	  using OM = WdRiscv::OperandMode;
+
+	  auto mode = di_.ithOperandMode(i);
+	  if (mode == OM::Read or mode == OM::ReadWrite)
+	    {
+	      auto producer = opProducers_.at(i);
+	      if (producer and producer->tag_ == other.tag_)
+		return true;
+	    }
 	}
       return false;
     }
@@ -160,18 +167,13 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
 
     std::array<uint64_t, 3> opVal_;       // Operand values (count and types are in di)
 
-    // Each entry is a global register number of a source operand and the
-    // corresponding in-flight packet that produced that opernad
-    typedef std::pair<unsigned, std::shared_ptr<InstrPac>> SourceProducer;
-    std::array<SourceProducer, 3> sourceProducers_;
+    // Entry i is the in-flight producer of the ith operand.
+    std::array<std::shared_ptr<InstrPac>, 3> opProducers_;
 
     /// Global register index of a destination register and its corresponding
     /// value.
     typedef std::pair<unsigned, uint64_t> DestValue;
     std::array<DestValue, 2> destValues_;
-
-    /// Previous writer of the global destination register written by this instruction.
-    std::array<std::shared_ptr<InstrPac>, 2> prevDestWriter_;
 
     // Following applicable if instruction is a branch
     bool predicted_  : 1 = false;  // true if predicted to be a branch
@@ -336,6 +338,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// global register index.
     uint64_t getDestValue(const InstrPac& producer, unsigned gri) const
     {
+      assert(producer.executed());
       for (auto& p : producer.destValues_)
 	if (p.first == gri)
 	  return p.second;
