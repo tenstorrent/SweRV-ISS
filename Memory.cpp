@@ -253,7 +253,7 @@ Memory::loadBinaryFile(const std::string& fileName, uint64_t addr)
 }
 
 #ifdef LZ4_COMPRESS
-std::vector<uint8_t>
+std::pair<std::unique_ptr<uint8_t[]>, size_t>
 Memory::loadFile(const std::string& filename)
 {
   std::streampos length;
@@ -263,10 +263,10 @@ Memory::loadFile(const std::string& filename)
   length = f.tellg();
   f.seekg(0, std::ios::beg);
 
-  std::vector<uint8_t> data(length);
+  auto data = std::make_unique<uint8_t[]>(length);
   f.read((char *)&data[0], length);
 
-  return data;
+  return std::make_pair(std::move(data), std::move(length));
 }
 
 #define BLOCK_SIZE (4*1024*1024)
@@ -281,10 +281,9 @@ Memory::loadLz4File(const std::string& fileName, uint64_t addr)
       throw std::runtime_error("Couldn't initialize LZ4 context");
     }
 
-  std::vector<uint8_t> src = loadFile(fileName);
-  size_t src_size = src.size();
+  auto [src, src_size] = loadFile(fileName);
   size_t dst_size = BLOCK_SIZE;
-  std::vector<uint8_t> dst(dst_size);
+  auto dst = std::make_unique<uint8_t[]>(dst_size);
   size_t src_offset = 0;
 
   // unmapped and out of bounds addresses
@@ -295,7 +294,7 @@ Memory::loadLz4File(const std::string& fileName, uint64_t addr)
       size_t src_bytes_read = src_size;
       size_t dst_bytes_written = dst_size;
 
-      size_t ret = LZ4F_decompress(dctx, dst.data(), &dst_bytes_written, &src.data()[src_offset], &src_bytes_read, NULL);
+      size_t ret = LZ4F_decompress(dctx, dst.get(), &dst_bytes_written, &src[src_offset], &src_bytes_read, NULL);
       if (LZ4F_isError(ret))
 	{
 	  throw std::runtime_error("LZ4F_decompress failed");
