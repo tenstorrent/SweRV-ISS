@@ -29,7 +29,7 @@ cc_binary(
     name          = "whisper",
     srcs          = ["whisper.cpp"],
     deps          = [":rvcore"],
-    local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS"],
+    local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS", "LZ4_COMPRESS"],
     linkopts      = ["-lboost_program_options", "-rdynamic"],
     visibility    = ["//visibility:public"],
 )
