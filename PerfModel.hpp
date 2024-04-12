@@ -361,8 +361,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
 
     /// Map a global register index to the in-flight instruction producing that
     /// register. This is register renaming.
-    typedef std::vector<std::shared_ptr<InstrPac>> RegProducersChain;
-    typedef std::vector<RegProducersChain> RegProducers;
+    typedef std::vector<std::shared_ptr<InstrPac>> RegProducers;
 
     System64& system_;
     std::shared_ptr<InstrPac> prevFetch_;

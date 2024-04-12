@@ -15,11 +15,7 @@ PerfApi::PerfApi(System64& system)
   hartRegProducers_.resize(n);
 
   for (auto& producers : hartRegProducers_)
-    {
-      producers.resize(totalRegCount_);
-      for (size_t i = 0; i < totalRegCount_; i++)
-        producers.at(i).push_back(nullptr);
-    }
+    producers.resize(totalRegCount_);
 }
 
 
@@ -153,7 +149,7 @@ PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode)
 	{
 	  unsigned regNum = di.ithOperand(i);
 	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
-	  packet->opProducers_.at(i) = producers.at(gri).back();
+	  packet->opProducers_.at(i) = producers.at(gri);
 	}
     }
 
@@ -167,7 +163,7 @@ PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode)
 	{
 	  unsigned regNum = di.ithOperand(i);
 	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
-	  producers.at(gri).push_back(packet);
+	  producers.at(gri) = packet;
 	}
     }
 
@@ -471,10 +467,8 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag, FILE* traceFile)
     {
       auto gri = packet.destValues_.at(i).first;
       auto& producer = producers.at(gri);
-      producer.erase(std::remove_if(producer.begin(), producer.end(),
-          [packet] (auto prod) {
-            return prod and prod->tag() == packet.tag();
-      }), producer.end());
+      if (producer and producer->tag() == packet.tag())
+        producer = nullptr;
     }
 
   packet.retired_ = true;
@@ -680,7 +674,7 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
   if (not checkHart("Flush", hartIx))
     return false;
 
-  for (uint64_t tagIx = tag; tagIx <= oldestTag_; ++tagIx)
+  for (uint64_t tagIx = oldestTag_; tagIx >= tag; --tagIx)
     {
       auto pacPtr = checkTag("Flush", hartIx, tagIx);
 
@@ -692,7 +686,6 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
 
       auto& packet = *pacPtr;
       auto& di = packet.di_;
-
       auto& producers = hartRegProducers_.at(hartIx);
       for (size_t i = 0; i < di.operandCount(); ++i)
         {
@@ -702,10 +695,7 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
               unsigned regNum = di.ithOperand(i);
               unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
               auto& producer = producers.at(gri);
-              producer.erase(std::remove_if(producer.begin(), producer.end(),
-                  [packet] (auto prod) {
-                    return prod and prod->tag() == packet.tag();
-              }), producer.end());
+              producer = packet.opProducers_.at(i);
             }
         }
 
