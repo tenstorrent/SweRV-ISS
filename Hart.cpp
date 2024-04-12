@@ -2376,7 +2376,10 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& phy
     done = readInstFromFetchCache(physAddr2, upperHalf);
 
   if (not done and not memory_.readInst(physAddr2, upperHalf))
-    return ExceptionCause::INST_ACC_FAULT;
+    {
+      virtAddr += 2;  // To report faulting portion of fetch.
+      return ExceptionCause::INST_ACC_FAULT;
+    }
 
   if (initStateFile_)
     dumpInitState("fetch", virtAddr, physAddr2);

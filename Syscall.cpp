@@ -1801,7 +1801,7 @@ Syscall<URV>::getUsedMemBlocks(uint64_t sp, std::vector<AddrLen>& usedBlocks)
   if (stackSize > maxStackSize)
     {
       stackSize = maxStackSize;
-      std::cerr << "Error: detUsedMemBlocks: Stack size too large\n";
+      std::cerr << "Error: detUsedMemBlocks: Stack size too large: " << stackSize << "\n";
     }
   
   usedBlocks.emplace_back(memSize - maxStackSize, maxStackSize);
