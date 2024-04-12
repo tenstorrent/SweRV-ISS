@@ -677,34 +677,40 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
   if (not checkTime("Flush", time))
     return false;
 
-  auto hart = checkHart("Flush", hartIx);
-  auto pacPtr = checkTag("Flush", hartIx, tag);
+  if (not checkHart("Flush", hartIx))
+    return false;
 
-  if (not hart or not pacPtr or pacPtr->retired())
+  for (uint64_t tagIx = tag; tagIx <= oldestTag_; ++tagIx)
     {
-      assert(0);
-      return false;
-    }
+      auto pacPtr = checkTag("Flush", hartIx, tagIx);
 
-  auto& packetMap = hartPacketMaps_.at(hartIx);
-  auto& packet = *packetMap.at(tag);
-  auto& di = packet.di_;
-
-  auto& producers = hartRegProducers_.at(hartIx);
-  for (size_t i = 0; i < di.operandCount(); ++i)
-    {
-      if (di.ithOperandMode(i) == WdRiscv::OperandMode::Write or
-          di.ithOperandMode(i) == WdRiscv::OperandMode::ReadWrite)
+      if (not pacPtr or pacPtr->retired())
         {
-          unsigned regNum = di.ithOperand(i);
-          unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
-          auto& producer = producers.at(gri);
-          producer.erase(std::remove_if(producer.begin(), producer.end(),
-              [packet] (auto prod) {
-                return prod and prod->tag() == packet.tag();
-          }), producer.end());
+          assert(0);
+          return false;
         }
+
+      auto& packet = *pacPtr;
+      auto& di = packet.di_;
+
+      auto& producers = hartRegProducers_.at(hartIx);
+      for (size_t i = 0; i < di.operandCount(); ++i)
+        {
+          if (di.ithOperandMode(i) == WdRiscv::OperandMode::Write or
+              di.ithOperandMode(i) == WdRiscv::OperandMode::ReadWrite)
+            {
+              unsigned regNum = di.ithOperand(i);
+              unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
+              auto& producer = producers.at(gri);
+              producer.erase(std::remove_if(producer.begin(), producer.end(),
+                  [packet] (auto prod) {
+                    return prod and prod->tag() == packet.tag();
+              }), producer.end());
+            }
+        }
+
+      auto& packetMap = hartPacketMaps_.at(hartIx);
+      packetMap.erase(tagIx);
     }
-  packetMap.erase(tag);
   return true;
 }

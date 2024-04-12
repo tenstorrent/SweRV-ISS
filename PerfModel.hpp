@@ -295,6 +295,10 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     {
       auto& packetMap = hartPacketMaps_.at(hartIx);
       packetMap[tag] = ptr;
+      if (tag < oldestTag_)
+        assert(0 and "Inserted packet with tag newer than oldest tag.");
+      else
+        oldestTag_ = tag;
     }
 
     std::shared_ptr<Hart64> checkHart(const char* caller, unsigned hartIx);
@@ -376,6 +380,8 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     std::vector<RegProducers> hartRegProducers_;
 
     uint64_t time_ = 0;
+    /// Assume oldest tag is largest tag.
+    uint64_t oldestTag_ = 0;
     FILE* commandLog_ = nullptr;
 
     /// Global indexing for all registers.
