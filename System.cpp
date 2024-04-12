@@ -1001,7 +1001,7 @@ template <typename URV>
 bool
 System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t stepWindow)
 {
-#if 1
+#if 0
   uint64_t trapPc = 0, tag = 1, time = 0;
   ExceptionCause cause = ExceptionCause::NONE;
   bool trap = false;
