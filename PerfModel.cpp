@@ -611,13 +611,6 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
 
   auto& storeMap =  hartStoreMaps_.at(hartIx);
 
-  static bool firstTime = true;
-  if (firstTime)
-    {
-      std::cerr << "Fix PerApi::getLoadData to handle page crosses.\n";
-      firstTime = false;
-    }
-
   unsigned mask = (1 << size) - 1;  // One bit ber byte of load data.
   unsigned forwarded = 0;            // One bit per forwarded byte.
 
@@ -658,7 +651,7 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
   for (unsigned i = 0; i < size; ++i)
     if (not (forwarded & (1 << i)))
       {
-	uint8_t byte;
+	uint8_t byte = 0;
 	if (not hart->peekMemory(vaddr + i, byte, true))
 	  assert(0);
 	data |= uint64_t(byte) << (i*8);
