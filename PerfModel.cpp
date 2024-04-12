@@ -614,20 +614,55 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
   static bool firstTime = true;
   if (firstTime)
     {
-      std::cerr << "Fix PerApi::getLoadData to handle forwarding from multiple sources.\n";
       std::cerr << "Fix PerApi::getLoadData to handle page crosses.\n";
       firstTime = false;
     }
+
+  unsigned mask = (1 << size) - 1;  // One bit ber byte of load data.
+  unsigned forwarded = 0;            // One bit per forwarded byte.
 
   for (auto& kv : storeMap)
     {
       auto stTag = kv.first;
       auto& stPac = kv.second;
-      if (stTag < tag and stPac->executed() and stPac->dataVa() == vaddr and
-	  stPac->dataSize() == size)
-	data = stPac->opVal_.at(0);
-      return true;
+
+      if (stTag > tag)
+	break;
+
+      if (not stPac->executed())
+	continue;
+
+      uint64_t stAddr = stPac->dataVa();
+      unsigned stSize = stPac->dataSize();
+      if (stAddr + stSize < vaddr or vaddr + size < stSize)
+	continue;  // No overlap.
+
+      uint64_t stData = stPac->opVal_.at(0);
+
+      for (unsigned i = 0; i < size; ++i)
+	{
+	  unsigned byteMask = 1 << i;
+	  uint64_t byteAddr = vaddr + i;
+	  if (byteAddr >= stAddr and byteAddr < stAddr + stSize)
+	    {
+	      uint64_t stByte = (stData >> (byteAddr - stAddr)*8) & 0xff;
+	      data |= stByte << (i*8);
+	      forwarded |= byteMask;
+	    }
+	}
     }
 
-  return false;
+  if (forwarded == mask)
+    return true;
+
+  for (unsigned i = 0; i < size; ++i)
+    if (not (forwarded & (1 << i)))
+      {
+	uint8_t byte;
+	if (not hart->peekMemory(vaddr + i, byte, true))
+	  assert(0);
+	data |= uint64_t(byte) << (i*8);
+      }
+
+  return true;
 }
