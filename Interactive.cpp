@@ -1326,6 +1326,8 @@ printInteractiveHelp()
   cout << "  Perf model API only command. Retires instruction packet\n";
   cout << "perf_model_drain_store tag\n";
   cout << "  Perf model API only command. Drains store associated with instruction packet\n";
+  cout << "perf_model_flush tag\n";
+  cout << "  Perf model API only command. Flushes instruction packet\n";
   cout << "quit\n";
   cout << "  Terminate the simulator\n\n";
 }
@@ -1900,6 +1902,15 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
   if (command == "perf_model_drain_store")
     {
       if (not perfModelDrainStoreCommand(line, tokens))
+        return false;
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "perf_model_flush")
+    {
+      if (not perfModelFlushCommand(line, tokens))
         return false;
       if (commandLog)
         fprintf(commandLog, "%s\n", line.c_str());
@@ -2522,6 +2533,28 @@ Interactive<URV>::perfModelDrainStoreCommand(const std::string& line,
     {
       std::cerr << "Invalid perf_model_drain_store command: " << line << '\n';
       std::cerr << "Expecting: perf_model_drain_store <tag>\n";
+      return false;
+    }
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::perfModelFlushCommand(const std::string& line,
+		                        const std::vector<std::string>& tokens)
+{
+  if (tokens.size() == 2)
+    {
+      uint64_t tag;
+      if (not parseCmdLineNumber("perf-model-flush-tag", tokens.at(1), tag))
+        return false;
+
+      return system_.perfApiFlush(hartId_, time_, tag);
+    }
+  else
+    {
+      std::cerr << "Invalid perf_model_flush command: " << line << '\n';
+      std::cerr << "Expecting: perf_model_flush <tag>\n";
       return false;
     }
 }

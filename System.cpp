@@ -27,7 +27,6 @@
 #include "Uart8250.hpp"
 #include "Uartsf.hpp"
 #include "pci/virtio/Blk.hpp"
-#include "PerfModel.hpp"
 
 
 using namespace WdRiscv;
@@ -926,6 +925,16 @@ System<URV>::perfApiDrainStore(unsigned hart, uint64_t time, uint64_t tag)
   if (not perfApi_)
     return false;
   return perfApi_->drainStore(hart, time, tag);
+}
+
+
+template <typename URV>
+bool
+System<URV>::perfApiFlush(unsigned hart, uint64_t time, uint64_t tag)
+{
+  if (not perfApi_)
+    return false;
+  return perfApi_->flush(hart, time, tag);
 }
 
 
