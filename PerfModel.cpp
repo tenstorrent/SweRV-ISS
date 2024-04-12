@@ -15,7 +15,11 @@ PerfApi::PerfApi(System64& system)
   hartRegProducers_.resize(n);
 
   for (auto& producers : hartRegProducers_)
-    producers.resize(totalRegCount_);
+    {
+      producers.resize(totalRegCount_);
+      for (size_t i = 0; i < totalRegCount_; i++)
+        producers.at(i).push_back(nullptr);
+    }
 }
 
 
@@ -149,7 +153,7 @@ PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode)
 	{
 	  unsigned regNum = di.ithOperand(i);
 	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
-	  packet->opProducers_.at(i) = producers.at(gri);
+	  packet->opProducers_.at(i) = producers.at(gri).back();
 	}
     }
 
@@ -163,7 +167,7 @@ PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode)
 	{
 	  unsigned regNum = di.ithOperand(i);
 	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
-	  producers.at(gri) = packet;
+	  producers.at(gri).push_back(packet);
 	}
     }
 
@@ -467,8 +471,10 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag, FILE* traceFile)
     {
       auto gri = packet.destValues_.at(i).first;
       auto& producer = producers.at(gri);
-      if (producer and producer->tag() == packet.tag())
-	producers.at(gri) = nullptr;
+      producer.erase(std::remove_if(producer.begin(), producer.end(),
+          [packet] (auto prod) {
+            return prod and prod->tag() == packet.tag();
+      }), producer.end());
     }
 
   packet.retired_ = true;
@@ -657,5 +663,48 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
 	data |= uint64_t(byte) << (i*8);
       }
 
+  return true;
+}
+
+
+bool
+PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
+{
+  if (commandLog_)
+    fprintf(commandLog_, "hart=%" PRIu32 " time=%" PRIu64 " perf_model_flush %" PRIu64 "\n",
+            hartIx, time, tag);
+
+  if (not checkTime("Flush", time))
+    return false;
+
+  auto hart = checkHart("Flush", hartIx);
+  auto pacPtr = checkTag("Flush", hartIx, tag);
+
+  if (not hart or not pacPtr or pacPtr->retired())
+    {
+      assert(0);
+      return false;
+    }
+
+  auto& packetMap = hartPacketMaps_.at(hartIx);
+  auto& packet = *packetMap.at(tag);
+  auto& di = packet.di_;
+
+  auto& producers = hartRegProducers_.at(hartIx);
+  for (size_t i = 0; i < di.operandCount(); ++i)
+    {
+      if (di.ithOperandMode(i) == WdRiscv::OperandMode::Write or
+          di.ithOperandMode(i) == WdRiscv::OperandMode::ReadWrite)
+        {
+          unsigned regNum = di.ithOperand(i);
+          unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
+          auto& producer = producers.at(gri);
+          producer.erase(std::remove_if(producer.begin(), producer.end(),
+              [packet] (auto prod) {
+                return prod and prod->tag() == packet.tag();
+          }), producer.end());
+        }
+    }
+  packetMap.erase(tag);
   return true;
 }

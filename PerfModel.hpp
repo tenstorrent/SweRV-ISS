@@ -15,6 +15,7 @@
 #pragma once
 
 #include <iostream>
+#include <vector>
 #include "System.hpp"
 #include "Hart.hpp"
 #include "DecodedInst.hpp"
@@ -252,6 +253,10 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
       return nullptr;
     }
 
+    /// Helper to flush an instruction and all older instructions at the given hart.
+    /// Restores dependency chain prior to mispredict.
+    bool flush(unsigned hartIx, uint64_t time, uint64_t tag);
+
     /// Translate an instruction virtual address into a physical address. Return
     /// ExceptionCause::NONE on success and actual cause on failure.
     WdRiscv::ExceptionCause translateInstrAddr(unsigned hart, uint64_t iva, uint64_t& ipa);
@@ -352,7 +357,8 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
 
     /// Map a global register index to the in-flight instruction producing that
     /// register. This is register renaming.
-    typedef std::vector<std::shared_ptr<InstrPac>> RegProducers;
+    typedef std::vector<std::shared_ptr<InstrPac>> RegProducersChain;
+    typedef std::vector<RegProducersChain> RegProducers;
 
     System64& system_;
     std::shared_ptr<InstrPac> prevFetch_;
@@ -370,7 +376,6 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     std::vector<RegProducers> hartRegProducers_;
 
     uint64_t time_ = 0;
-
     FILE* commandLog_ = nullptr;
 
     /// Global indexing for all registers.
