@@ -74,6 +74,14 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
   if (not checkTime("Fetch", time))
     return false;
 
+  auto& packetMap = hartPacketMaps_.at(hartIx);
+  if (not packetMap.empty() and packetMap.rbegin()->first >= tag)
+    {
+      std::cerr << "Error in PerfApi::fetch: tag " << tag << "is not in increasing order.\n";
+      assert(0);
+      return false;
+    }
+
   auto packet = getInstructionPacket(hartIx, tag);
   if (packet)
     return false;   // Tag already fetched.
@@ -674,9 +682,14 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
   if (not checkHart("Flush", hartIx))
     return false;
 
-  for (uint64_t tagIx = oldestTag_; tagIx >= tag; --tagIx)
+  auto& packetMap = hartPacketMaps_.at(hartIx);
+
+  // Flush tag and all older packets. Flush in reverse order to undo register renaming.
+  for (auto iter = packetMap.rbegin(); iter != packetMap.rend(); ++iter)
     {
-      auto pacPtr = checkTag("Flush", hartIx, tagIx);
+      auto pacPtr = iter->second;
+      if (pacPtr->tag_ < tag)
+	break;
 
       if (not pacPtr or pacPtr->retired())
         {
@@ -694,13 +707,12 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
             {
               unsigned regNum = di.ithOperand(i);
               unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
-              auto& producer = producers.at(gri);
-              producer = packet.opProducers_.at(i);
+              producers.at(gri) = packet.opProducers_.at(i);
             }
         }
 
-      auto& packetMap = hartPacketMaps_.at(hartIx);
-      packetMap.erase(tagIx);
+      packetMap.erase(pacPtr->tag_);
     }
+
   return true;
 }
