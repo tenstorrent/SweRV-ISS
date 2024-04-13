@@ -347,6 +347,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 	assert(0);
 
       packet.dva_ = sva;
+      packet.dpa_ = spa1;  // FIX TODO : handle page corrsing
       packet.dsize_ = di.storeSize();
       assert(ssize = packet.dsize_);
 
