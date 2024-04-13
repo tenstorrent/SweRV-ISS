@@ -1328,6 +1328,8 @@ printInteractiveHelp()
   cout << "  Perf model API only command. Drains store associated with instruction packet\n";
   cout << "perf_model_flush tag\n";
   cout << "  Perf model API only command. Flushes instruction packet\n";
+  cout << "perf_model_flush tag\n";
+  cout << "  Perf model API only command. Determines whether flushing is required\n";
   cout << "quit\n";
   cout << "  Terminate the simulator\n\n";
 }
@@ -1911,6 +1913,15 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
   if (command == "perf_model_flush")
     {
       if (not perfModelFlushCommand(line, tokens))
+        return false;
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "perf_model_should_flush")
+    {
+      if (not perfModelShouldFlushCommand(line, tokens))
         return false;
       if (commandLog)
         fprintf(commandLog, "%s\n", line.c_str());
@@ -2558,6 +2569,36 @@ Interactive<URV>::perfModelFlushCommand(const std::string& line,
       return false;
     }
 }
+
+
+template <typename URV>
+bool
+Interactive<URV>::perfModelShouldFlushCommand(const std::string& line,
+					      const std::vector<std::string>& tokens)
+{
+  if (tokens.size() == 2)
+    {
+      uint64_t tag;
+      if (not parseCmdLineNumber("perf-model-should-flush-tag", tokens.at(1), tag))
+        return false;
+
+      bool flag = false;
+      uint64_t addr = 0;
+      bool ok = system_.perfApiShouldFlush(hartId_, time_, tag, flag, addr);
+      std::cout << flag;
+      if (flag)
+	std::cout << " 0x" << std::hex << addr << std::dec;
+      std::cout << '\n';
+      return ok;
+    }
+  else
+    {
+      std::cerr << "Invalid perf_model_flush command: " << line << '\n';
+      std::cerr << "Expecting: perf_model_flush <tag>\n";
+      return false;
+    }
+}
+
 
 
 template <typename URV>

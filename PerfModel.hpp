@@ -156,10 +156,11 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
   private:
 
     uint64_t tag_ = 0;
-    uint64_t iva_ = 0;        // instruction virtual address
-    uint64_t ipa_ = 0;        // instruction physical address
-    uint64_t ipa2_ = 0;       // instruction physical address on other page
-    uint64_t nextIva_ = 0;    // virtual address of subsequent instruction in prog order
+    uint64_t iva_ = 0;        // Instruction virtual address (from performance model)
+    uint64_t ipa_ = 0;        // Instruction physical address
+    uint64_t ipa2_ = 0;       // Instruction physical address on other page
+    uint64_t nextIva_ = 0;    // Virtual address of subsequent instruction in prog order
+    uint64_t realIva_ = 0;    // Instruction virtual address expected by whisper
 
     uint64_t dva_ = 0;        // ld/st data virtual address
     uint64_t dpa_ = 0;        // ld/st data physical address
@@ -256,6 +257,13 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// Helper to flush an instruction and all older instructions at the given hart.
     /// Restores dependency chain prior to mispredict.
     bool flush(unsigned hartIx, uint64_t time, uint64_t tag);
+
+    /// Call by performance model to determine whether or not it should redirect
+    /// fetch. Return true on success and false on failure. If successful set
+    /// flush to true if flush is required and false otherwise. If flush is
+    /// required, the new fetch address will be in addr.
+    bool shouldFlush(unsigned hartIx, uint64_t time, uint64_t tag, bool& flush,
+		     uint64_t& addr);
 
     /// Translate an instruction virtual address into a physical address. Return
     /// ExceptionCause::NONE on success and actual cause on failure.
@@ -377,6 +385,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     std::vector<RegProducers> hartRegProducers_;
 
     uint64_t time_ = 0;
+    uint64_t executePc_ = 0;    // Expected PC at execute.
 
     FILE* commandLog_ = nullptr;
 

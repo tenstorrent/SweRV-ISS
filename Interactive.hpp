@@ -172,6 +172,9 @@ namespace WdRiscv
     bool perfModelFlushCommand(const std::string& line,
 		               const std::vector<std::string>& tokens);
 
+    bool perfModelShouldFlushCommand(const std::string& line,
+				     const std::vector<std::string>& tokens);
+
     static void peekAllFpRegs(Hart<URV>& hart, std::ostream& out);
     static void peekAllIntRegs(Hart<URV>& hart, std::ostream& out);
     static void peekAllVecRegs(Hart<URV>& hart, std::ostream& out);

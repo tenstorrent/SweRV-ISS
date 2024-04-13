@@ -940,6 +940,18 @@ System<URV>::perfApiFlush(unsigned hart, uint64_t time, uint64_t tag)
 
 template <typename URV>
 bool
+System<URV>::perfApiShouldFlush(unsigned hart, uint64_t time, uint64_t tag, bool& flush,
+				uint64_t& addr)
+{
+  flush = false;
+  if (not perfApi_)
+    return false;
+  return perfApi_->shouldFlush(hart, time, tag, flush, addr);
+}
+
+
+template <typename URV>
+bool
 System<URV>::produceTestSignatureFile(std::string_view outPath) const
 {
   // Find the begin_signature and end_signature section addresses

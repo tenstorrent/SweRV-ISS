@@ -16,6 +16,9 @@ PerfApi::PerfApi(System64& system)
 
   for (auto& producers : hartRegProducers_)
     producers.resize(totalRegCount_);
+
+  auto& hart0 = *system.ithHart(0);
+  executePc_ = hart0.peekPc();
 }
 
 
@@ -261,6 +264,12 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   using OT = WdRiscv::OperandType;
 
   uint64_t prevPc = hart.peekPc();
+
+  // Don't execute if on wrong path to avoid potential exception.
+  packet.realIva_ = executePc_;
+  if (executePc_ != packet.iva_)
+    return true;  // Wrong pc. Must be flushed. Pretend it was executed.
+
   hart.pokePc(packet.instrVa());
 
   std::array<uint64_t, 3> prevVal;  // Previous operand values
@@ -418,6 +427,8 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 	  break;
 	}
     }
+
+  executePc_ = hart.peekPc();
 
   hart.pokePc(prevPc);
   hart.setInstructionCount(hart.getInstructionCount() - 1);
@@ -713,6 +724,38 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
         }
 
       packetMap.erase(pacPtr->tag_);
+    }
+
+  return true;
+}
+
+
+bool
+PerfApi::shouldFlush(unsigned hartIx, uint64_t time, uint64_t tag, bool& flush,
+		     uint64_t& addr)
+{
+  flush = false;
+  addr = 0;
+
+  if (commandLog_)
+    fprintf(commandLog_, "hart=%" PRIu32 " time=%" PRIu64 " perf_model_should_flush %" PRIu64 "\n",
+            hartIx, time, tag);
+
+  if (not checkTime("Flush", time))
+    return false;
+
+  if (not checkHart("Flush", hartIx))
+    return false;
+
+  auto pacPtr = checkTag("Retire", hartIx, tag);
+  if (not pacPtr)
+    return false;
+  auto& packet = *pacPtr;
+
+  if (packet.executed() and packet.realIva_ != packet.iva_)
+    {
+      flush = true;
+      addr= packet.realIva_;
     }
 
   return true;
