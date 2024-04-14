@@ -215,7 +215,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
 
     /// Optionally called by performance model after decode to inform Whisper of branch
     /// prediction. Returns true on success and false on error (tag was never decoded).
-    bool branchPredict(unsigned hart, uint64_t tag, bool prTaken, uint64_t prTarget)
+    bool predictBranch(unsigned hart, uint64_t tag, bool prTaken, uint64_t prTarget)
     {
       auto packet = getInstructionPacket(hart, tag);
       if (not packet)

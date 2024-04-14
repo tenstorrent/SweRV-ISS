@@ -87,10 +87,11 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
     return false;   // Tag already fetched.
 
   auto prev = this->prevFetch_;
-  if (prev and prev->executed())
+  if (prev and not prev->predicted() and not prev->trapped() and not prev->executed())
     {
-      if (prev->nextPc() != vpc and not prev->trapped() and not prev->predicted())
-	prev->predictBranch(true /*taken*/, vpc);
+      if (not prev->decodedInst().isBranch())
+	if (prev->instrVa() + prev->decodedInst().instSize() != vpc)
+	  prev->predictBranch(true, vpc);
     }
 
   uint64_t ppc = 0, ppc2 = 0;  // Physical pc.
@@ -245,8 +246,8 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   packet.execTime_ = time;
   if (packet.isBranch() and packet.predicted_)
     {
-      bool taken = packet.nextIva_ != packet.iva_ + packet.di_.instSize();
-      packet.mispredicted_ = packet.prTaken_ != taken or packet.prTarget_ == packet.nextIva_;
+      packet.mispredicted_ = packet.prTarget_ != packet.nextIva_;
+      packet.realIva_ = packet.iva_;
     }
 
   return true;
@@ -272,6 +273,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   if (not hartPtr->readInst(packet.iva_, opcode) or packet.di_.inst() != opcode)
     {
       packet.mispredicted_ = true;
+      packet.realIva_ = packet.iva_;
       return true;  // Wrong opcode. Must be flushed. Pretend it was executed.
     }
 

@@ -364,6 +364,9 @@ namespace WdRiscv
 
     bool perfApiDrainStore(unsigned hart, uint64_t time, uint64_t tag);
 
+    bool perfApiPredictBranch(unsigned hart, uint64_t time, uint64_t tag, bool taken,
+			      uint64_t addr);
+
     bool perfApiFlush(unsigned hart, uint64_t time, uint64_t tag);
 
     bool perfApiShouldFlush(unsigned hart, uint64_t time, uint64_t tag, bool& flush,

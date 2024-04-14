@@ -48,6 +48,31 @@ getHexForm()
 }
 
 
+static
+bool
+parseCmdLineBool(const std::string& option,
+		 const std::string& boolStr,
+		 bool& flag)
+{
+  bool good = not boolStr.empty();
+
+  if (good)
+    {
+      if (boolStr == "true" or boolStr == "t" or boolStr == "1")
+	flag = true;
+      else if (boolStr == "false" or boolStr == "f" or boolStr == "0")
+	flag = false;
+      else
+	good = false;
+    }
+
+  if (not good)
+    std::cerr << "Invalid command line " << option << " value: " << boolStr << '\n';
+
+  return good;
+}
+
+
 /// Convert the command line string numberStr to a number using
 /// strotull and a base of zero (prefixes 0 and 0x are
 /// honored). Return true on success and false on failure (string does
@@ -1326,6 +1351,8 @@ printInteractiveHelp()
   cout << "  Perf model API only command. Retires instruction packet\n";
   cout << "perf_model_drain_store tag\n";
   cout << "  Perf model API only command. Drains store associated with instruction packet\n";
+  cout << "perf_model_predict_branch\n";
+  cout << "  Perf model API only command. Record branch prediction for an instruction\n";
   cout << "perf_model_flush tag\n";
   cout << "  Perf model API only command. Flushes instruction packet\n";
   cout << "perf_model_flush tag\n";
@@ -1904,6 +1931,15 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
   if (command == "perf_model_drain_store")
     {
       if (not perfModelDrainStoreCommand(line, tokens))
+        return false;
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "perf_model_predict_branch")
+    {
+      if (not perfModelPredictBranch(line, tokens))
         return false;
       if (commandLog)
         fprintf(commandLog, "%s\n", line.c_str());
@@ -2544,6 +2580,36 @@ Interactive<URV>::perfModelDrainStoreCommand(const std::string& line,
     {
       std::cerr << "Invalid perf_model_drain_store command: " << line << '\n';
       std::cerr << "Expecting: perf_model_drain_store <tag>\n";
+      return false;
+    }
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::perfModelPredictBranch(const std::string& line,
+					 const std::vector<std::string>& tokens)
+{
+  if (tokens.size() == 4)
+    {
+      uint64_t tag = 0;
+      if (not parseCmdLineNumber("perf-model-predict-branch-tag", tokens.at(1), tag))
+        return false;
+
+      bool flag = false;
+      if (not parseCmdLineBool("perf-model-predict-branch-taken", tokens.at(2), flag))
+	return false;
+
+      uint64_t addr = 0;
+      if (not parseCmdLineNumber("perf-model-branch-prediction-target", tokens.at(3), addr))
+	return false;
+
+      return system_.perfApiPredictBranch(hartId_, time_, tag, flag, addr);
+    }
+  else
+    {
+      std::cerr << "Invalid perf_model_predict_branch command: " << line << '\n';
+      std::cerr << "Expecting: perf_model_predict_branch <tag> <flag> <addr>\n";
       return false;
     }
 }

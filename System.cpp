@@ -930,6 +930,17 @@ System<URV>::perfApiDrainStore(unsigned hart, uint64_t time, uint64_t tag)
 
 template <typename URV>
 bool
+System<URV>::perfApiPredictBranch(unsigned hart, uint64_t /*time*/, uint64_t tag,
+				  bool taken, uint64_t target)
+{
+  if (not perfApi_)
+    return false;
+  return perfApi_->predictBranch(hart, tag, taken, target);
+}
+
+
+template <typename URV>
+bool
 System<URV>::perfApiFlush(unsigned hart, uint64_t time, uint64_t tag)
 {
   if (not perfApi_)
