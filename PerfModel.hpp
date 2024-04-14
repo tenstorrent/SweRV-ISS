@@ -48,12 +48,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// returns true, then the performance model subsequent call must be a flush to cause
     /// whisper to flush.
     bool shouldFlush() const
-    {
-      if (not executed_ or not predicted_ or not isBranch())
-	return false;
-      bool taken = nextIva_ != iva_ + di_.instSize();
-      return prTaken_ != taken or prTarget_ == nextIva_;
-    }
+    { return mispredicted_; }
 
     /// Return the instruction virtual address.
     uint64_t instrVa() const
@@ -182,15 +177,16 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     std::array<DestValue, 2> destValues_;
 
     // Following applicable if instruction is a branch
-    bool predicted_  : 1 = false;  // true if predicted to be a branch
-    bool prTaken_    : 1 = false;  // true if predicted branch/jump is taken
+    bool predicted_    : 1 = false;  // true if predicted to be a branch
+    bool prTaken_      : 1 = false;  // true if predicted branch/jump is taken
+    bool mispredicted_ : 1 = false;
 
-    bool fetched_    : 1 = false;  // true if instruction fetched
-    bool decoded_    : 1 = false;  // true if instruction decoded
-    bool executed_   : 1 = false;  // true if instruction executed
-    bool retired_    : 1 = false;  // true if instruction retired (committed)
-    bool drained_    : 1 = false;  // true if a store that has been drained
-    bool trap_       : 1 = false;  // true if instruction trapped
+    bool fetched_      : 1 = false;  // true if instruction fetched
+    bool decoded_      : 1 = false;  // true if instruction decoded
+    bool executed_     : 1 = false;  // true if instruction executed
+    bool retired_      : 1 = false;  // true if instruction retired (committed)
+    bool drained_      : 1 = false;  // true if a store that has been drained
+    bool trap_         : 1 = false;  // true if instruction trapped
   };
 
 
@@ -385,7 +381,6 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     std::vector<RegProducers> hartRegProducers_;
 
     uint64_t time_ = 0;
-    uint64_t executePc_ = 0;    // Expected PC at execute.
 
     FILE* commandLog_ = nullptr;
 

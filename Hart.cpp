@@ -2321,6 +2321,8 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& phy
       if (initStateFile_)
 	dumpInitState("fetch", virtAddr, physAddr);
 
+      if (isCompressedInst(inst))
+	inst = (inst << 16) >> 16;
       return ExceptionCause::NONE;
     }
 

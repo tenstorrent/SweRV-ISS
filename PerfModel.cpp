@@ -16,9 +16,6 @@ PerfApi::PerfApi(System64& system)
 
   for (auto& producers : hartRegProducers_)
     producers.resize(totalRegCount_);
-
-  auto& hart0 = *system.ithHart(0);
-  executePc_ = hart0.peekPc();
 }
 
 
@@ -246,6 +243,11 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
 
   packet.executed_ = true;
   packet.execTime_ = time;
+  if (packet.isBranch() and packet.predicted_)
+    {
+      bool taken = packet.nextIva_ != packet.iva_ + packet.di_.instSize();
+      packet.mispredicted_ = packet.prTaken_ != taken or packet.prTarget_ == packet.nextIva_;
+    }
 
   return true;
 }
@@ -266,9 +268,12 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   uint64_t prevPc = hart.peekPc();
 
   // Don't execute if on wrong path to avoid potential exception.
-  packet.realIva_ = executePc_;
-  if (executePc_ != packet.iva_)
-    return true;  // Wrong pc. Must be flushed. Pretend it was executed.
+  uint32_t opcode = 0;
+  if (not hartPtr->readInst(packet.iva_, opcode) or packet.di_.inst() != opcode)
+    {
+      packet.mispredicted_ = true;
+      return true;  // Wrong opcode. Must be flushed. Pretend it was executed.
+    }
 
   hart.pokePc(packet.instrVa());
 
@@ -427,8 +432,6 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 	  break;
 	}
     }
-
-  executePc_ = hart.peekPc();
 
   hart.pokePc(prevPc);
   hart.setInstructionCount(hart.getInstructionCount() - 1);
@@ -752,10 +755,10 @@ PerfApi::shouldFlush(unsigned hartIx, uint64_t time, uint64_t tag, bool& flush,
     return false;
   auto& packet = *pacPtr;
 
-  if (packet.executed() and packet.realIva_ != packet.iva_)
+  if (packet.shouldFlush())
     {
       flush = true;
-      addr= packet.realIva_;
+      addr = packet.realIva_;
     }
 
   return true;
