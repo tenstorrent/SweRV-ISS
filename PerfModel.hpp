@@ -48,7 +48,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// returns true, then the performance model subsequent call must be a flush to cause
     /// whisper to flush.
     bool shouldFlush() const
-    { return mispredicted_; }
+    { return shouldFlush_; }
 
     /// Return the instruction virtual address.
     uint64_t instrVa() const
@@ -155,7 +155,6 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     uint64_t ipa_ = 0;        // Instruction physical address
     uint64_t ipa2_ = 0;       // Instruction physical address on other page
     uint64_t nextIva_ = 0;    // Virtual address of subsequent instruction in prog order
-    uint64_t realIva_ = 0;    // Instruction virtual address expected by whisper
 
     uint64_t dva_ = 0;        // ld/st data virtual address
     uint64_t dpa_ = 0;        // ld/st data physical address
@@ -180,6 +179,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     bool predicted_    : 1 = false;  // true if predicted to be a branch
     bool prTaken_      : 1 = false;  // true if predicted branch/jump is taken
     bool mispredicted_ : 1 = false;
+    bool shouldFlush_  : 1 = false;
 
     bool fetched_      : 1 = false;  // true if instruction fetched
     bool decoded_      : 1 = false;  // true if instruction decoded

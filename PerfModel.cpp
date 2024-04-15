@@ -245,10 +245,7 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   packet.executed_ = true;
   packet.execTime_ = time;
   if (packet.isBranch() and packet.predicted_)
-    {
-      packet.mispredicted_ = packet.prTarget_ != packet.nextIva_;
-      packet.realIva_ = packet.iva_;
-    }
+    packet.mispredicted_ = packet.prTarget_ != packet.nextIva_;
 
   return true;
 }
@@ -272,8 +269,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   uint32_t opcode = 0;
   if (not hartPtr->readInst(packet.iva_, opcode) or packet.di_.inst() != opcode)
     {
-      packet.mispredicted_ = true;
-      packet.realIva_ = packet.iva_;
+      packet.shouldFlush_ = true;
       return true;  // Wrong opcode. Must be flushed. Pretend it was executed.
     }
 
@@ -760,7 +756,18 @@ PerfApi::shouldFlush(unsigned hartIx, uint64_t time, uint64_t tag, bool& flush,
   if (packet.shouldFlush())
     {
       flush = true;
-      addr = packet.realIva_;
+      addr = packet.iva_;
+    }
+  else
+    {
+      // If on the wrong path after a branch, then we wshould flush.
+      auto& packetMap = hartPacketMaps_.at(hartIx);
+      for (auto iter = packetMap.find(tag); iter != packetMap.end(); --iter)
+	if (iter->second->mispredicted_)
+	  {
+	    flush = true;
+	    addr = iter->second->nextIva_;
+	  }
     }
 
   return true;
