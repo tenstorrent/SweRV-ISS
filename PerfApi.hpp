@@ -44,9 +44,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     ~InstrPac()
     { }
 
-    /// This must be called by the performance model after a call to execute. If it
-    /// returns true, then the performance model subsequent call must be a flush to cause
-    /// whisper to flush.
+    /// This supports PerfApi::shouldFlush. It is not meant to be called directly.
     bool shouldFlush() const
     { return shouldFlush_; }
 
@@ -127,24 +125,31 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     uint64_t nextPc() const
     { assert(executed_); return nextIva_; }
 
+    /// Return true if instruction fetch or execute encountered a trap.
     bool trapped() const
     { return trap_; }
 
+    /// Return true if a branch prediction was made for this instruction.
     bool predicted() const
     { return predicted_; }
 
+    /// Return true if instruction is decoded.
     bool decoded() const
     { return decoded_; }
 
+    /// Return true if instruction is executed.
     bool executed() const
     { return executed_; }
 
+    /// Return true if instruction is retired.
     bool retired() const
     { return retired_; }
 
+    /// Return true if this is a store instruction and the store is drained.
     bool drained() const
     { return drained_; }
 
+    /// Return the tag of this instruction.
     uint64_t tag() const
     { return tag_; }
 
@@ -165,13 +170,12 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     uint64_t execTime_ = 0;   // Execution time
     uint64_t prTarget_ = 0;   // Predicted branch target
 
-    std::array<uint64_t, 3> opVal_;       // Operand values (count and types are in di)
+    std::array<uint64_t, 3> opVal_;       // Operand values (count and types are in di_)
 
     // Entry i is the in-flight producer of the ith operand.
     std::array<std::shared_ptr<InstrPac>, 3> opProducers_;
 
-    /// Global register index of a destination register and its corresponding
-    /// value.
+    // Global register index of a destination register and its corresponding value.
     typedef std::pair<unsigned, uint64_t> DestValue;
     std::array<DestValue, 2> destValues_;
 
@@ -250,14 +254,15 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
       return nullptr;
     }
 
-    /// Helper to flush an instruction and all older instructions at the given hart.
-    /// Restores dependency chain prior to mispredict.
+    /// Flush an instruction and all older instructions at the given hart. Restore
+    /// dependency chain (register renaming) to the way it was before the flushed
+    /// instructions were decoded.
     bool flush(unsigned hartIx, uint64_t time, uint64_t tag);
 
-    /// Call by performance model to determine whether or not it should redirect
-    /// fetch. Return true on success and false on failure. If successful set
-    /// flush to true if flush is required and false otherwise. If flush is
-    /// required, the new fetch address will be in addr.
+    /// Called by performance model to determine whether or not it should redirect
+    /// fetch. Return true on success and false on failure. If successful set flush to
+    /// true if flush is required and false otherwise. If flush is required, the new fetch
+    /// address will be in addr.
     bool shouldFlush(unsigned hartIx, uint64_t time, uint64_t tag, bool& flush,
 		     uint64_t& addr);
 
