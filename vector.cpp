@@ -3852,8 +3852,8 @@ Hart<URV>::vcompress_vm(unsigned vd, unsigned vs1, unsigned vs2,
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
 
   // Remaining elements are treated as tail elements.
-  elems = vecRegs_.elemMax();
-  for (unsigned ix = destIx; ix < elems; ++ix)
+  unsigned elemMax = vecRegs_.elemMax();
+  for (unsigned ix = elems; ix < elemMax; ++ix)
     if (not vecRegs_.isDestActive(vd, ix, destGroup, false /*masked*/, dest))
       vecRegs_.write(vd, ix, destGroup, dest);  // Either copy of original or all ones.
 
