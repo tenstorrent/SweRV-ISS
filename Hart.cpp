@@ -43,7 +43,7 @@
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
 #include "Mcm.hpp"
-#include "PerfModel.hpp"
+#include "PerfApi.hpp"
 #include "wideint.hpp"
 
 

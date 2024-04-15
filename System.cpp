@@ -23,7 +23,7 @@
 #include "SparseMem.hpp"
 #include "System.hpp"
 #include "Mcm.hpp"
-#include "PerfModel.hpp"
+#include "PerfApi.hpp"
 #include "Uart8250.hpp"
 #include "Uartsf.hpp"
 #include "pci/virtio/Blk.hpp"

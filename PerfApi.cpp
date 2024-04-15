@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <cinttypes>
-#include "PerfModel.hpp"
+#include "PerfApi.hpp"
 
 using namespace TT_PERF;
 
