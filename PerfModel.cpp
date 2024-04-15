@@ -172,6 +172,8 @@ PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode)
 	{
 	  unsigned regNum = di.ithOperand(i);
 	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
+	  if (regNum == 0 and di.ithOperandType(i) == WdRiscv::OperandType::IntReg)
+	    continue;  // Reg X0 has no producer
 	  producers.at(gri) = packet;
 	}
     }
