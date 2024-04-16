@@ -4135,7 +4135,7 @@ namespace WdRiscv
 
     template <typename ELEM_TYPE>
     [[nodiscard]]
-    bool vectorLoadSegIndexed(const DecodedInst*, ElementWidth);
+    bool vectorLoadSegIndexed(const DecodedInst*, ElementWidth, unsigned fields);
 
     void execVluxsegei8_v(const DecodedInst*);
     void execVluxsegei16_v(const DecodedInst*);
@@ -4148,7 +4148,7 @@ namespace WdRiscv
 
     template <typename ELEM_TYPE>
     [[nodiscard]]
-    bool vectorStoreSegIndexed(const DecodedInst*, ElementWidth);
+    bool vectorStoreSegIndexed(const DecodedInst*, ElementWidth, unsigned fields);
 
     void execVsuxsegei8_v(const DecodedInst*);
     void execVsuxsegei16_v(const DecodedInst*);

@@ -12852,7 +12852,8 @@ Hart<URV>::execVsssege1024_v(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 bool
-Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
+Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
+                                unsigned fieldCount)
 {
   uint32_t elemWidth = vecRegs_.elemWidthInBits();
   uint32_t offsetWidth = VecRegs::elemWidthInBits(offsetEew);
@@ -12863,6 +12864,8 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not VecRegs::groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
+  badConfig = badConfig or (groupX8*fieldCount > 64);
+
   if (not preVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
@@ -12880,7 +12883,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
   uint64_t addr = intRegs_.read(rs1);
   unsigned start = csRegs_.peekVstart(), elemSize = elemWidth / 8;
-  unsigned elemCount = vecRegs_.elemMax(), fieldCount = di->vecFieldCount();
+  unsigned elemCount = vecRegs_.elemMax();
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
   // Used registers must not exceed 32.
@@ -13013,7 +13016,8 @@ Hart<URV>::execVluxsegei1024_v(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 bool
-Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
+Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
+                                 unsigned fieldCount)
 {
   uint32_t elemWidth = vecRegs_.elemWidthInBits();
   uint32_t offsetWidth = VecRegs::elemWidthInBits(offsetEew);
@@ -13024,6 +13028,8 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not VecRegs::groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
+  badConfig = badConfig or (groupX8*fieldCount > 64);
+
   if (not preVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
@@ -13041,7 +13047,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
   uint64_t addr = intRegs_.read(rs1);
   unsigned start = csRegs_.peekVstart(), elemSize = elemWidth / 8;
-  unsigned elemCount = vecRegs_.elemCount(), fieldCount = di->vecFieldCount();
+  unsigned elemCount = vecRegs_.elemCount();
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
   // Used registers must not exceed 32.
@@ -13205,15 +13211,16 @@ void
 Hart<URV>::execVloxsegei8_v(const DecodedInst* di)
 {
   ElementWidth sew = vecRegs_.elemWidth();
+  unsigned fieldCount = di->vecFieldCount();
   bool ok = true;
 
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Byte); break;
-    case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Byte); break;
-    case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Byte); break;
-    case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Byte); break;
+    case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Byte, fieldCount); break;
+    case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Byte, fieldCount); break;
+    case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Byte, fieldCount); break;
+    case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Byte, fieldCount); break;
     default:         postVecFail(di); return;
     }
 
@@ -13227,15 +13234,16 @@ void
 Hart<URV>::execVloxsegei16_v(const DecodedInst* di)
 {
   ElementWidth sew = vecRegs_.elemWidth();
+  unsigned fieldCount = di->vecFieldCount();
   bool ok = true;
 
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Half); break;
-    case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Half); break;
-    case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Half); break;
-    case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Half); break;
+    case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Half, fieldCount); break;
+    case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Half, fieldCount); break;
+    case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Half, fieldCount); break;
+    case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Half, fieldCount); break;
     default:         postVecFail(di); return;
     }
 
@@ -13249,15 +13257,16 @@ void
 Hart<URV>::execVloxsegei32_v(const DecodedInst* di)
 {
   ElementWidth sew = vecRegs_.elemWidth();
+  unsigned fieldCount = di->vecFieldCount();
   bool ok = true;
 
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Word); break;
-    case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Word); break;
-    case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Word); break;
-    case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Word); break;
+    case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Word, fieldCount); break;
+    case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Word, fieldCount); break;
+    case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Word, fieldCount); break;
+    case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Word, fieldCount); break;
     default:         postVecFail(di); return;
     }
 
@@ -13271,15 +13280,16 @@ void
 Hart<URV>::execVloxsegei64_v(const DecodedInst* di)
 {
   ElementWidth sew = vecRegs_.elemWidth();
+  unsigned fieldCount = di->vecFieldCount();
   bool ok = true;
 
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Word2); break;
-    case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Word2); break;
-    case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Word2); break;
-    case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Word2); break;
+    case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Word2, fieldCount); break;
+    case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Word2, fieldCount); break;
+    case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Word2, fieldCount); break;
+    case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Word2, fieldCount); break;
     default:         postVecFail(di); return;
     }
 
@@ -13325,15 +13335,16 @@ void
 Hart<URV>::execVsoxsegei8_v(const DecodedInst* di)
 {
   ElementWidth sew = vecRegs_.elemWidth();
+  unsigned fieldCount = di->vecFieldCount();
   bool ok = true;
 
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Byte); break;
-    case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Byte); break;
-    case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Byte); break;
-    case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Byte); break;
+    case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Byte, fieldCount); break;
+    case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Byte, fieldCount); break;
+    case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Byte, fieldCount); break;
+    case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Byte, fieldCount); break;
     default:         postVecFail(di); return;
     }
 
@@ -13347,15 +13358,16 @@ void
 Hart<URV>::execVsoxsegei16_v(const DecodedInst* di)
 {
   ElementWidth sew = vecRegs_.elemWidth();
+  unsigned fieldCount = di->vecFieldCount();
   bool ok = true;
 
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Half); break;
-    case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Half); break;
-    case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Half); break;
-    case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Half); break;
+    case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Half, fieldCount); break;
+    case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Half, fieldCount); break;
+    case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Half, fieldCount); break;
+    case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Half, fieldCount); break;
     default:         postVecFail(di); return;
     }
 
@@ -13369,15 +13381,16 @@ void
 Hart<URV>::execVsoxsegei32_v(const DecodedInst* di)
 {
   ElementWidth sew = vecRegs_.elemWidth();
+  unsigned fieldCount = di->vecFieldCount();
   bool ok = true;
 
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Word); break;
-    case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Word); break;
-    case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Word); break;
-    case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Word); break;
+    case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Word, fieldCount); break;
+    case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Word, fieldCount); break;
+    case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Word, fieldCount); break;
+    case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Word, fieldCount); break;
     default:         postVecFail(di); return;
     }
 
@@ -13391,15 +13404,16 @@ void
 Hart<URV>::execVsoxsegei64_v(const DecodedInst* di)
 {
   ElementWidth sew = vecRegs_.elemWidth();
+  unsigned fieldCount = di->vecFieldCount();
   bool ok = true;
 
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Word2); break;
-    case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Word2); break;
-    case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Word2); break;
-    case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Word2); break;
+    case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Word2, fieldCount); break;
+    case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Word2, fieldCount); break;
+    case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Word2, fieldCount); break;
+    case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Word2, fieldCount); break;
     default:         postVecFail(di); return;
     }
 
