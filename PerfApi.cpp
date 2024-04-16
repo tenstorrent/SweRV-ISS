@@ -103,9 +103,17 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
   auto prev = this->prevFetch_;
   if (prev and not prev->predicted() and not prev->trapped() and not prev->executed())
     {
+      bool sequential = prev->instrVa() + prev->decodedInst().instSize() == vpc;
       if (not prev->decodedInst().isBranch())
-	if (prev->instrVa() + prev->decodedInst().instSize() != vpc)
-	  prev->predictBranch(true, vpc);
+	{
+	  if (not sequential)
+	    prev->predictBranch(true, vpc);
+	}
+      else
+	{
+	  if (sequential)
+	    prev->predictBranch(false, vpc);
+	}
     }
 
   uint64_t ppc = 0, ppc2 = 0;  // Physical pc.
@@ -260,7 +268,7 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
 
   packet.executed_ = true;
   packet.execTime_ = time;
-  if (packet.isBranch() and packet.predicted_)
+  if (packet.predicted_)
     packet.mispredicted_ = packet.prTarget_ != packet.nextIva_;
 
   return true;
@@ -779,11 +787,17 @@ PerfApi::shouldFlush(unsigned hartIx, uint64_t time, uint64_t tag, bool& flush,
       // If on the wrong path after a branch, then we wshould flush.
       auto& packetMap = hartPacketMaps_.at(hartIx);
       for (auto iter = packetMap.find(tag); iter != packetMap.end(); --iter)
-	if (iter->second->mispredicted_)
-	  {
-	    flush = true;
-	    addr = iter->second->nextIva_;
-	  }
+	{
+	  auto& packet = *iter->second;
+	  if (packet.mispredicted_)
+	    {
+	      flush = true;
+	      if (packet.di_.isBranch())
+		addr = packet.nextIva_;
+	      else
+		addr = packet.iva_;
+	    }
+	}
     }
 
   return true;
