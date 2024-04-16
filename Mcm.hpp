@@ -47,6 +47,7 @@ namespace WdRiscv
     uint64_t data_ = 0;       // Data for load/sore instructions.
     uint64_t addrTime_ = 0;   // Time address register was produced (for ld/st/amo).
     uint64_t dataTime_ = 0;   // Time data register was produced (for st/amo).
+    uint64_t retireTime_ = 0; // Time instructin was retired.
     McmInstrIx addrProducer_ = 0;
     McmInstrIx dataProducer_ = 0;
     DecodedInst di_;

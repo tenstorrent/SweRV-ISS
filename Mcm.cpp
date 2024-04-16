@@ -511,6 +511,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
     }
 
   instr->retired_ = true;
+  instr->retireTime_ = time;
   instr->di_ = di;
   if (instr->di_.instId() == InstId::sfence_vma)
     {
@@ -1801,8 +1802,10 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  // Bit i of mask is 1 if byte i of data of instruction B is not
-  // written by a preceeding store.
+  uint64_t minOpTimeB = earliestOpTime(instrB);
+
+  // Bit i of mask is 1 if byte i of data of instruction B is not written by a preceeding
+  // store.
   unsigned mask = (1 << instrB.size_) - 1;
 
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
@@ -1810,6 +1813,11 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
       const auto& instrA =  instrVec.at(tag-1);
       if (instrA.isCanceled() or not instrA.isMemory() or not instrA.overlaps(instrB))
 	continue;
+
+      // Read happen before retire, instrucions retire in program order, if an instruction
+      // retires before B performs, no eralier instruction can read after B.
+      if (instrA.retireTime_ < minOpTimeB)
+	break;
 
       clearMaskBitsForWrite(instrA, instrB, mask);
       if (mask == 0)
@@ -2349,17 +2357,21 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
 
   if (not instrB.isMemory())
     return true;
+
   if (not instrB.di_.isValid())
     {
       cerr << "Mcm::ppoRule8: Instr B undecoded\n";
       assert(0 && "Mcm::ppoRule8: Instr B undecoded");
     }
+
   if (not instrB.di_.isSc())
     return true;
 
   uint64_t addr = 0, value = 0;
   if (not hart.lastStore(addr, value))
     return true;  // Score conditional was not successful.
+
+  uint64_t minOpTimeB = earliestOpTime(instrB);
 
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
@@ -2368,17 +2380,23 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
       const auto& instrA =  instrVec.at(tag-1);
       if (instrA.isCanceled())
 	continue;
+
       if (not instrA.isRetired() or not instrA.di_.isValid())
 	{
 	  cerr << "Mcm::ppoRule8: Instr A undecoded/invalid\n";
 	  assert(0 && "Mcm::ppoRule8: Instr B undecoded/invalid");
 	}
+
+      // Read happen before retire, instrucions retire in program order, if an instruction
+      // retires before B performs, no eralier instruction can read after B.
+      if (instrA.retireTime_ < minOpTimeB)
+	break;
+
       if (not instrA.di_.isLr())
 	continue;
 
       if (not instrA.complete_ or
-          (not instrB.memOps_.empty() and
-           earliestOpTime(instrB) <= latestOpTime(instrA)))
+          (not instrB.memOps_.empty() and minOpTimeB <= latestOpTime(instrA)))
 	{
 	  cerr << "Error: PPO rule 8 failed: hart-id=" << hart.hartId()
 	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
@@ -2387,8 +2405,6 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
 
       return true;
     }
-
-  cerr << "Error: PPO rule 8: Could not find LR instruction paired with SC at tag=" << instrB.tag_ << '\n';
 
   return true;
 }
