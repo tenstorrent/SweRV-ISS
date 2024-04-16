@@ -572,6 +572,8 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
       walkVec.back().emplace_back(address, WalkEntry::Type::GPA);
     }
 
+  bool global = false;
+
   while (true)
     {
       // 2.
@@ -604,6 +606,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
         return stage1PageFaultType(read, write, exec);
 
       // 4.
+      global = global or pte.global();
       if (not pte.read() and not pte.exec())
         {  // pte is a pointer to the next level
 	  if (pte.accessed() or pte.dirty() or pte.user() or pte.pbmt() != 0)
@@ -696,7 +699,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
   tlbEntry.physPageNum_ = pa >> pageBits_;
   tlbEntry.asid_ = asid_;
   tlbEntry.valid_ = true;
-  tlbEntry.global_ = pte.global();
+  tlbEntry.global_ = global;
   tlbEntry.user_ = pte.user();
   tlbEntry.read_ = pte.read();
   tlbEntry.write_ = pte.write();
@@ -735,6 +738,8 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       walkVec.back().emplace_back(address, WalkEntry::Type::GPA);
     }
 
+  bool global = false;
+
   while (true)
     {
       // 2.
@@ -766,9 +771,10 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
         return stage2PageFaultType(read, write, exec);
 
       // 4.
+      global = global or pte.global();
       if (not pte.read() and not pte.exec())
         {  // pte is a pointer to the next level
-	  if (pte.accessed() or pte.dirty() or pte.user() or pte.global() or pte.pbmt() != 0)
+	  if (pte.accessed() or pte.dirty() or pte.user() or global or pte.pbmt() != 0)
             return stage2PageFaultType(read, write, exec);  // A/D/U/G bits must be zero in non-leaf entries.
           ii = ii - 1;
           if (ii < 0)
@@ -858,7 +864,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   tlbEntry.asid_ = asid_;
   tlbEntry.vmid_ = vmid_;
   tlbEntry.valid_ = true;
-  tlbEntry.global_ = pte.global();
+  tlbEntry.global_ = global;
   tlbEntry.user_ = pte.user();
   tlbEntry.read_ = pte.read();
   tlbEntry.write_ = pte.write();
@@ -896,6 +902,8 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       walkVec.resize(walkVec.size() + 1);
       walkVec.back().emplace_back(address, WalkEntry::Type::GVA);
     }
+
+  bool global = false;
 
   while (true)
     {
@@ -937,6 +945,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
         return stage1PageFaultType(read, write, exec);
 
       // 4.
+      global = global or pte.global();
       if (not pte.read() and not pte.exec())
         {  // pte is a pointer to the next level
 	  if (pte.accessed() or pte.dirty() or pte.user() or pte.pbmt() != 0)
@@ -1039,7 +1048,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   tlbEntry.asid_ = vsAsid_;
   tlbEntry.vmid_ = vmid_;
   tlbEntry.valid_ = true;
-  tlbEntry.global_ = pte.global();
+  tlbEntry.global_ = global;
   tlbEntry.user_ = pte.user();
   tlbEntry.read_ = pte.read();
   tlbEntry.write_ = pte.write();
