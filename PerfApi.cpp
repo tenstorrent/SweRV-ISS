@@ -385,7 +385,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
       packet.dva_ = sva;
       packet.dpa_ = spa1;  // FIX TODO : handle page corrsing
       packet.dsize_ = di.storeSize();
-      assert(ssize = packet.dsize_);
+      assert(ssize == packet.dsize_);
 
       auto& storeMap =  hartStoreMaps_.at(hartIx);
       storeMap[packet.tag()] = getInstructionPacket(hartIx, packet.tag());
