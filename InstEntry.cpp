@@ -639,37 +639,37 @@ InstTable::setupInstVec()
 
       // CSR
       { "csrrw", InstId::csrrw, 0x1073, funct3Low7Mask,
-	RvExtension::I, RvFormat::I,
+	RvExtension::Zicsr, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::CsReg, OperandMode::ReadWrite, immTop12 },
 
       { "csrrs", InstId::csrrs, 0x2073, funct3Low7Mask,
-	RvExtension::I, RvFormat::I,
+	RvExtension::Zicsr, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::CsReg, OperandMode::ReadWrite, immTop12 },
 
       { "csrrc", InstId::csrrc, 0x3073, funct3Low7Mask,
-	RvExtension::I, RvFormat::I,
+	RvExtension::Zicsr, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::CsReg, OperandMode::ReadWrite, immTop12 },
 
       { "csrrwi", InstId::csrrwi,  0x5073, funct3Low7Mask,
-	RvExtension::I, RvFormat::I,
+	RvExtension::Zicsr, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::Imm, OperandMode::None, rs1Mask,
 	OperandType::CsReg, OperandMode::ReadWrite, immTop12 },
 
       { "csrrsi", InstId::csrrsi, 0x6073, funct3Low7Mask,
-	RvExtension::I, RvFormat::I,
+	RvExtension::Zicsr, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::Imm, OperandMode::None, rs1Mask,
 	OperandType::CsReg, OperandMode::ReadWrite, immTop12 },
 
       { "csrrci", InstId::csrrci, 0x7073, funct3Low7Mask,
-	RvExtension::I, RvFormat::I,
+	RvExtension::Zicsr, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::Imm, OperandMode::None, rs1Mask,
 	OperandType::CsReg, OperandMode::ReadWrite, immTop12 },

@@ -3817,8 +3817,9 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
   else
     pregs.updateCounters(EventNumber::Inst32Commited, prevPerfControl_, lastPriv_, lastVirt_);
 
-  if (info.extension() == RvExtension::I)
+  switch (info.extension())
     {
+    case RvExtension::I:
       if (id == InstId::ebreak or id == InstId::c_ebreak)
 	pregs.updateCounters(EventNumber::Ebreak, prevPerfControl_, lastPriv_, lastVirt_);
       else if (id == InstId::ecall)
@@ -3837,19 +3838,78 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
 	}
       else if (id != InstId::illegal)
 	pregs.updateCounters(EventNumber::Alu, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+
+    case RvExtension::Zmmul:
+    case RvExtension::M:
+      if (info.isMultiply())
+	pregs.updateCounters(EventNumber::Mult, prevPerfControl_, lastPriv_, lastVirt_);
+      else
+	pregs.updateCounters(EventNumber::Div, prevPerfControl_, lastPriv_, lastVirt_);
+      pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+
+    case RvExtension::A:
+      if (id == InstId::lr_w or id == InstId::lr_d)
+	pregs.updateCounters(EventNumber::Lr, prevPerfControl_, lastPriv_, lastVirt_);
+      else if (id == InstId::sc_w or id == InstId::sc_d)
+	pregs.updateCounters(EventNumber::Sc, prevPerfControl_, lastPriv_, lastVirt_);
+      else
+	pregs.updateCounters(EventNumber::Atomic, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+      
+    case RvExtension::F:
+      pregs.updateCounters(EventNumber::FpSingle, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+
+    case RvExtension::D:
+      pregs.updateCounters(EventNumber::FpDouble, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+
+    case RvExtension::Zfh:
+      pregs.updateCounters(EventNumber::FpHalf, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+      
+    case RvExtension::V:
+      pregs.updateCounters(EventNumber::Vector, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+
+    case RvExtension::Zba:
+    case RvExtension::Zbb:
+    case RvExtension::Zbc:
+    case RvExtension::Zbe:
+    case RvExtension::Zbf:
+    case RvExtension::Zbm:
+    case RvExtension::Zbp:
+    case RvExtension::Zbr:
+    case RvExtension::Zbs:
+    case RvExtension::Zbt:
+      pregs.updateCounters(EventNumber::Bitmanip, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+
+    case RvExtension::Zicsr:
+      if (not hasException_)
+	{
+	  if ((id == InstId::csrrw or id == InstId::csrrwi))
+	    {
+	      auto evNum = op0 == 0 ? EventNumber::CsrWrite : EventNumber::CsrReadWrite;
+	      pregs.updateCounters(evNum, prevPerfControl_, lastPriv_, lastVirt_);
+	    }
+	  else
+	    {
+	      auto evNum = op1 == 0 ? EventNumber::CsrRead : EventNumber::CsrReadWrite;
+	      pregs.updateCounters(evNum, prevPerfControl_, lastPriv_, lastVirt_);
+	    }
+	  pregs.updateCounters(EventNumber::Csr, prevPerfControl_, lastPriv_, lastVirt_);
+	}
+      break;
+
+    default:
+      break;
     }
 
-  if (info.isMultiply())
-    {
-      pregs.updateCounters(EventNumber::Mult, prevPerfControl_, lastPriv_, lastVirt_);
-      pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_, lastPriv_, lastVirt_);
-    }
-  else if (info.isDivide())
-    {
-      pregs.updateCounters(EventNumber::Div, prevPerfControl_, lastPriv_, lastVirt_);
-      pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_, lastPriv_, lastVirt_);
-    }
-  else if (info.isPerfLoad())
+  // Some insts (e.g. flw) can be both load/store and FP
+  if (info.isPerfLoad())
     {
       pregs.updateCounters(EventNumber::Load, prevPerfControl_, lastPriv_, lastVirt_);
       if (misalignedLdSt_)
@@ -3861,47 +3921,6 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
       if (misalignedLdSt_)
 	pregs.updateCounters(EventNumber::MisalignStore, prevPerfControl_, lastPriv_, lastVirt_);
     }
-  else if (info.isBitManipulation())
-    {
-      pregs.updateCounters(EventNumber::Bitmanip, prevPerfControl_, lastPriv_, lastVirt_);
-    }
-  else if (info.isAtomic())
-    {
-      if (id == InstId::lr_w or id == InstId::lr_d)
-	pregs.updateCounters(EventNumber::Lr, prevPerfControl_, lastPriv_, lastVirt_);
-      else if (id == InstId::sc_w or id == InstId::sc_d)
-	pregs.updateCounters(EventNumber::Sc, prevPerfControl_, lastPriv_, lastVirt_);
-      else
-	pregs.updateCounters(EventNumber::Atomic, prevPerfControl_, lastPriv_, lastVirt_);
-    }
-  else if (info.isCsr() and not hasException_)
-    {
-      if ((id == InstId::csrrw or id == InstId::csrrwi))
-	{
-	  if (op0 == 0)
-	    pregs.updateCounters(EventNumber::CsrWrite, prevPerfControl_, lastPriv_, lastVirt_);
-	  else
-	    pregs.updateCounters(EventNumber::CsrReadWrite, prevPerfControl_, lastPriv_, lastVirt_);
-	}
-      else
-	{
-	  if (op1 == 0)
-	    pregs.updateCounters(EventNumber::CsrRead, prevPerfControl_, lastPriv_, lastVirt_);
-	  else
-	    pregs.updateCounters(EventNumber::CsrReadWrite, prevPerfControl_, lastPriv_, lastVirt_);
-	}
-      pregs.updateCounters(EventNumber::Csr, prevPerfControl_, lastPriv_, lastVirt_);
-    }
-
-  // Some insts (e.g. flw) can be both load/store and FP
-  if (info.extension() == RvExtension::F)
-    pregs.updateCounters(EventNumber::FpSingle, prevPerfControl_, lastPriv_, lastVirt_);
-  else if (info.extension() == RvExtension::D)
-    pregs.updateCounters(EventNumber::FpDouble, prevPerfControl_, lastPriv_, lastVirt_);
-  else if (info.extension() == RvExtension::Zfh)
-    pregs.updateCounters(EventNumber::FpHalf, prevPerfControl_, lastPriv_, lastVirt_);
-  else if (info.extension() == RvExtension::V)
-    pregs.updateCounters(EventNumber::Vector, prevPerfControl_, lastPriv_, lastVirt_);
 }
 
 
