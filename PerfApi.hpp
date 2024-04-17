@@ -35,8 +35,8 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     friend class PerfApi;
 
     /// Constructor: iva/ipa are the instruction virtual/physical addresses.  For
-    /// instruction crossing page boundary, ipa2 is the phusical address of the other
-    /// page. I nto crossing page boundary ipa2 is same as ipa.
+    /// instruction crossing page boundary, ipa2 is the physical address of the other
+    /// page. I not crossing page boundary ipa2 is same as ipa.
     InstrPac(uint64_t tag, uint64_t iva, uint64_t ipa, uint64_t ipa2)
       : tag_(tag), iva_(iva), ipa_(ipa), ipa2_(ipa2)
     { }
@@ -71,7 +71,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     uint64_t dataPa() const
     { return dpa_; }
 
-    /// Return the size of the instrution (2 or 4 bytes). Instruction must be fetched.
+    /// Return the size of the instruction (2 or 4 bytes). Instruction must be fetched.
     uint64_t instrSize() const
     { assert(fetched_); return di_.instSize(); }
 
@@ -232,8 +232,8 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// if the given tag has not yet been fetched or if it has been flushed.
     bool execute(unsigned hart, uint64_t time, uint64_t tag);
 
-    /// Helper to above execute: Excecute packet instrction without cahging hart state.
-    /// Poke packet source register values into hart, execute, collect dstination
+    /// Helper to above execute: Execute packet instruction without changing hart state.
+    /// Poke packet source register values into hart, execute, collect destination
     /// values. Restore hart state.
     bool execute(unsigned hartIx, InstrPac& packet);
 
@@ -393,7 +393,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     const unsigned intRegOffset_ = 0;
     const unsigned fpRegOffset_ = 32;
     const unsigned csRegOffset_ = 64;
-    const unsigned totalRegCount_ = csRegOffset_ + 4096; // 4096: max csr count.
+    const unsigned totalRegCount_ = csRegOffset_ + 4096; // 4096: max CSR count.
   };
 
 }
