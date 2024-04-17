@@ -3831,6 +3831,12 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
 	pregs.updateCounters(EventNumber::Mret, prevPerfControl_, lastPriv_, lastVirt_);
       else if (id != InstId::illegal)
 	pregs.updateCounters(EventNumber::Alu, prevPerfControl_, lastPriv_, lastVirt_);
+      else if (info.isBranch())
+	{
+	  pregs.updateCounters(EventNumber::Branch, prevPerfControl_, lastPriv_, lastVirt_);
+	  if (lastBranchTaken_)
+	    pregs.updateCounters(EventNumber::BranchTaken, prevPerfControl_, lastPriv_, lastVirt_);
+	}
     }
   else if (info.isMultiply())
     {
@@ -3884,12 +3890,6 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
 	    pregs.updateCounters(EventNumber::CsrReadWrite, prevPerfControl_, lastPriv_, lastVirt_);
 	}
       pregs.updateCounters(EventNumber::Csr, prevPerfControl_, lastPriv_, lastVirt_);
-    }
-  else if (info.isBranch())
-    {
-      pregs.updateCounters(EventNumber::Branch, prevPerfControl_, lastPriv_, lastVirt_);
-      if (lastBranchTaken_)
-	pregs.updateCounters(EventNumber::BranchTaken, prevPerfControl_, lastPriv_, lastVirt_);
     }
 
   // Some insts (e.g. flw) can be both load/store and FP
