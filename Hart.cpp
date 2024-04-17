@@ -3802,13 +3802,22 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
   if (hasInterrupt_)
     return;
 
-  // We do not update the performance counters if an instruction
-  // causes an exception unless it is an ebreak or an ecall.
-  if (hasException_ and id != InstId::ecall and id != InstId::ebreak and
-      id != InstId::c_ebreak)
-    return;
-
   PerfRegs& pregs = csRegs_.mPerfRegs_;
+
+  // We do not update the performance counters if an instruction causes an exception
+  // unless it is an ebreak or an ecall.
+  if (hasException_)
+    {
+      if (id == InstId::ebreak or id == InstId::c_ebreak or id == InstId::ecall)
+	{
+	  pregs.updateCounters(EventNumber::InstCommited, prevPerfControl_, lastPriv_, lastVirt_);
+	  if (id == InstId::ebreak or id == InstId::c_ebreak)
+	    pregs.updateCounters(EventNumber::Ebreak, prevPerfControl_, lastPriv_, lastVirt_);
+	  else if (id == InstId::ecall)
+	    pregs.updateCounters(EventNumber::Ecall, prevPerfControl_, lastPriv_, lastVirt_);
+	}
+      return;
+    }
 
   pregs.updateCounters(EventNumber::InstCommited, prevPerfControl_, lastPriv_, lastVirt_);
 
@@ -3820,11 +3829,7 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
   switch (info.extension())
     {
     case RvExtension::I:
-      if (id == InstId::ebreak or id == InstId::c_ebreak)
-	pregs.updateCounters(EventNumber::Ebreak, prevPerfControl_, lastPriv_, lastVirt_);
-      else if (id == InstId::ecall)
-	pregs.updateCounters(EventNumber::Ecall, prevPerfControl_, lastPriv_, lastVirt_);
-      else if (id == InstId::fence)
+      if (id == InstId::fence)
 	pregs.updateCounters(EventNumber::Fence, prevPerfControl_, lastPriv_, lastVirt_);
       else if (id == InstId::fence_i)
 	pregs.updateCounters(EventNumber::Fencei, prevPerfControl_, lastPriv_, lastVirt_);
@@ -3888,20 +3893,17 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
       break;
 
     case RvExtension::Zicsr:
-      if (not hasException_)
+      if ((id == InstId::csrrw or id == InstId::csrrwi))
 	{
-	  if ((id == InstId::csrrw or id == InstId::csrrwi))
-	    {
-	      auto evNum = op0 == 0 ? EventNumber::CsrWrite : EventNumber::CsrReadWrite;
-	      pregs.updateCounters(evNum, prevPerfControl_, lastPriv_, lastVirt_);
-	    }
-	  else
-	    {
-	      auto evNum = op1 == 0 ? EventNumber::CsrRead : EventNumber::CsrReadWrite;
-	      pregs.updateCounters(evNum, prevPerfControl_, lastPriv_, lastVirt_);
-	    }
-	  pregs.updateCounters(EventNumber::Csr, prevPerfControl_, lastPriv_, lastVirt_);
+	  auto evNum = op0 == 0 ? EventNumber::CsrWrite : EventNumber::CsrReadWrite;
+	  pregs.updateCounters(evNum, prevPerfControl_, lastPriv_, lastVirt_);
 	}
+      else
+	{
+	  auto evNum = op1 == 0 ? EventNumber::CsrRead : EventNumber::CsrReadWrite;
+	  pregs.updateCounters(evNum, prevPerfControl_, lastPriv_, lastVirt_);
+	}
+      pregs.updateCounters(EventNumber::Csr, prevPerfControl_, lastPriv_, lastVirt_);
       break;
 
     default:
