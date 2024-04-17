@@ -3838,7 +3838,8 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
 	    pregs.updateCounters(EventNumber::BranchTaken, prevPerfControl_, lastPriv_, lastVirt_);
 	}
     }
-  else if (info.isMultiply())
+
+  if (info.isMultiply())
     {
       pregs.updateCounters(EventNumber::Mult, prevPerfControl_, lastPriv_, lastVirt_);
       pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_, lastPriv_, lastVirt_);
