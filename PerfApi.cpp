@@ -519,7 +519,7 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag, FILE* traceFile)
   if (packet.instrVa() != hart->peekPc())
     {
       std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag << std::hex
-		<< " Wrong pc: 0x" << packet.instrVa() << " expecting "
+		<< " Wrong pc at retire: 0x" << packet.instrVa() << " expecting 0x"
 		<< hart->peekPc() << '\n' << std::dec;
       return false;
     }
@@ -772,6 +772,9 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
       ++iter;
       packetMap.erase(pacPtr->tag_);
     }
+
+  if (prevFetch_->tag_ > tag)
+    prevFetch_ = nullptr;
 
   return true;
 }
