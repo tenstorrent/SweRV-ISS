@@ -750,6 +750,25 @@ Enable support for debug triggers when set to true.
 When true, the lr/sc instructions will be counted as load/store 
 by the performance counters.
 
+### trigger registers
+Each trigger register is associated with 3 components tdata1, tdata2, and tdata3. Here's
+an example of how to configure the reset values and masks of these components in a system
+with 2 trigger registers (the mask and reset values are made up):
+```
+     "triggers" : [
+         {
+	    "reset"    : [0, 0, 0],
+	    "mask"     : ["0xffffffff", "0xffffffff", "0xffffffff"],
+	    "poke_mask": ["0xffffffff", "0xffffffff", "0xffffffff"]
+         },
+         {
+	    "reset"    : [0, 0, 0],
+	    "mask"     : ["0xffffffff", "0xffffffff", "0xffffffff"],
+	    "poke_mask": ["0xffffffff", "0xffffffff", "0xffffffff"]
+         }
+     ],
+```
+
 ### perf_count_fp_load_store
 When true, the floating point load/store instructions will be counted
 as load/store by the performance counters.
