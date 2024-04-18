@@ -103,6 +103,10 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
 
   auto& tlb = virtMem_.stage2Tlb_;
 
+  // Some implementations do not store guest-physical-addresses in the TLB. For those, we
+  // over-invalidate.
+  bool useGpa = not hfenceGvmaIgnoresGpa_;
+
   // Invalidate whole VS TLB. This is overkill.
   if (di->op0() == 0 and di->op1() == 0)
     tlb.invalidate();
@@ -117,7 +121,8 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
       // address is shifted right by 2 bits
       addr = virtMem_.applyPointerMask(addr << 2, privMode_, virtMode_);
       uint64_t vpn = virtMem_.pageNumber(addr);
-      tlb.invalidateVirtualPage(vpn);
+      if (useGpa)
+	tlb.invalidateVirtualPage(vpn);
     }
   else
     {
@@ -125,7 +130,10 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
       addr = virtMem_.applyPointerMask(addr << 2, privMode_, virtMode_);
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV vmid = intRegs_.read(di->op1());
-      tlb.invalidateVirtualPageVmid(vpn, vmid);
+      if (useGpa)
+	tlb.invalidateVirtualPageVmid(vpn, vmid);
+      else
+	tlb.invalidateVmid(vmid);
     }
 
   invalidateDecodeCache();

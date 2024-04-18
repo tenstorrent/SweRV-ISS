@@ -1549,6 +1549,11 @@ namespace WdRiscv
     void enableClearMprvOnRet(bool flag)
     { clearMprvOnRet_ = flag; }
 
+    /// Make hfence.gvma ignore guest physical addresses (over-invalidate) when flag is
+    /// true.
+    void hfenceGvmaIgnoresGpa(bool flag)
+    { hfenceGvmaIgnoresGpa_ = flag; }
+
     /// Clear MTVAL on illegal instruction exception if flag is true.
     /// Otherwise, set MTVAL to the opcode of the illegal instruction.
     void enableClearMtvalOnIllInst(bool flag)
@@ -5038,6 +5043,9 @@ namespace WdRiscv
 
     bool clearMprvOnRet_ = true;
     bool cancelLrOnTrap_ = true;    // Cancel reservation on traps when true.
+
+    // Make hfence.gvma ignore huest physical addresses when true.
+    bool hfenceGvmaIgnoresGpa_ = false;
 
     VirtMem::Mode lastPageMode_ = VirtMem::Mode::Bare;  // Before current inst
     VirtMem::Mode lastVsPageMode_ = VirtMem::Mode::Bare;

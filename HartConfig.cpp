@@ -1958,6 +1958,14 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.setWfiTimeout(timeout);
     }
 
+  tag = "hfence_gvma_ignores_gpa";
+  if (config_ ->contains(tag))
+    {
+      bool flag = false;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.hfenceGvmaIgnoresGpa(flag);
+    }
+
   return errors == 0;
 }
 
