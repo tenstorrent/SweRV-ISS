@@ -91,7 +91,7 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
   auto& packetMap = hartPacketMaps_.at(hartIx);
   if (not packetMap.empty() and packetMap.rbegin()->first >= tag)
     {
-      std::cerr << "Error in PerfApi::fetch: tag " << tag << "is not in increasing order.\n";
+      std::cerr << "Error in PerfApi::fetch: tag " << tag << " is not in increasing order.\n";
       assert(0);
       return false;
     }
@@ -131,6 +131,12 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
 	assert(0);
       prevFetch_ = packet;
       trap = false;
+
+      if (prev and not prev->trapped() and prev->executed() and prev->nextIva_ != vpc)
+	{
+	  packet->shouldFlush_ = true;
+	  packet->iva_ = prev->nextIva_;
+	}
     }
   else
     {
@@ -223,8 +229,9 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
     return false;
 
   auto& packet = *pacPtr;
-
   auto& di = packet.decodedInst();
+
+  auto& packetMap = hartPacketMaps_.at(hartIx);
 
   if (packet.executed())
     {
@@ -232,7 +239,6 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
       // depends on it must be re-executed.
       if (not di.isLoad() and not di.isStore())
 	assert(0);
-      auto& packetMap = hartPacketMaps_.at(hartIx);
       auto iter = packetMap.find(packet.tag());
       assert(iter != packetMap.end());
       for ( ; iter != packetMap.end(); ++iter)
@@ -270,6 +276,18 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   packet.execTime_ = time;
   if (packet.predicted_)
     packet.mispredicted_ = packet.prTarget_ != packet.nextIva_;
+  else if (packet.isBranch())
+    {
+      // Check if the next instruction in program order is at the right PC.
+      auto iter = packetMap.find(packet.tag());
+      ++iter;
+      if (iter != packetMap.end())
+	{
+	  auto& next = *(iter->second);
+	  if (next.iva_ != packet.nextIva_)
+	    next.shouldFlush_ = true;
+	}
+    }
 
   return true;
 }
@@ -390,8 +408,8 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
       auto& storeMap =  hartStoreMaps_.at(hartIx);
       storeMap[packet.tag()] = getInstructionPacket(hartIx, packet.tag());
     }
-  else if (packet.isBranch())
-    packet.nextIva_ = hart.peekPc();
+
+  packet.nextIva_ = hart.peekPc();
 
   // Record the values of the dstination register.
   unsigned destIx = 0;
@@ -722,7 +740,7 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
   auto& packetMap = hartPacketMaps_.at(hartIx);
 
   // Flush tag and all older packets. Flush in reverse order to undo register renaming.
-  for (auto iter = packetMap.rbegin(); iter != packetMap.rend(); ++iter)
+  for (auto iter = packetMap.rbegin(); iter != packetMap.rend(); )
     {
       auto pacPtr = iter->second;
       if (pacPtr->tag_ < tag)
@@ -748,6 +766,7 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
             }
         }
 
+      ++iter;
       packetMap.erase(pacPtr->tag_);
     }
 
@@ -786,7 +805,8 @@ PerfApi::shouldFlush(unsigned hartIx, uint64_t time, uint64_t tag, bool& flush,
     {
       // If on the wrong path after a branch, then we wshould flush.
       auto& packetMap = hartPacketMaps_.at(hartIx);
-      for (auto iter = packetMap.find(tag); iter != packetMap.end(); --iter)
+      auto iter = packetMap.find(tag); --iter;
+      for ( ; iter != packetMap.end(); --iter)
 	{
 	  auto& packet = *iter->second;
 	  if (packet.mispredicted_)
