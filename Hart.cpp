@@ -709,7 +709,8 @@ Hart<URV>::resetVector()
   // configure for 128-bits per regiser and 32-bits per elemement.
   if (isRvv())
     {
-      if (vecRegs_.registerCount() == 0)
+      bool configured = vecRegs_.registerCount() > 0;
+      if (not configured)
 	vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/,
 			4 /*maxBytesPerElem*/, nullptr /*minSewPerLmul*/, nullptr);
       unsigned bytesPerReg = vecRegs_.bytesPerRegister();
@@ -719,7 +720,7 @@ Hart<URV>::resetVector()
       auto csr = csRegs_.findCsr(CsrNumber::VSTART);
       if (not csr or csr->getWriteMask() != vstartMask)
 	{
-	  if (hartIx_ == 0)
+	  if (hartIx_ == 0 and configured)
 	    std::cerr << "Warning: Write mask of CSR VSTART changed to 0x" << std::hex
 		      << vstartMask << " to be compatible with VLEN=" << std::dec
 		      << (bytesPerReg*8) << '\n';
