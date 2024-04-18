@@ -276,7 +276,8 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   packet.execTime_ = time;
   if (packet.predicted_)
     packet.mispredicted_ = packet.prTarget_ != packet.nextIva_;
-  else if (packet.isBranch())
+
+  if (packet.isBranch())
     {
       // Check if the next instruction in program order is at the right PC.
       auto iter = packetMap.find(packet.tag());
@@ -286,6 +287,8 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
 	  auto& next = *(iter->second);
 	  if (next.iva_ != packet.nextIva_)
 	    next.shouldFlush_ = true;
+	  if (next.executed_)
+	    packet.shouldFlush_ = true;
 	}
     }
 
