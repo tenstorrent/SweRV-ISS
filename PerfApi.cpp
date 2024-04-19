@@ -126,8 +126,9 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
       packet = std::make_shared<InstrPac>(tag, vpc, ppc, ppc2);
       assert(packet);
       packet->fetched_ = true;
+      packet->opcode_= opcode;
       insertPacket(hartIx, tag, packet);
-      if (not decode(hartIx, time, tag, opcode))
+      if (not decode(hartIx, time, tag))
 	assert(0);
       prevFetch_ = packet;
       trap = false;
@@ -151,11 +152,11 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
 
 
 bool
-PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode)
+PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag)
 {
   if (commandLog_)
-    fprintf(commandLog_, "hart=%" PRIu32 " time=%" PRIu64 " perf_model_decode %" PRIu64 " 0x%" PRIx32 "\n",
-            hartIx, time, tag, opcode);
+    fprintf(commandLog_, "hart=%" PRIu32 " time=%" PRIu64 " perf_model_decode %" PRIu64 "\n",
+            hartIx, time, tag);
 
   if (not checkTime("Decode", time))
     return false;
@@ -171,7 +172,7 @@ PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode)
   if (packet->decoded())
     return true;
 
-  hart->decode(packet->instrVa(), packet->instrPa(), opcode, packet->di_);
+  hart->decode(packet->instrVa(), packet->instrPa(), packet->opcode_, packet->di_);
   packet->decoded_ = true;
 
   // Collect producers of operands of this instruction.
@@ -309,14 +310,6 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   using OT = WdRiscv::OperandType;
 
   uint64_t prevPc = hart.peekPc();
-
-  // Don't execute if on wrong path to avoid potential exception.
-  uint32_t opcode = 0;
-  if (not hartPtr->readInst(packet.iva_, opcode) or packet.di_.inst() != opcode)
-    {
-      packet.shouldFlush_ = true;
-      return true;  // Wrong opcode. Must be flushed. Pretend it was executed.
-    }
 
   hart.pokePc(packet.instrVa());
 

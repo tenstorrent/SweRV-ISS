@@ -890,11 +890,11 @@ System<URV>::perfApiFetch(unsigned hart, uint64_t time, uint64_t tag, uint64_t v
 
 template <typename URV>
 bool
-System<URV>::perfApiDecode(unsigned hart, uint64_t time, uint64_t tag, uint32_t opcode)
+System<URV>::perfApiDecode(unsigned hart, uint64_t time, uint64_t tag)
 {
   if (not perfApi_)
     return false;
-  return perfApi_->decode(hart, time, tag, opcode);
+  return perfApi_->decode(hart, time, tag);
 }
 
 

@@ -179,6 +179,8 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     typedef std::pair<unsigned, uint64_t> DestValue;
     std::array<DestValue, 2> destValues_;
 
+    uint32_t opcode_ = 0;
+
     // Following applicable if instruction is a branch
     bool predicted_    : 1 = false;  // true if predicted to be a branch
     bool prTaken_      : 1 = false;  // true if predicted branch/jump is taken
@@ -215,7 +217,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// will return false if the instruction has not been fetched; otherwise, it
     /// will return true after decoding the instruction, updating the di field of
     /// the corresponding packet, and marking the packed as decoded.
-    bool decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode);
+    bool decode(unsigned hartIx, uint64_t time, uint64_t tag);
 
     /// Optionally called by performance model after decode to inform Whisper of branch
     /// prediction. Returns true on success and false on error (tag was never decoded).

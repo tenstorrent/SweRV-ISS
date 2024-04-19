@@ -2499,20 +2499,17 @@ bool
 Interactive<URV>::perfModelDecodeCommand(const std::string& line,
 		                         const std::vector<std::string>& tokens)
 {
-  if (tokens.size() == 3)
+  if (tokens.size() == 2)
     {
-      uint64_t tag; uint32_t opcode;
+      uint64_t tag;
       if (not parseCmdLineNumber("perf-model-decode-tag", tokens.at(1), tag))
         return false;
-      if (not parseCmdLineNumber("perf-model-decode-vpc", tokens.at(2), opcode))
-        return false;
-
-      return system_.perfApiDecode(hartId_, time_, tag, opcode);
+      return system_.perfApiDecode(hartId_, time_, tag);
     }
   else
     {
       std::cerr << "Invalid perf_model_decode command: " << line << '\n';
-      std::cerr << "Expecting: perf_model_decode <tag> <opcode>\n";
+      std::cerr << "Expecting: perf_model_decode <tag>\n";
       return false;
     }
 }

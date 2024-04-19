@@ -356,7 +356,7 @@ namespace WdRiscv
 
     bool perfApiFetch(unsigned hart, uint64_t time, uint64_t tag, uint64_t vpc);
 
-    bool perfApiDecode(unsigned hart, uint64_t time, uint64_t tag, uint32_t opcode);
+    bool perfApiDecode(unsigned hart, uint64_t time, uint64_t tag);
 
     bool perfApiExecute(unsigned hart, uint64_t time, uint64_t tag);
 
