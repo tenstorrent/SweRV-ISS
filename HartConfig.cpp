@@ -1668,7 +1668,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       if (hart.sysHartIndex() == 0)
 	cerr << "Warning: Config tag " << tag << " is deprecated -- "
-	     << "feature is now controlled by bit 61 of the MENVCFG CSR.\n";
+	     << "feature is now controlled by bit 61 of the MENVCFG/HENVCFG CSR.\n";
       getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
       // hart.setFaultOnFirstAccess(flag);
     }

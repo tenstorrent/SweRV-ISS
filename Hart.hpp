@@ -405,6 +405,7 @@ namespace WdRiscv
 	  flag = flag and csRegs_.menvcfgPbmte();
 	  bool adu = csRegs_.menvcfgAdue();
 	  virtMem_.setFaultOnFirstAccess(not adu);
+	  virtMem_.setFaultOnFirstAccessStage2(not adu);
 	}
       virtMem_.enablePbmt(flag);
       auto henv = csRegs_.getImplementedCsr(CsrNumber::HENVCFG);
@@ -412,7 +413,7 @@ namespace WdRiscv
 	{
           flag = flag and csRegs_.henvcfgPbmte();
 	  bool adu = csRegs_.henvcfgAdue();
-	  virtMem_.setFaultOnFirstAccessStage2(not adu);
+	  virtMem_.setFaultOnFirstAccessStage1(not adu);
 	}
       virtMem_.enableVsPbmt(flag);
     }
@@ -1633,6 +1634,11 @@ namespace WdRiscv
     /// translation.
     void setFaultOnFirstAccess(bool flag)
     { virtMem_.setFaultOnFirstAccess(flag); }
+
+    /// Similar to setFaultOnFirstAccess but applies to the first stage
+    /// of 2-stage translation.
+    void setFaultOnFirstAccessStage1(bool flag)
+    { virtMem_.setFaultOnFirstAccessStage1(flag); }
 
     /// Similar to setFaultOnFirstAccess but applies to the second stage
     /// of 2-stage translation.

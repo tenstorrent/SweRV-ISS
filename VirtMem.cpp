@@ -474,7 +474,7 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
             return stage1PageFaultType(read, write, exec);
 	  if (not entry->accessed_ or (write and not entry->dirty_))
 	    {
-	      if (faultOnFirstAccess_)
+	      if (faultOnFirstAccess1_)
                 return stage1PageFaultType(read, write, exec);
 	      entry->accessed_ = true;
 	      if (write)
@@ -990,7 +990,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	{
 	  // We have a choice:
 	  // A. Page fault
-	  if (faultOnFirstAccess_)
+	  if (faultOnFirstAccess1_)
             return stage1PageFaultType(read, write, exec);  // A
 
 	  // Or B
