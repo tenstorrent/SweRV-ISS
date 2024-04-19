@@ -12537,6 +12537,8 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
+
+  // lmul*fieldcount cannot be larger than 8 registers.
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
   unsigned start = csRegs_.peekVstart();
