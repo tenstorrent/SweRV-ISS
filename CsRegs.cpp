@@ -1009,13 +1009,13 @@ CsRegs<URV>::enableSscofpmf(bool flag)
           {
             event->poke(fields.value_ >> 32);
 	    if (superEnabled_)
-	      updateScountovfValue(evnum, fields.value_ >> 32);
+	      updateScountovfValue(evnum);
           }
 	else
           {
             event->poke(fields.value_);
 	    if (superEnabled_)
-	      updateScountovfValue(evnum, fields.value_);
+	      updateScountovfValue(evnum);
           }
 	this->recordWrite(evnum);
 
@@ -1941,7 +1941,7 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
       if (cofEnabled_ and superEnabled_)
         {
           if (not rv32_ or (rv32_ and num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
-            updateScountovfValue(num, value);
+            updateScountovfValue(num);
         }
     }
   else if (num == CN::FFLAGS or num == CN::FRM or num == CN::FCSR)
@@ -3481,9 +3481,9 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
       if (cofEnabled_ and superEnabled_)
         {
           if (rv32_ and num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31)
-            updateScountovfValue(num, value);
+            updateScountovfValue(num);
           else if (not rv32_)
-            updateScountovfValue(num, value);
+            updateScountovfValue(num);
         }
     }
   else if (num == CN::FFLAGS or num == CN::FRM or num == CN::FCSR)
@@ -3871,33 +3871,42 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
 
 template <typename URV>
 void
-CsRegs<URV>::updateScountovfValue(CsrNumber mhpm, uint64_t value)
+CsRegs<URV>::updateScountovfValue(CsrNumber mhpmNum)
 {
   using CN = CsrNumber;
 
-  Csr<URV>* csr = getImplementedCsr(CN::SCOUNTOVF);
-  if (not csr)
+  auto scountovf = getImplementedCsr(CN::SCOUNTOVF);
+  if (not scountovf)
     {
       assert(0);
       return;
     }
 
+  auto mhpm = getImplementedCsr(mhpmNum);
+  if (not mhpm)
+    {
+      assert(0);
+      return;
+    }
+
+  URV value = mhpm->read();
   bool of = value >> (8*sizeof(URV) - 1);
+
   URV ix = 3;
   if (rv32_)
     {
-      assert(mhpm >= CN::MHPMEVENTH3 and mhpm <= CN::MHPMEVENTH31);
-      ix += uint32_t(mhpm) - uint32_t(CN::MHPMEVENTH3);
+      assert(mhpmNum >= CN::MHPMEVENTH3 and mhpmNum <= CN::MHPMEVENTH31);
+      ix += uint32_t(mhpmNum) - uint32_t(CN::MHPMEVENTH3);
     }
   else
     {
-      assert(mhpm >= CN::MHPMEVENT3 and mhpm <= CN::MHPMEVENT31);
-      ix += uint32_t(mhpm) - uint32_t(CN::MHPMEVENT3);
+      assert(mhpmNum >= CN::MHPMEVENT3 and mhpmNum <= CN::MHPMEVENT31);
+      ix += uint32_t(mhpmNum) - uint32_t(CN::MHPMEVENT3);
     }
 
   URV mask = ~ (1 << ix);
-  URV prev = csr->read() & mask;
-  csr->poke(of << ix | prev);
+  URV prev = scountovf->read() & mask;
+  scountovf->poke(of << ix | prev);
 }
 
 
