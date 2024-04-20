@@ -375,6 +375,26 @@ namespace WdRiscv
       return rangesOverlap(instr.physAddr2_, size2, op.physAddr_, op.size_);
     }
 
+    /// Return true if the data memory referenced by given instruction overlpas
+    /// the given address.
+    bool overlapsAddr(const McmInstr& instr, uint64_t addr) const
+    {
+      if (instr.size_ == 0)
+	std::cerr << "Mcm::overlapsAddr: Error: tag1=" << instr.tag_
+		  << " zero data size\n";
+
+      if (instr.physAddr_ == instr.physAddr2_)   // Non-page-crossing
+	return addr >= instr.physAddr_ and addr < instr.physAddr_ +  instr.size_;
+
+      // Page crossing.
+      unsigned size1 = offsetToNextPage(instr.physAddr_);
+      if (addr >= instr.physAddr_ and addr < instr.physAddr_ + size1)
+	return true;
+
+      unsigned size2 = instr.size_ - size1;
+      return addr >= instr.physAddr2_ and addr < instr.physAddr2_ +  size2;
+    }
+
     /// Return true if the given address ranges overlap one another.
     bool rangesOverlap(uint64_t addr1, unsigned size1, uint64_t addr2, unsigned size2) const
     {

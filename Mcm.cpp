@@ -1819,6 +1819,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
       if (instrA.retireTime_ < minOpTimeB)
 	break;
 
+      // Clear mask bits corresponding to bytes of B written by a preceeding store (A).
       clearMaskBitsForWrite(instrA, instrB, mask);
       if (mask == 0)
 	return true; // All bytes of B written by preceeding stores.
@@ -1826,8 +1827,8 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
       if (not instrA.isLoad_ or isBeforeInMemoryTime(instrA, instrB))
 	continue;
 
-      // Is there a remote write between A and B memory time that
-      // covers a byte of B.
+      // Is there a remote write between A and B memory time that covers non-covered a
+      // byte of B.
       if (instrA.memOps_.empty() or instrB.memOps_.empty())
 	{
 	  cerr << "Error: PPO Rule 2: Instruction with no memory operation: "
@@ -1840,17 +1841,48 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 
       for (uint64_t ix = ix0; ix <= ix1; ++ix)
 	{
-	  const MemoryOp& op = sysMemOps_.at(ix);
-	  if (op.isCanceled())
+	  const MemoryOp& remoteOp = sysMemOps_.at(ix);
+	  if (remoteOp.isCanceled() or remoteOp.hartIx_ == hartIx or remoteOp.isRead_)
 	    continue;
-	  if (op.hartIx_ != hartIx and not op.isRead_ and overlaps(instrB, op))
+
+	  // Check the of bytes of the remote write. If the address of any of them
+	  // overlaps A and B and corresponding time is between times of A and B, we fail.
+	  for (unsigned byteIx = 0; byteIx < remoteOp.size_; ++byteIx)
 	    {
-	      unsigned opMask = determineOpMask(instrB, op);
-	      if ((opMask & mask) != 0)
+	      uint64_t addr = remoteOp.physAddr_ + byteIx;
+
+	      if (not overlapsAddr(instrA, addr) or not overlapsAddr(instrB, addr))
+		continue;
+
+	      unsigned byteMask = 0;
+	      if (instrB.physAddr_ == instrB.physAddr2_) // non page crossing
+		byteMask = 1 << (addr - instrB.physAddr_);
+	      else
+		{
+		  unsigned size1 = offsetToNextPage(instrB.physAddr_);
+		  if (addr > instrB.physAddr_ and addr < instrB.physAddr_ + size1)
+		    byteMask = 1 << (addr - instrB.physAddr_);
+		  else
+		    byteMask = 1 << (size1 + addr - instrB.physAddr2_);
+		}
+
+	      if (not (byteMask & mask))
+		continue;   // Byte of B covered by local store.
+
+	      // Find earliest read time of B overlapping remote byte addr.
+	      auto earlyB = earliestByteTime(instrB, addr);
+
+	      // Find latest read time of A overlapping remote byte addr.
+	      auto lateA = latestByteTime(instrA, addr);
+
+	      auto rot = remoteOp.time_;
+	      if (earlyB <= lateA and earlyB <= rot and rot <= lateA)
 		{
 		  cerr << "Error: PPO Rule 2 failed: hart-id=" << hart.hartId()
 		       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_
-		       << " intermediate store at time=" << op.time_ << '\n';
+		       << " intermediate remote store from hart-id="
+		       << remoteOp.hartIx_ << " store-tag=" << remoteOp.instrTag_
+		       << " store-time=" << remoteOp.time_ << '\n';
 		  return false;
 		}
 	    }
