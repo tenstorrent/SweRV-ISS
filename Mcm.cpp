@@ -954,7 +954,7 @@ Mcm<URV>::checkRtlRead(unsigned hartId, const McmInstr& instr,
 
   if (op.rtlData_ != op.data_)
     {
-      if (skipReadCheck_.find(op.physAddr_) !=  skipReadCheck_.end())
+      if (skipReadCheck_.find(op.physAddr_) ==  skipReadCheck_.end())
 	{
 	  cerr << "Error: RTL/whisper read mismatch time=" << op.time_
 	       << " hart-id=" << hartId << " instr-tag=" 
