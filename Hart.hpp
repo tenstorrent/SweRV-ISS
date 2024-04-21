@@ -2075,6 +2075,24 @@ namespace WdRiscv
     ExceptionCause fetchInstNoTrap(uint64_t& virAddr, uint64_t& physAddr, uint64_t& physAddr2,
 				   uint64_t& gPhysAddr, uint32_t& instr);
 
+    bool isClintAddr(uint64_t addr) const
+    { return addr >= clintStart_ and addr < clintEnd_; }
+
+    bool isInterruptorAddr(uint64_t addr, unsigned size) const
+    { return hasInterruptor_ and addr == interruptor_ and size == 4; }
+
+    bool isImsicAddr(uint64_t addr) const
+    {
+      return (imsic_ and ((addr >= imsicMbase_ and addr < imsicMend_) or
+			  (addr >= imsicSbase_ and addr < imsicSend_)));
+    }
+
+    bool isPciAddr(uint64_t addr) const
+    {
+      return (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
+			(addr >= pciMmioBase_ and addr < pciMmioEnd_)));
+    }
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
@@ -2132,6 +2150,7 @@ namespace WdRiscv
 
       unsigned size = sizeof(value);
       unsigned size1 = size - (pa1 & (size - 1));
+
       unsigned size2 = size - size1;
 
       value = 0;

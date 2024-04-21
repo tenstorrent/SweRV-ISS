@@ -528,8 +528,6 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   // If instruction is a store, save address, size, and written data.
   bool ok = retireStore(hart, *instr);
 
-  URV hartId = hart.hartId();
-
   // Check read operations of instruction comparing RTL values to
   // memory model (whisper) values.
   for (auto opIx : instr->memOps_)
@@ -540,7 +538,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       if (not op.isRead_)
 	continue;
 
-      if (not checkRtlRead(hartId, *instr, op))
+      if (not checkRtlRead(hart, *instr, op))
 	ok = false;
     }
 
@@ -942,24 +940,26 @@ Mcm<URV>::cancelInstruction(Hart<URV>& hart, uint64_t instrTag)
 
 template <typename URV>
 bool
-Mcm<URV>::checkRtlRead(unsigned hartId, const McmInstr& instr,
+Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
 		       const MemoryOp& op) const
 {
   if (op.size_ > instr.size_)
     {
       cerr << "Warning: Read operation size (" << unsigned(op.size_) << ") larger than "
 	   << "instruction data size (" << unsigned(instr.size_) << "): Hart-id="
-	   << hartId << " time=" << op.time_ << " tag=" << instr.tag_ << '\n';
+	   << hart.hartId() << " time=" << op.time_ << " tag=" << instr.tag_ << '\n';
     }
 
-  bool skip = skipReadCheck_.find(op.physAddr_) != skipReadCheck_.end();
+  uint64_t addr = op.physAddr_;
+  bool skip = (hart.isClintAddr(addr) or hart.isInterruptorAddr(addr, op.size_) or
+	       hart.isImsicAddr(addr) or hart.isPciAddr(addr));
   if (skip)
     return true;
 
   if (op.rtlData_ != op.data_)
     {
       cerr << "Error: RTL/whisper read mismatch time=" << op.time_
-	   << " hart-id=" << hartId << " instr-tag=" 
+	   << " hart-id=" << hart.hartId() << " instr-tag=" 
 	   << op.instrTag_ << " addr=0x" << std::hex << op.physAddr_
 	   << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
 	   << " whisper=0x" << op.data_ << std::dec << '\n';

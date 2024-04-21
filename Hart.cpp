@@ -2060,7 +2060,7 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
 
   invalidateDecodeCache(virtAddr, ldStSize_);
 
-  if (addr1 >= clintStart_ and addr1 < clintEnd_)
+  if (isClintAddr(addr1))
     {
       assert(addr1 == addr2);
       URV val = storeVal;
@@ -2069,22 +2069,20 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
       memWrite(addr1, addr2, storeVal);
       return true;
     }
-  else if (hasInterruptor_ and addr1 == interruptor_ and ldStSize_ == 4)
+  else if (isInterruptorAddr(addr1, ldStSize_))
     {
       processInterruptorWrite(storeVal);
       memWrite(addr1, addr2, storeVal);
       return true;
     }
-  else if (imsic_ and ((addr1 >= imsicMbase_ and addr1 < imsicMend_) or
-		       (addr1 >= imsicSbase_ and addr1 < imsicSend_)))
+  else if (isImsicAddr(addr1))
     {
       imsicWrite_(addr1, sizeof(storeVal), storeVal);
       storeVal = 0;  // Reads from IMSIC space will yield zero.
       memWrite(addr1, addr2, storeVal);
       return true;
     }
-  else if (pci_ and ((addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_) or
-                    (addr1 >= pciMmioBase_ and addr1 < pciMmioEnd_)))
+  else if (isPciAddr(addr1))
     {
       if (addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_)
         pci_->config_mmio<STORE_TYPE>(addr1, storeVal, true);
@@ -5114,11 +5112,6 @@ void
 Hart<URV>::setMcm(std::shared_ptr<Mcm<URV>> mcm)
 {
   mcm_ = std::move(mcm);
-
-  // We cannot match the RTL timer value: We skip checking it.
-  if (mcm_ and hasClint())
-    mcm_->skipReadCheck(clintStart_ + 0xbff8);
-
   ooo_ = mcm_ != nullptr or perfApi_ != nullptr;
 }
 

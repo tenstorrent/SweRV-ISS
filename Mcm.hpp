@@ -185,11 +185,6 @@ namespace WdRiscv
     unsigned mergeBufferLineSize() const
     { return lineSize_; }
 
-    /// Skip checking RTL read-op values against this model. This is used
-    /// for items like the CLINT timer where we cannot match the RTL.
-    void skipReadCheck(uint64_t addr)
-    { skipReadCheck_.insert(addr); }
-
     /// Enable/disable total-store-order.
     void enableTso(bool flag)
     { isTso_ = flag; }
@@ -441,7 +436,7 @@ namespace WdRiscv
     bool checkRtlWrite(unsigned hartId, const McmInstr& instr,
 		       const MemoryOp& op) const;
 
-    bool checkRtlRead(unsigned hartId, const McmInstr& instr,
+    bool checkRtlRead(Hart<URV>&hart, const McmInstr& instr,
 		      const MemoryOp& op) const;
 
     bool updateTime(const char* method, uint64_t time);
