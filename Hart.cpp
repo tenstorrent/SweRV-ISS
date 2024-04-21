@@ -1986,7 +1986,8 @@ template <typename URV>
 template <typename STORE_TYPE>
 inline
 bool
-Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal, [[maybe_unused]] bool amoLock)
+Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal,
+		 [[maybe_unused]] bool amoLock)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
@@ -2060,27 +2061,26 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
 
   invalidateDecodeCache(virtAddr, ldStSize_);
 
-  if (ooo_)
-    return true;  // Memory updated & lr-canceled when merge buffer is written.
-
-  memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
-  if (addr2 != addr1)
-    memory_.invalidateOtherHartLr(hartIx_, addr2, ldStSize_);
-
   if (isClintAddr(addr1))
     {
       assert(addr1 == addr2);
       URV val = storeVal;
       processClintWrite(addr1, ldStSize_, val);
       storeVal = val;
+      memWrite(addr1, addr2, storeVal);
+      return true;
     }
   else if (isInterruptorAddr(addr1, ldStSize_))
     {
       processInterruptorWrite(storeVal);
+      memWrite(addr1, addr2, storeVal);
+      return true;
     }
   else if (isImsicAddr(addr1))
     {
       imsicWrite_(addr1, sizeof(storeVal), storeVal);
+      memWrite(addr1, addr2, storeVal);
+      return true;
     }
   else if (isPciAddr(addr1))
     {
@@ -2088,7 +2088,16 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
         pci_->config_mmio<STORE_TYPE>(addr1, storeVal, true);
       else
         pci_->mmio<STORE_TYPE>(addr1, storeVal, true);
+      memWrite(addr1, addr2, storeVal);
+      return true;
     }
+
+  if (ooo_)
+    return true;  // Memory updated & lr-canceled when merge buffer is written.
+
+  memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
+  if (addr2 != addr1)
+    memory_.invalidateOtherHartLr(hartIx_, addr2, ldStSize_);
 
   memWrite(addr1, addr2, storeVal);
 
