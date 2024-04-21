@@ -2060,27 +2060,28 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
 
   invalidateDecodeCache(virtAddr, ldStSize_);
 
-  if (ooo_)
-    return true;  // Memory updated & lr-canceled when merge buffer is written.
-
-  memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
-  if (addr2 != addr1)
-    memory_.invalidateOtherHartLr(hartIx_, addr2, ldStSize_);
-
   if (addr1 >= clintStart_ and addr1 < clintEnd_)
     {
       assert(addr1 == addr2);
       URV val = storeVal;
       processClintWrite(addr1, ldStSize_, val);
       storeVal = val;
+      memWrite(addr1, addr2, storeVal);
+      return true;
     }
   else if (hasInterruptor_ and addr1 == interruptor_ and ldStSize_ == 4)
-    processInterruptorWrite(storeVal);
+    {
+      processInterruptorWrite(storeVal);
+      memWrite(addr1, addr2, storeVal);
+      return true;
+    }
   else if (imsic_ and ((addr1 >= imsicMbase_ and addr1 < imsicMend_) or
 		       (addr1 >= imsicSbase_ and addr1 < imsicSend_)))
     {
       imsicWrite_(addr1, sizeof(storeVal), storeVal);
       storeVal = 0;  // Reads from IMSIC space will yield zero.
+      memWrite(addr1, addr2, storeVal);
+      return true;
     }
   else if (pci_ and ((addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_) or
                     (addr1 >= pciMmioBase_ and addr1 < pciMmioEnd_)))
@@ -2089,7 +2090,16 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
         pci_->config_mmio<STORE_TYPE>(addr1, storeVal, true);
       else
         pci_->mmio<STORE_TYPE>(addr1, storeVal, true);
+      memWrite(addr1, addr2, storeVal);
+      return true;
     }
+
+  if (ooo_)
+    return true;  // Memory updated & lr-canceled when merge buffer is written.
+
+  memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
+  if (addr2 != addr1)
+    memory_.invalidateOtherHartLr(hartIx_, addr2, ldStSize_);
 
   memWrite(addr1, addr2, storeVal);
 
