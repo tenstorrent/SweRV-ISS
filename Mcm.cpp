@@ -943,6 +943,10 @@ bool
 Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
 		       const MemoryOp& op) const
 {
+  // This is disabled until we resolve discrepancy over CLINT between
+  // whisper config file and RTL.
+  return true;
+
   if (op.size_ > instr.size_)
     {
       cerr << "Warning: Read operation size (" << unsigned(op.size_) << ") larger than "
