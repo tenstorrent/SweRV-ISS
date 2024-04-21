@@ -960,7 +960,7 @@ Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
     {
       cerr << "Error: RTL/whisper read mismatch time=" << op.time_
 	   << " hart-id=" << hart.hartId() << " instr-tag=" 
-	   << op.instrTag_ << " addr=0x" << std::hex << op.physAddr_
+	   << op.instrTag_ << " addr=0x" << std::hex << addr
 	   << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
 	   << " whisper=0x" << op.data_ << std::dec << '\n';
       return false;
