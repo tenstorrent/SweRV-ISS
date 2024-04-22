@@ -4631,11 +4631,8 @@ Hart<URV>::execVid_v(const DecodedInst* di)
   // Spec does not mention vstart > 0. Got a clarification saying it
   // is ok not to take an exception in that case.
   uint32_t start = csRegs_.peekVstart();
-  if (not preVecExec() or not vecRegs_.legalConfig() or start > 0)
-    {
-      postVecFail(di);
-      return;
-    }
+  if (not checkSewLmulVstart(di))
+    return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
