@@ -20182,7 +20182,7 @@ Hart<URV>::execVfwmaccbf16_vv(const DecodedInst* di)
 
   unsigned elems = vecRegs_.elemMax(dsew);
 
-  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
+  if (not checkVecTernaryOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   using EW = ElementWidth;
@@ -20215,7 +20215,7 @@ Hart<URV>::execVfwmaccbf16_vf(const DecodedInst* di)
 
   unsigned elems = vecRegs_.elemMax(dsew);
 
-  if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
+  if (not checkVecTernaryOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
 
   using EW = ElementWidth;
