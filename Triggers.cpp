@@ -66,6 +66,30 @@ Triggers<URV>::readData3(URV trigger, URV& value) const
 
 template <typename URV>
 bool
+Triggers<URV>::readInfo(URV trigger, URV& value) const
+{
+  if (trigger >= triggers_.size())
+    return false;
+
+  value = triggers_.at(trigger).readInfo();
+  return true;
+}
+
+
+template <typename URV>
+bool
+Triggers<URV>::readControl(URV trigger, URV& value) const
+{
+  if (trigger >= triggers_.size())
+    return false;
+
+  value = triggers_.at(trigger).readControl();
+  return true;
+}
+
+
+template <typename URV>
+bool
 Triggers<URV>::writeData1(URV trigIx, bool debugMode, URV value)
 {
   if (trigIx >= triggers_.size())
@@ -124,12 +148,34 @@ Triggers<URV>::writeData2(URV trigger, bool debugMode, URV value)
 
 template <typename URV>
 bool
-Triggers<URV>::writeData3(URV trigger, bool /*debugMode*/, URV /*value*/)
+Triggers<URV>::writeData3(URV trigger, bool debugMode, URV value)
 {
   if (trigger >= triggers_.size())
     return false;
 
-  return false;
+  return triggers_.at(trigger).writeData3(debugMode, value);
+}
+
+
+template <typename URV>
+bool
+Triggers<URV>::writeInfo(URV trigger, bool debugMode, URV value)
+{
+  if (trigger >= triggers_.size())
+    return false;
+
+  return triggers_.at(trigger).writeInfo(debugMode, value);
+}
+
+
+template <typename URV>
+bool
+Triggers<URV>::writeControl(URV trigger, bool debugMode, URV value)
+{
+  if (trigger >= triggers_.size())
+    return false;
+
+  return triggers_.at(trigger).writeControl(debugMode, value);
 }
 
 
@@ -452,6 +498,34 @@ Triggers<URV>::pokeData3(URV trigger, URV val)
   Trigger<URV>& trig = triggers_.at(trigger);
 
   trig.pokeData3(val);
+  return true;
+}
+
+
+template <typename URV>
+bool
+Triggers<URV>::pokeInfo(URV trigger, URV val)
+{
+  if (trigger >= triggers_.size())
+    return false;
+
+  Trigger<URV>& trig = triggers_.at(trigger);
+
+  trig.pokeInfo(val);
+  return true;
+}
+
+
+template <typename URV>
+bool
+Triggers<URV>::pokeControl(URV trigger, URV val)
+{
+  if (trigger >= triggers_.size())
+    return false;
+
+  Trigger<URV>& trig = triggers_.at(trigger);
+
+  trig.pokeControl(val);
   return true;
 }
 

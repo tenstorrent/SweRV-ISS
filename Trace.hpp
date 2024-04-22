@@ -269,15 +269,17 @@ namespace WdRiscv
         {
           if (not hart_->peekCsr(csr, value, false))
             continue;
-          if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TDATA3)
+          if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TCONTROL)
             continue; // Debug trigger values collected below.
           cvps.push_back(CVP(URV(csr), value));
         }
 
-      /// Collect trigger CSRs and their values. A synthetic CSR number
-      /// is used encoding the trigger number and the trigger component.
+      /// Collect trigger CSRs and their values. A synthetic CSR number is used encoding
+      /// the trigger number and the trigger component.
       for (unsigned trigger : triggers)
         {
+	  // FIXME TODO : get tinfo and tcontrol
+
           uint64_t data1(0), data2(0), data3(0);
           if (not hart_->peekTrigger(trigger, data1, data2, data3))
             continue;

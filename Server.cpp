@@ -620,7 +620,7 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
       // We always record the real csr number for VS/S mappings
       if (hart.peekCsr(csr, value, false))
 	{
-	  if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TDATA3)
+	  if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TCONTROL)
 	    {
 	      size_t ix = size_t(csr) - size_t(CsrNumber::TDATA1);
 	      tdataChanged.at(ix) = true;
@@ -633,6 +633,13 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
   // Collect changes associated with trigger register.
   for (unsigned trigger : triggers)
     {
+      static bool firstTime = true;
+      if (firstTime)
+	{
+	  std::cerr << "FIX ME: Collect change in tinfo and tcontrol components of triggers.\n";
+	  firstTime = false;
+	}
+
       uint64_t data1(0), data2(0), data3(0);
       if (not hart.peekTrigger(trigger, data1, data2, data3))
 	continue;

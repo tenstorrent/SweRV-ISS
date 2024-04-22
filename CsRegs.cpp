@@ -485,7 +485,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
   if (csr->isDebug() and not inDebugMode())
     return false; // Debug-mode register.
 
-  if (num >= CN::TDATA1 and num <= CN::TDATA3)
+  if (num >= CN::TDATA1 and num <= CN::TCONTROL)
     return readTdata(num, mode, value);
 
   if (num == CN::FFLAGS or num == CN::FRM)
@@ -1816,7 +1816,7 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
       return true;  // Writing a locked PMPADDR register has no effect.
     }
 
-  if (num >= CN::TDATA1 and num <= CN::TDATA3)
+  if (num >= CN::TDATA1 and num <= CN::TCONTROL)
     {
       if (not writeTdata(num, mode, value))
 	return false;
@@ -3304,7 +3304,7 @@ CsRegs<URV>::peek(CsrNumber num, URV& value, bool virtMode) const
     return false;
   num = csr->getNumber();  // CSR may have been remapped from S to VS
 
-  if (num >= CN::TDATA1 and num <= CN::TDATA3)
+  if (num >= CN::TDATA1 and num <= CN::TCONTROL)
     return readTdata(num, PrivilegeMode::Machine, value);
 
   if (num == CN::FFLAGS or num == CN::FRM)
@@ -3397,7 +3397,7 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
   if (isPmpaddrLocked(num))
     return true;  // Writing a locked PMPADDR register has no effect.
 
-  if (num >= CN::TDATA1 and num <= CN::TDATA3)
+  if (num >= CN::TDATA1 and num <= CN::TCONTROL)
     return pokeTdata(num, value);
 
   // Poke mask of SIP/SIE is combined with that of MIE/MIP.
@@ -3509,6 +3509,12 @@ CsRegs<URV>::readTdata(CsrNumber number, PrivilegeMode mode, URV& value) const
   if (number == CsrNumber::TDATA3)
     return triggers_.readData3(trigger, value);
 
+  if (number == CsrNumber::TINFO)
+    return triggers_.readInfo(trigger, value);
+
+  if (number == CsrNumber::TCONTROL)
+    return triggers_.readControl(trigger, value);
+
   return false;
 }
 
@@ -3542,6 +3548,12 @@ CsRegs<URV>::writeTdata(CsrNumber number, PrivilegeMode mode, URV value)
   if (number == CsrNumber::TDATA3)
     return triggers_.writeData3(trigger, dMode, value);
 
+  if (number == CsrNumber::TINFO)
+    return triggers_.writeInfo(trigger, dMode, value);
+
+  if (number == CsrNumber::TCONTROL)
+    return triggers_.writeControl(trigger, dMode, value);
+
   return false;
 }
 
@@ -3572,6 +3584,12 @@ CsRegs<URV>::pokeTdata(CsrNumber number, URV value)
 
   if (number == CsrNumber::TDATA3)
     return triggers_.pokeData3(trigger, value);
+
+  if (number == CsrNumber::TINFO)
+    return triggers_.pokeInfo(trigger, value);
+
+  if (number == CsrNumber::TCONTROL)
+    return triggers_.pokeControl(trigger, value);
 
   return false;
 }

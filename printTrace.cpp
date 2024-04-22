@@ -418,15 +418,22 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       // We always record the real csr number for VS/S mappings
       if (not csRegs_.peek(csr, value, false))
         continue;
-      if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TDATA3)
+      if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TCONTROL)
         continue; // Debug trigger values collected below.
       cvps.push_back(CVP(URV(csr), value));
     }
 
-  // Collect trigger CSRs and their values. A synthetic CSR number
-  // is used encoding the trigger number and the trigger component.
+  // Collect trigger CSRs and their values. A synthetic CSR number is used encoding the
+  // trigger number and the trigger component.
   for (unsigned trigger : triggers)
     {
+      static bool firstTime = true;
+      if (firstTime)
+	{
+	  std::cerr << "FIX ME: Collect change in tinfo and tcontrol components of triggers.\n";
+	  firstTime = false;
+	}
+
       uint64_t data1(0), data2(0), data3(0);
       if (not peekTrigger(trigger, data1, data2, data3))
         continue;

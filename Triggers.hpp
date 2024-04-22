@@ -263,22 +263,30 @@ namespace WdRiscv
 	data2WriteMask_(mask2), data3WriteMask_(mask3)
     { }
 
-    /// Read the data1 register of the trigger. This is typically the
+    /// Read the tdata1 register of the trigger. This is typically the
     /// control register of the trigger.
     URV readData1() const
     { return modifiedT1_? prevData1_ : data1_.value_; }
 
-    /// Read the data2 register of the trigger. This is typically the
+    /// Read the tdata2 register of the trigger. This is typically the
     /// target value of the trigger.
     URV readData2() const
     { return data2_; }
 
-    /// Read the data3 register of the trigger (currently unused).
+    /// Read the tdata3 register of the trigger (currently unused).
     URV readData3() const
     { return data3_; }
 
-    /// Write the data1 register of the trigger. This is the interface
-    /// for CSR instructions.
+    /// Read the tinfo register ot the trigger.
+    URV readInfo() const
+    { return info_; }
+
+    /// Read the tcontrol register ot the trigger.
+    URV readControl() const
+    { return control_; }
+
+    /// Write the tdata1 register of the trigger. This is the interface for CSR
+    /// instructions.
     bool writeData1(bool debugMode, URV x)
     {
       if (isDebugModeOnly() and not debugMode)
@@ -325,8 +333,8 @@ namespace WdRiscv
       return true;
     }
 
-    /// Write the data2 register of the trigger. This is the interface
-    /// for CSR instructions.
+    /// Write the tdata2 register of the trigger. This is the interface for CSR
+    /// instructions.
     bool writeData2(bool debugMode, URV value)
     {
       if (isDebugModeOnly() and not debugMode)
@@ -339,8 +347,8 @@ namespace WdRiscv
       return true;
     }
 
-    /// Write the data3 register of the trigger. This is the interface
-    /// for CSR instructions.
+    /// Write the tdata3 register of the trigger. This is the interface for CSR
+    /// instructions.
     bool writeData3(bool debugMode, URV value)
     {
       if (isDebugModeOnly() and not debugMode)
@@ -351,8 +359,34 @@ namespace WdRiscv
       return true;
     }
 
-    /// Poke data1. This allows writing of modifiable bits that are
-    /// read-only to the CSR instructions.
+    /// Write the tinfo register of the trigger. This is the interface for CSR
+    /// instructions.
+    bool writeInfo(bool debugMode, URV value)
+    {
+      if (isDebugModeOnly() and not debugMode)
+	return false;
+
+      info_ = (value & infoWriteMask_) | (data2_ & ~infoWriteMask_);
+      modifiedInfo_ = true;
+
+      return true;
+    }
+
+    /// Write the tcontrol register of the trigger. This is the interface for CSR
+    /// instructions.
+    bool writeControl(bool debugMode, URV value)
+    {
+      if (isDebugModeOnly() and not debugMode)
+	return false;
+
+      info_ = (value & controlWriteMask_) | (data2_ & ~controlWriteMask_);
+      modifiedControl_ = true;
+
+      return true;
+    }
+
+    /// Poke tdata1. This allows writing of modifiable bits that are read-only to the CSR
+    /// instructions.
     void pokeData1(URV x)
     {
       URV val = (x & data1PokeMask_) | (data1_.value_ & ~data1PokeMask_);
@@ -362,30 +396,44 @@ namespace WdRiscv
 	data1_.mcontrol_.action_ = 0;
     }
 
-    /// Poke data2. This allows writing of modifiable bits that are
-    /// read-only to the CSR instructions.
+    /// Poke tdata2. This allows writing of modifiable bits that are read-only to the CSR
+    /// instructions.
     void pokeData2(URV x)
     {
       data2_ = (x & data2PokeMask_) | (data2_ & ~data2PokeMask_);
       updateCompareMask();
     }
 
-    /// Poke data1. This allows writing of modifiable bits that are
-    /// read-only to the CSR instructions.
+    /// Poke tdata3. This allows writing of modifiable bits that are read-only to the CSR
+    /// instructions.
     void pokeData3(URV x)
     { data3_ = (x & data3PokeMask_) | (data3_ & ~data3PokeMask_); }
 
+    /// Poke tinfo. This allows writing of modifiable bits that are read-only to the CSR
+    /// instructions.
+    void pokeInfo(URV x)
+    { info_ = (x & infoPokeMask_) | (data3_ & ~infoPokeMask_); }
+
+    /// Poke tcontrol. This allows writing of modifiable bits that are read-only to the CSR
+    /// instructions.
+    void pokeControl(URV x)
+    { control_ = (x & controlPokeMask_) | (data3_ & ~controlPokeMask_); }
+
     void configData1(URV reset, URV mask, URV pokeMask)
-    { data1Reset_ = reset; data1_.value_ = reset; data1WriteMask_ = mask;
-      data1PokeMask_ = pokeMask;}
+    { data1Reset_ = reset; data1_.value_ = reset; data1WriteMask_ = mask; data1PokeMask_ = pokeMask;}
 
     void configData2(URV reset, URV mask, URV pokeMask)
-    { data2Reset_ = reset; data2_ = reset; data2WriteMask_ = mask;
-      data2PokeMask_ = pokeMask;}
+    { data2Reset_ = reset; data2_ = reset; data2WriteMask_ = mask; data2PokeMask_ = pokeMask;}
 
     void configData3(URV reset, URV mask, URV pokeMask)
-    { data3Reset_ = reset; data3_ = reset; data3WriteMask_ = mask;
-      data3PokeMask_ = pokeMask;}
+    { data3Reset_ = reset; data3_ = reset; data3WriteMask_ = mask; data3PokeMask_ = pokeMask;}
+
+    void configInfo(URV reset, URV mask, URV pokeMask)
+    { infoReset_ = reset; info_ = reset; infoWriteMask_ = mask; infoPokeMask_ = pokeMask;}
+
+    void configControl(URV reset, URV mask, URV pokeMask)
+    { controlReset_ = reset; control_ = reset; controlWriteMask_ = mask; controlPokeMask_ = pokeMask;}
+
 
     /// Reset trigger.
     void reset()
@@ -617,18 +665,26 @@ namespace WdRiscv
     Data1Bits<URV> data1_ = Data1Bits<URV> (0);
     URV data2_ = 0;
     URV data3_ = 0;
+    URV info_ = 0;
+    URV control_ = 0;
 
     URV data1Reset_ = 0;
     URV data2Reset_ = 0;
     URV data3Reset_ = 0;
+    URV infoReset_ = 0;
+    URV controlReset_ = 0;
 
     URV data1WriteMask_ = ~URV(0);
     URV data2WriteMask_ = ~URV(0);
     URV data3WriteMask_ = 0;              // Place holder.
+    URV infoWriteMask_ = ~URV(0);
+    URV controlWriteMask_ = ~URV(0);
 
     URV data1PokeMask_ = ~URV(0);
     URV data2PokeMask_ = ~URV(0);
     URV data3PokeMask_ = 0;              // Place holder.
+    URV infoPokeMask_ = ~URV(0);
+    URV controlPokeMask_ = ~URV(0);
 
     URV data2CompareMask_ = ~URV(0);
 
@@ -639,6 +695,8 @@ namespace WdRiscv
     bool modifiedT1_ = false;
     bool modifiedT2_ = false;
     bool modifiedT3_ = false;
+    bool modifiedInfo_ = false;
+    bool modifiedControl_ = false;
 
     size_t chainBegin_ = 0, chainEnd_ = 0;
     bool enableLoadData_ = false;
@@ -656,40 +714,56 @@ namespace WdRiscv
     size_t size() const
     { return triggers_.size(); }
 
-    /// Set value to the data1 register of the given trigger. Return
-    /// true on success and false (leaving value unmodified) if
-    /// trigger is out of bounds.
+    /// Set value to the tdata1 register of the given trigger. Return true on success and
+    /// false (leaving value unmodified) if trigger is out of bounds.
     bool readData1(URV trigger, URV& value) const;
 
-    /// Set value to the data2 register of the given trigger. Return
-    /// true on success and false (leaving value unmodified) if
-    /// trigger is out of bounds or if data2 is not implemented.
+    /// Set value to the tdata2 register of the given trigger. Return true on success and
+    /// false (leaving value unmodified) if trigger is out of bounds or if data2 is not
+    /// implemented.
     bool readData2(URV trigger, URV& value) const;
 
-    /// Set value to the data3 register of the given trigger. Return
-    /// true on success and false (leaving value unmodified) if
-    /// trigger is out of bounds of if data3 is not implemented.
+    /// Set value to the tdata3 register of the given trigger. Return true on success and
+    /// false (leaving value unmodified) if trigger is out of bounds of if data3 is not
+    /// implemented.
     bool readData3(URV trigger, URV& value) const;
 
-    /// Set the data1 register of the given trigger to the given
-    /// value. Return true on success and false (leaving value
-    /// unmodified) if trigger is out of bounds.
+    /// Set value to the tinfo register of the given trigger. Return true on success and
+    /// false (leaving value unmodified) if trigger is out of bounds of if tinfo is not
+    /// implemented.
+    bool readInfo(URV trigger, URV& value) const;
+
+    /// Set value to the tcontroinfo of the given trigger. Return true on success and
+    /// false (leaving value unmodified) if trigger is out of bounds of if tcontrol is not
+    /// implemented.
+    bool readControl(URV trigger, URV& value) const;
+
+    /// Set the tdata1 register of the given trigger to the given value. Return true on
+    /// success and false (leaving value unmodified) if trigger is out of bounds.
     bool writeData1(URV trigger, bool debugMode, URV value);
 
-    /// Set the data2 register of the given trigger to the given
-    /// value. Return true on success and false (leaving value
-    /// unmodified) if trigger is out of bounds or if data2 is not
-    /// implemented.
+    /// Set the tdata2 register of the given trigger to the given value. Return true on
+    /// success and false (leaving value unmodified) if trigger is out of bounds or if
+    /// tdata2 is not implemented.
     bool writeData2(URV trigger, bool debugMode, URV value);
 
-    /// Set the data3 register of the given trigger to the given
-    /// value. Return true on success and false (leaving value
-    /// unmodified) if trigger is out of bounds or if data3 is not
-    /// implemented.
+    /// Set the tdata3 register of the given trigger to the given value. Return true on
+    /// success and false (leaving value unmodified) if trigger is out of bounds or if
+    /// tdata3 is not implemented.
     bool writeData3(URV trigger, bool debugMode, URV value);
 
-    /// Return true if given trigger is enabled. Return false if
-    /// trigger is not enabled or if it is out of bounds.
+    /// Set the tinfo register of the given trigger to the given value. Return true on
+    /// success and false (leaving value unmodified) if trigger is out of bounds or if
+    /// tinfo is not implemented.
+    bool writeInfo(URV trigger, bool debugMode, URV value);
+
+    /// Set the tcontrol register of the given trigger to the given value. Return true on
+    /// success and false (leaving value unmodified) if trigger is out of bounds or if
+    /// tcontrol is not implemented.
+    bool writeControl(URV trigger, bool debugMode, URV value);
+
+    /// Return true if given trigger is enabled. Return false if trigger is not enabled or
+    /// if it is out of bounds.
     bool isEnabled(URV trigger) const
     {
       if (trigger >= triggers_.size())
@@ -782,6 +856,8 @@ namespace WdRiscv
     bool pokeData1(URV trigger, URV val);
     bool pokeData2(URV trigger, URV val);
     bool pokeData3(URV trigger, URV val);
+    bool pokeInfo(URV trigger, URV val);
+    bool pokeControl(URV trigger, URV val);
 
     /// Clear the remembered indices of the triggers written by the
     /// last instruction.
