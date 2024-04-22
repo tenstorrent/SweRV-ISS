@@ -26,35 +26,49 @@ namespace WdRiscv
   enum class TriggerTiming { Before, After };
 
   /// Trigger type.
-  enum class TriggerType { None, Legacy, AddrData, InstCount, Unavailable };
+  enum class TriggerType { None = 0, Legacy = 1, AddrData = 2, Mcontrol = AddrData, InstCount = 3,
+			   Itrigger = 4, Etrigger = 5, Mcontrol6 = 6, Tmext = 7, Custom0 = 12,
+			   Custom1 = 13, Custom2 = 14, Disabled = 15 };
 
 
   template <typename URV>
   struct Mcontrol;
 
 
+  template <typename URV>
+  struct Mcontrol6;
+
+
+  /// Bit fields of tinfo trigger register view.
+  struct Tinfo
+  {
+    unsigned info_     : 16;   // Bits 15-0 : Supported types in type field of TDATA1.
+    unsigned           : 8;    // Bits 23-16: Reserved -- hardwired to zero.
+    unsigned version_  : 8;    // Bits 24-31: Version
+  };
+
+
   /// Bit fields of mcontrol trigger register view. 32-bit version.
   template <>
   struct Mcontrol<uint32_t>
     {
-      // SPEC is bogus it has an extra zero bit.
-      unsigned load_    : 1;   // trigger on load
-      unsigned store_   : 1;   // trigger on store
-      unsigned execute_ : 1;   // trigger on instruction
-      unsigned u_       : 1;   // enable in user mode
-      unsigned s_       : 1;   // enable in supervisor mode
-      unsigned          : 1;
-      unsigned m_       : 1;   // enable in machine mode
-      unsigned match_   : 4;   // controls what is considered to be a match
-      unsigned chain_   : 1;
-      unsigned action_  : 6;
-      unsigned timing_  : 1;
-      unsigned select_  : 1;
-      unsigned hit_     : 1;
-      // URV               : 8*sizeof(URV) - 32;  // zero
-      unsigned maskMax_ : 6;
-      unsigned dmode_   : 1;   // Trigger writable only in debug mode.
-      unsigned type_    : 4;
+      unsigned load_    : 1;   // Bit  0    : trigger on load
+      unsigned store_   : 1;   // Bit  1    : trigger on store
+      unsigned execute_ : 1;   // Bit  2    : trigger on instruction
+      unsigned u_       : 1;   // Bit  3    : enable in user mode
+      unsigned s_       : 1;   // Bit  4    : enable in supervisor mode
+      unsigned          : 1;   // Bit  5    : reserved: hardwired to zero
+      unsigned m_       : 1;   // Bit  6    : enable in machine mode
+      unsigned match_   : 4;   // Bits 10-7 : controls what is considered to be a match
+      unsigned chain_   : 1;   // Bit  11   :
+      unsigned action_  : 4;   // Bits 15-12:
+      unsigned sizelo_  : 2;   // Bits 17-16:
+      unsigned timing_  : 1;   // Bit  18   :
+      unsigned select_  : 1;   // Bit  19   :
+      unsigned hit_     : 1;   // Bit  20   :
+      unsigned maskMax_ : 6;   // Bit  26-21:
+      unsigned dmode_   : 1;   // Bit  27   : trigger writable only in debug mode.
+      unsigned type_    : 4;   // Bits 31-28:
   } __attribute__((packed));
 
 
@@ -62,24 +76,82 @@ namespace WdRiscv
   template <>
   struct Mcontrol<uint64_t>
   {
+    unsigned load_    : 1;   // Bit  0    : trigger on load				
+    unsigned store_   : 1;   // Bit  1    : trigger on store				
+    unsigned execute_ : 1;   // Bit  2    : trigger on instruction			
+    unsigned u_       : 1;   // Bit  3    : enable in user mode			
+    unsigned s_       : 1;   // Bit  4    : enable in supervisor mode			
+    unsigned          : 1;   // Bit  5    : reserved: hardwired to zero		
+    unsigned m_       : 1;   // Bit  6    : enable in machine mode			
+    unsigned match_   : 4;   // Bits 10-7 : controls what is considered to be a match	
+    unsigned chain_   : 1;   // Bit  11   :						
+    unsigned action_  : 4;   // Bits 15-12:						
+    unsigned sizelo_  : 2;   // Bits 17-16:						
+    unsigned timing_  : 1;   // Bit  18   :						
+    unsigned select_  : 1;   // Bit  19   :
+    unsigned hit_     : 1;   // Bit  20   :
+    unsigned sizehi_  : 2;   // Bits 22-21:
+    unsigned          : 30;  // Bits 52-23:
+    unsigned maskMax_ : 6;   // Bits 58-53:
+    unsigned dmode_   : 1;   // Bit  59   : trigger writable only in debug mode.
+    unsigned type_    : 4;   // Bits 63-60:
+  } __attribute__((packed));
+
+
+  /// Bit fields of mcontrol6 trigger register view. 32-bit version.
+  template <>
+  struct Mcontrol6<uint32_t>
+  {
     // SPEC is bogus it has an extra zero bit.
-    unsigned load_    : 1;   // trigger on load
-    unsigned store_   : 1;   // trigger on store
-    unsigned execute_ : 1;   // trigger on instruction
-    unsigned u_       : 1;   // enable in user mode
-    unsigned s_       : 1;   // enable in supervisor mode
-    unsigned          : 1;
-    unsigned m_       : 1;   // enable in machine mode
-    unsigned match_   : 4;   // controls what is considered to be a match
-    unsigned chain_   : 1;
-    unsigned action_  : 6;
-    unsigned timing_  : 1;
-    unsigned select_  : 1;
-    unsigned hit_     : 1;
-    unsigned          : 32;  // 8*sizeof(URV) - 32;
-    unsigned maskMax_ : 6;
-    unsigned dmode_   : 1;   // Trigger writable only in debug mode.
-    unsigned type_    : 4;
+    unsigned load_    : 1;   // Bit  0    : trigger on load				
+    unsigned store_   : 1;   // Bit  1    : trigger on store				
+    unsigned execute_ : 1;   // Bit  2    : trigger on instruction			
+    unsigned u_       : 1;   // Bit  3    : enable in user mode			
+    unsigned s_       : 1;   // Bit  4    : enable in supervisor mode			
+    unsigned unceren_ : 1;   // Bit  5    : uncertain
+    unsigned m_       : 1;   // Bit  6    : enable in machine mode			
+    unsigned match_   : 4;   // Bits 10-7 : controls what is considered to be a match	
+    unsigned chain_   : 1;   // Bit  11   :						
+    unsigned action_  : 4;   // Bits 15-12:
+    unsigned size_    : 3;   // Bits 18-16:
+    unsigned          : 2;   // Bits 20-19: reserved
+    unsigned select_  : 1;   // Bit  21   :
+    unsigned hit0_    : 1;   // Bit  22   :
+    unsigned vu_      : 1;   // Bit  23   :
+    unsigned vs_      : 1;   // Bit  24   :
+    unsigned hit1_    : 1;   // Bit  25   :
+    unsigned uncer_   : 2;   // Bits 26   :
+    unsigned dmode_   : 1;   // Bit  27   : trigger writable only in debug mode.
+    unsigned type_    : 4;   // Bits 31-28:
+  } __attribute__((packed));
+
+
+  /// Bit fields of mcontrol6 trigger register view. 64-bit version.
+  template <>
+  struct Mcontrol6<uint64_t>
+  {
+    // SPEC is bogus it has an extra zero bit.
+    unsigned load_    : 1;   // Bit  0    : trigger on load				
+    unsigned store_   : 1;   // Bit  1    : trigger on store				
+    unsigned execute_ : 1;   // Bit  2    : trigger on instruction			
+    unsigned u_       : 1;   // Bit  3    : enable in user mode			
+    unsigned s_       : 1;   // Bit  4    : enable in supervisor mode			
+    unsigned unceren_ : 1;   // Bit  5    : uncertain
+    unsigned m_       : 1;   // Bit  6    : enable in machine mode			
+    unsigned match_   : 4;   // Bits 10-7 : controls what is considered to be a match	
+    unsigned chain_   : 1;   // Bit  11   :						
+    unsigned action_  : 4;   // Bits 15-12:
+    unsigned size_    : 3;   // Bits 18-16:
+    unsigned          : 2;   // Bits 20-19: reserved
+    unsigned select_  : 1;   // Bit  21   :
+    unsigned hit0_    : 1;   // Bit  22   :
+    unsigned vu_      : 1;   // Bit  23   :
+    unsigned vs_      : 1;   // Bit  24   :
+    unsigned hit1_    : 1;   // Bit  25   :
+    unsigned uncer_   : 2;   // Bits 26   :
+    unsigned          : 32;  // Bits 58-27:
+    unsigned dmode_   : 1;   // Bit  59   : trigger writable only in debug mode.
+    unsigned type_    : 4;   // Bits 63-60:
   } __attribute__((packed));
 
 
@@ -127,7 +199,22 @@ namespace WdRiscv
   } __attribute__((packed));
 
 
-  /// TDATA1 trigger register value
+  /// Union to pack/unpack TINFO trigger register value
+  union TinfoBits
+  {
+    TinfoBits(uint64_t value) :
+      value_(value)
+    { }
+
+    unsigned info() const      { return tinfo_.info_; }
+    unsigned version() const   { return tinfo_.version_; }
+
+    uint64_t value_ = 0;
+    Tinfo tinfo_;
+  };
+
+
+  /// Union to pack/unpack TDATA1 trigger register value
   template <typename URV>
   union Data1Bits
   {
@@ -147,7 +234,7 @@ namespace WdRiscv
     Mcontrol<URV> mcontrol_;
     Icount<URV> icount_;
   };
-      
+
 
   template <typename URV>
   class Triggers;
@@ -208,9 +295,8 @@ namespace WdRiscv
 
       if (data1_.isAddrData())
 	{
-	  // If load-data is not enabled, then turn it off when
-	  // attempted. If exec-opcode is not enabled, then turn it
-	  // off when attempted.
+	  // If load-data is not enabled, then turn it off when attempted. If exec-opcode
+	  // is not enabled, then turn it off when attempted.
 	  if (Select(data1_.mcontrol_.select_) == Select::MatchData)
 	    {
               if (not enableLoadData_)
@@ -320,21 +406,13 @@ namespace WdRiscv
 
     /// Return true if trigger is writable only in debug mode.
     bool isDebugModeOnly() const
-    {
-      if (data1_.isAddrData() or data1_.isInstCount())
-	return data1_.dmodeOnly();
-      return true;
-    }
+    { return data1_.dmodeOnly(); }
 
     /// Return true if this is an instruction (execute) trigger.
     bool isInst() const
-    {
-      return (data1_.isAddrData() and
-	      data1_.mcontrol_.execute_);
-    }
+    { return data1_.isAddrData() and data1_.mcontrol_.execute_; }
 
-    /// Return true if this trigger will cause the processor to enter debug
-    /// mode on a hit.
+    /// Return true if this trigger will cause the processor to enter debug mode on a hit.
     bool isEnterDebugOnHit() const
     {
       if (data1_.isAddrData())
@@ -393,16 +471,14 @@ namespace WdRiscv
       return icount.count_ == 0;
     }
 
-    /// Perform a match on the given item (maybe an address or a
-    /// value) and the data2 component of this trigger (assumed to be
-    /// of type Address) according to the match field. If clearBit0 is
-    /// true (this is used for instruction address matching), then
+    /// Perform a match on the given item (maybe an address or a value) and the data2
+    /// component of this trigger (assumed to be of type Address) according to the match
+    /// field. If clearBit0 is true (this is used for instruction address matching), then
     /// clear bit0 in item and data2 before perfroming the match.
     bool doMatch(URV item, bool clearBit0) const;
 
-    /// Set the hit bit of this trigger. For a chained trigger, this
-    /// is to be called only if all the triggers in the chain have
-    /// tripped.
+    /// Set the hit bit of this trigger. For a chained trigger, this is to be called only
+    /// if all the triggers in the chain have tripped.
     void setHit(bool flag)
     {
       if (data1_.isAddrData())

@@ -1097,7 +1097,7 @@ namespace WdRiscv
     /// Enable debug-triggers. Without this, triggers will not trip
     /// and will not cause exceptions.
     void enableTriggers(bool flag)
-    { enableTriggers_ = flag;  }
+    { enableTriggers_ = flag; csRegs_.enableTriggers(flag);  }
 
     /// Enable performance counters (count up for some enabled
     /// performance counters when their events do occur).

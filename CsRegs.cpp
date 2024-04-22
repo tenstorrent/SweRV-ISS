@@ -603,37 +603,22 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 
   using CN = CsrNumber;
 
+  auto enableCsr = [this] (CN csrn, bool flag) {
+    auto csr = findCsr(csrn);
+    if (csr)
+      csr->setImplemented(flag);
+  };
+
   for (auto csrn : { CN::SSTATUS, CN::SIE, CN::STVEC, CN::SCOUNTEREN,
 		     CN::SSCRATCH, CN::SEPC, CN::SCAUSE, CN::STVAL, CN::SIP,
 		     CN::SENVCFG, CN::SATP, CN::MEDELEG, CN::MIDELEG,
 		     CN::SCONTEXT } )
-    {
-      auto csr = findCsr(csrn);
-      if (not csr)
-        {
-          std::cerr << "Error: enableSupervisorMode: CSR number 0x"
-                    << std::hex << URV(csrn) << std::dec << " undefined\n";
-          assert(0);
-        }
-      else
-        csr->setImplemented(flag);
-    }
+    enableCsr(csrn, flag);
 
   if (hyperEnabled_)
-    {
-      for (auto csrn : { CN::VSSTATUS, CN::VSIE, CN::VSTVEC, CN::VSSCRATCH,
-			 CN::VSEPC, CN::VSCAUSE, CN::VSTVAL, CN::VSIP, CN::VSATP } )
-	{
-	  auto csr = findCsr(csrn);
-	  if (not csr)
-	    {
-	      std::cerr << "Error: enableSupervisorMode: CSR number 0x"
-			<< std::hex << URV(csrn) << std::dec << " undefined\n";
-	    }
-	  else
-	    csr->setImplemented(flag);
-	}
-    }
+    for (auto csrn : { CN::VSSTATUS, CN::VSIE, CN::VSTVEC, CN::VSSCRATCH,
+		       CN::VSEPC, CN::VSCAUSE, CN::VSTVAL, CN::VSIP, CN::VSATP } )
+      enableCsr(csrn, flag);
 
   using IC = InterruptCause;
 
@@ -680,6 +665,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
   updateSstc();  // To activate/deactivate STIMECMP.
   enableSscofpmf(cofEnabled_);  // To activate/deactivate SCOUNTOVF.
   enableStateen(stateenOn_);  // To activate/deactivate STATEEN CSRs.
+  enableTriggers(triggersOn_);  // To activate/deactivate SCONTEXT.
 }
 
 
@@ -773,44 +759,25 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
 
   using CN = CsrNumber;
 
+  auto enableCsr = [this] (CN csrn, bool flag) {
+    auto csr = findCsr(csrn);
+    if (csr)
+      csr->setImplemented(flag);
+  };
+
   for (auto csrn : { CN::HSTATUS, CN::HEDELEG, CN::HIDELEG, CN::HIE, CN::HCOUNTEREN,
 	CN::HGEIE, CN::HTVAL, CN::HIP, CN::HVIP, CN::HTINST, CN::HGEIP, CN::HENVCFG,
 	CN::HGATP, CN::HCONTEXT, CN::HTIMEDELTA, CN::MTVAL2, CN::MTINST, CN::HCONTEXT } )
-    {
-      auto csr = findCsr(csrn);
-      if (not csr)
-	std::cerr << "Error: enableHypervisorMode: CSR number 0x"
-		  << std::hex << URV(csrn) << std::dec << " undefined\n";
-      else
-        csr->setImplemented(flag);
-    }
+    enableCsr(csrn, flag);
 
   if (rv32_)
     for (auto csrn : { CN::HENVCFGH, CN::HTIMEDELTAH } )
-      {
-	auto csr = findCsr(csrn);
-	if (not csr)
-	  std::cerr << "Error: enableHypervisorMode: CSR number 0x"
-		    << std::hex << URV(csrn) << std::dec << " undefined\n";
-	else
-	  csr->setImplemented(flag);
-      }
+      enableCsr(csrn, flag);
 
   if (superEnabled_)
-    {
-      for (auto csrn : { CN::VSSTATUS, CN::VSIE, CN::VSTVEC, CN::VSSCRATCH,
-			 CN::VSEPC, CN::VSCAUSE, CN::VSTVAL, CN::VSIP, CN::VSATP })
-	{
-	  auto csr = findCsr(csrn);
-	  if (not csr)
-	    {
-	      std::cerr << "Error: enableHypervisorMode: CSR number 0x"
-			<< std::hex << URV(csrn) << std::dec << " undefined\n";
-	    }
-	  else
-	    csr->setImplemented(flag);
-	}
-    }
+    for (auto csrn : { CN::VSSTATUS, CN::VSIE, CN::VSTVEC, CN::VSSCRATCH,
+		       CN::VSEPC, CN::VSCAUSE, CN::VSTVAL, CN::VSIP, CN::VSATP })
+      enableCsr(csrn, flag);
 
   // Enable/disable MPV and GVA bits
   {
@@ -895,9 +862,10 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
       csr->setReadMask(flag ? (mask | bits) : (mask & ~bits));
     }
 
-  updateSstc();  // To activate/deactivate VSTIMECMP.
-  enableStateen(stateenOn_);  // To activate/deactivate STATEEN CSRs.
-  enableAia(aiaEnabled_);   // To activate/deactivate AIA hypervisor CSRs.
+  updateSstc();                // To activate/deactivate VSTIMECMP.
+  enableStateen(stateenOn_);   // To activate/deactivate STATEEN CSRs.
+  enableAia(aiaEnabled_);      // To activate/deactivate AIA hypervisor CSRs.
+  enableTriggers(triggersOn_); // To activate/deactivate HCONTEXT.
 }
 
 
@@ -1108,49 +1076,34 @@ template <typename URV>
 void
 CsRegs<URV>::enableStateen(bool flag)
 {
-  stateenOn_ = flag;
-
   using CN = CsrNumber;
 
+  stateenOn_ = flag;
+
+  auto enableCsr = [this] (CN csrn, bool flag) {
+    auto csr = findCsr(csrn);
+    if (csr)
+      csr->setImplemented(flag);
+  };
 
   for (auto csrn : { CN::MSTATEEN0, CN::MSTATEEN1, CN::MSTATEEN2, CN::MSTATEEN3 } )
-    {
-      auto csr = findCsr(csrn);
-      if (csr)
-	csr->setImplemented(flag);
-    }
+    enableCsr(csrn, flag);
 
   if (rv32_)
     for (auto csrn : { CN::MSTATEEN0H, CN::MSTATEEN1H, CN::MSTATEEN2H, CN::MSTATEEN3H } )
-      {
-	auto csr = findCsr(csrn);
-	if (csr)
-	  csr->setImplemented(flag);
-      }
+      enableCsr(csrn, flag);
 
   flag &= superEnabled_;
   for (auto csrn : { CN::SSTATEEN0, CN::SSTATEEN1, CN::SSTATEEN2, CN::SSTATEEN3 } )
-    {
-      auto csr = findCsr(csrn);
-      if (csr)
-	csr->setImplemented(flag);
-    }
+    enableCsr(csrn, flag);
 
   flag &= hyperEnabled_;
   for (auto csrn : { CN::HSTATEEN0, CN::HSTATEEN1, CN::HSTATEEN2, CN::HSTATEEN3 } )
-    {
-      auto csr = findCsr(csrn);
-      if (csr)
-	csr->setImplemented(flag);
-    }
+    enableCsr(csrn, flag);
 
   if (rv32_)
     for (auto csrn : { CN::HSTATEEN0H, CN::HSTATEEN1H, CN::HSTATEEN2H, CN::HSTATEEN3H } )
-      {
-	auto csr = findCsr(csrn);
-	if (csr)
-	  csr->setImplemented(flag);
-      }
+      enableCsr(csrn, flag);
 }
 
 
@@ -1816,6 +1769,29 @@ CsRegs<URV>::enableMenvcfgPbmte(bool flag)
 
   bool pbmte = menvcfgPbmte();
   enableHenvcfgPbmte(pbmte);
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableTriggers(bool flag)
+{
+  using CN = CsrNumber;
+
+  triggersOn_ = true;
+
+  auto enableCsr = [this] (CN csrn, bool flag) {
+    auto csr = findCsr(csrn);
+    if (csr)
+      csr->setImplemented(flag);
+  };
+
+  for (auto csrn : { CN::TSELECT, CN::TDATA1, CN::TDATA2, CN::TDATA3, CN::TINFO,
+		     CN::TCONTROL, CN::MCONTEXT })
+    enableCsr(csrn, flag);
+
+  enableCsr(CN::SCONTEXT, flag and superEnabled_);
+  enableCsr(CN::HCONTEXT, flag and superEnabled_ and hyperEnabled_);
 }
 
 
@@ -3029,11 +3005,15 @@ CsRegs<URV>::defineDebugRegs()
 
   // Debug/Trace registers.
   defineCsr("scontext", Csrn::SCONTEXT, !mand, !imp, 0, wam, wam);
-  defineCsr("tselect",  Csrn::TSELECT,  !mand, imp,  0, wam, wam);
-  defineCsr("tdata1",   Csrn::TDATA1,   !mand, imp,  0, wam, wam);
-  defineCsr("tdata2",   Csrn::TDATA2,   !mand, imp,  0, wam, wam);
-  defineCsr("tdata3",   Csrn::TDATA3,   !mand, !imp, 0, wam, wam);
-  defineCsr("tinfo",    Csrn::TINFO,    !mand, !imp, 0, wam, wam);
+  defineCsr("tselect",  Csrn::TSELECT,  !mand, !imp,  0, wam, wam);
+  defineCsr("tdata1",   Csrn::TDATA1,   !mand, !imp,  0, wam, wam);
+  defineCsr("tdata2",   Csrn::TDATA2,   !mand, !imp,  0, wam, wam);
+  defineCsr("tdata3",   Csrn::TDATA3,   !mand, !imp,  0, wam, wam);
+
+  URV mask = 0x100ffff;   // Only least sig bit of version is writeable.
+  URV reset = 0x10087d;   // Tmext/Legacy/Custom types are not supported.
+  defineCsr("tinfo",    Csrn::TINFO,    !mand, !imp,  reset, mask, mask);
+
   defineCsr("tcontrol", Csrn::TCONTROL, !mand, !imp, 0, wam, wam);
   defineCsr("mcontext", Csrn::MCONTEXT, !mand, !imp, 0, wam, wam);
   if (not nameToNumber_.contains("hcontext"))

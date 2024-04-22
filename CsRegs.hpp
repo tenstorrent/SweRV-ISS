@@ -955,6 +955,9 @@ namespace WdRiscv
     void configExecOpcodeTrigger(bool flag)
     { triggers_.enableExecOpcode(flag); }
 
+    /// Enable triggers.
+    void enableTriggers(bool flag);
+
     /// Restrict chaining only to pairs of consecutive (even-numbered followed
     /// by odd) triggers.
     void configEvenOddTriggerChaining(bool flag)
@@ -1942,6 +1945,7 @@ namespace WdRiscv
     bool sstcEnabled_ = false;    // Supervisor time compare
     bool cofEnabled_ = false;     // Counter overflow
     bool stateenOn_ = false;      // Mstateen extension.
+    bool triggersOn_ = false;     // Stdtrig (debug triggers) extension.
     bool pmpTor_ = true;          // Top-of-range PMP mode enabled
     bool pmpNa4_ = true;          // Na4 PMP mode enabled
     bool aiaEnabled_ = false;     // Aia extension.
