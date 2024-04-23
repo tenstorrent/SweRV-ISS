@@ -226,6 +226,10 @@ namespace WdRiscv
 
     TriggerType type() const { return TriggerType(mcontrol_.type_); }
 
+    /// Return true if type is None or Disabled.
+    bool isDisabled() const
+    { return type() == TriggerType::None or type() == TriggerType::Disabled; }
+
     bool isAddrData() const  { return type() == TriggerType::AddrData; }
     bool isInstCount() const { return type() == TriggerType::InstCount; }
 
@@ -289,7 +293,7 @@ namespace WdRiscv
 
     /// Write the tdata1 register of the trigger. This is the interface for CSR
     /// instructions.
-    bool writeData1(bool debugMode, URV x)
+    bool writeData1(bool debugMode, URV val)
     {
       if (isDebugModeOnly() and not debugMode)
 	return false;
@@ -300,7 +304,13 @@ namespace WdRiscv
       if (not modifiedT1_)
         prevData1_ = data1_.value_;
 
-      data1_.value_ = (x & mask) | (data1_.value_ & ~mask);
+      // Writing 0 (None) into type is changed to 15 (Disabled). Section 5.7.2 of spec.
+      Data1Bits<URV> valBits{val};
+      if (valBits.mcontrol_.type_ == unsigned(TriggerType::None))
+	valBits.mcontrol_.type_ = unsigned(TriggerType::Disabled);
+      val = valBits.value_;
+
+      data1_.value_ = (val & mask) | (data1_.value_ & ~mask);
       modifiedT1_ = true;
 
       if (data1_.isAddrData())
