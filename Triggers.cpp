@@ -625,11 +625,7 @@ Trigger<URV>::matchLdStAddr(URV address, TriggerTiming timing, bool isLoad,
   bool isStore = not isLoad;
   bool clearBit0 = false;
 
-  TriggerTiming ctlTiming = TriggerTiming::Before;
-  if constexpr (std::is_same_v<M, decltype(data1_.mcontrol_)>)
-    ctlTiming = TriggerTiming(ctl.timing_);
-
-  if (ctlTiming == timing and
+  if (getTiming() == timing and
       Select(ctl.select_) == Select::MatchAddress and
       ((isLoad and ctl.load_) or (isStore and ctl.store_)))
     return doMatch(address, clearBit0);
@@ -685,11 +681,7 @@ Trigger<URV>::matchLdStData(URV value, TriggerTiming timing, bool isLoad,
   bool isStore = not isLoad;
   bool clearBit0 = false;
 
-  TriggerTiming ctlTiming = TriggerTiming::Before;
-  if constexpr (std::is_same_v<M, decltype(data1_.mcontrol_)>)
-    ctlTiming = TriggerTiming(ctl.timing_);
-
-  if (ctlTiming == timing and
+  if (getTiming() == timing and
       Select(ctl.select_) == Select::MatchData and
       ((isLoad and ctl.load_) or (isStore and ctl.store_)))
     return doMatch(value, clearBit0);
@@ -806,11 +798,7 @@ Trigger<URV>::matchInstAddr(URV address, TriggerTiming timing, PrivilegeMode mod
 
   bool clearBit0 = true;  // Clear bit0 of address before matching.
 
-  TriggerTiming ctlTiming = TriggerTiming::Before;
-  if constexpr (std::is_same_v<M, decltype(data1_.mcontrol_)>)
-    ctlTiming = TriggerTiming(ctl.timing_);
-
-  if (ctlTiming == timing and
+  if (getTiming() == timing and
       Select(ctl.select_) == Select::MatchAddress and
       ctl.execute_)
     return doMatch(address, clearBit0);
@@ -865,11 +853,7 @@ Trigger<URV>::matchInstOpcode(URV opcode, TriggerTiming timing,
 
   bool clearBit0 = false;
 
-  TriggerTiming ctlTiming = TriggerTiming::Before;
-  if constexpr (std::is_same_v<M, decltype(data1_.mcontrol_)>)
-    ctlTiming = TriggerTiming(ctl.timing_);
-
-  if (ctlTiming == timing and
+  if (getTiming() == timing and
       Select(ctl.select_) == Select::MatchData and
       ctl.execute_)
     return doMatch(opcode, clearBit0);
