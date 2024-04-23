@@ -503,7 +503,7 @@ applyTriggerConfig(Hart<URV>& hart, const nlohmann::json& config)
           continue;
         }
 
-      std::vector<URV> resets, masks, pokeMasks;
+      std::vector<uint64_t> resets, masks, pokeMasks;
       ok = (getJsonUnsignedVec(name + ".reset", trig.at("reset"), resets) and
             getJsonUnsignedVec(name + ".mask", trig.at("mask"), masks) and
             getJsonUnsignedVec(name + ".poke_mask", trig.at("poke_mask"), pokeMasks));
@@ -513,36 +513,22 @@ applyTriggerConfig(Hart<URV>& hart, const nlohmann::json& config)
           continue;
         }
 
-      if (resets.size() != 3)
-	{
-	  std::cerr << "Trigger " << name << ": Bad item count (" << resets.size()
-		    << ") for 'reset' field in config file. Expecting 3.\n";
-	  ok = false;
-	}
+      // Each trigger has up to 5 components: tdata1, tdata2, tdata3, tinfo, tcontrol
+      size_t maxSize = std::max(resets.size(), std::max(masks.size(), pokeMasks.size()));
+      if (maxSize > 5)
+	std::cerr << "Trigger " << name << ": Unreasonable item count (" << maxSize
+		  << ") for 'reset/mask/poke_mask' field in config file. "
+		  << " Expecting no more than to 5. Extra fields ignored.\n";
 
-      if (masks.size() != 3)
+      if (resets.size() != maxSize or masks.size() != maxSize or pokeMasks.size() != maxSize)
 	{
-	  std::cerr << "Trigger " << name << ": Bad item count (" << masks.size()
-		    << ") for 'mask' field in config file. Expecting 3.\n";
-	  ok = false;
-	}
-
-      if (pokeMasks.size() != 3)
-	{
-	  std::cerr << "Trigger " << name << ": Bad item count (" << pokeMasks.size()
-		    << ") for 'poke_mask' field in config file. Expecting 3.\n";
-	  ok = false;
-	}
-
-      if (not ok)
-	{
+	  std::cerr << "Trigger " << name << ": Error: reset/mask/poke_mask fields must have "
+		    << " same number of entries.\n";
 	  errors++;
 	  continue;
 	}
-      if (not hart.configTrigger(ix, resets.at(0), resets.at(1), resets.at(2),
-				 masks.at(0), masks.at(1), masks.at(2),
-				 pokeMasks.at(0), pokeMasks.at(1),
-                                 pokeMasks.at(2)))
+
+      if (not hart.configTrigger(ix, resets, masks, pokeMasks))
 	{
 	  std::cerr << "Failed to configure trigger " << std::dec << ix << '\n';
 	  ++errors;

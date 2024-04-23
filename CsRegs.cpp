@@ -3020,53 +3020,8 @@ CsRegs<URV>::defineDebugRegs()
     defineCsr("hcontext", Csrn::HCONTEXT, !mand, !imp, 0, wam, wam);
 
   // Define triggers.
-  unsigned triggerCount = 4;
+  unsigned triggerCount = 4;  // FIXME: why 4?
   triggers_ = Triggers<URV>(triggerCount);
-
-  Data1Bits<URV> data1Mask(0), data1Val(0);
-
-  // Set the masks of the read-write fields of data1 to all 1.
-  data1Mask.mcontrol_.dmode_   = 1;
-  data1Mask.mcontrol_.hit_     = 1;
-  data1Mask.mcontrol_.select_  = 1;
-  data1Mask.mcontrol_.action_  = 1; // Only least sig bit writeable
-  data1Mask.mcontrol_.chain_   = 1;
-  data1Mask.mcontrol_.match_   = 1; // Only least sig bit of match is writeable.
-  data1Mask.mcontrol_.m_       = 1;
-  data1Mask.mcontrol_.execute_ = 1;
-  data1Mask.mcontrol_.store_   = 1;
-  data1Mask.mcontrol_.load_    = 1;
-
-  // Set intitial values of fields of data1.
-  data1Val.mcontrol_.type_ = unsigned(TriggerType::AddrData);
-  data1Val.mcontrol_.maskMax_ = rv32_ ? 31 : 63;
-
-  // Values, write-masks, and poke-masks of the three components of
-  // the triggres.
-  URV val1(data1Val.value_), val2(0), val3(0);
-  URV wm1(data1Mask.value_), wm2(~URV(0)), wm3(0);
-  URV pm1(wm1), pm2(wm2), pm3(wm3);
-
-  triggers_.config(0, val1, val2, val3, wm1, wm2, wm3, pm1, pm2, pm3);
-  triggers_.config(1, val1, val2, val3, wm1, wm2, wm3, pm1, pm2, pm3);
-  triggers_.config(2, val1, val2, val3, wm1, wm2, wm3, pm1, pm2, pm3);
-
-  Data1Bits<URV> icountMask(0), icountVal(0);
-
-  icountMask.icount_.dmode_  = 1;
-  icountMask.icount_.count_  = (~0) & 0x3fff;
-  icountMask.icount_.m_      = 1;
-  icountMask.icount_.action_ = 0;
-  icountMask.icount_.action_ = (~0) & 0x3f;
-
-  icountVal.icount_.type_ = unsigned(TriggerType::InstCount);
-  icountVal.icount_.count_ = 0;
-
-  triggers_.config(3, icountVal.value_, 0, 0, icountMask.value_, 0, 0,
-		   icountMask.value_, 0, 0);
-
-  hasActiveTrigger_ = triggers_.hasActiveTrigger();
-  hasActiveInstTrigger_ = triggers_.hasActiveInstTrigger();
 
   // Debug mode registers.
   URV dcsrVal = 0x40000003;

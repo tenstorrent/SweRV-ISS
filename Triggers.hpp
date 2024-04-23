@@ -832,9 +832,10 @@ namespace WdRiscv
 
     /// Configure given trigger with given reset values, write masks and
     /// and poke masks.
-    bool config(unsigned trigger, uint64_t rv1, uint64_t rv2, uint64_t rv3,
-		uint64_t wm1, uint64_t wm2, uint64_t wm3,
-		uint64_t pm1, uint64_t pm2, uint64_t pm3);
+    bool config(unsigned trigger, 
+		const std::vector<uint64_t>& resets,
+		const std::vector<uint64_t>& masks,
+		const std::vector<uint64_t>& pokeMasks);
 
     /// Get the values of the three components of the given debug
     /// trigger. Return true on success and false if trigger is out of

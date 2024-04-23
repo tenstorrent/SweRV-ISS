@@ -1405,13 +1405,10 @@ namespace WdRiscv
     /// Configure given trigger with given reset values, write and
     /// poke masks. Return true on success and false on failure.
     bool configTrigger(unsigned trigger,
-                       uint64_t rv1, uint64_t rv2, uint64_t rv3,
-		       uint64_t wm1, uint64_t wm2, uint64_t wm3,
-		       uint64_t pm1, uint64_t pm2, uint64_t pm3)
-    {
-      return triggers_.config(trigger, rv1, rv2, rv3,
-			      wm1, wm2, wm3, pm1, pm2, pm3);
-    }
+                       const std::vector<uint64_t>& resets,
+		       const std::vector<uint64_t>& masks,
+		       const std::vector<uint64_t>& pokeMasks)
+    { return triggers_.config(trigger, resets, masks, pokeMasks); }
 
     bool isInterruptEnabled() const
     { return interruptEnable_; }

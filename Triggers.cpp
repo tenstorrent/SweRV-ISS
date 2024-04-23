@@ -353,19 +353,36 @@ Triggers<URV>::icountTriggerHit(PrivilegeMode mode, bool interruptEnabled)
 
 template <typename URV>
 bool
-Triggers<URV>::config(unsigned trigger,
-                      uint64_t rv1, uint64_t rv2, uint64_t rv3,
-		      uint64_t wm1, uint64_t wm2, uint64_t wm3,
-		      uint64_t pm1, uint64_t pm2, uint64_t pm3)
+Triggers<URV>::config(unsigned triggerIx,
+		      const std::vector<uint64_t>& resets,
+		      const std::vector<uint64_t>& masks,
+		      const std::vector<uint64_t>& pokeMasks)
 {
-  if (trigger <= triggers_.size())
-    triggers_.resize(trigger + 1);
+  if (triggerIx <= triggers_.size())
+    triggers_.resize(triggerIx + 1);
 
-  triggers_.at(trigger).configData1(rv1, wm1, pm1);
-  triggers_.at(trigger).configData2(rv2, wm2, pm2);
-  triggers_.at(trigger).configData3(rv3, wm3, pm3);
+  if (resets.size() !=masks.size() or resets.size() != pokeMasks.size())
+    return false;
 
-  triggers_.at(trigger).writeData2(true, rv2);  // Define compare mask.
+  auto& trigger = triggers_.at(triggerIx);
+
+  if (resets.size() > 0)
+    trigger.configData1(resets.at(0), masks.at(0), pokeMasks.at(0));
+
+  if (resets.size() > 1)
+    {
+      trigger.configData2(resets.at(1), masks.at(1), pokeMasks.at(1));
+      trigger.writeData2(true, resets.at(1));  // Define compare mask.
+    }
+
+  if (resets.size() > 2)
+    trigger.configData3(resets.at(2), masks.at(2), pokeMasks.at(2));
+
+  if (resets.size() > 3)
+    trigger.configInfo(resets.at(3), masks.at(3), pokeMasks.at(3));
+
+  if (resets.size() > 4)
+    trigger.configControl(resets.at(4), masks.at(4), pokeMasks.at(4));
 
   defineChainBounds();
 
