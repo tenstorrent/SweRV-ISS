@@ -427,37 +427,16 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   // trigger number and the trigger component.
   for (unsigned trigger : triggers)
     {
-      static bool firstTime = true;
-      if (firstTime)
+      // Components of trigger that were changed by instruction.
+      std::vector<std::pair<CsrNumber, uint64_t>> trigChanges;
+      getTriggerChange(trigger, trigChanges);
+
+      for (auto& pair : trigChanges)
 	{
-	  std::cerr << "FIX ME: Collect change in tinfo and tcontrol components of triggers.\n";
-	  firstTime = false;
-	}
-
-      uint64_t data1(0), data2(0), data3(0);
-      if (not peekTrigger(trigger, data1, data2, data3))
-        continue;
-
-      // Components of trigger that changed.
-      bool t1 = false, t2 = false, t3 = false;
-      getTriggerChange(trigger, t1, t2, t3);
-
-      if (t1)
-        {
-          URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA1);
-          cvps.push_back(CVP(ecsr, data1));
-        }
-
-      if (t2)
-        {
-          URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA2);
-          cvps.push_back(CVP(ecsr, data2));
-        }
-
-      if (t3)
-        {
-          URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA3);
-          cvps.push_back(CVP(ecsr, data3));
+	  auto csrn = pair.first;
+	  auto val = pair.second;
+          URV ecsr = (trigger << 16) | URV(csrn);
+          cvps.push_back(CVP(ecsr, URV(val)));
         }
     }
 

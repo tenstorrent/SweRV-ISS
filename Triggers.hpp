@@ -30,6 +30,8 @@ namespace WdRiscv
 			   Itrigger = 4, Etrigger = 5, Mcontrol6 = 6, Tmext = 7, Custom0 = 12,
 			   Custom1 = 13, Custom2 = 14, Disabled = 15 };
 
+  enum class TriggerOffset { Tdata1 = 0, Tdata2 = 1, Tdata3 = 2, Tinfo = 3, Tcontrol = 4 };
+
 
   template <typename URV>
   struct Mcontrol;
@@ -263,8 +265,8 @@ namespace WdRiscv
 	data2WriteMask_(mask2), data3WriteMask_(mask3)
     { }
 
-    /// Read the tdata1 register of the trigger. This is typically the
-    /// control register of the trigger.
+    /// Read the tdata1 register of the trigger. This is typically the control register of
+    /// the trigger.
     URV readData1() const
     { return modifiedT1_? prevData1_ : data1_.value_; }
 
@@ -618,10 +620,10 @@ namespace WdRiscv
     }
 
     bool isModified() const
-    { return modifiedT1_ or modifiedT2_ or modifiedT3_; }
+    { return modifiedT1_ or modifiedT2_ or modifiedT3_ or modifiedInfo_ or modifiedControl_; }
 
     void clearModified()
-    { modifiedT1_ = modifiedT2_ = modifiedT3_ = false; }
+    { modifiedT1_ = modifiedT2_ = modifiedT3_ = modifiedInfo_ = modifiedControl_ = false; }
 
     bool getLocalHit() const
     { return localHit_; }
@@ -928,15 +930,29 @@ namespace WdRiscv
     bool getLocalHit(URV ix) const
     { return ix < triggers_.size()? triggers_[ix].getLocalHit() : false; }
 
-    void getTriggerChange(URV ix, bool& t1, bool& t2, bool& t3) const
+    void getTriggerChange(URV ix, std::vector<std::pair<TriggerOffset, uint64_t>>& changes) const
     {
-      t1 = t2 = t3 = false;
+      changes.clear();
       if (ix >= triggers_.size())
         return;
+
+      using TO = TriggerOffset;
+
       const auto& trig = triggers_.at(ix);
-      t1 = trig.modifiedT1_;
-      t2 = trig.modifiedT2_;
-      t3 = trig.modifiedT3_;
+      if (trig.modifiedT1_)
+	changes.push_back(std::pair<TO, uint64_t>(TO::Tdata1, trig.data1_.value_));
+
+      if (trig.modifiedT2_)
+	changes.push_back(std::pair<TO, uint64_t>(TO::Tdata2, trig.data2_));
+
+      if (trig.modifiedT3_)
+	changes.push_back(std::pair<TO, uint64_t>(TO::Tdata3, trig.data3_));
+
+      if (trig.modifiedInfo_)
+	changes.push_back(std::pair<TO, uint64_t>(TO::Tinfo, trig.info_));
+
+      if (trig.modifiedControl_)
+	changes.push_back(std::pair<TO, uint64_t>(TO::Tcontrol, trig.control_));
     }
 
     bool isTdata3Modified(URV ix) const

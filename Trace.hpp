@@ -278,33 +278,17 @@ namespace WdRiscv
       /// the trigger number and the trigger component.
       for (unsigned trigger : triggers)
         {
-	  // FIXME TODO : get tinfo and tcontrol
-
-          uint64_t data1(0), data2(0), data3(0);
-          if (not hart_->peekTrigger(trigger, data1, data2, data3))
-            continue;
-
           // Components of trigger that changed.
-          bool t1 = false, t2 = false, t3 = false;
-          hart_->getTriggerChange(trigger, t1, t2, t3);
+	  std::vector<std::pair<CsrNumber, uint64_t>> trigChanges;
+          hart_->getTriggerChange(trigger, trigChanges);
 
-          if (t1)
-            {
-              URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA1);
-              cvps.push_back(CVP(ecsr, data1));
-            }
-
-          if (t2)
-            {
-              URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA2);
-              cvps.push_back(CVP(ecsr, data2));
-            }
-
-          if (t3)
-            {
-              URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA3);
-              cvps.push_back(CVP(ecsr, data3));
-            }
+	  for (auto& pair : trigChanges)
+	    {
+	      auto csrn = pair.first;
+	      auto val = pair.second;
+	      URV ecsr = (trigger << 16) | URV(csrn);
+	      cvps.push_back(CVP(ecsr, URV(val)));
+	    }
         }
     }
 

@@ -1069,11 +1069,22 @@ namespace WdRiscv
     void countTrippedTriggers(unsigned& pre, unsigned& post) const
     { triggers_.countTrippedTriggers(pre, post); }
 
-    /// Set t1, t2, and t3 to true if corresponding component (tdata1,
-    /// tdata2, an tdata3) of given trigger was changed by the current
-    /// instruction.
-    void getTriggerChange(URV trigger, bool& t1, bool& t2, bool& t3) const
-    { triggers_.getTriggerChange(trigger, t1, t2, t3); }
+    /// Set change to the components of the given trigger that were changed by the last
+    /// executed instruction. Each entry is a component number (e.g. TDATA1, TINFO, ...)
+    /// with the corresponding value.
+    void getTriggerChange(URV trigger, std::vector<std::pair<CsrNumber, uint64_t>>& change)
+    {
+      change.clear();
+      std::vector<std::pair<TriggerOffset, uint64_t>> temp;
+      triggers_.getTriggerChange(trigger, temp);
+      for (auto& tempPair : temp)
+	{
+	  auto offset = tempPair.first;
+	  auto val = tempPair.second;
+	  CsrNumber csrn = CsrNumber(unsigned(offset) + unsigned(CsrNumber::TDATA1));
+	  change.push_back(std::pair<CsrNumber, uint64_t>(csrn, val));
+	}
+    }
 
     /// Associate given event number with given counter.  Subsequent
     /// calls to Hart::updatePerofrmanceCounters will cause given

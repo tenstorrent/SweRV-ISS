@@ -964,11 +964,11 @@ namespace WdRiscv
     void countTrippedTriggers(unsigned& pre, unsigned& post) const
     { csRegs_.countTrippedTriggers(pre, post); }
 
-    /// Set t1, t2, and t3 to true if corresponding component (tdata1,
-    /// tdata2, an tdata3) of given trigger was changed by the current
-    /// instruction.
-    void getTriggerChange(URV trigger, bool& t1, bool& t2, bool& t3) const
-    { csRegs_.getTriggerChange(trigger, t1, t2, t3); }
+    /// Set change to the components of the given trigger that were changed by the last
+    /// executed instruction. Each entry is a component number (e.g. TDATA1, TINFO, ...)
+    /// with the corresponding value.
+    void getTriggerChange(URV trigger, std::vector<std::pair<CsrNumber, uint64_t>>& change)
+    { csRegs_.getTriggerChange(trigger, change); }
 
     /// Enable collection of instruction frequencies.
     void enableInstructionFrequency(bool b);
