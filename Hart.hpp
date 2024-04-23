@@ -2624,7 +2624,7 @@ namespace WdRiscv
     bool ldStAddrTriggerHit(URV addr, TriggerTiming t, bool isLoad)
     {
       return csRegs_.ldStAddrTriggerHit(addr, t, isLoad, privilegeMode(),
-					isInterruptEnabled());
+					virtMode(), isInterruptEnabled());
     }
 
     /// Return true if one or more load-address/store-address trigger
@@ -2633,7 +2633,7 @@ namespace WdRiscv
     bool ldStDataTriggerHit(URV value, TriggerTiming t, bool isLoad)
     {
       return csRegs_.ldStDataTriggerHit(value, t, isLoad, privilegeMode(),
-					isInterruptEnabled());
+					virtMode(), isInterruptEnabled());
     }
 
     /// Return true if one or more execution trigger has a hit on the
@@ -2642,7 +2642,7 @@ namespace WdRiscv
     bool instAddrTriggerHit(URV addr, TriggerTiming t)
     {
       return csRegs_.instAddrTriggerHit(addr, t, privilegeMode(),
-					isInterruptEnabled());
+					virtMode(), isInterruptEnabled());
     }
 
     /// Return true if one or more execution trigger has a hit on the
@@ -2651,13 +2651,13 @@ namespace WdRiscv
     bool instOpcodeTriggerHit(URV opcode, TriggerTiming t)
     {
       return csRegs_.instOpcodeTriggerHit(opcode, t, privilegeMode(),
-					  isInterruptEnabled());
+					  virtMode(), isInterruptEnabled());
     }
 
     /// Make all active icount triggers count down, return true if
     /// any of them counts down to zero.
     bool icountTriggerHit()
-    { return csRegs_.icountTriggerHit(privilegeMode(), isInterruptEnabled()); }
+    { return csRegs_.icountTriggerHit(privilegeMode(), virtMode(), isInterruptEnabled()); }
 
     /// Return true if this hart has one or more active debug
     /// triggers.

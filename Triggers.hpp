@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -78,18 +78,18 @@ namespace WdRiscv
   template <>
   struct Mcontrol<uint64_t>
   {
-    unsigned load_    : 1;   // Bit  0    : trigger on load				
-    unsigned store_   : 1;   // Bit  1    : trigger on store				
-    unsigned execute_ : 1;   // Bit  2    : trigger on instruction			
-    unsigned u_       : 1;   // Bit  3    : enable in user mode			
-    unsigned s_       : 1;   // Bit  4    : enable in supervisor mode			
-    unsigned          : 1;   // Bit  5    : reserved: hardwired to zero		
-    unsigned m_       : 1;   // Bit  6    : enable in machine mode			
-    unsigned match_   : 4;   // Bits 10-7 : controls what is considered to be a match	
-    unsigned chain_   : 1;   // Bit  11   :						
-    unsigned action_  : 4;   // Bits 15-12:						
-    unsigned sizelo_  : 2;   // Bits 17-16:						
-    unsigned timing_  : 1;   // Bit  18   :						
+    unsigned load_    : 1;   // Bit  0    : trigger on load
+    unsigned store_   : 1;   // Bit  1    : trigger on store
+    unsigned execute_ : 1;   // Bit  2    : trigger on instruction
+    unsigned u_       : 1;   // Bit  3    : enable in user mode
+    unsigned s_       : 1;   // Bit  4    : enable in supervisor mode
+    unsigned          : 1;   // Bit  5    : reserved: hardwired to zero
+    unsigned m_       : 1;   // Bit  6    : enable in machine mode
+    unsigned match_   : 4;   // Bits 10-7 : controls what is considered to be a match
+    unsigned chain_   : 1;   // Bit  11   :
+    unsigned action_  : 4;   // Bits 15-12:
+    unsigned sizelo_  : 2;   // Bits 17-16:
+    unsigned timing_  : 1;   // Bit  18   :
     unsigned select_  : 1;   // Bit  19   :
     unsigned hit_     : 1;   // Bit  20   :
     unsigned sizehi_  : 2;   // Bits 22-21:
@@ -105,15 +105,15 @@ namespace WdRiscv
   struct Mcontrol6<uint32_t>
   {
     // SPEC is bogus it has an extra zero bit.
-    unsigned load_    : 1;   // Bit  0    : trigger on load				
-    unsigned store_   : 1;   // Bit  1    : trigger on store				
-    unsigned execute_ : 1;   // Bit  2    : trigger on instruction			
-    unsigned u_       : 1;   // Bit  3    : enable in user mode			
-    unsigned s_       : 1;   // Bit  4    : enable in supervisor mode			
+    unsigned load_    : 1;   // Bit  0    : trigger on load
+    unsigned store_   : 1;   // Bit  1    : trigger on store
+    unsigned execute_ : 1;   // Bit  2    : trigger on instruction
+    unsigned u_       : 1;   // Bit  3    : enable in user mode
+    unsigned s_       : 1;   // Bit  4    : enable in supervisor mode
     unsigned unceren_ : 1;   // Bit  5    : uncertain
-    unsigned m_       : 1;   // Bit  6    : enable in machine mode			
-    unsigned match_   : 4;   // Bits 10-7 : controls what is considered to be a match	
-    unsigned chain_   : 1;   // Bit  11   :						
+    unsigned m_       : 1;   // Bit  6    : enable in machine mode
+    unsigned match_   : 4;   // Bits 10-7 : controls what is considered to be a match
+    unsigned chain_   : 1;   // Bit  11   :
     unsigned action_  : 4;   // Bits 15-12:
     unsigned size_    : 3;   // Bits 18-16:
     unsigned          : 2;   // Bits 20-19: reserved
@@ -133,15 +133,15 @@ namespace WdRiscv
   struct Mcontrol6<uint64_t>
   {
     // SPEC is bogus it has an extra zero bit.
-    unsigned load_    : 1;   // Bit  0    : trigger on load				
-    unsigned store_   : 1;   // Bit  1    : trigger on store				
-    unsigned execute_ : 1;   // Bit  2    : trigger on instruction			
-    unsigned u_       : 1;   // Bit  3    : enable in user mode			
-    unsigned s_       : 1;   // Bit  4    : enable in supervisor mode			
+    unsigned load_    : 1;   // Bit  0    : trigger on load
+    unsigned store_   : 1;   // Bit  1    : trigger on store
+    unsigned execute_ : 1;   // Bit  2    : trigger on instruction
+    unsigned u_       : 1;   // Bit  3    : enable in user mode
+    unsigned s_       : 1;   // Bit  4    : enable in supervisor mode
     unsigned unceren_ : 1;   // Bit  5    : uncertain
-    unsigned m_       : 1;   // Bit  6    : enable in machine mode			
-    unsigned match_   : 4;   // Bits 10-7 : controls what is considered to be a match	
-    unsigned chain_   : 1;   // Bit  11   :						
+    unsigned m_       : 1;   // Bit  6    : enable in machine mode
+    unsigned match_   : 4;   // Bits 10-7 : controls what is considered to be a match
+    unsigned chain_   : 1;   // Bit  11   :
     unsigned action_  : 4;   // Bits 15-12:
     unsigned size_    : 3;   // Bits 18-16:
     unsigned          : 2;   // Bits 20-19: reserved
@@ -168,7 +168,9 @@ namespace WdRiscv
     unsigned m_       : 1;
     unsigned count_   : 14;
     unsigned hit_     : 1;
-    URV               : 8*sizeof(URV) - 30;  // Zero bits
+    unsigned vu_      : 1;
+    unsigned vs_      : 1;
+    URV               : 8*sizeof(URV) - 32;  // Zero bits
     unsigned dmode_   : 1;   // Trigger writable only in debug mode.
     unsigned type_    : 4;
   } __attribute__((packed));
@@ -215,7 +217,6 @@ namespace WdRiscv
     Tinfo tinfo_;
   };
 
-
   /// Union to pack/unpack TDATA1 trigger register value
   template <typename URV>
   union Data1Bits
@@ -230,14 +231,26 @@ namespace WdRiscv
     bool isDisabled() const
     { return type() == TriggerType::None or type() == TriggerType::Disabled; }
 
-    bool isAddrData() const  { return type() == TriggerType::AddrData; }
+    bool isMcontrol()  const { return type() == TriggerType::Mcontrol; }
+    bool isMcontrol6() const { return type() == TriggerType::Mcontrol6; }
+    bool isAddrData()  const { return isMcontrol() or isMcontrol6(); }
     bool isInstCount() const { return type() == TriggerType::InstCount; }
 
     /// Return true if trigger is writable only in debug mode.
     bool dmodeOnly() const   { return mcontrol_.dmode_; }
 
+    template <typename T>
+    const T& mcontrol() const
+    {
+      if constexpr (std::is_same_v<T, decltype(mcontrol_)>)
+        return mcontrol_;
+      else
+        return mcontrol6_;
+    }
+
     URV value_ = 0;
-    Mcontrol<URV> mcontrol_;
+    Mcontrol<URV>  mcontrol_;
+    Mcontrol6<URV> mcontrol6_;
     Icount<URV> icount_;
   };
 
@@ -315,9 +328,12 @@ namespace WdRiscv
 
       if (data1_.isAddrData())
 	{
+          Select sel = data1_.isMcontrol()? Select(data1_.mcontrol_.select_) :
+                                            Select(data1_.mcontrol6_.select_);
+
 	  // If load-data is not enabled, then turn it off when attempted. If exec-opcode
 	  // is not enabled, then turn it off when attempted.
-	  if (Select(data1_.mcontrol_.select_) == Select::MatchData)
+	  if (sel == Select::MatchData)
 	    {
               if (not enableLoadData_)
                 {
@@ -458,7 +474,13 @@ namespace WdRiscv
     bool isEnabled() const
     {
       if (data1_.isAddrData())
-	return data1_.mcontrol_.m_ or data1_.mcontrol_.s_ or data1_.mcontrol_.u_;
+        {
+          if (data1_.isMcontrol())
+            return data1_.mcontrol_.m_ or data1_.mcontrol_.s_ or data1_.mcontrol_.u_;
+          else
+            return data1_.mcontrol6_.m_ or data1_.mcontrol6_.s_ or data1_.mcontrol6_.u_ or
+                   data1_.mcontrol6_.vs_ or data1_.mcontrol6_.vu_;
+        }
       if (data1_.isInstCount())
 	return data1_.icount_.m_ or data1_.icount_.s_ or data1_.icount_.u_;
       return false;
@@ -486,30 +508,30 @@ namespace WdRiscv
     /// isLoad is false), for addresses, for the given timing and if
     /// it matches the given data address.  Return false otherwise.
     bool matchLdStAddr(URV address, TriggerTiming timing, bool isLoad,
-                       PrivilegeMode mode) const;
+                       PrivilegeMode mode, bool virtMode) const;
 
     /// Return true if this trigger is enabled for loads (or stores if
     /// isLoad is false), for data, for the given timing and if it
     /// matches the given value address.  Return false otherwise.
     bool matchLdStData(URV value, TriggerTiming timing, bool isLoad,
-                       PrivilegeMode mode) const;
+                       PrivilegeMode mode, bool virtMode) const;
 
     /// Return true if this trigger is enabled for instruction
     /// addresses (execution), for the given timing and if it matches
     /// the given address. Return false otherwise.
     bool matchInstAddr(URV address, TriggerTiming timing,
-                       PrivilegeMode mode) const;
+                       PrivilegeMode mode, bool virtMode) const;
 
     /// Return true if this trigger is enabled for instruction opcodes
     /// (execution), for the given timing and if it matches the given
     /// opcode.  Return false otherwise.
     bool matchInstOpcode(URV opcode, TriggerTiming timing,
-                         PrivilegeMode mode) const;
+                         PrivilegeMode mode, bool virtMode) const;
 
     /// If this trigger is enabled and is of type icount, then make it
     /// count down returning true if its value becomes zero. Return
     /// false otherwise.
-    bool instCountdown(PrivilegeMode mode)
+    bool instCountdown(PrivilegeMode mode, bool virtMode)
     {
       if (not data1_.isInstCount())
 	return false;  // Not an icount trigger.
@@ -518,10 +540,16 @@ namespace WdRiscv
       if (mode == PrivilegeMode::Machine and not icount.m_)
 	return false;  // Trigger is not enabled.
 
-      if (mode == PrivilegeMode::Supervisor and not icount.s_)
+      if (mode == PrivilegeMode::Supervisor and not virtMode and not icount.s_)
 	return false;  // Trigger is not enabled.
 
-      if (mode == PrivilegeMode::User and not icount.u_)
+      if (mode == PrivilegeMode::User and not virtMode and not icount.u_)
+	return false;  // Trigger is not enabled.
+
+      if (mode == PrivilegeMode::Supervisor and virtMode and not icount.vs_)
+	return false;  // Trigger is not enabled.
+
+      if (mode == PrivilegeMode::User and virtMode and not icount.vu_)
 	return false;  // Trigger is not enabled.
 
       if (mode == PrivilegeMode::Reserved)
@@ -545,7 +573,10 @@ namespace WdRiscv
 	{
           if (not modifiedT1_)
             prevData1_ = data1_.value_;
-	  data1_.mcontrol_.hit_ = flag;
+          if (data1_.isMcontrol())
+            data1_.mcontrol_.hit_ = flag;
+          else
+            data1_.mcontrol6_.hit0_ = flag; // only implement before
 	  modifiedT1_ = true;
 	}
       if (data1_.isInstCount())
@@ -561,7 +592,7 @@ namespace WdRiscv
     bool getHit() const
     {
       if (data1_.isAddrData())
-	return data1_.mcontrol_.hit_;
+        return data1_.isMcontrol()? data1_.mcontrol_.hit_ : data1_.mcontrol6_.hit0_;
       if (data1_.isInstCount())
 	return data1_.icount_.hit_;
       return false;
@@ -580,7 +611,7 @@ namespace WdRiscv
     TriggerTiming getTiming() const
     {
       if (data1_.isAddrData())
-	return TriggerTiming(data1_.mcontrol_.timing_);
+	return data1_.isMcontrol()? TriggerTiming(data1_.mcontrol_.timing_) : TriggerTiming::Before;
       return TriggerTiming::After;  // icount has "after" timing.
     }
 
@@ -671,6 +702,22 @@ namespace WdRiscv
       pm1 = data1PokeMask_; pm2 = data2PokeMask_; pm3 = data3PokeMask_;
       return ok;
     }
+
+    template <typename M>
+    bool matchLdStAddr(URV address, TriggerTiming timing, bool isLoad,
+                       PrivilegeMode mode, bool virtMode) const;
+
+    template <typename M>
+    bool matchLdStData(URV value, TriggerTiming timing, bool isLoad,
+                       PrivilegeMode mode, bool virtMode) const;
+
+    template <typename M>
+    bool matchInstAddr(URV address, TriggerTiming timing,
+                       PrivilegeMode mode, bool virtMode) const;
+
+    template <typename M>
+    bool matchInstOpcode(URV opcode, TriggerTiming timing,
+                         PrivilegeMode mode, bool virtMode) const;
 
   private:
 
@@ -810,19 +857,19 @@ namespace WdRiscv
     /// contingent on interrupts being enabled (ie == true), then the
     /// trigger will not trip even if its condition is satisfied.
     bool ldStAddrTriggerHit(URV address, TriggerTiming, bool isLoad,
-                            PrivilegeMode mode, bool ie);
+                            PrivilegeMode mode, bool virtMode, bool ie);
 
     /// Similar to ldStAddrTriggerHit but for data match.
     bool ldStDataTriggerHit(URV value, TriggerTiming, bool isLoad,
-                            PrivilegeMode mode, bool ie);
+                            PrivilegeMode mode, bool virtMode, bool ie);
 
     /// Similar to ldStAddrTriggerHit but for instruction address.
     bool instAddrTriggerHit(URV address, TriggerTiming timing,
-                            PrivilegeMode mode, bool ie);
+                            PrivilegeMode mode, bool virtMode, bool ie);
 
     /// Similar to instAddrTriggerHit but for instruction opcode.
     bool instOpcodeTriggerHit(URV opcode, TriggerTiming timing,
-                              PrivilegeMode mode, bool ie);
+                              PrivilegeMode mode, bool virtMode, bool ie);
 
     /// Make every active icount trigger count down unless it was
     /// written by the current instruction. If a count-down register
@@ -831,7 +878,7 @@ namespace WdRiscv
     /// interrupts are disabled), then consider the trigger as having
     /// tripped and set its hit bit to 1. Return true if any icount
     /// trigger trips; otherwise, return false.
-    bool icountTriggerHit(PrivilegeMode mode, bool interruptEnabled);
+    bool icountTriggerHit(PrivilegeMode mode, bool virtMode, bool interruptEnabled);
 
     /// Reset the given trigger with the given data1, data2, and data3
     /// values and corresponding write and poke masks. Values are applied

@@ -1004,9 +1004,9 @@ namespace WdRiscv
     /// trigger causes its chain to trip, then set the hit bit of all
     /// the triggers in that chain.
     bool ldStAddrTriggerHit(URV addr, TriggerTiming t, bool isLoad,
-                            PrivilegeMode mode, bool ie)
+                            PrivilegeMode mode, bool virtMode, bool ie)
     {
-      bool chainHit = triggers_.ldStAddrTriggerHit(addr, t, isLoad, mode, ie);
+      bool chainHit = triggers_.ldStAddrTriggerHit(addr, t, isLoad, mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))
@@ -1016,9 +1016,9 @@ namespace WdRiscv
 
     /// Similar to ldStAddrTriggerHit but for data match.
     bool ldStDataTriggerHit(URV data, TriggerTiming t, bool isLoad,
-                            PrivilegeMode mode, bool ie)
+                            PrivilegeMode mode, bool virtMode, bool ie)
     {
-      bool chainHit = triggers_.ldStDataTriggerHit(data, t, isLoad, mode, ie);
+      bool chainHit = triggers_.ldStDataTriggerHit(data, t, isLoad, mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))
@@ -1028,9 +1028,9 @@ namespace WdRiscv
 
     /// Similar to ldStAddrTriggerHit but for instruction address.
     bool instAddrTriggerHit(URV addr, TriggerTiming t, PrivilegeMode mode,
-                            bool ie)
+                            bool virtMode, bool ie)
     {
-      bool chainHit = triggers_.instAddrTriggerHit(addr, t, mode, ie);
+      bool chainHit = triggers_.instAddrTriggerHit(addr, t, mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))
@@ -1040,9 +1040,9 @@ namespace WdRiscv
 
     /// Similar to instAddrTriggerHit but for instruction opcode.
     bool instOpcodeTriggerHit(URV opcode, TriggerTiming t, PrivilegeMode mode,
-                              bool ie)
+                              bool virtMode, bool ie)
     {
-      bool chainHit = triggers_.instOpcodeTriggerHit(opcode, t, mode, ie);
+      bool chainHit = triggers_.instOpcodeTriggerHit(opcode, t, mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))
@@ -1055,9 +1055,9 @@ namespace WdRiscv
     /// counted-down register if its value becomes zero. Return true
     /// if any counted-down register reaches zero; otherwise, return
     /// false.
-    bool icountTriggerHit(PrivilegeMode mode, bool ie)
+    bool icountTriggerHit(PrivilegeMode mode, bool virtMode, bool ie)
     {
-      bool hit = triggers_.icountTriggerHit(mode, ie);
+      bool hit = triggers_.icountTriggerHit(mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))
