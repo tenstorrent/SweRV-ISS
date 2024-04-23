@@ -502,7 +502,7 @@ namespace WdRiscv
 
     /// Return true if register is implemented.
     bool isImplemented() const
-    { return implemented_; }
+    { return implemented_ and not userDisabled_; }
 
     /// Return true if register is mandatory (not optional).
     bool isMandatory() const
@@ -673,6 +673,10 @@ namespace WdRiscv
     void setImplemented(bool flag)
     { implemented_ = flag; }
 
+    /// Mark register as disabled by user configuration.
+    void setUserDisabled(bool flag)
+    { userDisabled_ = flag; }
+
     /// Set initial value.
     void setInitialValue(URV v)
     { initialValue_ = v; }
@@ -777,13 +781,14 @@ namespace WdRiscv
 
     std::string name_;
     unsigned number_ = 0;
-    bool mandatory_ = false;   // True if mandated by architecture.
-    bool implemented_ = false; // True if register is implemented.
-    bool hyper_ = false;       // True if hypervisor CSR.
+    bool mandatory_ = false;     // True if mandated by architecture.
+    bool implemented_ = false;   // True if register is implemented.
+    bool userDisabled_ = false;  // True if disabled by user in config file.
+    bool hyper_ = false;         // True if hypervisor CSR.
     bool mapsToVirtual_ = false; // True if CSR maps to a virtual supervisor CSR.
     bool defined_ = false;
-    bool debug_ = false;       // True if this is a debug-mode register.
-    bool shared_ = false;      // True if this is shared among harts.
+    bool debug_ = false;         // True if this is a debug-mode register.
+    bool shared_ = false;        // True if this is shared among harts.
     URV initialValue_ = 0;
     PrivilegeMode privMode_ = PrivilegeMode::Machine;
     URV value_ = 0;
@@ -1112,6 +1117,12 @@ namespace WdRiscv
     /// Configure CSR. Return true on success and false on failure.
     bool configCsr(std::string_view name, bool implemented, URV resetValue,
                    URV mask, URV pokeMask, bool debug, bool shared);
+
+    /// Configure CSR. Return true on success and false on failure. Mark non-implemented
+    /// csr (implemented == false) as user-disabled so that internal code cannot enable
+    /// them.
+    bool configCsrByUser(std::string_view name, bool implemented, URV resetValue,
+			 URV mask, URV pokeMask, bool debug, bool shared);
 
     /// Configure CSR. Return true on success and false on failure.
     bool configCsr(CsrNumber csr, bool implemented, URV resetValue,

@@ -296,11 +296,13 @@ namespace WdRiscv
     const Csr<URV>* findCsr(CsrNumber number)
     { return csRegs_.findCsr(number); }
 
-    /// Configure given CSR. Return true on success and false if
-    /// no such CSR.
-    bool configCsr(std::string_view name, bool implemented,
-		   URV resetValue, URV mask, URV pokeMask,
-		   bool isDebug, bool shared);
+    /// Configure given CSR. Return true on success and false if no such CSR.
+    bool configCsrByUser(std::string_view name, bool implemented, URV resetValue, URV mask,
+			 URV pokeMask, bool isDebug, bool shared);
+
+    /// Configure given CSR. Return true on success and false if no such CSR.
+    bool configCsr(std::string_view name, bool implemented, URV resetValue, URV mask,
+		   URV pokeMask, bool isDebug, bool shared);
 
     /// Define a new CSR (beyond the standard CSRs defined by the
     /// RISCV spec). Return true on success and false if name/number

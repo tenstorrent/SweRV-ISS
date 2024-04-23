@@ -2048,6 +2048,39 @@ CsRegs<URV>::configCsr(std::string_view name, bool implemented, URV resetValue,
 
 template <typename URV>
 bool
+CsRegs<URV>::configCsrByUser(std::string_view name, bool implemented, URV resetValue,
+			     URV mask, URV pokeMask, bool isDebug, bool shared)
+{
+  auto iter = nameToNumber_.find(name);
+  if (iter == nameToNumber_.end())
+    return false;
+
+  size_t num = size_t(iter->second);
+  if (num >= regs_.size())
+    return false;
+
+  bool ok = configCsr(CsrNumber(num), implemented, resetValue, mask, pokeMask,
+		      isDebug, shared);
+
+  // Make user choice to disable a CSR sticky.
+  if (not implemented)
+    {
+      auto csr = findCsr(CsrNumber(num));
+      if (csr)
+	{
+	  if (csr->isMandatory())
+	    std::cerr << "Error: Cannot disable mandatory CSR " << csr->getName() << '\n';
+	  else
+	    csr->setUserDisabled(true);
+	}
+    }
+
+  return ok;
+}
+
+
+template <typename URV>
+bool
 CsRegs<URV>::configCsr(CsrNumber csrNum, bool implemented, URV resetValue,
                        URV mask, URV pokeMask, bool isDebug, bool shared)
 {

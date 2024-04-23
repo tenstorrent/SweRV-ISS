@@ -333,7 +333,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
   if (errors)
     return false;
 
-  if (not hart.configCsr(name, exists, reset, mask, pokeMask, isDebug, shared))
+  if (not hart.configCsrByUser(name, exists, reset, mask, pokeMask, isDebug, shared))
     {
       std::cerr << "Invalid CSR (" << name << ") in config file.\n";
       return false;
