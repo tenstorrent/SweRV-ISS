@@ -25,10 +25,22 @@ namespace WdRiscv
     /// otherwise (xlen is left unmodified).
     bool getXlenFromElfFile(unsigned& xlen) const;
 
-    /// Parse command line arguments. Place option values in args. Return true on success
-    /// and false on failure.
+    /// Parse command line arguments and collect option values. Return true on success and
+    /// false on failure.
     bool parseCmdLineArgs(std::span<char*> argv);
 
+    /// Parse command line arguments and collect option vlaues. Return true on success and
+    /// false on failure.
+    bool parseCmdLineArgs(std::vector<std::string>& args)
+    {
+      std::vector<char*> argv;
+      for (auto& arg : args)
+	argv.push_back(arg.data());
+      argv.push_back(nullptr);
+      return parseCmdLineArgs(std::span(argv.data(), argv.size()));
+    }			      
+
+    /// Helper to parseCmdLineArgs.
     bool collectCommandLineValues(const boost::program_options::variables_map& varMap);
 
     /// Convert the command line string numberStr to a number using strotull and a base of
