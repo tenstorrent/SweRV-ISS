@@ -768,6 +768,8 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
 	out << (boost::format("0x%x") % hart.deferredInterrupts()) << std::endl;
       else if (addrStr == "seipin")
 	out << (boost::format("%d") % hart.getSeiPin()) << std::endl;
+      else if (addrStr == "effma")
+	;   // Nothing to do here. In server mode we return the effective memory attribute.
       else
 	ok = false;
 
