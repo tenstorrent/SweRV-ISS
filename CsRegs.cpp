@@ -3004,11 +3004,12 @@ CsRegs<URV>::defineDebugRegs()
   using Csrn = CsrNumber;
 
   // Debug/Trace registers.
-  defineCsr("scontext", Csrn::SCONTEXT, !mand, !imp, 0, wam, wam);
-  defineCsr("tselect",  Csrn::TSELECT,  !mand, !imp,  0, wam, wam);
-  defineCsr("tdata1",   Csrn::TDATA1,   !mand, !imp,  0, wam, wam);
-  defineCsr("tdata2",   Csrn::TDATA2,   !mand, !imp,  0, wam, wam);
-  defineCsr("tdata3",   Csrn::TDATA3,   !mand, !imp,  0, wam, wam);
+  defineCsr("scontext",  Csrn::SCONTEXT,  !mand, !imp,  0, wam, wam);
+  defineCsr("mscontext", Csrn::MSCONTEXT, !mand, !imp,  0, wam, wam);
+  defineCsr("tselect",   Csrn::TSELECT,   !mand, !imp,  0, wam, wam);
+  defineCsr("tdata1",    Csrn::TDATA1,    !mand, !imp,  0, wam, wam);
+  defineCsr("tdata2",    Csrn::TDATA2,    !mand, !imp,  0, wam, wam);
+  defineCsr("tdata3",    Csrn::TDATA3,    !mand, !imp,  0, wam, wam);
 
   URV mask = 0x100ffff;   // Only least sig bit of version is writeable.
   URV reset = 0x10087d;   // Tmext/Legacy/Custom types are not supported.
