@@ -795,6 +795,6 @@ namespace WdRiscv
     /// Callback to obtain pointer to memory; uint8_t*(uint64_t addr, size_t len);
     std::function<uint8_t*(uint64_t, size_t)> mapCallback_ = nullptr;
 
-    void *mmap_file(const std::string& filename, size_t& length);
+    std::pair<std::unique_ptr<uint8_t[]>, size_t> loadFile(const std::string& filename);
   };
 }
