@@ -1352,9 +1352,10 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
 
 template<typename URV>
 bool
-HartConfig::configClint(System<URV>& system, Hart<URV>& hart,
-			uint64_t clintStart, uint64_t clintEnd,
-			bool siOnReset) const
+HartConfig::configAclint(System<URV>& system, Hart<URV>& hart, uint64_t clintStart,
+                         uint64_t mswiOffset, bool hasMswi,
+                         uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
+		         bool siOnReset) const
 {
   // Define callback to recover a hart from a hart index. We do
   // this to avoid having the Hart class depend on the System class.
@@ -1362,7 +1363,8 @@ HartConfig::configClint(System<URV>& system, Hart<URV>& hart,
     return system.ithHart(ix).get();
   };
 
-  hart.configClint(clintStart, clintEnd, siOnReset, indexToHart);
+  hart.configAclint(clintStart + mswiOffset, hasMswi, clintStart + mtimerOffset,
+                   clintStart + mtimeOffset, hasMtimer, siOnReset, indexToHart);
   return true;
 }
 
@@ -1974,7 +1976,7 @@ template<typename URV>
 bool
 HartConfig::applyClintConfig(System<URV>& system, Hart<URV>& hart) const
 {
-  constexpr std::string_view tag = "clint";
+  std::string_view tag = "clint";
   if (not config_ -> contains(tag))
     return true;
 
@@ -1989,14 +1991,108 @@ HartConfig::applyClintConfig(System<URV>& system, Hart<URV>& hart) const
       return false;
     }
 
-  bool siOnReset = false;
-  constexpr std::string_view siTag = "clint_software_interrupt_on_reset";
-  if (config_ -> contains(siTag))
-    if (not getJsonBoolean(siTag, config_ -> at(siTag), siOnReset))
+  return configAclint(system, hart, addr, 0 /* swOffset */, true /* hasMswi */,
+                      0x4000 /* timerOffset */, 0xbff8 /* timeOffset */, true /* hasMtimer */);
+}
+
+
+template<typename URV>
+bool
+HartConfig::applyAclintConfig(System<URV>& system, Hart<URV>& hart) const
+{
+  std::string_view tag = "aclint";
+  if (not config_ -> contains(tag))
+    return true;
+
+  auto& aclint = config_ -> at("aclint");
+
+  uint64_t base = 0, swOffset = 0, timerOffset = 0, timeOffset = 0;
+
+  tag = "base";
+  if (aclint.contains(tag))
+    if (not getJsonUnsigned("aclint.base", aclint.at(tag), base))
       return false;
 
-  uint64_t clintStart = addr, clintEnd = addr + 0xc000 - 1;
-  return configClint(system, hart, clintStart, clintEnd, siOnReset);
+  bool hasMswi = false;
+  tag = "sw_offset";
+  if (aclint.contains(tag))
+    {
+      if (not getJsonUnsigned("aclint.sw_offset", aclint.at(tag), swOffset))
+        return false;
+      hasMswi = true;
+    }
+  uint64_t swEnd = swOffset + 0x4000;
+
+  bool hasMtimer = false;
+  tag = "timer_offset";
+  if (aclint.contains(tag))
+    {
+      if (not getJsonUnsigned("aclint.timer_offset", aclint.at(tag), timerOffset))
+        return false;
+      hasMtimer = true;
+    }
+  uint64_t timerEnd = timerOffset + 0x8000;
+
+  tag = "time_offset";
+  if (aclint.contains(tag))
+    {
+      if (not hasMtimer)
+        {
+          std::cerr << "Error: aclint specified time_offset, but no timer_offset\n";
+          return false;
+        }
+      if (not getJsonUnsigned("aclint.time_offset", aclint.at(tag), timeOffset))
+        return false;
+    }
+  else if (hasMtimer)
+    {
+      std::cerr << "Error: aclint specified timer_offset, but no time_offset\n";
+      return false;
+    }
+
+  if ((base & 7) != 0 or (swOffset & 7) != 0 or (timerOffset & 7) != 0 or
+      (timeOffset & 7) != 0)
+    {
+      std::cerr << "Error: Config file aclint addresses and offsets\n"
+                << "(0x" << std::hex << base << ")\n"
+                << "(0x" << swOffset << ")\n"
+                << "(0x" << timerOffset << ")\n"
+                << "(0x" << timeOffset << std::dec << ")\n"
+                << "must be a multiple of 8\n";
+      return false;
+    }
+
+  // Check overlap.
+  if (hasMswi and (timeOffset >= swOffset and timeOffset < swEnd))
+    {
+      std::cerr << "Error: aclint MTIME cannot sit in MSWI region.\n";
+      return false;
+    }
+
+  if (hasMswi and hasMtimer and
+      ((timerOffset >= swOffset and timerOffset < swEnd) or
+       (swOffset >= timerOffset and swOffset < timerEnd)))
+    {
+      std::cerr << "Error: aclint MTIMER and MSWI regions cannot overlap.\n";
+      return false;
+    }
+
+  bool siOnReset = false;
+  tag = "software_interrupt_on_reset";
+  if (aclint.contains(tag))
+    {
+      if (not getJsonBoolean("aclint.software_interrupt_on_reset", aclint.at(tag), siOnReset))
+        return false;
+      if (not hasMswi)
+        {
+          std::cerr << "Error: aclint software_interrupt_on_reset configured"
+                    << " without software device enabled.\n";
+          return false;
+        }
+    }
+
+  return configAclint(system, hart, base, swOffset, hasMswi,
+                     timerOffset, timeOffset, hasMtimer, siOnReset);
 }
 
 
@@ -2102,6 +2198,9 @@ HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
 	return false;
 
       if (not applyClintConfig(system, hart))
+        return false;
+
+      if (not applyAclintConfig(system, hart))
 	return false;
     }
 
@@ -2479,14 +2578,15 @@ template bool
 HartConfig::finalizeCsrConfig<uint64_t>(System<uint64_t>&) const;
 
 template bool
-HartConfig::configClint<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,
-				  uint64_t clintStart, uint64_t clintEnd,
-				  bool siOnReset) const;
-
+HartConfig::configAclint<uint32_t>(System<uint32_t>&, Hart<uint32_t>&, uint64_t clintStart,
+                                   uint64_t mswiOffset, bool hasMswi,
+                                   uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
+		                   bool siOnReset = false) const;
 template bool
-HartConfig::configClint<uint64_t>(System<uint64_t>& system, Hart<uint64_t>& hart,
-				  uint64_t clintStart, uint64_t clintEnd,
-				  bool siOnReset) const;
+HartConfig::configAclint<uint64_t>(System<uint64_t>&, Hart<uint64_t>&, uint64_t clintStart,
+                                   uint64_t mswiOffset, bool hasMswi,
+                                   uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
+		                   bool siOnReset = false) const;
 
 template bool
 HartConfig::configInterruptor<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,

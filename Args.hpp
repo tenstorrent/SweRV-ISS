@@ -11,7 +11,7 @@
 namespace WdRiscv
 {
   class HartConfig;
-  
+
   /// Parse/maintain arguments provided on the command line.
   struct Args
   {
@@ -93,8 +93,8 @@ namespace WdRiscv
     std::optional<uint64_t> tlbSize;
     Uint64Vec snapshotPeriods;
     std::optional<uint64_t> alarmInterval;
-    std::optional<uint64_t> clint;  // Core-local-interrupt (Clint) mem mapped address
-    std::optional<uint64_t> interruptor; // Interrupt generator mem mapped address
+    std::optional<uint64_t> clint;        // Advanced core-local-interrupt (CLINT) mem mapped address
+    std::optional<uint64_t> interruptor;  // Interrupt generator mem mapped address
     std::optional<uint64_t> syscallSlam;
     std::optional<uint64_t> instCounter;
     std::optional<uint64_t> branchWindow;

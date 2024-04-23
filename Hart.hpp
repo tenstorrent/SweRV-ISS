@@ -601,13 +601,25 @@ namespace WdRiscv
     { ownTrace_ = flag; }
 
     /// Define memory mapped locations for CLINT.
-    void configClint(uint64_t clintStart, uint64_t clintEnd,
-		     bool softwareInterruptOnReset,
-                     std::function<Hart<URV>*(unsigned ix)> indexToHart)
+    void configAclint(uint64_t mswiOffset, bool hasMswi,
+                      uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
+		      bool softwareInterruptOnReset,
+                      std::function<Hart<URV>*(unsigned ix)> indexToHart)
     {
-      clintStart_ = clintStart;
-      clintEnd_ = clintEnd;
-      clintSiOnReset_ = softwareInterruptOnReset;
+      if (hasMswi)
+        {
+          aclintSwStart_ = mswiOffset;
+          aclintSwEnd_ = mswiOffset + 0x4000;
+        }
+
+      if (hasMtimer)
+        {
+          aclintMtimerStart_ = mtimerOffset;
+          aclintMtimerEnd_ = mtimerOffset + 0x8000;
+          aclintMtimeStart_ = mtimeOffset;
+          aclintMtimeEnd_ = mtimeOffset + 0x8;
+        }
+      aclintSiOnReset_ = softwareInterruptOnReset;
       indexToHart_ = indexToHart;
     }
 
@@ -2043,27 +2055,26 @@ namespace WdRiscv
     void enableStee(bool flag)
     { steeEnabled_ = flag; }
 
-    /// Return true if CLINT is configured.
-    bool hasClint() const
-    { return clintStart_ < clintEnd_; }
+    /// Return true if ACLINT is configured.
+    bool hasAclint() const
+    { return (aclintSwStart_ < aclintSwEnd_) or (aclintMtimerStart_ < aclintMtimerEnd_); }
 
-    /// Return true if CLINT is configured setting address to the clint address.
-    /// Return false otherwise leaving address unmodified.
-    bool hasClint(uint64_t& addr) const
+    /// Set the ACLINT alarm to the given value.
+    bool hasAclintTimer(uint64_t& addr) const
     {
-      if (clintStart_ < clintEnd_)
+      if (aclintMtimerStart_ < aclintMtimerEnd_)
 	{
-	  addr = clintStart_;
+	  addr = aclintMtimerStart_;
 	  return true;
 	}
       return false;
     }
 
     /// Set the CLINT alarm to the given value.
-    void setClintAlarm(uint64_t value)
+    void setAclintAlarm(uint64_t value)
     {
-      if (hasClint())
-	clintAlarm_ = value;
+      if (hasAclint())
+	aclintAlarm_ = value;
     }
 
     /// Fetch an instruction from the given virtual address. Return ExceptionCause::None
@@ -2075,8 +2086,11 @@ namespace WdRiscv
     ExceptionCause fetchInstNoTrap(uint64_t& virAddr, uint64_t& physAddr, uint64_t& physAddr2,
 				   uint64_t& gPhysAddr, uint32_t& instr);
 
-    bool isClintAddr(uint64_t addr) const
-    { return addr >= clintStart_ and addr < clintEnd_; }
+    bool isAclintAddr(uint64_t addr) const
+    {
+      return hasAclint() and ((addr >= aclintSwStart_ and addr < aclintSwEnd_) or
+                              (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_));
+    }
 
     bool isInterruptorAddr(uint64_t addr, unsigned size) const
     { return hasInterruptor_ and addr == interruptor_ and size == 4; }
@@ -4974,10 +4988,14 @@ namespace WdRiscv
     bool conIoValid_ = false;    // True if conIo_ is valid.
     bool enableConIn_ = true;
 
-    uint64_t clintStart_ = 0;
-    uint64_t clintEnd_ = 0;
-    uint64_t clintAlarm_ = ~uint64_t(0); // Interrupt when timer >= this
-    bool clintSiOnReset_ = false;
+    uint64_t aclintSwStart_ = 0;
+    uint64_t aclintSwEnd_ = 0;
+    uint64_t aclintMtimerStart_ = 0;
+    uint64_t aclintMtimerEnd_ = 0;
+    uint64_t aclintMtimeStart_ = 0;
+    uint64_t aclintMtimeEnd_ = 0;
+    uint64_t aclintAlarm_ = ~uint64_t(0); // Interrupt when timer >= this
+    bool aclintSiOnReset_ = false;
     std::function<Hart<URV>*(unsigned ix)> indexToHart_ = nullptr;
 
     // True if we want to defer an interrupt for later. By default, take immediately.

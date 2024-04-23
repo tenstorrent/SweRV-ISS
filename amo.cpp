@@ -104,7 +104,7 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
     uval = mcmVal;
   else
     memRead(addr, addr, uval);
-    
+
   value = SRV(int32_t(uval)); // Sign extend.
   return true;  // Success.
 }
@@ -364,17 +364,16 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   if (mcm_)
     return true;  // Memory updated when merge buffer is written.
 
-  if (addr1 >= clintStart_ and addr1 < clintEnd_)
+  if (isAclintAddr(addr1))
     {
       assert(addr1 == addr2);
       URV val = storeVal;
       processClintWrite(addr1, ldStSize_, val);
       storeVal = val;
     }
-  else if (hasInterruptor_ and addr1 == interruptor_ and ldStSize_ == 4)
+  else if (isInterruptorAddr(addr1, ldStSize_))
     processInterruptorWrite(storeVal);
-  else if (imsic_ and ((addr1 >= imsicMbase_ and addr1 < imsicMend_) or
-		       (addr1 >= imsicSbase_ and addr1 < imsicSend_)))
+  else if (isImsicAddr(addr1))
     {
       imsicWrite_(addr1, sizeof(storeVal), storeVal);
       storeVal = 0;  // Reads from IMSIC space will yield zero.

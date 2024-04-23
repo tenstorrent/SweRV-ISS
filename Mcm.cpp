@@ -955,7 +955,7 @@ Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
     }
 
   uint64_t addr = op.physAddr_;
-  bool skip = (hart.isClintAddr(addr) or hart.isInterruptorAddr(addr, op.size_) or
+  bool skip = (hart.isAclintAddr(addr) or hart.isInterruptorAddr(addr, op.size_) or
 	       hart.isImsicAddr(addr) or hart.isPciAddr(addr));
   if (skip)
     return true;

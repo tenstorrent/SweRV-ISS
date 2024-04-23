@@ -76,8 +76,10 @@ namespace WdRiscv
     /// is true then a software interrupt for hart0 is injected
     /// in the clint at reset.
     template<typename URV>
-    bool configClint(System<URV>&, Hart<URV>&, uint64_t clintStart,
-		     uint64_t clintEnd, bool siOnReset = false) const;
+    bool configAclint(System<URV>&, Hart<URV>&, uint64_t clintStart,
+                      uint64_t mswiOffset, bool hasMswi,
+                      uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
+		      bool siOnReset = false) const;
 
     template<typename URV>
     bool configInterruptor(System<URV>&, Hart<URV>&, uint64_t addr) const;
@@ -160,6 +162,9 @@ namespace WdRiscv
     /// Helper to configHarts.
     template<typename URV>
     bool applyClintConfig(System<URV>& system, Hart<URV>& hart) const;
+
+    template<typename URV>
+    bool applyAclintConfig(System<URV>& system, Hart<URV>& hart) const;
 
     /// Set val to the reset value of the MISA CSR returning true on
     /// success and false if no such entry in this config or if entry

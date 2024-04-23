@@ -1533,13 +1533,13 @@ System<URV>::loadSnapshot(const std::string& snapDir)
   // Rearm CLINT timers.
   for (auto hartPtr : sysHarts_)
     {
-      uint64_t clintAddr = 0;
-      if (hartPtr->hasClint(clintAddr))
+      uint64_t mtimerAddr = 0;
+      if (hartPtr->hasAclintTimer(mtimerAddr))
 	{
-	  uint64_t timeCmpAddr = clintAddr + 0x4000 + hartPtr->sysHartIndex() * 8;
+          uint64_t timeCmpAddr = mtimerAddr + hartPtr->sysHartIndex() * 8;
 	  uint64_t timeCmp = 0;
 	  memory_->peek(timeCmpAddr, timeCmp, false);
-	  hartPtr->setClintAlarm(timeCmp);
+	  hartPtr->setAclintAlarm(timeCmp);
 	}
     }
 

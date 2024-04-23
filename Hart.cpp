@@ -670,8 +670,8 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   consecutiveIllegalCount_ = 0;
 
   // Trigger software interrupt in hart 0 on reset.
-  if (clintSiOnReset_ and hartIx_ == 0)
-    pokeMemory(clintStart_, uint32_t(1), true);
+  if (aclintSiOnReset_ and hartIx_ == 0)
+    pokeMemory(aclintSwStart_, uint32_t(1), true);
 
   clearTraceData();
 
@@ -957,7 +957,8 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
 
   URV adjusted = val;
-  if (addr >= clintStart_ and addr < clintEnd_)
+  if (hasAclint() and ((addr >= aclintSwStart_ and addr < aclintSwEnd_) or
+      (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_)))
     {
       processClintWrite(addr, sizeof(val), adjusted);
       val = adjusted;
@@ -1818,7 +1819,7 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
     }
 
   ULT narrow = 0;   // Unsigned narrow loaded value
-  if (addr1 >= clintStart_ and addr1 < clintEnd_ and addr1 - clintStart_ >= 0xbff8)
+  if (addr1 >= aclintMtimeStart_ and addr1 < aclintMtimeEnd_)
     {
       uint64_t tm = time_;
       tm = tm >> (addr1 - 0xbff8) * 8;
@@ -2061,7 +2062,7 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
 
   invalidateDecodeCache(virtAddr, ldStSize_);
 
-  if (isClintAddr(addr1))
+  if (isAclintAddr(addr1))
     {
       assert(addr1 == addr2);
       URV val = storeVal;
@@ -2118,9 +2119,9 @@ void
 Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 {
   // We assume that the CLINT device is little endian.
-  if (addr >= clintStart_ and addr < clintStart_ + 0x4000)
+  if (addr >= aclintSwStart_ and addr < aclintSwEnd_)
     {
-      unsigned hartIx = (addr - clintStart_) / 4;
+      unsigned hartIx = (addr - aclintSwStart_) / 4;
       auto hart = indexToHart_(hartIx);
       if (hart and stSize == 4 and (addr & 3) == 0)
 	{
@@ -2129,49 +2130,7 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 	  return;
 	}
     }
-  else if (addr >= clintStart_ + 0x4000 and addr < clintStart_ + 0xbff8) 
-    {
-      // don't expect software to modify clint alarm from two different harts
-      unsigned hartIx = (addr - clintStart_ - 0x4000) / 8;
-      auto hart = indexToHart_(hartIx);
-      if (hart and (stSize == 4 or stSize == 8))
-	{
-	  if (stSize == 4)
-	    {
-	      if ((addr & 7) == 0)  // Multiple of 8
-		{
-		  hart->clintAlarm_ = (hart->clintAlarm_ >> 32) << 32;  // Clear low 32
-		  hart->clintAlarm_ |= uint32_t(storeVal);  // Update low 32.
-		}
-	      else if ((addr & 3) == 0)  // Multiple of 4
-		{
-		  hart->clintAlarm_ = (hart->clintAlarm_ << 32) >> 32;  // Clear high 32
-		  hart->clintAlarm_ |= (uint64_t(storeVal) << 32);  // Update high 32.
-		}
-	    }
-	  else if (stSize == 8)
-	    {
-	      if ((addr & 7) == 0)
-		hart->clintAlarm_ = storeVal + 10000;
-
-	      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
-	      auto inFd = syscall_.effectiveFd(STDIN_FILENO);
-	      if (fromHostValid_ and hasPendingInput(inFd))
-		{
-		  uint64_t v = 0;
-		  peekMemory(fromHost_, v, true);
-		  if (v == 0)
-		    {
-		      int c = char(readCharNonBlocking(inFd));
-		      if (c > 0)
-			memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
-		    }
-		}
-	    }
-	  return;
-	}
-    }
-  else if (addr - clintStart_ >= 0xbff8 and addr <= clintStart_ + 0xbfff)
+  else if (addr >= aclintMtimeStart_ and addr < aclintMtimeEnd_)
     {
       uint64_t tm;
       if (stSize == 4)
@@ -2197,6 +2156,48 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
             }
         }
       return;  // Timer.
+    }
+  else if (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_)
+    {
+      // don't expect software to modify clint alarm from two different harts
+      unsigned hartIx = (addr - aclintMtimerStart_) / 8;
+      auto hart = indexToHart_(hartIx);
+      if (hart and (stSize == 4 or stSize == 8))
+	{
+	  if (stSize == 4)
+	    {
+	      if ((addr & 7) == 0)  // Multiple of 8
+		{
+		  hart->aclintAlarm_ = (hart->aclintAlarm_ >> 32) << 32;  // Clear low 32
+		  hart->aclintAlarm_ |= uint32_t(storeVal);  // Update low 32.
+		}
+	      else if ((addr & 3) == 0)  // Multiple of 4
+		{
+		  hart->aclintAlarm_ = (hart->aclintAlarm_ << 32) >> 32;  // Clear high 32
+		  hart->aclintAlarm_ |= (uint64_t(storeVal) << 32);  // Update high 32.
+		}
+	    }
+	  else if (stSize == 8)
+	    {
+	      if ((addr & 7) == 0)
+		hart->aclintAlarm_ = storeVal + 10000;
+
+	      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
+	      auto inFd = syscall_.effectiveFd(STDIN_FILENO);
+	      if (fromHostValid_ and hasPendingInput(inFd))
+		{
+		  uint64_t v = 0;
+		  peekMemory(fromHost_, v, true);
+		  if (v == 0)
+		    {
+		      int c = char(readCharNonBlocking(inFd));
+		      if (c > 0)
+			memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
+		    }
+		}
+	    }
+	  return;
+	}
     }
 
   // Address did not match any hart entry in clint.
@@ -4759,7 +4760,7 @@ Hart<URV>::simpleRun()
         {
           bool hasLim = (instCountLim_ < ~uint64_t(0));
           if (hasLim or bbFile_ or instrLineTrace_ or not branchTraceFile_.empty() or
-	      isRvs() or isRvu() or isRvv() or hasClint())
+	      isRvs() or isRvu() or isRvv() or hasAclint())
             simpleRunWithLimit();
           else
             simpleRunNoLimit();
@@ -5265,10 +5266,10 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       URV mipVal = csRegs_.peekMip();
       URV prev = mipVal;
 
-      if (hasClint())
+      if (hasAclint())
 	{
 	  // Deliver/clear machine timer interrupt from clint.
-	  if (time_ >= clintAlarm_ + timeShift_)
+	  if (time_ >= aclintAlarm_ + timeShift_)
 	    mipVal = mipVal | (URV(1) << URV(IC::M_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(IC::M_TIMER));
