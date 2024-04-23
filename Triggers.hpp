@@ -273,8 +273,9 @@ namespace WdRiscv
 
     enum class Chain { No, Yes };
 
-    enum class Match { Equal, Masked, GE, LT, MaskHighEqualLow,
-		       MaskLowEqualHigh };
+    enum class Match { Equal = 0, Masked = 1, GE = 2, LT = 3, MaskHighEqualLow = 4,
+		       MaskLowEqualHigh = 5, NotEqual = 8, NotMasked = 9,
+                       NotMaskHighEqualLow = 12, NotMaskLowEqualHigh = 13 };
 
     Trigger(URV data1 = 0, URV data2 = 0, URV /*data3*/ = 0,
 	    URV mask1 = ~URV(0), URV mask2 = ~URV(0), URV mask3 = 0)
