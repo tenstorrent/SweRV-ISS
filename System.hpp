@@ -374,6 +374,9 @@ namespace WdRiscv
     bool perfApiShouldFlush(unsigned hart, uint64_t time, uint64_t tag, bool& flush,
 			    uint64_t& addr);
 
+    std::shared_ptr<TT_PERF::PerfApi> getPerfApi()
+    { return perfApi_; }
+
     /// Produce a signature file used to score tests from the
     /// riscv-arch-tests project.  The file is written to the
     // path specified in the parameter.

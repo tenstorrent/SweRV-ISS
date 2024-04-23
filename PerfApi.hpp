@@ -292,9 +292,11 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
 
     /// Return a pointer of the hart having the given index or null if no such hart.
     std::shared_ptr<Hart64> getHart(unsigned hartIx)
-    {
-      return system_.ithHart(hartIx);
-    }
+    { return system_.ithHart(hartIx); }
+
+    /// Return number of harts int the system.
+    unsigned hartCount() const
+    { return system_.hartCount(); }
 
     /// Enable command log: Log API calls for replay.
     void enableCommandLog(FILE* log)
