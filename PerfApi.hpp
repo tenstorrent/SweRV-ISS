@@ -243,7 +243,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// changes. SC/AMO instructions are executed at this stage and write memory
     /// without going through the store/merge buffer. Return true on success and
     /// false on failure (instruction was not executed or was flushed).
-    bool retire(unsigned hart, uint64_t time, uint64_t tag, FILE* traceFile);
+    bool retire(unsigned hart, uint64_t time, uint64_t tag);
 
     /// Return a pointer to the instruction packet with the given tag in the given
     /// hart. Return a null pointer if the given tag has not yet been fetched.
@@ -296,9 +296,13 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
       return system_.ithHart(hartIx);
     }
 
-    /// Enable command log, contains API call information for replay.
+    /// Enable command log: Log API calls for replay.
     void enableCommandLog(FILE* log)
     { commandLog_ = log; }
+
+    /// Enable instruction tracing to the log file(s).
+    void enableTraceLog(std::vector<FILE*>& files)
+    { traceFiles_ = files; }
 
   protected:
 
@@ -390,6 +394,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     uint64_t time_ = 0;
 
     FILE* commandLog_ = nullptr;
+    std::vector<FILE*> traceFiles_;   // One per hart.
 
     /// Global indexing for all registers.
     const unsigned intRegOffset_ = 0;

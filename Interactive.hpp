@@ -163,8 +163,7 @@ namespace WdRiscv
 		                 const std::vector<std::string>& tokens);
 
     bool perfModelRetireCommand(const std::string& line,
-		                const std::vector<std::string>& tokens,
-                                FILE* traceFile);
+		                const std::vector<std::string>& tokens);
 
     bool perfModelDrainStoreCommand(const std::string& line,
 		                    const std::vector<std::string>& tokens);

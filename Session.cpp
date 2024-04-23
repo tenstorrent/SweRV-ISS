@@ -843,7 +843,7 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
 
   if (args.perfApi)
     {
-      if (not system.enablePerfApi())
+      if (not system.enablePerfApi(traceFiles_))
         errors++;
       if (not args.interactive and commandLog_)
         system.perfApiCommandLog(commandLog_);

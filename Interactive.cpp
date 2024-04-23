@@ -1923,7 +1923,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "perf_model_retire")
     {
-      if (not perfModelRetireCommand(line, tokens, traceFile))
+      if (not perfModelRetireCommand(line, tokens))
         return false;
       if (commandLog)
         fprintf(commandLog, "%s\n", line.c_str());
@@ -2542,8 +2542,7 @@ Interactive<URV>::perfModelExecuteCommand(const std::string& line,
 template <typename URV>
 bool
 Interactive<URV>::perfModelRetireCommand(const std::string& line,
-		                         const std::vector<std::string>& tokens,
-                                         FILE* traceFile)
+		                         const std::vector<std::string>& tokens)
 {
   if (tokens.size() == 2)
     {
@@ -2551,7 +2550,7 @@ Interactive<URV>::perfModelRetireCommand(const std::string& line,
       if (not parseCmdLineNumber("perf-model-retire-tag", tokens.at(1), tag))
         return false;
 
-      return system_.perfApiRetire(hartId_, time_, tag, traceFile);
+      return system_.perfApiRetire(hartId_, time_, tag);
     }
   else
     {

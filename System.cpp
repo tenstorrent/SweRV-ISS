@@ -754,7 +754,7 @@ System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll)
 
 template <typename URV>
 bool
-System<URV>::enablePerfApi()
+System<URV>::enablePerfApi(std::vector<FILE*>& traceFiles)
 {
   if constexpr (sizeof(URV) == 4)
     {
@@ -766,6 +766,7 @@ System<URV>::enablePerfApi()
       perfApi_ = std::make_shared<TT_PERF::PerfApi>(*this);
       for (auto& hart : sysHarts_)
 	hart->setPerfApi(perfApi_);
+      perfApi_->enableTraceLog(traceFiles);
     }
 
   return true;
@@ -877,6 +878,16 @@ System<URV>::perfApiCommandLog(FILE* log)
 
 
 template <typename URV>
+void
+System<URV>::perfApiTraceLog(std::vector<FILE*>& files)
+{
+  if (not perfApi_)
+    return;
+  perfApi_->enableTraceLog(files);
+}
+
+
+template <typename URV>
 bool
 System<URV>::perfApiFetch(unsigned hart, uint64_t time, uint64_t tag, uint64_t vpc)
 {
@@ -910,11 +921,11 @@ System<URV>::perfApiExecute(unsigned hart, uint64_t time, uint64_t tag)
 
 template <typename URV>
 bool
-System<URV>::perfApiRetire(unsigned hart, uint64_t time, uint64_t tag, FILE* traceFile)
+System<URV>::perfApiRetire(unsigned hart, uint64_t time, uint64_t tag)
 {
   if (not perfApi_)
     return false;
-  return perfApi_->retire(hart, time, tag, traceFile);
+  return perfApi_->retire(hart, time, tag);
 }
 
 

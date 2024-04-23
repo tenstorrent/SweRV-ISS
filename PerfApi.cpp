@@ -23,6 +23,8 @@ PerfApi::PerfApi(System64& system)
 {
   unsigned n = system.hartCount();
 
+  traceFiles_.resize(n);
+
   hartPacketMaps_.resize(n);
   hartStoreMaps_.resize(n);
   hartLastRetired_.resize(n);
@@ -477,7 +479,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
 
 bool
-PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag, FILE* traceFile)
+PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
 {
   if (commandLog_)
     fprintf(commandLog_, "hart=%" PRIu32 " time=%" PRIu64 " perf_model_retire %" PRIu64 "\n",
@@ -518,7 +520,7 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag, FILE* traceFile)
     }
 
   hart->setInstructionCount(tag - 1);
-  hart->singleStep(traceFile);
+  hart->singleStep(traceFiles_.at(hartIx));
 
   // Undo renaming of destination registers.
   auto& producers = hartRegProducers_.at(hartIx);

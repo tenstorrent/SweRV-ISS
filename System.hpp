@@ -281,7 +281,7 @@ namespace WdRiscv
     bool enableMcm(unsigned mergeBufferSize, bool mbLineCheckAll);
 
     /// Enable the performance mode API.
-    bool enablePerfApi();
+    bool enablePerfApi(std::vector<FILE*>& traceFiles);
 
     /// Enable/disable total-store-order: Valid only if mcm is enabled.
     void enableTso(bool);
@@ -354,13 +354,15 @@ namespace WdRiscv
     /// Perf model APIs.
     void perfApiCommandLog(FILE* log);
 
+    void perfApiTraceLog(std::vector<FILE*>& files);
+
     bool perfApiFetch(unsigned hart, uint64_t time, uint64_t tag, uint64_t vpc);
 
     bool perfApiDecode(unsigned hart, uint64_t time, uint64_t tag);
 
     bool perfApiExecute(unsigned hart, uint64_t time, uint64_t tag);
 
-    bool perfApiRetire(unsigned hart, uint64_t time, uint64_t tag, FILE* traceFile);
+    bool perfApiRetire(unsigned hart, uint64_t time, uint64_t tag);
 
     bool perfApiDrainStore(unsigned hart, uint64_t time, uint64_t tag);
 
