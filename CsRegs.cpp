@@ -730,15 +730,13 @@ CsRegs<URV>::updateSstc()
   bool hTm = (hMask & 2) >> 1;
 
   auto vstimecmp = findCsr(CsrNumber::VSTIMECMP);
-  if (sstcEnabled_ and hyperEnabled_ and not vstimecmp->isImplemented())
-    vstimecmp->setImplemented(true);
+  vstimecmp->setImplemented(sstcEnabled_ and hyperEnabled_);
   vstimecmp->setHypervisor(stce);
   vstimecmp->setPrivilegeMode(mode);
   if (rv32_)
     {
       auto vstimecmph = findCsr(CsrNumber::VSTIMECMPH);
-      if (sstcEnabled_ and hyperEnabled_ and not vstimecmph->isImplemented())
-	vstimecmph->setImplemented(true);
+      vstimecmph->setImplemented(sstcEnabled_ and hyperEnabled_);
       vstimecmph->setHypervisor(stce);
       vstimecmph->setPrivilegeMode(mode);
     }
