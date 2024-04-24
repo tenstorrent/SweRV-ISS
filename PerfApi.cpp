@@ -551,7 +551,9 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
 
   if (packet.isAmo())
     {
-      if (not commitMemoryWrite(*hart, packet.dpa_, packet.dsize_, packet.storeData_))
+      uint64_t sva = 0, spa1 = 0, spa2 = 0, sval = 0;
+      unsigned size = hart->lastStore(sva, spa1, spa2, sval);
+      if (not commitMemoryWrite(*hart, spa1, size, packet.storeData_))
 	assert(0);
     }
 
