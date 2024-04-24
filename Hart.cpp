@@ -2299,7 +2299,6 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& phy
 #else
 
   physAddr = physAddr2 = virtAddr;
-  assert(not triggerTripped_);
 
   // Inst address translation and memory protection is not affected by MPRV.
 
