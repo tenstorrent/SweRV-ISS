@@ -2094,6 +2094,9 @@ namespace WdRiscv
                               (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_));
     }
 
+    bool isAclintMtimeAddr(uint64_t addr) const
+    { return addr >= aclintMtimeStart_ and addr < aclintMtimeEnd_; }
+
     bool isInterruptorAddr(uint64_t addr, unsigned size) const
     { return hasInterruptor_ and addr == interruptor_ and size == 4; }
 

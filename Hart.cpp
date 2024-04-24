@@ -1818,28 +1818,39 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
       return true;
     }
 
-  ULT narrow = 0;   // Unsigned narrow loaded value
-  if (addr1 >= aclintMtimeStart_ and addr1 < aclintMtimeEnd_)
+  ULT uval = 0;   // Unsigned loaded value
+  bool device = false;  // True if loading from a device.
+  if (isAclintMtimeAddr(addr1))
     {
       uint64_t tm = time_;
       tm = tm >> (addr1 - 0xbff8) * 8;
-      narrow = tm;
+      uval = tm;
+      device = true;
     }
-  else if (imsic_ and ((addr1 >= imsicMbase_ and addr1 < imsicMend_) or
-	              (addr1 >= imsicSbase_ and addr1 < imsicSend_)))
+  else if (isImsicAddr(addr1))
     {
       uint64_t val = 0;
       if (imsicRead_)
         imsicRead_(addr1, sizeof(val), val);
-      narrow = val;
+      uval = val;
+      device = true;
     }
-  else if (pci_ and ((addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_) or
-                    (addr1 >= pciMmioBase_ and addr1 < pciMmioEnd_)))
+  else if (isPciAddr(addr1))
     {
       if (addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_)
-        pci_->config_mmio<ULT>(addr1, narrow, false);
+        pci_->config_mmio<ULT>(addr1, uval, false);
       else
-        pci_->mmio<ULT>(addr1, narrow, false);
+        pci_->mmio<ULT>(addr1, uval, false);
+      device = true;
+    }
+
+  if (device)
+    {
+      if (ooo_)
+	{
+	  uint64_t oooVal = 0;
+	  getOooLoadValue(virtAddr, addr1, addr2, ldStSize_, oooVal);
+	}
     }
   else
     {
@@ -1849,15 +1860,15 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
 	  uint64_t oooVal = 0;
 	  hasOooVal = getOooLoadValue(virtAddr, addr1, addr2, ldStSize_, oooVal);
 	  if (hasOooVal)
-	    narrow = oooVal;
+	    uval = oooVal;
 	}
       if (not hasOooVal)
-	memRead(addr1, addr2, narrow);
+	memRead(addr1, addr2, uval);
     }
 
-  data = narrow;
+  data = uval;
   if (not std::is_same<ULT, LOAD_TYPE>::value)
-    data = int64_t(LOAD_TYPE(narrow)); // Loading signed: Sign extend.
+    data = int64_t(LOAD_TYPE(uval)); // Loading signed: Sign extend.
 
   if (initStateFile_)
     {
@@ -1874,7 +1885,7 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
     {
       TriggerTiming timing = TriggerTiming::Before;
       bool isLoad = true;
-      if (ldStDataTriggerHit(narrow, timing, isLoad))
+      if (ldStDataTriggerHit(uval, timing, isLoad))
 	triggerTripped_ = true;
     }
   if (triggerTripped_)
