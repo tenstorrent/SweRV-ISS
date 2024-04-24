@@ -404,7 +404,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   auto& di = packet.decodedInst();
   if (di.isLoad())
     packet.dsize_ = di.loadSize();
-  else if (di.isStore())
+  else if (di.isStore() or di.isAmo())
     {
       uint64_t sva = 0, spa1 = 0, spa2 = 0, sval = 0;
       unsigned ssize = hart.lastStore(sva, spa1, spa2, sval);
@@ -413,11 +413,13 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
       packet.dva_ = sva;
       packet.dpa_ = spa1;  // FIX TODO : handle page corrsing
-      packet.dsize_ = di.storeSize();
+      packet.dsize_ = ssize;
       assert(ssize == packet.dsize_);
-
-      auto& storeMap =  hartStoreMaps_.at(hartIx);
-      storeMap[packet.tag()] = getInstructionPacket(hartIx, packet.tag());
+      if (di.isStore())
+	{
+	  auto& storeMap =  hartStoreMaps_.at(hartIx);
+	  storeMap[packet.tag()] = getInstructionPacket(hartIx, packet.tag());
+	}
     }
 
   packet.nextIva_ = hart.peekPc();
@@ -547,8 +549,14 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
 
   packet.retired_ = true;
 
+  if (packet.isAmo())
+    {
+      if (not commitMemoryWrite(*hart, packet.dpa_, packet.dsize_, packet.storeData_))
+	assert(0);
+    }
+
   // Stores erased at drain time.
-  if (not packet.decodedInst().isStore())
+  if (not packet.isStore())
     {
       auto& packetMap = hartPacketMaps_.at(hartIx);
       packetMap.erase(packet.tag());
@@ -626,31 +634,8 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
   uint64_t value = packet.opVal_.at(0);
   uint64_t addr = packet.dpa_;    // FIX TODO : Handle page crossing store.
 
-  switch (packet.dsize_)
-    {
-    case 1:
-      if (not hart->pokeMemory(addr, uint8_t(value), true))
-	assert(0);
-      break;
-
-    case 2:
-      if (not hart->pokeMemory(addr, uint16_t(value), true))
-	assert(0);
-      break;
-
-    case 4:
-      if (not hart->pokeMemory(addr, uint32_t(value), true))
-	assert(0);
-      break;
-
-    case 8:
-      if (not hart->pokeMemory(addr, value, true))
-	assert(0);
-      break;
-
-    default:
-      assert(0);
-    }
+  if (not commitMemoryWrite(*hart, addr, packet.dsize_, value))
+    assert(0);
 
   packet.drained_ = true;
 
@@ -732,6 +717,45 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
       }
 
   return true;
+}
+
+
+bool
+PerfApi::setStoreData(unsigned hartIx, uint64_t tag, uint64_t value)
+{
+  auto hart = checkHart("Set-store-data", hartIx);
+  auto packetPtr = checkTag("Set-store-Data", hartIx, tag);
+  if (not packetPtr)
+    {
+      assert(0);
+      return false;
+    }
+
+  auto& packet = *packetPtr;
+  if (not hart or not (packet.isStore() or packet.isAmo()))
+    {
+      assert(0);
+      return false;
+    }
+
+  packet.storeData_ = value;
+  return true;
+}
+
+
+bool
+PerfApi::commitMemoryWrite(Hart64& hart, unsigned addr, unsigned size, uint64_t value)
+{
+  switch (size)
+    {
+    case 1:  return hart.pokeMemory(addr, uint8_t(value), true);
+    case 2:  return hart.pokeMemory(addr, uint16_t(value), true);
+    case 4:  return hart.pokeMemory(addr, uint32_t(value), true);
+    case 8:  return hart.pokeMemory(addr, value, true);
+    default: assert(0);
+    }
+
+  return false;
 }
 
 

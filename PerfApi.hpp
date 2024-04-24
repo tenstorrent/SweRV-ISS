@@ -161,6 +161,11 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     bool isStore() const
     { return di_.isStore(); }
 
+    /// Return true if this an AMO instruction (does not include lr/sc).  Packet must be
+    /// decoded.
+    bool isAmo() const
+    { return di_.isAmo(); }
+
   private:
 
     uint64_t tag_ = 0;
@@ -172,6 +177,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     uint64_t dva_ = 0;        // ld/st data virtual address
     uint64_t dpa_ = 0;        // ld/st data physical address
     uint64_t dsize_ = 0;      // ld/st data size (total)
+    uint64_t storeData_ = 0;  // Store data.
 
     WdRiscv::DecodedInst di_; // decoded instruction.
 
@@ -300,6 +306,10 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// corresponding instruction is not executed or is not a load.
     bool getLoadData(unsigned hart, uint64_t tag, uint64_t vaddr, unsigned size, uint64_t& data);
 
+    /// Set the data value of a store/amo instruction to be commited to memory
+    /// at drain/retire time.
+    bool setStoreData(unsigned hart, uint64_t tag, uint64_t value);
+
     /// Return a pointer of the hart having the given index or null if no such hart.
     std::shared_ptr<Hart64> getHart(unsigned hartIx)
     { return system_.ithHart(hartIx); }
@@ -317,6 +327,8 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     { traceFiles_ = files; }
 
   protected:
+
+    bool commitMemoryWrite(Hart64& hart, unsigned addr, unsigned size, uint64_t value);
 
     void insertPacket(unsigned hartIx, uint64_t tag, std::shared_ptr<InstrPac> ptr)
     {

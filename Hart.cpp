@@ -2094,7 +2094,11 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
     }
 
   if (ooo_)
-    return true;  // Memory updated & lr-canceled when merge buffer is written.
+    {
+      if (perfApi_)
+	perfApi_->setStoreData(hartIx_, instCounter_, storeVal);
+      return true;  // Memory updated & lr-canceled when merge buffer is written.
+    }
 
   memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
   if (addr2 != addr1)

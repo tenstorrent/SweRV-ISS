@@ -304,10 +304,15 @@ namespace WdRiscv
     unsigned loadSize() const
     { return entry_ ? entry_->loadSize() : 0; }
 
-    /// Return the data size in bytes of a store instruction. Return
-    /// zero for a non-store instruction.
+    /// Return the data size in bytes of a store instruction. Return zero for a non-store
+    /// instruction.
     unsigned storeSize() const
     { return entry_ ? entry_->storeSize() : 0; }
+
+    /// Return the data size in bytes of an amo instruction (excluding lr/sc). Return zero
+    /// for a non-amo instruction.
+    unsigned amoSize() const
+    { return entry_ ? entry_->amoSize() : 0; }
 
     /// Return true if this is a branch instruction.
     bool isBranch() const
