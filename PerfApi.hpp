@@ -153,6 +153,14 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     uint64_t tag() const
     { return tag_; }
 
+    /// Return true if this a load instruction.  Packet must be decoded.
+    bool isLoad() const
+    { return di_.isLoad(); }
+
+    /// Return true if this a load instruction.  Packet must be decoded.
+    bool isStore() const
+    { return di_.isStore(); }
+
   private:
 
     uint64_t tag_ = 0;
@@ -210,6 +218,8 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// left unmodified. If a trap happens, whisper will expect the trapPc as the
     /// the vpc on the subsequent call to fetch.
     /// Return true on success and false if given tag has already been fetched.
+    /// The tag is a sequence number. It must be monotonically increasing and
+    /// must not be zero. Tags of flushed intructions may be reusede.
     bool fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
 	       bool& trap, ExceptionCause& cause, uint64_t& trapPC);
 

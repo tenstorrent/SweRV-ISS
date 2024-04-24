@@ -55,7 +55,7 @@ PerfApi::checkTag(const char* caller, unsigned hartIx, uint64_t tag)
   auto iter = packetMap.find(tag);
   if (iter != packetMap.end())
     return iter->second;
-  std::cerr << caller << ": Bad tag: " << tag << '\n';
+  std::cerr << caller << ": Unknown tag (never fetched): " << tag << '\n';
   assert(0);
   return nullptr;
 }
@@ -90,17 +90,30 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
   if (not checkTime("Fetch", time))
     return false;
 
+  if (tag == 0)
+    {    
+      std::cerr << "Error in PerfApi::fetch: Hart-ix=" << hartIx << "tag=" << tag
+		<< " zero tag is reserved.\n";
+      assert(0);
+      return false;
+    }
+
   auto& packetMap = hartPacketMaps_.at(hartIx);
   if (not packetMap.empty() and packetMap.rbegin()->first >= tag)
     {
-      std::cerr << "Error in PerfApi::fetch: tag " << tag << " is not in increasing order.\n";
+      std::cerr << "Error in PerfApi::fetch: Hart-ix=" << hartIx << "tag=" << tag
+		<< " tag is not in increasing order.\n";
       assert(0);
       return false;
     }
 
   auto packet = getInstructionPacket(hartIx, tag);
   if (packet)
-    return false;   // Tag already fetched.
+    {
+      std::cerr << "Error in PerfApi::fetch: Hart-ix=" << hartIx << "tag=" << tag
+		<< " tag is already fetched.\n";
+      return false;   // Tag already fetched.
+    }
 
   auto prev = this->prevFetch_;
   if (prev and not prev->predicted() and not prev->trapped() and not prev->executed())

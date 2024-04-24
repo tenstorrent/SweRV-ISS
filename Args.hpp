@@ -36,7 +36,6 @@ namespace WdRiscv
       std::vector<char*> argv;
       for (auto& arg : args)
 	argv.push_back(arg.data());
-      argv.push_back(nullptr);
       return parseCmdLineArgs(std::span(argv.data(), argv.size()));
     }			      
 
