@@ -446,14 +446,12 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
   // Exactly one of read/write/exec must be true.
   assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
+  va = (exec or xForR_)? va : applyPointerMask(va, priv, true);
+
   if (vsMode_ == Mode::Bare)
-    {
-      va = (exec or xForR_)? va : applyPointerMaskPa(va, priv, true);
-      gpa = pa = va;
-    }
+    gpa = pa = va;
   else
     {
-      va = (exec or xForR_)? va : applyPointerMaskVa(va, priv, true);
       gpa = pa = va;
 
       // Lookup virtual page number in TLB.
