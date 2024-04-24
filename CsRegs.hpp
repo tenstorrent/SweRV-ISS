@@ -1055,9 +1055,10 @@ namespace WdRiscv
     /// counted-down register if its value becomes zero. Return true
     /// if any counted-down register reaches zero; otherwise, return
     /// false.
-    bool icountTriggerHit(PrivilegeMode mode, bool virtMode, bool ie)
+    bool icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode,
+                          PrivilegeMode mode, bool virtMode, bool ie)
     {
-      bool hit = triggers_.icountTriggerHit(mode, virtMode, ie);
+      bool hit = triggers_.icountTriggerHit(prevPrivMode, prevVirtMode, mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))
