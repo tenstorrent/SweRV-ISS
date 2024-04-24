@@ -3963,6 +3963,13 @@ Hart<URV>::vredop_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
   vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
+  unsigned destElems = vecRegs_.singleMax(vecRegs_.elemWidth());
+  for (unsigned ix = 1; ix < destElems; ++ix)
+    if (vecRegs_.tailAgn_ and vecRegs_.tailAgnOnes_)
+      {
+        setAllBits(result);
+        vecRegs_.write(vd, ix, scalarElemGroupX8, result);
+      }
 }
 
 
@@ -4155,6 +4162,17 @@ Hart<URV>::vwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
   vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
+  ElementWidth dsew;
+  if (not vecRegs_.doubleSew(vecRegs_.elemWidth(), dsew))
+    assert(0);
+
+  unsigned destElems = vecRegs_.singleMax(dsew);
+  for (unsigned ix = 1; ix < destElems; ++ix)
+    if (vecRegs_.tailAgn_ and vecRegs_.tailAgnOnes_)
+      {
+        setAllBits(result);
+        vecRegs_.write(vd, ix, scalarElemGroupX8, result);
+      }
 }
 
 
@@ -18893,6 +18911,13 @@ Hart<URV>::vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     result = std::numeric_limits<decltype(result)>::quiet_NaN();
 
   vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
+  unsigned destElems = vecRegs_.singleMax(vecRegs_.elemWidth());
+  for (unsigned ix = 1; ix < destElems; ++ix)
+    if (vecRegs_.tailAgn_ and vecRegs_.tailAgnOnes_)
+      {
+        setAllBits(result);
+        vecRegs_.write(vd, ix, scalarElemGroupX8, result);
+      }
 }
 
 
@@ -18965,6 +18990,13 @@ Hart<URV>::vfredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
   vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
+  unsigned destElems = vecRegs_.singleMax(vecRegs_.elemWidth());
+  for (unsigned ix = 1; ix < destElems; ++ix)
+    if (vecRegs_.tailAgn_ and vecRegs_.tailAgnOnes_)
+      {
+        setAllBits(result);
+        vecRegs_.write(vd, ix, scalarElemGroupX8, result);
+      }
 }
 
 
@@ -19037,6 +19069,13 @@ Hart<URV>::vfredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
   vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
+  unsigned destElems = vecRegs_.singleMax(vecRegs_.elemWidth());
+  for (unsigned ix = 1; ix < destElems; ++ix)
+    if (vecRegs_.tailAgn_ and vecRegs_.tailAgnOnes_)
+      {
+        setAllBits(result);
+        vecRegs_.write(vd, ix, scalarElemGroupX8, result);
+      }
   updateAccruedFpBits();
 }
 
@@ -19109,6 +19148,13 @@ Hart<URV>::vfredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
   vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
+  unsigned destElems = vecRegs_.singleMax(vecRegs_.elemWidth());
+  for (unsigned ix = 1; ix < destElems; ++ix)
+    if (vecRegs_.tailAgn_ and vecRegs_.tailAgnOnes_)
+      {
+        setAllBits(result);
+        vecRegs_.write(vd, ix, scalarElemGroupX8, result);
+      }
   updateAccruedFpBits();
 }
 
@@ -19169,6 +19215,10 @@ Hart<URV>::vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
 
   vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result);
 
+  ElementWidth dsew = vecRegs_.elemWidth();
+  if (not vecRegs_.doubleSew(vecRegs_.elemWidth(), dsew))
+    assert(0);
+
   ELEM_TYPE e1{};
 
   bool anyActive = false;
@@ -19214,10 +19264,6 @@ Hart<URV>::vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
       // Perform reduction first for double-wide on register group.
       doVecFpRedSumAdjacent(tree, vecRegs_.elemMax(), vecRegs_.elemMax() / 2);
 
-      ElementWidth dsew = vecRegs_.elemWidth();
-      if (not vecRegs_.doubleSew(vecRegs_.elemWidth(), dsew))
-	assert(0);
-
       // Perform group-wise reduction.
       if (group > 8)
         doVecFpRedSumGroup(tree, dsew, group);
@@ -19242,6 +19288,13 @@ Hart<URV>::vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
     result = std::numeric_limits<decltype(result)>::quiet_NaN();
 
   vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
+  unsigned destElems = vecRegs_.singleMax(dsew);
+  for (unsigned ix = 1; ix < destElems; ++ix)
+    if (vecRegs_.tailAgn_ and vecRegs_.tailAgnOnes_)
+      {
+        setAllBits(result);
+        vecRegs_.write(vd, ix, scalarElemGroupX8, result);
+      }
 }
 
 
@@ -19318,6 +19371,17 @@ Hart<URV>::vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
     }
 
   vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
+  ElementWidth dsew;
+  if (not vecRegs_.doubleSew(vecRegs_.elemWidth(), dsew))
+    assert(0);
+
+  unsigned destElems = vecRegs_.singleMax(dsew);
+  for (unsigned ix = 1; ix < destElems; ++ix)
+    if (vecRegs_.tailAgn_ and vecRegs_.tailAgnOnes_)
+      {
+        setAllBits(result);
+        vecRegs_.write(vd, ix, scalarElemGroupX8, result);
+      }
 }
 
 
