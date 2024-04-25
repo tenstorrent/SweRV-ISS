@@ -1538,13 +1538,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 
   applySteeConfig(hart, *config_) or errors++;
 
-  tag = "even_odd_trigger_chains";
-  if (config_ -> contains(tag))
-    {
-      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
-      hart.configEvenOddTriggerChaining(flag);
-    }
-
   tag = "load_data_trigger";
   if (config_ -> contains(tag))
     {

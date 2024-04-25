@@ -3018,7 +3018,7 @@ CsRegs<URV>::defineDebugRegs()
   URV reset = 0x10087d;   // Version 1, Tmext/Legacy/Custom types are not supported.
   defineCsr("tinfo",    Csrn::TINFO,    !mand, !imp,  reset, mask, mask);
 
-  mask = 0x88;   // Only MTPTE and MTE bits writable.
+  mask = 0x88;   // Only MPTE and MTE bits writable.
   defineCsr("tcontrol", Csrn::TCONTROL, !mand, !imp, 0, mask, mask);
 
   defineCsr("mcontext", Csrn::MCONTEXT, !mand, !imp, 0, wam, wam);

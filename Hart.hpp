@@ -331,11 +331,6 @@ namespace WdRiscv
     void configExecOpcodeTrigger(bool flag)
     { csRegs_.configExecOpcodeTrigger(flag); }
 
-    /// Restrict chaining only to pairs of consecutive (even-numbered followed
-    /// by odd) triggers.
-    void configEvenOddTriggerChaining(bool flag)
-    { csRegs_.configEvenOddTriggerChaining(flag); }
-
     /// Configure machine mode performance counters returning true on
     /// success and false on failure. N consecutive counters starting
     /// at MHPMCOUNTER3/MHPMCOUNTER3H are made read/write. The

@@ -959,11 +959,6 @@ namespace WdRiscv
     /// Enable triggers.
     void enableTriggers(bool flag);
 
-    /// Restrict chaining only to pairs of consecutive (even-numbered followed
-    /// by odd) triggers.
-    void configEvenOddTriggerChaining(bool flag)
-    { triggers_.setEvenOddChaining(flag); }
-
     /// Return true if one more debug triggers are enabled.
     bool hasActiveTrigger() const
     { return hasActiveTrigger_; }

@@ -345,13 +345,11 @@ namespace WdRiscv
                 }
 	    }
 
-	  // EHX1: Clearing dmode bit clears action field.
 	  if (not data1_.dmodeOnly())
 	    data1_.mcontrol_.action_ = 0;
 	}
       else if (data1_.isInstCount())
 	{
-	  // EHX1: Clearing dmode bit clears action field.
 	  if (not data1_.dmodeOnly())
 	    data1_.icount_.action_ = 0;
 	}
@@ -954,11 +952,6 @@ namespace WdRiscv
       return false;
     }
 
-    /// Restrict chaining only to pairs of consecutive (even-numbered followed
-    /// by odd) triggers.
-    void setEvenOddChaining(bool flag)
-    { chainPairs_ = flag; }
-
     /// Enable load-data triggerring (disabled by default).
     void enableLoadData(bool flag)
     { for ( auto& trig : triggers_) trig.enableLoadData(flag); }
@@ -1030,7 +1023,6 @@ namespace WdRiscv
   private:
 
     std::vector< Trigger<URV> > triggers_;
-    bool chainPairs_ = false;
     bool mmodeEnabled_ = true;  // Triggers trip in Machine mode when true.
   };
 }
