@@ -746,6 +746,10 @@ namespace WdRiscv
         {
           if (pte.hasNapot())
             {
+	      // Table 6.1 of privileged spec (version 1.12) disallows napot for non-leaf
+	      if (not pte.leaf())
+		return false;
+
               if ((pte.ppn0() & 0xf) != 0x8)
                 return false;
               pte.setPpn0((pte.ppn0() & ~0xf) | (va.vpn0() & 0xf));
