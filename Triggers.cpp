@@ -202,8 +202,13 @@ Triggers<URV>::ldStAddrTriggerHit(URV address, TriggerTiming timing,
   bool chainHit = false;  // Chain hit.
   for (auto& trigger : triggers_)
     {
-      if (not trigger.isEnterDebugOnHit() and skip)
-	continue;
+      if (not trigger.isEnterDebugOnHit())
+	{
+	  if (skip)
+	    continue;
+	  if (mode == PrivilegeMode::Machine and not mmodeEnabled_)
+	    continue;  // Cannot fire in machine mode.
+	}
 
       if (not trigger.matchLdStAddr(address, timing, isLoad, mode, virtMode))
 	continue;
@@ -229,8 +234,13 @@ Triggers<URV>::ldStDataTriggerHit(URV value, TriggerTiming timing, bool isLoad,
   bool chainHit = false;  // Chain hit.
   for (auto& trigger : triggers_)
     {
-      if (not trigger.isEnterDebugOnHit() and skip)
-	continue;
+      if (not trigger.isEnterDebugOnHit())
+	{
+	  if (skip)
+	    continue;
+	  if (mode == PrivilegeMode::Machine and not mmodeEnabled_)
+	    continue;  // Cannot fire in machine mode.
+	}
 
       if (not trigger.matchLdStData(value, timing, isLoad, mode, virtMode))
 	continue;
@@ -314,7 +324,8 @@ Triggers<URV>::instOpcodeTriggerHit(URV opcode, TriggerTiming timing,
 
 template <typename URV>
 bool
-Triggers<URV>::icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode, PrivilegeMode mode, bool virtMode, bool interruptEnabled)
+Triggers<URV>::icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode, PrivilegeMode mode,
+				bool virtMode, bool interruptEnabled)
 {
   // Check if we should skip tripping because we are running in
   // machine mode and interrupts disabled.
@@ -330,8 +341,13 @@ Triggers<URV>::icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode, P
       if (not trig.instCountdown(prevPrivMode, prevVirtMode))
         continue;
 
-      if (not trig.isEnterDebugOnHit() and skip)
-	continue;
+      if (not trig.isEnterDebugOnHit())
+	{
+	  if (skip)
+	    continue;
+	  if (mode == PrivilegeMode::Machine and not mmodeEnabled_)
+	    continue;  // Cannot fire in machine mode.
+	}
 
       if (not trig.matchInstCount(mode, virtMode) or
           not trig.data1_.icount_.pending_)
