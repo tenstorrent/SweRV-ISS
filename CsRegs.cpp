@@ -3015,10 +3015,12 @@ CsRegs<URV>::defineDebugRegs()
   defineCsr("tdata3",    Csrn::TDATA3,    !mand, !imp,  0, wam, wam);
 
   URV mask = 0x100ffff;   // Only least sig bit of version is writeable.
-  URV reset = 0x10087d;   // Tmext/Legacy/Custom types are not supported.
+  URV reset = 0x10087d;   // Version 1, Tmext/Legacy/Custom types are not supported.
   defineCsr("tinfo",    Csrn::TINFO,    !mand, !imp,  reset, mask, mask);
 
-  defineCsr("tcontrol", Csrn::TCONTROL, !mand, !imp, 0, wam, wam);
+  mask = 0x88;   // Only MTPTE and MTE bits writable.
+  defineCsr("tcontrol", Csrn::TCONTROL, !mand, !imp, 0, mask, mask);
+
   defineCsr("mcontext", Csrn::MCONTEXT, !mand, !imp, 0, wam, wam);
   if (not nameToNumber_.contains("hcontext"))
     defineCsr("hcontext", Csrn::HCONTEXT, !mand, !imp, 0, wam, wam);
