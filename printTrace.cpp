@@ -418,7 +418,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       // We always record the real csr number for VS/S mappings
       if (not csRegs_.peek(csr, value, false))
         continue;
-      if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TCONTROL)
+      if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TINFO)
         continue; // Debug trigger values collected below.
       cvps.push_back(CVP(URV(csr), value));
     }

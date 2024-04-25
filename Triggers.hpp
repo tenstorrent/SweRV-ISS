@@ -30,7 +30,7 @@ namespace WdRiscv
 			   Itrigger = 4, Etrigger = 5, Mcontrol6 = 6, Tmext = 7, Custom0 = 12,
 			   Custom1 = 13, Custom2 = 14, Disabled = 15 };
 
-  enum class TriggerOffset { Tdata1 = 0, Tdata2 = 1, Tdata3 = 2, Tinfo = 3, Tcontrol = 4 };
+  enum class TriggerOffset { Tdata1 = 0, Tdata2 = 1, Tdata3 = 2, Tinfo = 3 };
 
 
   template <typename URV>
@@ -217,6 +217,7 @@ namespace WdRiscv
     Tinfo tinfo_;
   };
 
+
   /// Union to pack/unpack TDATA1 trigger register value
   template <typename URV>
   union Data1Bits
@@ -299,11 +300,7 @@ namespace WdRiscv
 
     /// Read the tinfo register ot the trigger.
     URV readInfo() const
-    { return info_; }
-
-    /// Read the tcontrol register ot the trigger.
-    URV readControl() const
-    { return control_; }
+    { return info_.value_; }
 
     /// Write the tdata1 register of the trigger. This is the interface for CSR
     /// instructions.
@@ -401,19 +398,6 @@ namespace WdRiscv
       return true;
     }
 
-    /// Write the tcontrol register of the trigger. This is the interface for CSR
-    /// instructions.
-    bool writeControl(bool debugMode, URV value)
-    {
-      if (isDebugModeOnly() and not debugMode)
-	return false;
-
-      info_ = (value & controlWriteMask_) | (data2_ & ~controlWriteMask_);
-      modifiedControl_ = true;
-
-      return true;
-    }
-
     /// Poke tdata1. This allows writing of modifiable bits that are read-only to the CSR
     /// instructions.
     void pokeData1(URV x)
@@ -443,11 +427,6 @@ namespace WdRiscv
     void pokeInfo(URV x)
     { info_ = (x & infoPokeMask_) | (data3_ & ~infoPokeMask_); }
 
-    /// Poke tcontrol. This allows writing of modifiable bits that are read-only to the CSR
-    /// instructions.
-    void pokeControl(URV x)
-    { control_ = (x & controlPokeMask_) | (data3_ & ~controlPokeMask_); }
-
     void configData1(URV reset, URV mask, URV pokeMask)
     { data1Reset_ = reset; data1_.value_ = reset; data1WriteMask_ = mask; data1PokeMask_ = pokeMask;}
 
@@ -459,10 +438,6 @@ namespace WdRiscv
 
     void configInfo(URV reset, URV mask, URV pokeMask)
     { infoReset_ = reset; info_ = reset; infoWriteMask_ = mask; infoPokeMask_ = pokeMask;}
-
-    void configControl(URV reset, URV mask, URV pokeMask)
-    { controlReset_ = reset; control_ = reset; controlWriteMask_ = mask; controlPokeMask_ = pokeMask;}
-
 
     /// Reset trigger.
     void reset()
@@ -722,29 +697,25 @@ namespace WdRiscv
 
   private:
 
-    Data1Bits<URV> data1_ = Data1Bits<URV> (0);
-    URV data2_ = 0;
-    URV data3_ = 0;
-    URV info_ = 0;
-    URV control_ = 0;
+    Data1Bits<URV> data1_ = Data1Bits<URV>(0);
+    URV data2_            = 0;
+    URV data3_            = 0;
+    TinfoBits info_       = TinfoBits(0);
 
-    URV data1Reset_ = 0;
-    URV data2Reset_ = 0;
-    URV data3Reset_ = 0;
-    URV infoReset_ = 0;
-    URV controlReset_ = 0;
+    URV data1Reset_   = 0;
+    URV data2Reset_   = 0;
+    URV data3Reset_   = 0;
+    URV infoReset_    = 0;
 
-    URV data1WriteMask_ = ~URV(0);
-    URV data2WriteMask_ = ~URV(0);
-    URV data3WriteMask_ = 0;              // Place holder.
-    URV infoWriteMask_ = ~URV(0);
-    URV controlWriteMask_ = ~URV(0);
+    URV data1WriteMask_   = ~URV(0);
+    URV data2WriteMask_   = ~URV(0);
+    URV data3WriteMask_   = 0;              // Place holder.
+    URV infoWriteMask_    = ~URV(0);
 
-    URV data1PokeMask_ = ~URV(0);
-    URV data2PokeMask_ = ~URV(0);
-    URV data3PokeMask_ = 0;              // Place holder.
-    URV infoPokeMask_ = ~URV(0);
-    URV controlPokeMask_ = ~URV(0);
+    URV data1PokeMask_   = ~URV(0);
+    URV data2PokeMask_   = ~URV(0);
+    URV data3PokeMask_   = 0;              // Place holder.
+    URV infoPokeMask_    = ~URV(0);
 
     URV data2CompareMask_ = ~URV(0);
 
@@ -918,7 +889,6 @@ namespace WdRiscv
     bool pokeData2(URV trigger, URV val);
     bool pokeData3(URV trigger, URV val);
     bool pokeInfo(URV trigger, URV val);
-    bool pokeControl(URV trigger, URV val);
 
     /// Clear the remembered indices of the triggers written by the
     /// last instruction.
@@ -989,6 +959,11 @@ namespace WdRiscv
     bool getLocalHit(URV ix) const
     { return ix < triggers_.size()? triggers_[ix].getLocalHit() : false; }
 
+    /// Enable/disable firing of triggers in machine mode. This supports MTE bit of the
+    /// TCONTROL CSR.
+    void enableMachineMode(bool flag)
+    { mmodeEnabled_ = flag; }
+
     void getTriggerChange(URV ix, std::vector<std::pair<TriggerOffset, uint64_t>>& changes) const
     {
       changes.clear();
@@ -1008,10 +983,7 @@ namespace WdRiscv
 	changes.push_back(std::pair<TO, uint64_t>(TO::Tdata3, trig.data3_));
 
       if (trig.modifiedInfo_)
-	changes.push_back(std::pair<TO, uint64_t>(TO::Tinfo, trig.info_));
-
-      if (trig.modifiedControl_)
-	changes.push_back(std::pair<TO, uint64_t>(TO::Tcontrol, trig.control_));
+	changes.push_back(std::pair<TO, uint64_t>(TO::Tinfo, trig.info_.value_));
     }
 
     bool isTdata3Modified(URV ix) const
@@ -1044,5 +1016,6 @@ namespace WdRiscv
 
     std::vector< Trigger<URV> > triggers_;
     bool chainPairs_ = false;
+    bool mmodeEnabled_ = true;  // Triggers trip in Machine mode when true.
   };
 }

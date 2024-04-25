@@ -616,7 +616,7 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
       // We always record the real csr number for VS/S mappings
       if (hart.peekCsr(csr, value, false))
 	{
-	  if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TCONTROL)
+	  if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TINFO)
 	    ; // Trigger data collected below.
 	  else
 	    csrMap[URV(csr)] = value;

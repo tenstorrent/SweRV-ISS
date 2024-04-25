@@ -1693,8 +1693,8 @@ namespace WdRiscv
     /// otherwise, bit is readable.
     void enableMenvcfgStce(bool flag);
 
-    /// Return the value of the STCE bit of the MENVCFG CSR. Return
-    /// false if CSR is not implemented or if SSTC extension is off.
+    /// Return the value of the STCE bit of the MENVCFG CSR. Return false if CSR is not
+    /// implemented or if SSTC extension is off.
     bool menvcfgStce()
     {
       auto csr = getImplementedCsr(rv32_? CsrNumber::MENVCFGH : CsrNumber::MENVCFG);
@@ -1711,6 +1711,16 @@ namespace WdRiscv
       MenvcfgFields<uint64_t> fields(value);
       return fields.bits_.STCE;
     }
+
+    /// Return the MTE bit of the TCONTROL CSR. Return false if CSR is not implemented.
+    bool tcontrolMte()
+    {
+      auto csr = getImplementedCsr(CsrNumber::TCONTROL);
+      if (not csr)
+	return false;
+      TcontrolFields<URV> tcf{csr->read()};
+      return tcf.bits_.mte_;
+    }      
 
     /// If flag is false, bit HENVCFG.PBMTE becomes read-only ero;
     /// otherwise, bit is readable.

@@ -80,18 +80,6 @@ Triggers<URV>::readInfo(URV trigger, URV& value) const
 
 template <typename URV>
 bool
-Triggers<URV>::readControl(URV trigger, URV& value) const
-{
-  if (trigger >= triggers_.size())
-    return false;
-
-  value = triggers_.at(trigger).readControl();
-  return true;
-}
-
-
-template <typename URV>
-bool
 Triggers<URV>::writeData1(URV trigIx, bool debugMode, URV value)
 {
   if (trigIx >= triggers_.size())
@@ -167,17 +155,6 @@ Triggers<URV>::writeInfo(URV trigger, bool debugMode, URV value)
     return false;
 
   return triggers_.at(trigger).writeInfo(debugMode, value);
-}
-
-
-template <typename URV>
-bool
-Triggers<URV>::writeControl(URV trigger, bool debugMode, URV value)
-{
-  if (trigger >= triggers_.size())
-    return false;
-
-  return triggers_.at(trigger).writeControl(debugMode, value);
 }
 
 
@@ -280,8 +257,13 @@ Triggers<URV>::instAddrTriggerHit(URV address, TriggerTiming timing,
   bool chainHit = false;  // Chain hit.
   for (auto& trigger : triggers_)
     {
-      if (not trigger.isEnterDebugOnHit() and skip)
-	continue;
+      if (not trigger.isEnterDebugOnHit())
+	{
+	  if (skip)
+	    continue;
+	  if (mode == PrivilegeMode::Machine and not mmodeEnabled_)
+	    continue;  // Cannot fire in machine mode.
+	}
 
       if (not trigger.matchInstAddr(address, timing, mode, virtMode))
 	continue;
@@ -309,8 +291,13 @@ Triggers<URV>::instOpcodeTriggerHit(URV opcode, TriggerTiming timing,
   bool hit = false;
   for (auto& trigger : triggers_)
     {
-      if (not trigger.isEnterDebugOnHit() and skip)
-	continue;
+      if (not trigger.isEnterDebugOnHit())
+	{
+	  if (skip)
+	    continue;
+	  if (mode == PrivilegeMode::Machine and not mmodeEnabled_)
+	    continue;  // Cannot fire in machine mode.
+	}
 
       if (not trigger.matchInstOpcode(opcode, timing, mode, virtMode))
 	continue;
@@ -383,9 +370,6 @@ Triggers<URV>::config(unsigned triggerIx,
 
   if (resets.size() > 3)
     trigger.configInfo(resets.at(3), masks.at(3), pokeMasks.at(3));
-
-  if (resets.size() > 4)
-    trigger.configControl(resets.at(4), masks.at(4), pokeMasks.at(4));
 
   defineChainBounds();
 
@@ -532,20 +516,6 @@ Triggers<URV>::pokeInfo(URV trigger, URV val)
   Trigger<URV>& trig = triggers_.at(trigger);
 
   trig.pokeInfo(val);
-  return true;
-}
-
-
-template <typename URV>
-bool
-Triggers<URV>::pokeControl(URV trigger, URV val)
-{
-  if (trigger >= triggers_.size())
-    return false;
-
-  Trigger<URV>& trig = triggers_.at(trigger);
-
-  trig.pokeControl(val);
   return true;
 }
 

@@ -485,7 +485,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
   if (csr->isDebug() and not inDebugMode())
     return false; // Debug-mode register.
 
-  if (num >= CN::TDATA1 and num <= CN::TCONTROL)
+  if (num >= CN::TDATA1 and num <= CN::TINFO)
     return readTdata(num, mode, value);
 
   if (num == CN::FFLAGS or num == CN::FRM)
@@ -1816,7 +1816,7 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
       return true;  // Writing a locked PMPADDR register has no effect.
     }
 
-  if (num >= CN::TDATA1 and num <= CN::TCONTROL)
+  if (num >= CN::TDATA1 and num <= CN::TINFO)
     {
       if (not writeTdata(num, mode, value))
 	return false;
@@ -1930,6 +1930,8 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
     updateVirtInterruptCtl();
   else if (num == CN::MVIEN or num == CN::MVIP)
     updateShadowSie();
+  else if (num == CN::TCONTROL)
+    triggers_.enableMachineMode(tcontrolMte());
   else
     hyperWrite(csr);   // Update hypervisor CSR aliased bits.
 
@@ -1991,6 +1993,7 @@ CsRegs<URV>::reset()
 
   triggers_.reset();
   mPerfRegs_.reset();
+  triggers_.enableMachineMode(tcontrolMte());
 
   // Cache interrupt enable.
   Csr<URV>* mstatus = getImplementedCsr(CsrNumber::MSTATUS);
@@ -3260,7 +3263,7 @@ CsRegs<URV>::peek(CsrNumber num, URV& value, bool virtMode) const
     return false;
   num = csr->getNumber();  // CSR may have been remapped from S to VS
 
-  if (num >= CN::TDATA1 and num <= CN::TCONTROL)
+  if (num >= CN::TDATA1 and num <= CN::TINFO)
     return readTdata(num, PrivilegeMode::Machine, value);
 
   if (num == CN::FFLAGS or num == CN::FRM)
@@ -3353,7 +3356,7 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
   if (isPmpaddrLocked(num))
     return true;  // Writing a locked PMPADDR register has no effect.
 
-  if (num >= CN::TDATA1 and num <= CN::TCONTROL)
+  if (num >= CN::TDATA1 and num <= CN::TINFO)
     return pokeTdata(num, value);
 
   // Poke mask of SIP/SIE is combined with that of MIE/MIP.
@@ -3426,6 +3429,14 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
     updateFcsrGroupForPoke(num, value);   // fflags and frm are parts of fcsr
   else if (num == CN::VXSAT or num == CN::VXRM or num == CN::VCSR)
     updateVcsrGroupForPoke(num, value); // fflags and frm are parts of fcsr
+  else if (num == CN::MCOUNTEREN or num == CN::SCOUNTEREN or num == CN::HCOUNTEREN)
+    updateCounterPrivilege();  // Reflect counter accessibility in user/supervisor.
+  else if (num == CN::HVICTL)
+    updateVirtInterruptCtl();
+  else if (num == CN::MVIEN or num == CN::MVIP)
+    updateShadowSie();
+  else if (num == CN::TCONTROL)
+    triggers_.enableMachineMode(tcontrolMte());
 
   // Cache interrupt enable.
   if (num == CN::MSTATUS)
@@ -3468,9 +3479,6 @@ CsRegs<URV>::readTdata(CsrNumber number, PrivilegeMode mode, URV& value) const
   if (number == CsrNumber::TINFO)
     return triggers_.readInfo(trigger, value);
 
-  if (number == CsrNumber::TCONTROL)
-    return triggers_.readControl(trigger, value);
-
   return false;
 }
 
@@ -3507,9 +3515,6 @@ CsRegs<URV>::writeTdata(CsrNumber number, PrivilegeMode mode, URV value)
   if (number == CsrNumber::TINFO)
     return triggers_.writeInfo(trigger, dMode, value);
 
-  if (number == CsrNumber::TCONTROL)
-    return triggers_.writeControl(trigger, dMode, value);
-
   return false;
 }
 
@@ -3543,9 +3548,6 @@ CsRegs<URV>::pokeTdata(CsrNumber number, URV value)
 
   if (number == CsrNumber::TINFO)
     return triggers_.pokeInfo(trigger, value);
-
-  if (number == CsrNumber::TCONTROL)
-    return triggers_.pokeControl(trigger, value);
 
   return false;
 }
