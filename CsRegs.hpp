@@ -1074,7 +1074,7 @@ namespace WdRiscv
     /// Set change to the components of the given trigger that were changed by the last
     /// executed instruction. Each entry is a component number (e.g. TDATA1, TINFO, ...)
     /// with the corresponding value.
-    void getTriggerChange(URV trigger, std::vector<std::pair<CsrNumber, uint64_t>>& change)
+    void getTriggerChange(URV trigger, std::vector<std::pair<CsrNumber, uint64_t>>& change) const
     {
       change.clear();
       std::vector<std::pair<TriggerOffset, uint64_t>> temp;
