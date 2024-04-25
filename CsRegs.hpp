@@ -1723,6 +1723,33 @@ namespace WdRiscv
       return tcf.bits_.mte_;
     }      
 
+    /// Save TCONTROL.MTE into TCONTROL.MPTE. This is called on traps to machine mode.
+    void saveTcontrolMte()
+    {
+      auto csr = getImplementedCsr(CsrNumber::TCONTROL);
+      if (not csr)
+	return;
+      TcontrolFields<URV> tcf{csr->read()};
+      tcf.bits_.mpte_ = tcf.bits_.mte_;
+      tcf.bits_.mte_ = 0;
+      csr->poke(tcf.value_);
+      triggers_.enableMachineMode(tcontrolMte());
+      recordWrite(CsrNumber::TCONTROL);
+    }
+
+    /// Restore TCONTROL.MTE from TCONTROL.MPTE. This is called by mret.
+    void restoreTcontrolMte()
+    {
+      auto csr = getImplementedCsr(CsrNumber::TCONTROL);
+      if (not csr)
+	return;
+      TcontrolFields<URV> tcf{csr->read()};
+      tcf.bits_.mte_ = tcf.bits_.mpte_;
+      csr->poke(tcf.value_);
+      triggers_.enableMachineMode(tcontrolMte());
+      recordWrite(CsrNumber::TCONTROL);
+    }
+
     /// If flag is false, bit HENVCFG.PBMTE becomes read-only ero;
     /// otherwise, bit is readable.
     void enableHenvcfgPbmte(bool flag);

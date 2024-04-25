@@ -2702,7 +2702,8 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
 
 template <typename URV>
 void
-Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pcToSave, URV info, URV info2)
+Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pcToSave,
+			URV info, URV info2)
 {
   if (cancelLrOnTrap_)
     cancelLr(CancelLrCause::TRAP);
@@ -2740,7 +2741,8 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
 		{
 		  virtMode_ = true;
 		  // Remap the cause to non-VS cause (e.g. VSTIME becomes STIME).
-		  if (interrupt and (cause == URV(IC::VS_EXTERNAL) or cause == URV(IC::VS_TIMER) or cause == URV(IC::VS_SOFTWARE)))
+		  if (interrupt and (cause == URV(IC::VS_EXTERNAL) or cause == URV(IC::VS_TIMER)
+				     or cause == URV(IC::VS_SOFTWARE)))
 		    cause--;
 		}
 	    }
@@ -2805,6 +2807,8 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
         assert(0 and "Failed to write MTVAL2 register");
       if (isRvh() and not csRegs_.write(CsrNumber::MTINST, PM::Machine, tinst))
 	assert(0 and "Failed to write MTINST register");
+      if (enableTriggers_)
+	csRegs_.saveTcontrolMte();
     }
   else if (nextMode == PM::Supervisor)
     {
@@ -9933,6 +9937,9 @@ namespace WdRiscv
 
     if (triggerTripped_)
       return;
+
+    if (enableTriggers_)
+      csRegs_.restoreTcontrolMte();
 
     // 1. Restore privilege mode, interrupt enable, and virtual mode.
     uint64_t value = csRegs_.peekMstatus();
