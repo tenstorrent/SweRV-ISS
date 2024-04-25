@@ -2006,8 +2006,9 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
-  if (hasTrig and ldStAddrTriggerHit(virtAddr, timing, isLd))
-    triggerTripped_ = true;
+  if (hasTrig and (ldStAddrTriggerHit(virtAddr, timing, isLd) or
+                   ldStDataTriggerHit(storeVal, timing, isLd)))
+      triggerTripped_ = true;
 
   // Determine if a store exception is possible.
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
@@ -2016,11 +2017,6 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
 
-  // Consider store-data trigger if there is no trap or if the trap is
-  // due to an external cause.
-  if (hasTrig and cause == ExceptionCause::NONE)
-    if (ldStDataTriggerHit(storeVal, timing, isLd))
-      triggerTripped_ = true;
   if (triggerTripped_)
     return false;
 
