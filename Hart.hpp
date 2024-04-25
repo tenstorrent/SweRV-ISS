@@ -2657,7 +2657,11 @@ namespace WdRiscv
     /// Make all active icount triggers count down, return true if
     /// any of them counts down to zero.
     bool icountTriggerHit()
-    { return csRegs_.icountTriggerHit(privilegeMode(), virtMode(), isInterruptEnabled()); }
+    {
+      return csRegs_.icountTriggerHit(lastPrivMode(), lastVirtMode(),
+                                      privilegeMode(), virtMode(),
+                                      isInterruptEnabled());
+    }
 
     /// Return true if this hart has one or more active debug
     /// triggers.

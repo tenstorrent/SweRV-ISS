@@ -4619,6 +4619,10 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
                     dumpInitState("dpt", entry.addr_, entry.addr_);
 	    }
 
+	  if (enableTriggers_ and icountTriggerHit())
+	    if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
+	      return true;
+
 	  if (hasException_)
 	    {
               if (doStats)
@@ -4651,9 +4655,6 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	    accumulateInstructionStats(*di);
 	  printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
 
-	  if (enableTriggers_ and icountTriggerHit())
-	    if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
-	      return true;
           prevPerfControl_ = perfControl_;
 
 	  if (traceBranchOn and (di->isBranch() or di->isXRet()))
@@ -5444,6 +5445,12 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       if (mcycleEnabled())
 	++cycleCount_;
 
+      if (enableTriggers_ and icountTriggerHit())
+        {
+	  takeTriggerAction(traceFile, pc_, pc_, instCounter_, false);
+	  return;
+        }
+
       if (hasException_ or hasInterrupt_)
 	{
 	  if (doStats)
@@ -5467,12 +5474,6 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       if (doStats)
 	accumulateInstructionStats(di);
       printInstTrace(inst, instCounter_, instStr, traceFile);
-
-      if (enableTriggers_ and icountTriggerHit())
-	{
-	  takeTriggerAction(traceFile, pc_, pc_, instCounter_, false);
-	  return;
-	}
 
       // If step bit set in dcsr then enter debug mode unless already there.
       if (dcsrStep_ and not ebreakInstDebug_)

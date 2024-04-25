@@ -504,10 +504,11 @@ namespace WdRiscv
     bool matchInstOpcode(URV opcode, TriggerTiming timing,
                          PrivilegeMode mode, bool virtMode) const;
 
-    /// If this trigger is enabled and is of type icount, then make it
-    /// count down returning true if its value becomes zero. Return
-    /// false otherwise.
-    bool instCountdown(PrivilegeMode mode, bool virtMode)
+
+    /// Return true if this trigger is enabled for given mode.
+    /// Return false otherwise. This is called for both
+    /// instruction retire and trap scenarios.
+    bool matchInstCount(PrivilegeMode mode, bool virtMode)
     {
       if (not data1_.isInstCount())
 	return false;  // Not an icount trigger.
@@ -531,8 +532,21 @@ namespace WdRiscv
       if (mode == PrivilegeMode::Reserved)
         return false;
 
-      icount.count_--;
-      return icount.count_ == 0;
+      return true;
+    }
+
+    /// If this trigger is enabled and is of type icount, then make it
+    /// count down returning true if its value becomes zero. Return
+    /// false otherwise.
+    bool instCountdown(PrivilegeMode mode, bool virtMode)
+    {
+      if (not matchInstCount(mode, virtMode))
+        return false;
+      Icount<URV>& icount = data1_.icount_;
+
+      icount.count_ = icount.count_? icount.count_ - 1 : 0;
+      icount.pending_ = not icount.count_;
+      return icount.pending_;
     }
 
     /// Perform a match on the given item (maybe an address or a value) and the data2
@@ -850,7 +864,8 @@ namespace WdRiscv
     /// interrupts are disabled), then consider the trigger as having
     /// tripped and set its hit bit to 1. Return true if any icount
     /// trigger trips; otherwise, return false.
-    bool icountTriggerHit(PrivilegeMode mode, bool virtMode, bool interruptEnabled);
+    bool icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode,
+                          PrivilegeMode mode, bool virtMode, bool ie);
 
     /// Reset the given trigger with the given data1, data2, and data3
     /// values and corresponding write and poke masks. Values are applied

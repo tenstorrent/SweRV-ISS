@@ -314,7 +314,7 @@ Triggers<URV>::instOpcodeTriggerHit(URV opcode, TriggerTiming timing,
 
 template <typename URV>
 bool
-Triggers<URV>::icountTriggerHit(PrivilegeMode mode, bool virtMode, bool interruptEnabled)
+Triggers<URV>::icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode, PrivilegeMode mode, bool virtMode, bool interruptEnabled)
 {
   // Check if we should skip tripping because we are running in
   // machine mode and interrupts disabled.
@@ -324,18 +324,23 @@ Triggers<URV>::icountTriggerHit(PrivilegeMode mode, bool virtMode, bool interrup
 
   for (auto& trig : triggers_)
     {
-      if (not trig.isEnterDebugOnHit() and skip)
-	continue;
-
       if (trig.isModified())
 	continue; // Trigger was written by current instruction.
 
-      if (not trig.instCountdown(mode, virtMode))
+      if (not trig.instCountdown(prevPrivMode, prevVirtMode))
+        continue;
+
+      if (not trig.isEnterDebugOnHit() and skip)
 	continue;
+
+      if (not trig.matchInstCount(mode, virtMode) or
+          not trig.data1_.icount_.pending_)
+        continue; // Next mode is non-matching.
 
       hit = true;
       trig.setHit(true);
       trig.setLocalHit(true);
+      trig.data1_.icount_.pending_ = false;
     }
   return hit;
 }
