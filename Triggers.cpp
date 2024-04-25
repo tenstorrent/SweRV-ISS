@@ -679,52 +679,6 @@ Trigger<URV>::matchLdStData(URV value, TriggerTiming timing, bool isLoad,
 
 
 template <typename URV>
-static bool
-doMatchItem(URV item, URV compare, typename Trigger<URV>::Match match, uint64_t compareMask)
-{
-  using Match = Trigger<URV>::Match;
-
-  switch (match)
-    {
-    case Match::Equal:
-      return item == compare;
-
-    case Match::Masked:
-      return (item & compareMask) == (compare & compareMask);
-
-    case Match::GE:
-      return item >= compare;
-
-    case Match::LT:
-      return item < compare;
-
-    case Match::MaskHighEqualLow:
-      {
-	unsigned halfBitCount = 4*sizeof(URV);
-	// Mask low half of item with data2_ high half
-	item = item & (compare >> halfBitCount);
-	// Compare low half
-	return (item << halfBitCount) == (compare << halfBitCount);
-      }
-
-    case Match::MaskLowEqualHigh:
-      {
-	unsigned halfBitCount = 4*sizeof(URV);
-	// Mask high half of item with data2_ low half
-	item = item & (compare << halfBitCount);
-	// Compare high half
-	return (item >> halfBitCount) == (compare >> halfBitCount);
-      }
-
-    default:
-      assert(0 and "Unhandled match case.");
-    }
-
-  return false;
-}
-
-
-template <typename URV>
 bool
 Trigger<URV>::doMatch(URV item, bool clearBit0) const
 {
@@ -735,11 +689,51 @@ Trigger<URV>::doMatch(URV item, bool clearBit0) const
       item = (item >> 1) << 1;
     }
 
+  auto doMatch = [this] (URV item, URV compare, Match match) -> bool {
+    switch (match)
+      {
+      case Match::Equal:
+        return item == compare;
+
+      case Match::Masked:
+        return (item & data2CompareMask_) == (compare & data2CompareMask_);
+
+      case Match::GE:
+        return item >= compare;
+
+      case Match::LT:
+        return item < compare;
+
+      case Match::MaskHighEqualLow:
+        {
+          unsigned halfBitCount = 4*sizeof(URV);
+          // Mask low half of item with data2_ high half
+          item = item & (compare >> halfBitCount);
+          // Compare low half
+          return (item << halfBitCount) == (compare << halfBitCount);
+        }
+
+      case Match::MaskLowEqualHigh:
+        {
+          unsigned halfBitCount = 4*sizeof(URV);
+          // Mask high half of item with data2_ low half
+          item = item & (compare << halfBitCount);
+          // Compare high half
+          return (item >> halfBitCount) == (compare >> halfBitCount);
+        }
+
+      default:
+        assert(0 and "Unhandled match case.");
+      }
+
+    return false;
+  };
+
   Match match = Match(data1_.mcontrol_.match_);
   if (match >= Match::Equal and match <= Match::MaskLowEqualHigh)
-    return doMatchItem(item, data2, match, data2CompareMask_);
+    return doMatch(item, data2, match);
   else
-    return not doMatchItem(item, data2, Match(uint32_t(match) - 8), data2CompareMask_);
+    return not doMatch(item, data2, Match(uint32_t(match) - 8));
 }
 
 
