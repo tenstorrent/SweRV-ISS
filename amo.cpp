@@ -69,7 +69,7 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, false /*isLoad*/))
+      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/))
 	triggerTripped_ = true;
     }
 
@@ -104,7 +104,7 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
     uval = mcmVal;
   else
     memRead(addr, addr, uval);
-    
+
   value = SRV(int32_t(uval)); // Sign extend.
   return true;  // Success.
 }
@@ -127,7 +127,7 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, false /*isLoad*/))
+      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/))
 	triggerTripped_ = true;
     }
 
