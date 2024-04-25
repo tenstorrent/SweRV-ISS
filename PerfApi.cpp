@@ -567,6 +567,10 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
       if (not commitMemoryWrite(*hart, spa1, size, packet.storeData_))
 	assert(0);
     }
+  else if (packet.isSc())
+    {
+      hart->cancelLr(WdRiscv::CancelLrCause::SC);
+    }
 
   // Stores erased at drain time.
   if (not packet.isStore())

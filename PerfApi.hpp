@@ -166,6 +166,10 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     bool isAmo() const
     { return di_.isAmo(); }
 
+    /// Return true if this a store conditional (sc) instruction.  Packet must be decoded.
+    bool isSc() const
+    { return di_.isSc(); }
+
   private:
 
     uint64_t tag_ = 0;
