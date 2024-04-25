@@ -719,6 +719,8 @@ doMatchItem(URV item, URV compare, typename Trigger<URV>::Match match, uint64_t 
     default:
       assert(0 and "Unhandled match case.");
     }
+
+  return false;
 }
 
 
