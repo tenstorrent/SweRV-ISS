@@ -277,7 +277,16 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
 
       auto& producer = packet.opProducers_.at(i);
       if (producer)
-	value = getDestValue(*producer, gri);
+	{
+	  value = getDestValue(*producer, gri);
+	  if (not producer->executed())
+	    {
+	      std::cerr << "Error: PerfApi::execute: Hart-ix=" << hartIx << "tag=" << tag
+			<< " depends on tag=" << producer->tag_ << " which is not yet executed.\n";
+	      assert(0);
+	      return false;
+	    }
+	}
       else if (not peekRegister(*hart, di.ithOperandType(i), regNum, value))
 	assert(0);
       packet.opVal_.at(i) = value;
@@ -325,8 +334,10 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   using OT = WdRiscv::OperandType;
 
   uint64_t prevPc = hart.peekPc();
+  uint64_t prevInstrCount = hart.getInstructionCount();
 
   hart.pokePc(packet.instrVa());
+  hart.setInstructionCount(packet.tag_ - 1);
 
   std::array<uint64_t, 3> prevVal;  // Previous operand values
 
@@ -487,7 +498,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
     }
 
   hart.pokePc(prevPc);
-  hart.setInstructionCount(hart.getInstructionCount() - 1);
+  hart.setInstructionCount(prevInstrCount);
 
   return true;
 }
