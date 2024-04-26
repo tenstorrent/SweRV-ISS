@@ -486,7 +486,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
     return false; // Debug-mode register.
 
   if (num >= CN::TDATA1 and num <= CN::TINFO)
-    return readTdata(num, mode, value);
+    return readTrigger(num, mode, value);
 
   if (num == CN::FFLAGS or num == CN::FRM)
     {
@@ -1818,7 +1818,7 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
 
   if (num >= CN::TDATA1 and num <= CN::TINFO)
     {
-      if (not writeTdata(num, mode, value))
+      if (not writeTrigger(num, mode, value))
 	return false;
       recordWrite(num);
       return true;
@@ -3266,7 +3266,7 @@ CsRegs<URV>::peek(CsrNumber num, URV& value, bool virtMode) const
   num = csr->getNumber();  // CSR may have been remapped from S to VS
 
   if (num >= CN::TDATA1 and num <= CN::TINFO)
-    return readTdata(num, PrivilegeMode::Machine, value);
+    return readTrigger(num, PrivilegeMode::Machine, value);
 
   if (num == CN::FFLAGS or num == CN::FRM)
     {
@@ -3359,7 +3359,7 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
     return true;  // Writing a locked PMPADDR register has no effect.
 
   if (num >= CN::TDATA1 and num <= CN::TINFO)
-    return pokeTdata(num, value);
+    return pokeTrigger(num, value);
 
   // Poke mask of SIP/SIE is combined with that of MIE/MIP.
   if (num == CN::SIP or num == CN::SIE)
@@ -3462,7 +3462,7 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
 
 template <typename URV>
 bool
-CsRegs<URV>::readTdata(CsrNumber number, PrivilegeMode mode, URV& value) const
+CsRegs<URV>::readTrigger(CsrNumber number, PrivilegeMode mode, URV& value) const
 {
   // Determine currently selected trigger.
   URV trigger = 0;
@@ -3487,7 +3487,7 @@ CsRegs<URV>::readTdata(CsrNumber number, PrivilegeMode mode, URV& value) const
 
 template <typename URV>
 bool
-CsRegs<URV>::writeTdata(CsrNumber number, PrivilegeMode mode, URV value)
+CsRegs<URV>::writeTrigger(CsrNumber number, PrivilegeMode mode, URV value)
 {
   // Determine currently selected trigger.
   URV trigger = 0;
@@ -3523,7 +3523,7 @@ CsRegs<URV>::writeTdata(CsrNumber number, PrivilegeMode mode, URV value)
 
 template <typename URV>
 bool
-CsRegs<URV>::pokeTdata(CsrNumber number, URV value)
+CsRegs<URV>::pokeTrigger(CsrNumber number, URV value)
 {
   // Determine currently selected trigger.
   URV trigger = 0;

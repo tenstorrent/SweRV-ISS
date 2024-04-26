@@ -71,7 +71,10 @@ bool
 Triggers<URV>::readInfo(URV trigger, URV& value) const
 {
   if (trigger >= triggers_.size())
-    return false;
+    {
+      value = 1;  // Per spec.
+      return true;
+    }
 
   value = triggers_.at(trigger).readInfo();
   return true;

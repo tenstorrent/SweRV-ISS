@@ -1232,11 +1232,11 @@ namespace WdRiscv
     /// hypervisor related CSRs.
     void hyperPoke(Csr<URV>* csr);
 
-    bool readTdata(CsrNumber number, PrivilegeMode mode, URV& value) const;
+    bool readTrigger(CsrNumber number, PrivilegeMode mode, URV& value) const;
 
-    bool writeTdata(CsrNumber number, PrivilegeMode mode, URV value);
+    bool writeTrigger(CsrNumber number, PrivilegeMode mode, URV value);
 
-    bool pokeTdata(CsrNumber number, URV value);
+    bool pokeTrigger(CsrNumber number, URV value);
 
     bool readTopi(CsrNumber number, URV& value) const;
 
