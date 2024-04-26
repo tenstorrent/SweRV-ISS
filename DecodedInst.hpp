@@ -286,6 +286,18 @@ namespace WdRiscv
     bool isLoad(bool& isUnsigned) const
     { return entry_ and entry_->isLoad(isUnsigned); }
 
+    /// Return true if this instruction is viewed as a load by the performance
+    /// counters. By default LR is not a perf-load instuctions. Also by default FP loads
+    /// are not perf-loads.
+    bool isPerfLoad() const
+    { return entry_ and entry_->isPerfLoad(); }
+
+    /// Return true if this instruction is viewed as a store by the performance
+    /// counters. By default SC is not a perf-store instuctions. Also by default FP stores
+    /// are not perf-stores.
+    bool isPerfStore() const
+    { return entry_ and entry_->isPerfStore(); }
+
     /// Return true if this is a store instruction. This includes
     /// floating point store and store-conditional but not AMOs.
     bool isStore() const

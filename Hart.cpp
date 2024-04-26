@@ -2510,7 +2510,7 @@ Hart<URV>::initiateInterrupt(InterruptCause cause, URV pc)
     setSwInterrupt(0);
 #endif
 
-  if (not enableCounters_)
+  if (not enableCounters_ or not hasActivePerfCounter())
     return;
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
@@ -2567,9 +2567,8 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
   initiateTrap(di, interrupt, URV(cause), pc, info, info2);
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
-  if (enableCounters_)
-    pregs.updateCounters(EventNumber::Exception, prevPerfControl_,
-                         lastPriv_, lastVirt_);
+  if (enableCounters_ or not hasActivePerfCounter())
+    pregs.updateCounters(EventNumber::Exception, prevPerfControl_, lastPriv_, lastVirt_);
 }
 
 
@@ -3826,15 +3825,17 @@ isDebugModeStopCount(const Hart<URV>& hart)
 
 template <typename URV>
 void
-Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
-				     uint32_t op0, uint32_t op1)
+Hart<URV>::updatePerformanceCounters(const DecodedInst& di)
 {
-  InstId id = info.instId();
+  InstId id = di.instId();
 
   if (isDebugModeStopCount(*this))
     return;
 
   if (hasInterrupt_)
+    return;
+
+  if (not hasActivePerfCounter())
     return;
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
@@ -3856,12 +3857,12 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
 
   pregs.updateCounters(EventNumber::InstCommited, prevPerfControl_, lastPriv_, lastVirt_);
 
-  if (isCompressedInst(inst))
+  if (isCompressedInst(di.inst()))
     pregs.updateCounters(EventNumber::Inst16Commited, prevPerfControl_, lastPriv_, lastVirt_);
   else
     pregs.updateCounters(EventNumber::Inst32Commited, prevPerfControl_, lastPriv_, lastVirt_);
 
-  switch (info.extension())
+  switch (di.extension())
     {
     case RvExtension::I:
       if (id == InstId::fence)
@@ -3870,7 +3871,7 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
 	pregs.updateCounters(EventNumber::Fencei, prevPerfControl_, lastPriv_, lastVirt_);
       else if (id == InstId::mret)
 	pregs.updateCounters(EventNumber::Mret, prevPerfControl_, lastPriv_, lastVirt_);
-      else if (info.isBranch())
+      else if (di.isBranch())
 	{
 	  pregs.updateCounters(EventNumber::Branch, prevPerfControl_, lastPriv_, lastVirt_);
 	  if (lastBranchTaken_)
@@ -3882,7 +3883,7 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
 
     case RvExtension::Zmmul:
     case RvExtension::M:
-      if (info.isMultiply())
+      if (di.isMultiply())
 	pregs.updateCounters(EventNumber::Mult, prevPerfControl_, lastPriv_, lastVirt_);
       else
 	pregs.updateCounters(EventNumber::Div, prevPerfControl_, lastPriv_, lastVirt_);
@@ -3930,12 +3931,12 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
     case RvExtension::Zicsr:
       if ((id == InstId::csrrw or id == InstId::csrrwi))
 	{
-	  auto evNum = op0 == 0 ? EventNumber::CsrWrite : EventNumber::CsrReadWrite;
+	  auto evNum = di.op0() == 0 ? EventNumber::CsrWrite : EventNumber::CsrReadWrite;
 	  pregs.updateCounters(evNum, prevPerfControl_, lastPriv_, lastVirt_);
 	}
       else
 	{
-	  auto evNum = op1 == 0 ? EventNumber::CsrRead : EventNumber::CsrReadWrite;
+	  auto evNum = di.op1() == 0 ? EventNumber::CsrRead : EventNumber::CsrReadWrite;
 	  pregs.updateCounters(evNum, prevPerfControl_, lastPriv_, lastVirt_);
 	}
       pregs.updateCounters(EventNumber::Csr, prevPerfControl_, lastPriv_, lastVirt_);
@@ -3946,13 +3947,13 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
     }
 
   // Some insts (e.g. flw) can be both load/store and FP
-  if (info.isPerfLoad())
+  if (di.isPerfLoad())
     {
       pregs.updateCounters(EventNumber::Load, prevPerfControl_, lastPriv_, lastVirt_);
       if (misalignedLdSt_)
 	pregs.updateCounters(EventNumber::MisalignLoad, prevPerfControl_, lastPriv_, lastVirt_);
     }
-  else if (info.isPerfStore())
+  else if (di.isPerfStore())
     {
       pregs.updateCounters(EventNumber::Store, prevPerfControl_, lastPriv_, lastVirt_);
       if (misalignedLdSt_)
@@ -3965,15 +3966,11 @@ template <typename URV>
 void
 Hart<URV>::updatePerformanceCountersForCsr(const DecodedInst& di)
 {
-  const InstEntry& info = *(di.instEntry());
-
-  if (not enableCounters_)
+  if (not enableCounters_ or not hasActivePerfCounter())
     return;
 
-  if (not info.isCsr())
-    return;
-
-  updatePerformanceCounters(di.inst(), info, di.op0(), di.op1());
+  if (di.isCsr())
+    updatePerformanceCounters(di);
 }
 
 
@@ -3983,13 +3980,13 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 {
   const InstEntry& info = *(di.instEntry());
 
-  if (enableCounters_)
+  if (enableCounters_ and not hasActivePerfCounter())
     {
       // For CSR instruction we need to let the counters count before
       // letting CSR instruction write. Consequently we update the counters
       // from within the code executing the CSR instruction.
       if (not info.isCsr())
-        updatePerformanceCounters(di.inst(), info, di.op0(), di.op1());
+        updatePerformanceCounters(di);
     }
 
   prevPerfControl_ = perfControl_;

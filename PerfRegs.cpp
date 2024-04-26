@@ -52,6 +52,15 @@ PerfRegs::applyPerfEventAssign()
   eventOfCounter_.at(pendingCounter_) = pendingEvent_;
   enableMask_.at(pendingCounter_) = pendingMask_;
 
+  activeCounter_ = false;
+
+  for (auto& event : eventOfCounter_)
+    if (event != EventNumber::None)
+      {
+	activeCounter_ = true;
+	break;
+      }
+
   return true;
 }
 

@@ -2112,6 +2112,11 @@ namespace WdRiscv
 			(addr >= pciMmioBase_ and addr < pciMmioEnd_)));
     }
 
+    /// Return true if there is one or more active performance counter (a counter that is
+    /// assigned a valid event).
+    bool hasActivePerfCounter() const
+    { return csRegs_.mPerfRegs_.hasActiveCounter(); }
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
@@ -2701,8 +2706,7 @@ namespace WdRiscv
     /// Update performance counters: Enabled counters tick up
     /// according to the events associated with the most recent
     /// retired instruction.
-    void updatePerformanceCounters(uint32_t inst, const InstEntry&,
-				   uint32_t op0, uint32_t op1);
+    void updatePerformanceCounters(const DecodedInst& di);
 
     // For CSR instruction we need to let the counters count before
     // letting CSR instruction write. Consequently we update the
