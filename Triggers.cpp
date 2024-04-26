@@ -198,9 +198,11 @@ Triggers<URV>::ldStAddrTriggerHit(URV address, TriggerTiming timing,
                                   bool virtMode,
                                   bool interruptEnabled)
 {
-  // Check if we should skip tripping because we are running in
-  // machine mode and interrupts disabled.
-  bool skip = mode == PrivilegeMode::Machine and not interruptEnabled;
+  // Check if we should skip tripping because we are running in machine mode and
+  // interrupts are enabled.
+  bool skip = false;
+  if (mmodeIfIntDis_ and interruptEnabled)
+    skip = mode == PrivilegeMode::Machine;
 
   bool chainHit = false;  // Chain hit.
   for (auto& trigger : triggers_)
@@ -230,9 +232,11 @@ bool
 Triggers<URV>::ldStDataTriggerHit(URV value, TriggerTiming timing, bool isLoad,
 				  PrivilegeMode mode, bool virtMode, bool interruptEnabled)
 {
-  // Check if we should skip tripping because we are running in
-  // machine mode and interrupts disabled.
-  bool skip = mode == PrivilegeMode::Machine and not interruptEnabled;
+  // Check if we should skip tripping because we are running in machine mode and
+  // interrupts are enabled.
+  bool skip = false;
+  if (mmodeIfIntDis_ and interruptEnabled)
+    skip = mode == PrivilegeMode::Machine;
 
   bool chainHit = false;  // Chain hit.
   for (auto& trigger : triggers_)
@@ -263,9 +267,11 @@ bool
 Triggers<URV>::instAddrTriggerHit(URV address, TriggerTiming timing,
                                   PrivilegeMode mode, bool virtMode, bool interruptEnabled)
 {
-  // Check if we should skip tripping because we are running in
-  // machine mode and interrupts disabled.
-  bool skip = mode == PrivilegeMode::Machine and not interruptEnabled;
+  // Check if we should skip tripping because we are running in machine mode and
+  // interrupts are enabled.
+  bool skip = false;
+  if (mmodeIfIntDis_ and interruptEnabled)
+    skip = mode == PrivilegeMode::Machine;
 
   bool chainHit = false;  // Chain hit.
   for (auto& trigger : triggers_)
@@ -297,9 +303,11 @@ Triggers<URV>::instOpcodeTriggerHit(URV opcode, TriggerTiming timing,
                                     PrivilegeMode mode, bool virtMode,
 				    bool interruptEnabled)
 {
-  // Check if we should skip tripping because we are running in
-  // machine mode and interrupts disabled.
-  bool skip = mode == PrivilegeMode::Machine and not interruptEnabled;
+  // Check if we should skip tripping because we are running in machine mode and
+  // interrupts are enabled.
+  bool skip = false;
+  if (mmodeIfIntDis_ and interruptEnabled)
+    skip = mode == PrivilegeMode::Machine;
 
   bool hit = false;
   for (auto& trigger : triggers_)
@@ -330,9 +338,11 @@ bool
 Triggers<URV>::icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode, PrivilegeMode mode,
 				bool virtMode, bool interruptEnabled)
 {
-  // Check if we should skip tripping because we are running in
-  // machine mode and interrupts disabled.
-  bool skip = mode == PrivilegeMode::Machine and not interruptEnabled;
+  // Check if we should skip tripping because we are running in machine mode and
+  // interrupts are enabled.
+  bool skip = false;
+  if (mmodeIfIntDis_ and interruptEnabled)
+    skip = mode == PrivilegeMode::Machine;
 
   bool hit = false;
 

@@ -1024,5 +1024,6 @@ namespace WdRiscv
 
     std::vector< Trigger<URV> > triggers_;
     bool mmodeEnabled_ = true;  // Triggers trip in Machine mode when true.
+    bool mmodeIfIntDis_ = false;  // Triggers trip in Machine mode only if interrupt disabled. 
   };
 }
