@@ -524,6 +524,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 
     void enableTrace(bool flag)
     {
+      trace_ = flag;
       mfile_.enableTrace(flag);
       sfile_.enableTrace(flag);
       for (auto& g : gfiles_)
@@ -537,6 +538,9 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
                     std::vector<unsigned>& sinterrupts,
                     std::vector<std::vector<unsigned>> ginterrupts) const
     {
+      if (not trace_)
+        return;
+
       mselects.clear();
       sselects.clear();
       gselects.clear();
@@ -566,6 +570,9 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 
     void clearTrace()
     {
+      if (not trace_)
+        return;
+
       mfile_.clearTrace();
       sfile_.clearTrace();
       for (auto& g : gfiles_)
@@ -610,6 +617,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     File mfile_;
     File sfile_;
     std::vector<File> gfiles_;
+    bool trace_ = false;
 
     // Callback functions to mark interrupt pending-and-enabled (or not).
     std::function<void(bool flag)> mInterrupt_;
