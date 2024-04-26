@@ -959,6 +959,10 @@ namespace WdRiscv
     /// Enable triggers.
     void enableTriggers(bool flag);
 
+    /// Enable/disable firing of triggers in machine mode when interrupts are enabled.
+    void enableMmodeTriggersWithIe(bool flag)
+    { triggers_.enableMmodeWithIe(flag); }
+
     /// Return true if one more debug triggers are enabled.
     bool hasActiveTrigger() const
     { return hasActiveTrigger_; }

@@ -1086,13 +1086,17 @@ namespace WdRiscv
     /// instruction.)
     void clearTraceData();
 
-    /// Enable debug-triggers. Without this, triggers will not trip
-    /// and will not cause exceptions.
+    /// Enable debug-triggers. Without this, triggers will not trip and will not cause
+    /// exceptions.
     void enableTriggers(bool flag)
     { enableTriggers_ = flag; csRegs_.enableTriggers(flag);  }
 
-    /// Enable performance counters (count up for some enabled
-    /// performance counters when their events do occur).
+    /// Enable/disable firing of triggers in machine mode when interrupts are enabled.
+    void enableMmodeTriggersWithIe(bool flag)
+    { csRegs_.enableMmodeTriggersWithIe(flag); }
+
+    /// Enable performance counters (count up for some enabled performance counters when
+    /// their events do occur).
     void enablePerformanceCounters(bool flag)
     { enableCounters_ = flag;  }
 

@@ -200,9 +200,7 @@ Triggers<URV>::ldStAddrTriggerHit(URV address, TriggerTiming timing,
 {
   // Check if we should skip tripping because we are running in machine mode and
   // interrupts are enabled.
-  bool skip = false;
-  if (mmodeIfIntDis_ and interruptEnabled)
-    skip = mode == PrivilegeMode::Machine;
+  bool skip = mode == PrivilegeMode::Machine and interruptEnabled and not mmodeWithIe_;
 
   bool chainHit = false;  // Chain hit.
   for (auto& trigger : triggers_)
@@ -234,9 +232,7 @@ Triggers<URV>::ldStDataTriggerHit(URV value, TriggerTiming timing, bool isLoad,
 {
   // Check if we should skip tripping because we are running in machine mode and
   // interrupts are enabled.
-  bool skip = false;
-  if (mmodeIfIntDis_ and interruptEnabled)
-    skip = mode == PrivilegeMode::Machine;
+  bool skip = mode == PrivilegeMode::Machine and interruptEnabled and not mmodeWithIe_;
 
   bool chainHit = false;  // Chain hit.
   for (auto& trigger : triggers_)
@@ -269,9 +265,7 @@ Triggers<URV>::instAddrTriggerHit(URV address, TriggerTiming timing,
 {
   // Check if we should skip tripping because we are running in machine mode and
   // interrupts are enabled.
-  bool skip = false;
-  if (mmodeIfIntDis_ and interruptEnabled)
-    skip = mode == PrivilegeMode::Machine;
+  bool skip = mode == PrivilegeMode::Machine and interruptEnabled and not mmodeWithIe_;
 
   bool chainHit = false;  // Chain hit.
   for (auto& trigger : triggers_)
@@ -305,9 +299,7 @@ Triggers<URV>::instOpcodeTriggerHit(URV opcode, TriggerTiming timing,
 {
   // Check if we should skip tripping because we are running in machine mode and
   // interrupts are enabled.
-  bool skip = false;
-  if (mmodeIfIntDis_ and interruptEnabled)
-    skip = mode == PrivilegeMode::Machine;
+  bool skip = mode == PrivilegeMode::Machine and interruptEnabled and not mmodeWithIe_;
 
   bool hit = false;
   for (auto& trigger : triggers_)
@@ -340,9 +332,7 @@ Triggers<URV>::icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode, P
 {
   // Check if we should skip tripping because we are running in machine mode and
   // interrupts are enabled.
-  bool skip = false;
-  if (mmodeIfIntDis_ and interruptEnabled)
-    skip = mode == PrivilegeMode::Machine;
+  bool skip = mode == PrivilegeMode::Machine and interruptEnabled and not mmodeWithIe_;
 
   bool hit = false;
 

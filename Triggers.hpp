@@ -972,6 +972,10 @@ namespace WdRiscv
     void enableMachineMode(bool flag)
     { mmodeEnabled_ = flag; }
 
+    /// Enable/disable firing of triggers in machine mode when interrupts are enabled.
+    void enableMmodeWithIe(bool flag)
+    { mmodeWithIe_ = flag; }
+
     void getTriggerChange(URV ix, std::vector<std::pair<TriggerOffset, uint64_t>>& changes) const
     {
       changes.clear();
@@ -1024,6 +1028,6 @@ namespace WdRiscv
 
     std::vector< Trigger<URV> > triggers_;
     bool mmodeEnabled_ = true;  // Triggers trip in Machine mode when true.
-    bool mmodeIfIntDis_ = false;  // Triggers trip in Machine mode only if interrupt disabled. 
+    bool mmodeWithIe_ = true;  // Triggers trip in Machine mode when interrupt enabled. 
   };
 }
