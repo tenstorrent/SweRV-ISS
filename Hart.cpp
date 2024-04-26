@@ -2567,7 +2567,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
   initiateTrap(di, interrupt, URV(cause), pc, info, info2);
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
-  if (enableCounters_ or not hasActivePerfCounter())
+  if (enableCounters_ and hasActivePerfCounter())
     pregs.updateCounters(EventNumber::Exception, prevPerfControl_, lastPriv_, lastVirt_);
 }
 
@@ -3252,7 +3252,7 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 
   // This makes sure that counters stop counting after corresponding
   // event reg is written.
-  if (enableCounters_)
+  if (enableCounters_ and hasActivePerfCounter())
     if ((csr >= CN::MHPMEVENT3 and csr <= CN::MHPMEVENT31) or
         (csr >= CN::MHPMEVENTH3 and csr <= CN::MHPMEVENTH31))
       {
@@ -3980,7 +3980,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 {
   const InstEntry& info = *(di.instEntry());
 
-  if (enableCounters_ and not hasActivePerfCounter())
+  if (enableCounters_ and hasActivePerfCounter())
     {
       // For CSR instruction we need to let the counters count before
       // letting CSR instruction write. Consequently we update the counters
