@@ -671,14 +671,6 @@ System<URV>::configPci(uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize
 
 
 template <typename URV>
-std::shared_ptr<PciDev>
-System<URV>::defineVirtioBlk(std::string_view filename, bool ro) const
-{
-  return std::make_shared<Blk>(std::string(filename), ro);
-}
-
-
-template <typename URV>
 bool
 System<URV>::addPciDevices(const std::vector<std::string>& devs)
 {
@@ -719,8 +711,13 @@ System<URV>::addPciDevices(const std::vector<std::string>& devs)
               std::cerr << "virtio-blk requires backing input file" << std::endl;
               return false;
             }
-          dev = defineVirtioBlk(tokens.at(3), false);
+
+          dev = std::make_shared<Blk>(false);
+          if (not std::reinterpret_pointer_cast<Blk>(dev)->open_file(tokens.at(3)))
+            return false;
         }
+      else
+        return false;
 
       if (not pci_->register_device(dev, bus, slot, devmapf, writef))
         return false;

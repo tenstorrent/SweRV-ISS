@@ -290,9 +290,6 @@ namespace WdRiscv
     /// which use transport.
     bool configPci(uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize, unsigned buses, unsigned slots);
 
-    /// Define a virtio-blk device.
-    std::shared_ptr<PciDev> defineVirtioBlk(std::string_view filename, bool ro) const;
-
     /// Add PCIe devices specified by the user.
     bool addPciDevices(const std::vector<std::string>& devs);
 

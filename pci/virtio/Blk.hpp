@@ -10,17 +10,23 @@ class Blk : public Virtio {
   public:
 
     // input file as disk image
-    Blk(const std::string& filename, bool readonly);
+    Blk(bool readonly);
 
     ~Blk()
     {
-      close(fd_);
+      if (fd_)
+        close(fd_);
     }
+
+    bool open_file(const std::string& filename);
 
   private:
 
     bool setup() final
     {
+      if (not fd_)
+        return false;
+
       Virtio::setup();
 
       config_ = get_device_config<virtio_blk_config>();
