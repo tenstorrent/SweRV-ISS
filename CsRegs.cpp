@@ -3440,6 +3440,11 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
       value &= csr->getPokeMask();
       value = legalizeMstatusValue(value);
     }
+  else if (num == CN::TSELECT)
+    {
+      if (value >= triggers_.size())
+	return true; // New value out of bounds. Preserve old.
+    }
 
   csr->poke(value);
 
