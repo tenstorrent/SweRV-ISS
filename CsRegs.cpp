@@ -1898,6 +1898,11 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
 	  value = mnf.value_;
 	}
     }
+  else if (num == CN::TSELECT)
+    {
+      if (value > triggers_.size())
+	value = ~URV(0);  // Change value (section 5.7.1 of debug spec.).
+    }
 
   csr->write(value);
   recordWrite(csrn);

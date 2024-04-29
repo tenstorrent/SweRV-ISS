@@ -754,6 +754,7 @@ namespace WdRiscv
 
     Triggers(unsigned count = 0);
 
+    /// Return the number of defined triggers.
     size_t size() const
     { return triggers_.size(); }
 
