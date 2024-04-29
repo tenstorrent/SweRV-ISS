@@ -7464,7 +7464,7 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs1Mask,
         OperandType::IntReg, OperandMode::Read, rs2Mask, },
 
-      { "c.mop", InstId::c_mop, 0x6081, 0x6781,
+      { "cmop", InstId::c_mop, 0x6081, 0x6781,
         RvExtension::Zcmop, RvFormat::I,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask },
