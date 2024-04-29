@@ -1895,6 +1895,11 @@ namespace WdRiscv
     void setTimeShift(unsigned shift)
     { timeShift_ = shift; }
 
+    // Define time scaling factor such that the time value increment period
+    // is scaled down by 2^N.
+    void setTimeDownSample(unsigned n)
+    { timeDownSample_ = n; }
+
     /// Return true if external interrupts are enabled and one or more
     /// external interrupt that is pending is also enabled. Set cause
     /// to the type of interrupt if one is possible; otherwise, leave
@@ -5041,6 +5046,8 @@ namespace WdRiscv
     unsigned cacheLineSize_ = 64;
 
     uint64_t& time_;             // Only hart 0 increments this value.
+    uint64_t timeDownSample_ = 0;
+    uint64_t timeSample_ = 0;
 
     uint64_t retiredInsts_ = 0;  // Proxy for minstret CSR.
     uint64_t cycleCount_ = 0;    // Proxy for mcycle CSR.
