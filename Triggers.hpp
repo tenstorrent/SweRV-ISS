@@ -270,7 +270,7 @@ namespace WdRiscv
     enum class Select { MatchAddress, MatchData };
 
     enum class Action { RaiseBreak, EnterDebug, StartTrace, StopTrace,
-			EmitTrace };
+			EmitTrace, Reserved, External0, External1 };
 
     enum class Chain { No, Yes };
 
