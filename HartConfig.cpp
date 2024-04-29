@@ -1749,6 +1749,18 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	hart.setTimeShift(shift);
     }
 
+  // Same as above, but this is used to apply a scaling factor
+  // instead of a simple shift.
+  tag = "time_down_sample";
+  if (config_ ->contains(tag))
+    {
+      unsigned n = 0;
+      if (not getJsonUnsigned(tag, config_ -> at(tag), n))
+	errors++;
+      else
+	hart.setTimeDownSample(n);
+    }
+
   tag = "cancel_lr_on_ret";
   if (config_ -> contains(tag))
     {

@@ -4609,7 +4609,10 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	  ++instCounter_;
 
           if (not hartIx_)
-            ++time_;
+            {
+              ++timeSample_;
+              time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+            }
 
 	  if (mcycleEnabled())
 	    ++cycleCount_;
@@ -4900,7 +4903,10 @@ Hart<URV>::simpleRunWithLimit()
       ++instCounter_;
 
       if (not hartIx_)
-        ++time_;
+        {
+          ++timeSample_;
+          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+        }
 
       if (mcycleEnabled())
 	++cycleCount_;
@@ -5450,7 +5456,10 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       ++instCounter_;
 
       if (not hartIx_)
-        ++time_;
+        {
+          ++timeSample_;
+          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+        }
 
       if (processExternalInterrupt(traceFile, instStr))
 	return;  // Next instruction in interrupt handler.
