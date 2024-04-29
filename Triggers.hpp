@@ -186,7 +186,7 @@ namespace WdRiscv
     unsigned          : 1;                  // Reserved -- zero.
     unsigned vu_      : 1;
     unsigned vs_      : 1;
-    unsigned          : 8*sizeof(URV) - 19; // Reserved -- zero.
+    uint64_t          : 8*sizeof(URV) - 19; // Reserved -- zero.
     unsigned hit      : 1;
     unsigned dmode    : 1;
     unsigned type     : 4;
@@ -205,7 +205,7 @@ namespace WdRiscv
     unsigned nmi_     : 1;
     unsigned vu_      : 1;
     unsigned vs_      : 1;
-    unsigned          : sizeof(URV)*8 - 19; // Reserved -- zero.
+    uint64_t          : sizeof(URV)*8 - 19; // Reserved -- zero.
     unsigned hit      : 1;
     unsigned dmode    : 1;
     unsigned type     : 4;
@@ -245,6 +245,8 @@ namespace WdRiscv
     bool isMcontrol6() const { return type() == TriggerType::Mcontrol6; }
     bool isAddrData()  const { return isMcontrol() or isMcontrol6(); }
     bool isInstCount() const { return type() == TriggerType::InstCount; }
+    bool isEtrigger()  const { return type() == TriggerType::Etrigger; }
+    bool isItrigger()  const { return type() == TriggerType::Etrigger; }
 
     /// Return true if trigger is writable only in debug mode.
     bool dmodeOnly() const   { return mcontrol_.dmode_; }
@@ -262,6 +264,8 @@ namespace WdRiscv
     Mcontrol<URV>  mcontrol_;
     Mcontrol6<URV> mcontrol6_;
     Icount<URV> icount_;
+    Etrigger<URV> etrigger_;
+    Itrigger<URV> itrigger_;
   };
 
 
@@ -510,7 +514,6 @@ namespace WdRiscv
     /// opcode.  Return false otherwise.
     bool matchInstOpcode(URV opcode, TriggerTiming timing,
                          PrivilegeMode mode, bool virtMode) const;
-
 
     /// Return true if this trigger is enabled for given mode.
     /// Return false otherwise. This is called for both
@@ -843,13 +846,12 @@ namespace WdRiscv
       return false;
     }
 
-    /// Return true if any of the load (store if isLoad is true)
-    /// triggers trips. A load/store trigger trips if it matches the
-    /// given address and timing and if all the remaining triggers in
-    /// its chain have tripped. Set the local-hit bit of any
-    /// load/store trigger that matches. If the trigger action is
-    /// contingent on interrupts being enabled (ie == true), then the
-    /// trigger will not trip even if its condition is satisfied.
+    /// Return true if any of the load (store if isLoad is true) triggers trips. A
+    /// load/store trigger trips if it matches the given address and timing and if all the
+    /// remaining triggers in its chain have tripped. Set the local-hit bit of any
+    /// load/store trigger that matches. If the trigger action is contingent on interrupts
+    /// being enabled (ie == true), then the trigger will not trip even if its condition
+    /// is satisfied.
     bool ldStAddrTriggerHit(URV address, TriggerTiming, bool isLoad,
                             PrivilegeMode mode, bool virtMode, bool ie);
 
@@ -865,15 +867,19 @@ namespace WdRiscv
     bool instOpcodeTriggerHit(URV opcode, TriggerTiming timing,
                               PrivilegeMode mode, bool virtMode, bool ie);
 
-    /// Make every active icount trigger count down unless it was
-    /// written by the current instruction. If a count-down register
-    /// becomes zero as a result of the count-down and the associated
-    /// actions is not suppressed (e.g. action is ebreak exception and
-    /// interrupts are disabled), then consider the trigger as having
-    /// tripped and set its hit bit to 1. Return true if any icount
-    /// trigger trips; otherwise, return false.
+    /// Make every active icount trigger count down unless it was written by the current
+    /// instruction. If a count-down register becomes zero as a result of the count-down
+    /// and the associated actions is not suppressed (e.g. action is ebreak exception and
+    /// interrupts are disabled), then consider the trigger as having tripped and set its
+    /// hit bit to 1. Return true if any icount trigger trips; otherwise, return false.
     bool icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode,
                           PrivilegeMode mode, bool virtMode, bool ie);
+
+    /// Return true if any of the exception-triggers (etrigger) trips.
+    bool expTriggerHit(URV cause, PrivilegeMode mode, bool virtMode, bool interruptEnabled);
+
+    /// Return true if any of the interrupt-triggers (itrigger) trips.
+    bool intTriggerHit(URV cause, PrivilegeMode mode, bool virtMode, bool interruptEnabled);
 
     /// Reset the given trigger with the given data1, data2, and data3
     /// values and corresponding write and poke masks. Values are applied

@@ -367,6 +367,116 @@ Triggers<URV>::icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode, P
 
 template <typename URV>
 bool
+Triggers<URV>::expTriggerHit(URV cause, PrivilegeMode mode, bool virtMode, bool interruptEnabled)
+{
+  // Check if we should skip tripping because we are running in machine mode and
+  // interrupts are enabled.
+  bool skip = mode == PrivilegeMode::Machine and interruptEnabled and not mmodeWithIe_;
+
+  URV mask = URV(1) << cause;
+
+  bool hit = false;
+
+  for (auto& trigger : triggers_)
+    {
+      using PM = PrivilegeMode;
+
+      if (not trigger.isEnterDebugOnHit())
+	{
+	  if (skip)
+	    continue;
+
+	  if (mode == PM::Machine and not mmodeEnabled_)
+	    continue;  // Cannot fire in machine mode.
+	}
+	  
+      if (not trigger.data1_.isEtrigger())
+	continue;
+
+      auto& etrig = trigger.data1_.etrigger_;
+
+      if (mode == PM::Machine and not etrig.m_)
+	continue;
+
+      if (mode == PM::Supervisor and not virtMode and not etrig.s_)
+	continue;
+
+      if (mode == PrivilegeMode::User and not virtMode and not etrig.u_)
+	continue;
+
+      if (mode == PrivilegeMode::Reserved)
+	continue;
+
+      URV data2 = trigger.data2_;
+      if (data2 & mask)
+	{
+	  trigger.setLocalHit(true);
+	  hit = true;
+	}
+    }
+
+  return hit;
+}
+
+
+template <typename URV>
+bool
+Triggers<URV>::intTriggerHit(URV cause, PrivilegeMode mode, bool virtMode, bool interruptEnabled)
+{
+  // Check if we should skip tripping because we are running in machine mode and
+  // interrupts are enabled.
+  bool skip = mode == PrivilegeMode::Machine and interruptEnabled and not mmodeWithIe_;
+
+  cause = (cause << 1) >> 1;  // Clear most sig bit.
+
+  URV mask = URV(1) << cause;
+
+  bool hit = false;
+
+  for (auto& trigger : triggers_)
+    {
+      using PM = PrivilegeMode;
+
+      if (not trigger.isEnterDebugOnHit())
+	{
+	  if (skip)
+	    continue;
+
+	  if (mode == PM::Machine and not mmodeEnabled_)
+	    continue;  // Cannot fire in machine mode.
+	}
+	  
+      if (not trigger.data1_.isItrigger())
+	continue;
+
+      auto& itrig = trigger.data1_.itrigger_;
+
+      if (mode == PM::Machine and not itrig.m_)
+	continue;
+
+      if (mode == PM::Supervisor and not virtMode and not itrig.s_)
+	continue;
+
+      if (mode == PrivilegeMode::User and not virtMode and not itrig.u_)
+	continue;
+
+      if (mode == PrivilegeMode::Reserved)
+	continue;
+
+      URV data2 = trigger.data2_;
+      if (data2 & mask)
+	{
+	  trigger.setLocalHit(true);
+	  hit = true;
+	}
+    }
+
+  return hit;
+}
+
+
+template <typename URV>
+bool
 Triggers<URV>::config(unsigned triggerIx,
 		      const std::vector<uint64_t>& resets,
 		      const std::vector<uint64_t>& masks,
@@ -771,6 +881,7 @@ Trigger<URV>::matchInstAddr(URV address, TriggerTiming timing, PrivilegeMode mod
   bool clearBit0 = true;  // Clear bit0 of address before matching.
 
   if (getTiming() == timing and
+
       Select(ctl.select_) == Select::MatchAddress and
       ctl.execute_)
     return doMatch(address, clearBit0);
