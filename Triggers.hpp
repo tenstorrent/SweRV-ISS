@@ -41,7 +41,7 @@ namespace WdRiscv
   struct Mcontrol6;
 
 
-  /// Bit fields of tinfo trigger register view.
+  /// Bit fields of tinfo trigger register component.
   struct Tinfo
   {
     unsigned info_     : 16;   // Bits 15-0 : Supported types in type field of TDATA1.
@@ -50,7 +50,7 @@ namespace WdRiscv
   };
 
 
-  /// Bit fields of mcontrol trigger register view. 32-bit version.
+  /// Bit fields of mcontrol trigger register component. 32-bit version.
   template <>
   struct Mcontrol<uint32_t>
     {
@@ -74,7 +74,7 @@ namespace WdRiscv
   } __attribute__((packed));
 
 
-  /// Bit fields of mcontrol trigger register view. 64-bit version.
+  /// Bit fields of mcontrol trigger register component. 64-bit version.
   template <>
   struct Mcontrol<uint64_t>
   {
@@ -100,11 +100,10 @@ namespace WdRiscv
   } __attribute__((packed));
 
 
-  /// Bit fields of mcontrol6 trigger register view. 32-bit version.
+  /// Bit fields of mcontrol6 trigger register component. 32-bit version.
   template <>
   struct Mcontrol6<uint32_t>
   {
-    // SPEC is bogus it has an extra zero bit.
     unsigned load_    : 1;   // Bit  0    : trigger on load
     unsigned store_   : 1;   // Bit  1    : trigger on store
     unsigned execute_ : 1;   // Bit  2    : trigger on instruction
@@ -128,11 +127,10 @@ namespace WdRiscv
   } __attribute__((packed));
 
 
-  /// Bit fields of mcontrol6 trigger register view. 64-bit version.
+  /// Bit fields of mcontrol6 trigger register component. 64-bit version.
   template <>
   struct Mcontrol6<uint64_t>
   {
-    // SPEC is bogus it has an extra zero bit.
     unsigned load_    : 1;   // Bit  0    : trigger on load
     unsigned store_   : 1;   // Bit  1    : trigger on store
     unsigned execute_ : 1;   // Bit  2    : trigger on instruction
@@ -157,7 +155,7 @@ namespace WdRiscv
   } __attribute__((packed));
 
 
-  // Bit fields for Icount trigger register view.
+  /// Bit fields for Icount trigger register component.
   template <typename URV>
   struct Icount
   {
@@ -176,31 +174,42 @@ namespace WdRiscv
   } __attribute__((packed));
 
 
-  /// Bit fields of mcontrol6 trigger register view.
+  /// Bif tields for Etrigger trigger register component.
   template <typename URV>
-  struct Mcontrol6
-    {
-      // SPEC is bogus it has an extra zero bit.
-      unsigned load_    : 1;   // trigger on load
-      unsigned store_   : 1;   // trigger on store
-      unsigned execute_ : 1;   // trigger on instruction
-      unsigned u_       : 1;   // enable in user mode
-      unsigned s_       : 1;   // enable in supervisor mode
-      unsigned          : 1;   // zero bit
-      unsigned m_       : 1;   // enable in machine mode
-      unsigned match_   : 4;   // controls what is considered to be a match
-      unsigned chain_   : 1;
-      unsigned action_  : 4;
-      unsigned size_    : 4;
-      unsigned timing_  : 1;
-      unsigned select_  : 1;
-      unsigned hit_     : 1;
-      unsigned vu_      : 1;   // enable in virtual user mode
-      unsigned vs_      : 1;   // enable in virtual user mode
-      URV               : 8*sizeof(URV) - 30;  // zero bits
-      unsigned dmode_   : 1;   // trigger writable only in debug mode.
-      unsigned type_    : 4;
-  } __attribute__((packed));
+  struct Etrigger
+  {
+    unsigned action_  : 6;
+    unsigned u_       : 1;
+    unsigned s_       : 1;
+    unsigned          : 1;                  // Reserved -- zero.
+    unsigned m_       : 1;
+    unsigned          : 1;                  // Reserved -- zero.
+    unsigned vu_      : 1;
+    unsigned vs_      : 1;
+    unsigned          : 8*sizeof(URV) - 19; // Reserved -- zero.
+    unsigned hit      : 1;
+    unsigned dmode    : 1;
+    unsigned type     : 4;
+  } __attribute((packed));
+
+
+  /// Bif tields for Itrigger trigger register component.
+  template <typename URV>
+  struct Itrigger
+  {
+    unsigned action_  : 6;
+    unsigned u_       : 1;
+    unsigned s_       : 1;
+    unsigned          : 1;                  // Reserved -- zero.
+    unsigned m_       : 1;
+    unsigned nmi_     : 1;
+    unsigned vu_      : 1;
+    unsigned vs_      : 1;
+    unsigned          : sizeof(URV)*8 - 19; // Reserved -- zero.
+    unsigned hit      : 1;
+    unsigned dmode    : 1;
+    unsigned type     : 4;
+  } __attribute((packed));
 
 
   /// Union to pack/unpack TINFO trigger register value
