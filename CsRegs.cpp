@@ -1898,8 +1898,8 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
     }
   else if (num == CN::TSELECT)
     {
-      if (value > triggers_.size())
-	value = ~URV(0);  // Change value (section 5.7.1 of debug spec.).
+      if (value >= triggers_.size())
+	return true; // New value out of bounds. Preserve old.
     }
 
   csr->write(value);
