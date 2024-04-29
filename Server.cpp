@@ -609,22 +609,15 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
   // Map to keep CSRs in order and to drop duplicate entries.
   std::map<URV,URV> csrMap;
 
-  // Components of the triggers that changed (if any).
-  std::vector<bool> tdataChanged(3);
-
-  // Collect changed CSRs and their values. Collect components of
-  // changed trigger.
+  // Collect changed CSRs and their values. Collect components of changed trigger.
   for (CsrNumber csr : csrs)
     {
       URV value;
       // We always record the real csr number for VS/S mappings
       if (hart.peekCsr(csr, value, false))
 	{
-	  if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TDATA3)
-	    {
-	      size_t ix = size_t(csr) - size_t(CsrNumber::TDATA1);
-	      tdataChanged.at(ix) = true;
-	    }
+	  if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TINFO)
+	    ; // Trigger data collected below.
 	  else
 	    csrMap[URV(csr)] = value;
 	}
@@ -633,28 +626,16 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
   // Collect changes associated with trigger register.
   for (unsigned trigger : triggers)
     {
-      uint64_t data1(0), data2(0), data3(0);
-      if (not hart.peekTrigger(trigger, data1, data2, data3))
-	continue;
-
-      // Components of trigger that changed.
-      bool t1 = false, t2 = false, t3 = false;
-      hart.getTriggerChange(trigger, t1, t2, t3);
-
-      if (t1)
+      // Components of trigger that were changed by instruction.
+      std::vector<std::pair<CsrNumber, uint64_t>> trigChanges;
+      hart.getTriggerChange(trigger, trigChanges);
+      
+      for (auto& pair : trigChanges)
 	{
-	  URV addr = (trigger << 16) | unsigned(CsrNumber::TDATA1);
-	  csrMap[addr] = data1;
-	}
-      if (t2)
-	{
-	  URV addr = (trigger << 16) | unsigned(CsrNumber::TDATA2);
-	  csrMap[addr] = data2;
-	}
-      if (t3)
-	{
-	  URV addr = (trigger << 16) | unsigned(CsrNumber::TDATA3);
-	  csrMap[addr] = data3;
+	  auto csrn = pair.first;
+	  auto val = pair.second;
+	  URV ecsr = (trigger << 16) | unsigned(csrn); // effective csr number.
+	  csrMap[ecsr] = val;
 	}
     }
 

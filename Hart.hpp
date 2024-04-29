@@ -314,13 +314,10 @@ namespace WdRiscv
     /// Configure given trigger with given reset values, write and
     /// poke masks. Return true on success and false on failure.
     bool configTrigger(unsigned trigger,
-                       uint64_t rv1, uint64_t rv2, uint64_t rv3,
-		       uint64_t wm1, uint64_t wm2, uint64_t wm3,
-		       uint64_t pm1, uint64_t pm2, uint64_t pm3)
-    {
-      return csRegs_.configTrigger(trigger, rv1, rv2, rv3,
-				   wm1, wm2, wm3, pm1, pm2, pm3);
-    }
+                       const std::vector<uint64_t>& resets,
+		       const std::vector<uint64_t>& masks,
+		       const std::vector<uint64_t>& pokeMasks)
+    { return csRegs_.configTrigger(trigger, resets, masks, pokeMasks); }
 
     /// Enable the extensions defined by the given string. If
     /// updateMisa is true then the MISA CSR reset value is updated to
@@ -335,11 +332,6 @@ namespace WdRiscv
     /// Enable/disable exec-opcode triggering (disabled by default).
     void configExecOpcodeTrigger(bool flag)
     { csRegs_.configExecOpcodeTrigger(flag); }
-
-    /// Restrict chaining only to pairs of consecutive (even-numbered followed
-    /// by odd) triggers.
-    void configEvenOddTriggerChaining(bool flag)
-    { csRegs_.configEvenOddTriggerChaining(flag); }
 
     /// Configure machine mode performance counters returning true on
     /// success and false on failure. N consecutive counters starting
@@ -978,11 +970,11 @@ namespace WdRiscv
     void countTrippedTriggers(unsigned& pre, unsigned& post) const
     { csRegs_.countTrippedTriggers(pre, post); }
 
-    /// Set t1, t2, and t3 to true if corresponding component (tdata1,
-    /// tdata2, an tdata3) of given trigger was changed by the current
-    /// instruction.
-    void getTriggerChange(URV trigger, bool& t1, bool& t2, bool& t3) const
-    { csRegs_.getTriggerChange(trigger, t1, t2, t3); }
+    /// Set change to the components of the given trigger that were changed by the last
+    /// executed instruction. Each entry is a component number (e.g. TDATA1, TINFO, ...)
+    /// with the corresponding value.
+    void getTriggerChange(URV trigger, std::vector<std::pair<CsrNumber, uint64_t>>& change) const
+    { csRegs_.getTriggerChange(trigger, change); }
 
     /// Enable collection of instruction frequencies.
     void enableInstructionFrequency(bool b);
@@ -1108,13 +1100,17 @@ namespace WdRiscv
     /// instruction.)
     void clearTraceData();
 
-    /// Enable debug-triggers. Without this, triggers will not trip
-    /// and will not cause exceptions.
+    /// Enable debug-triggers. Without this, triggers will not trip and will not cause
+    /// exceptions.
     void enableTriggers(bool flag)
-    { enableTriggers_ = flag;  }
+    { enableTriggers_ = flag; csRegs_.enableTriggers(flag);  }
 
-    /// Enable performance counters (count up for some enabled
-    /// performance counters when their events do occur).
+    /// Enable/disable firing of triggers in machine mode when interrupts are enabled.
+    void enableMmodeTriggersWithIe(bool flag)
+    { csRegs_.enableMmodeTriggersWithIe(flag); }
+
+    /// Enable performance counters (count up for some enabled performance counters when
+    /// their events do occur).
     void enablePerformanceCounters(bool flag)
     { enableCounters_ = flag;  }
 
@@ -2651,7 +2647,7 @@ namespace WdRiscv
     bool ldStAddrTriggerHit(URV addr, TriggerTiming t, bool isLoad)
     {
       return csRegs_.ldStAddrTriggerHit(addr, t, isLoad, privilegeMode(),
-					isInterruptEnabled());
+					virtMode(), isInterruptEnabled());
     }
 
     /// Return true if one or more load-address/store-address trigger
@@ -2660,7 +2656,7 @@ namespace WdRiscv
     bool ldStDataTriggerHit(URV value, TriggerTiming t, bool isLoad)
     {
       return csRegs_.ldStDataTriggerHit(value, t, isLoad, privilegeMode(),
-					isInterruptEnabled());
+					virtMode(), isInterruptEnabled());
     }
 
     /// Return true if one or more execution trigger has a hit on the
@@ -2669,7 +2665,7 @@ namespace WdRiscv
     bool instAddrTriggerHit(URV addr, TriggerTiming t)
     {
       return csRegs_.instAddrTriggerHit(addr, t, privilegeMode(),
-					isInterruptEnabled());
+					virtMode(), isInterruptEnabled());
     }
 
     /// Return true if one or more execution trigger has a hit on the
@@ -2678,13 +2674,17 @@ namespace WdRiscv
     bool instOpcodeTriggerHit(URV opcode, TriggerTiming t)
     {
       return csRegs_.instOpcodeTriggerHit(opcode, t, privilegeMode(),
-					  isInterruptEnabled());
+					  virtMode(), isInterruptEnabled());
     }
 
     /// Make all active icount triggers count down, return true if
     /// any of them counts down to zero.
     bool icountTriggerHit()
-    { return csRegs_.icountTriggerHit(privilegeMode(), isInterruptEnabled()); }
+    {
+      return csRegs_.icountTriggerHit(lastPrivMode(), lastVirtMode(),
+                                      privilegeMode(), virtMode(),
+                                      isInterruptEnabled());
+    }
 
     /// Return true if this hart has one or more active debug
     /// triggers.

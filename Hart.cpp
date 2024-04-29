@@ -2018,8 +2018,9 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
-  if (hasTrig and ldStAddrTriggerHit(virtAddr, timing, isLd))
-    triggerTripped_ = true;
+  if (hasTrig and (ldStAddrTriggerHit(virtAddr, timing, isLd) or
+                   ldStDataTriggerHit(storeVal, timing, isLd)))
+      triggerTripped_ = true;
 
   // Determine if a store exception is possible.
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
@@ -2028,11 +2029,6 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
 
-  // Consider store-data trigger if there is no trap or if the trap is
-  // due to an external cause.
-  if (hasTrig and cause == ExceptionCause::NONE)
-    if (ldStDataTriggerHit(storeVal, timing, isLd))
-      triggerTripped_ = true;
   if (triggerTripped_)
     return false;
 
@@ -2315,7 +2311,6 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& phy
 #else
 
   physAddr = physAddr2 = virtAddr;
-  assert(not triggerTripped_);
 
   // Inst address translation and memory protection is not affected by MPRV.
 
@@ -2718,7 +2713,8 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
 
 template <typename URV>
 void
-Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pcToSave, URV info, URV info2)
+Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pcToSave,
+			URV info, URV info2)
 {
   if (cancelLrOnTrap_)
     cancelLr(CancelLrCause::TRAP);
@@ -2756,7 +2752,8 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
 		{
 		  virtMode_ = true;
 		  // Remap the cause to non-VS cause (e.g. VSTIME becomes STIME).
-		  if (interrupt and (cause == URV(IC::VS_EXTERNAL) or cause == URV(IC::VS_TIMER) or cause == URV(IC::VS_SOFTWARE)))
+		  if (interrupt and (cause == URV(IC::VS_EXTERNAL) or cause == URV(IC::VS_TIMER)
+				     or cause == URV(IC::VS_SOFTWARE)))
 		    cause--;
 		}
 	    }
@@ -2821,6 +2818,8 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
         assert(0 and "Failed to write MTVAL2 register");
       if (isRvh() and not csRegs_.write(CsrNumber::MTINST, PM::Machine, tinst))
 	assert(0 and "Failed to write MTINST register");
+      if (enableTriggers_)
+	csRegs_.saveTcontrolMte();
     }
   else if (nextMode == PM::Supervisor)
     {
@@ -4643,6 +4642,10 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
                     dumpInitState("dpt", entry.addr_, entry.addr_);
 	    }
 
+	  if (enableTriggers_ and icountTriggerHit())
+	    if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
+	      return true;
+
 	  if (hasException_)
 	    {
               if (doStats)
@@ -4675,9 +4678,6 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	    accumulateInstructionStats(*di);
 	  printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
 
-	  if (enableTriggers_ and icountTriggerHit())
-	    if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
-	      return true;
           prevPerfControl_ = perfControl_;
 
 	  if (traceBranchOn and (di->isBranch() or di->isXRet()))
@@ -5468,6 +5468,12 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       if (mcycleEnabled())
 	++cycleCount_;
 
+      if (enableTriggers_ and icountTriggerHit())
+        {
+	  takeTriggerAction(traceFile, pc_, pc_, instCounter_, false);
+	  return;
+        }
+
       if (hasException_ or hasInterrupt_)
 	{
 	  if (doStats)
@@ -5491,12 +5497,6 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       if (doStats)
 	accumulateInstructionStats(di);
       printInstTrace(inst, instCounter_, instStr, traceFile);
-
-      if (enableTriggers_ and icountTriggerHit())
-	{
-	  takeTriggerAction(traceFile, pc_, pc_, instCounter_, false);
-	  return;
-	}
 
       // If step bit set in dcsr then enter debug mode unless already there.
       if (dcsrStep_ and not ebreakInstDebug_)
@@ -9956,6 +9956,9 @@ namespace WdRiscv
 
     if (triggerTripped_)
       return;
+
+    if (enableTriggers_)
+      csRegs_.restoreTcontrolMte();
 
     // 1. Restore privilege mode, interrupt enable, and virtual mode.
     uint64_t value = csRegs_.peekMstatus();

@@ -69,7 +69,7 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, false /*isLoad*/))
+      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/))
 	triggerTripped_ = true;
     }
 
@@ -127,7 +127,7 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, false /*isLoad*/))
+      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/))
 	triggerTripped_ = true;
     }
 
@@ -299,7 +299,8 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
-  if (hasTrig and ldStAddrTriggerHit(virtAddr, timing, isLd))
+  if (hasTrig and (ldStAddrTriggerHit(virtAddr, timing, isLd) or
+                   ldStDataTriggerHit(storeVal, timing, isLd)))
     triggerTripped_ = true;
 
   // Misaligned store causes an exception.
@@ -331,10 +332,6 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
 	cause = EC::STORE_ACC_FAULT;
     }
 
-  // If no exception: consider store-data  trigger
-  if (cause == EC::NONE and hasTrig)
-    if (ldStDataTriggerHit(storeVal, timing, isLd))
-      triggerTripped_ = true;
   if (triggerTripped_)
     return false;
 
