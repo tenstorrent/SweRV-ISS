@@ -2646,58 +2646,54 @@ namespace WdRiscv
     /// procerssor state as a side effect to the csr change.
     void postCsrUpdate(CsrNumber csr, URV val, URV lastVal);
 
-    /// Return true if one or more load-address/store-address trigger
-    /// has a hit on the given address and given timing
-    /// (before/after). Set the hit bit of all the triggers that trip.
+    /// Return true if one or more load-address/store-address trigger has a hit on the
+    /// given address and given timing (before/after). Set the hit bit of all the triggers
+    /// that trip.
     bool ldStAddrTriggerHit(URV addr, TriggerTiming t, bool isLoad)
     {
-      return csRegs_.ldStAddrTriggerHit(addr, t, isLoad, privilegeMode(),
-					virtMode(), isInterruptEnabled());
+      return csRegs_.ldStAddrTriggerHit(addr, t, isLoad, privilegeMode(), virtMode(),
+					isInterruptEnabled());
     }
 
-    /// Return true if one or more load-address/store-address trigger
-    /// has a hit on the given data value and given timing
-    /// (before/after). Set the hit bit of all the triggers that trip.
+    /// Return true if one or more load-address/store-address trigger has a hit on the
+    /// given data value and given timing (before/after). Set the hit bit of all the
+    /// triggers that trip.
     bool ldStDataTriggerHit(URV value, TriggerTiming t, bool isLoad)
     {
-      return csRegs_.ldStDataTriggerHit(value, t, isLoad, privilegeMode(),
-					virtMode(), isInterruptEnabled());
+      return csRegs_.ldStDataTriggerHit(value, t, isLoad, privilegeMode(), virtMode(),
+					isInterruptEnabled());
     }
 
-    /// Return true if one or more execution trigger has a hit on the
-    /// given address and given timing (before/after). Set the hit bit
-    /// of all the triggers that trip.
+    /// Return true if one or more execution trigger has a hit on the given address and
+    /// given timing (before/after). Set the hit bit of all the triggers that trip.
     bool instAddrTriggerHit(URV addr, TriggerTiming t)
     {
-      return csRegs_.instAddrTriggerHit(addr, t, privilegeMode(),
-					virtMode(), isInterruptEnabled());
+      return csRegs_.instAddrTriggerHit(addr, t, privilegeMode(), virtMode(),
+					isInterruptEnabled());
     }
 
-    /// Return true if one or more execution trigger has a hit on the
-    /// given opcode value and given timing (before/after). Set the
-    /// hit bit of all the triggers that trip.
+    /// Return true if one or more execution trigger has a hit on the given opcode value
+    /// and given timing (before/after). Set the hit bit of all the triggers that trip.
     bool instOpcodeTriggerHit(URV opcode, TriggerTiming t)
     {
-      return csRegs_.instOpcodeTriggerHit(opcode, t, privilegeMode(),
-					  virtMode(), isInterruptEnabled());
+      return csRegs_.instOpcodeTriggerHit(opcode, t, privilegeMode(), virtMode(),
+					  isInterruptEnabled());
     }
 
-    /// Make all active icount triggers count down, return true if
-    /// any of them counts down to zero.
+    /// Make all active icount triggers count down, return true if any of them counts down
+    /// to zero.
     bool icountTriggerHit()
     {
-      return csRegs_.icountTriggerHit(lastPrivMode(), lastVirtMode(),
-                                      privilegeMode(), virtMode(),
-                                      isInterruptEnabled());
+      return csRegs_.icountTriggerHit(lastPrivMode(), lastVirtMode(), privilegeMode(),
+				      virtMode(), isInterruptEnabled());
     }
 
-    /// Return true if this hart has one or more active debug
-    /// triggers.
+    /// Return true if this hart has one or more active debug triggers.
     bool hasActiveTrigger() const
     { return (enableTriggers_ and csRegs_.hasActiveTrigger()); }
 
-    /// Return true if this hart has one or more active debug instruction
-    /// (execute) triggers.
+    /// Return true if this hart has one or more active debug instruction (execute)
+    /// triggers.
     bool hasActiveInstTrigger() const
     { return (enableTriggers_ and csRegs_.hasActiveInstTrigger()); }
 

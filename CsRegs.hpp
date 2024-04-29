@@ -1000,13 +1000,11 @@ namespace WdRiscv
     bool pokeTrigger(URV trigger, URV data1, URV data2, URV data3)
     { return triggers_.poke(trigger, data1, data2, data3); }
 
-    /// Return true if any of the load (store if isLoad is false)
-    /// triggers trips. A load/store trigger trips if it matches the
-    /// given address and timing and if all the remaining triggers in
-    /// its chain have tripped. Set the local-hit bit of any
-    /// load/store trigger that matches. If a matching load/store
-    /// trigger causes its chain to trip, then set the hit bit of all
-    /// the triggers in that chain.
+    /// Return true if any of the load (store if isLoad is false) triggers trips. A
+    /// load/store trigger trips if it matches the given address and timing and if all the
+    /// remaining triggers in its chain have tripped. Set the local-hit bit of any
+    /// load/store trigger that matches. If a matching load/store trigger causes its chain
+    /// to trip, then set the hit bit of all the triggers in that chain.
     bool ldStAddrTriggerHit(URV addr, TriggerTiming t, bool isLoad,
                             PrivilegeMode mode, bool virtMode, bool ie)
     {
@@ -1054,10 +1052,31 @@ namespace WdRiscv
       return chainHit;
     }
 
-    /// Make every active icount trigger count down unless it was
-    /// written by the current instruction. Set the hit bit of a
-    /// counted-down register if its value becomes zero. Return true
-    /// if any counted-down register reaches zero; otherwise, return
+    /// Similar to instAddrTriggerHit but for interrupt triggers.
+    bool intTriggerHit(URV cause, PrivilegeMode mode, bool virtMode, bool ie)
+    {
+      bool chainHit = triggers_.intTriggerHit(cause, mode, virtMode, ie);
+      URV tselect = 0;
+      peek(CsrNumber::TSELECT, tselect);
+      if (triggers_.getLocalHit(tselect))
+	recordWrite(CsrNumber::TDATA1);  // Hit bit in TDATA1 changed.
+      return chainHit;
+    }
+
+    /// Similar to instAddrTriggerHit but for exception triggers.
+    bool expTriggerHit(URV cause, PrivilegeMode mode, bool virtMode, bool ie)
+    {
+      bool chainHit = triggers_.expTriggerHit(cause, mode, virtMode, ie);
+      URV tselect = 0;
+      peek(CsrNumber::TSELECT, tselect);
+      if (triggers_.getLocalHit(tselect))
+	recordWrite(CsrNumber::TDATA1);  // Hit bit in TDATA1 changed.
+      return chainHit;
+    }
+
+    /// Make every active icount trigger count down unless it was written by the current
+    /// instruction. Set the hit bit of a counted-down register if its value becomes
+    /// zero. Return true if any counted-down register reaches zero; otherwise, return
     /// false.
     bool icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode,
                           PrivilegeMode mode, bool virtMode, bool ie)

@@ -2888,6 +2888,20 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
 
   if (branchBuffer_.max_size() and not branchTraceFile_.empty())
     traceBranch(nullptr);
+
+  if (hasActiveTrigger())
+    {
+      if (interrupt)
+	{	
+	  if (csRegs_.intTriggerHit(cause, privMode_, virtMode_, isInterruptEnabled()))
+	    initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
+	}
+      else if (cause != URV(ExceptionCause::BREAKP))
+	{
+	  if (csRegs_.expTriggerHit(cause, privMode_, virtMode_, isInterruptEnabled()))
+	    initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
+	}
+    }
 }
 
 
