@@ -207,11 +207,8 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
   auto& regProducer = hartRegProducers_.at(hartIx);
 
   const DecodedInst& di = instr.di_;
-  if (not di.isValid())
-    {
-      cerr << "Mcm::updateDependencies: Error: Decoded instr is invalid\n";
-      assert(0 && "Mcm::updateDependencies: Decoded instr is invalid");
-    }
+  assert(di.isValid());
+
   if (di.operandCount() == 0)
     return;
 
@@ -572,6 +569,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	ok = checkStoreData(hartIx, *instr) and ok;
       ok = ppoRule1(hart, *instr) and ok;
     }
+
+  assert(di.isValid());
 
   ok = ppoRule2(hart, *instr) and ok;
   ok = ppoRule3(hart, *instr) and ok;
@@ -1706,7 +1705,8 @@ bool
 Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 1: B is a store, A and B have overlapping addresses.
-  
+  assert(instrB.di_.isValid());
+
   if (not instrB.complete_)
     return true;  // We will try again when B is complete.
 
@@ -1906,12 +1906,6 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
   // Rule 3: A is a write resulting from an AMO/SC instructions, A and
   // B have overlapping addresses, B loads data from A.
  
-  if (not instrB.di_.isValid())
-    {
-      cerr << "Mcm::ppoRule3: Error: Instruction B is not decoded.\n";
-      assert(0 && "Mcm::ppoRule3: Error: Instruction B is not decoded.");
-    }
-
   // Instruction B must be a load/amo instruction.
   const DecodedInst& bdi = instrB.di_;
   if (bdi.isStore())
@@ -1945,12 +1939,7 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 
       // If A is not atomic remove from mask the bytes of B that are
       // covered by A. Done when all bytes of B are covered.
-      if (not instrA.di_.isValid())
-	{
-	  cerr << "Mcm::ppoRule3: Error: Instruction A is not decoded.\n";
-	  assert(0 && "Mcm::ppoRule3: Instruction A is not decoded.");
-	}
-
+      assert(instrA.di_.isValid());
       if (not instrA.di_.isAtomic())
 	{
 	  clearMaskBitsForWrite(instrA, instrB, mask);
@@ -1975,12 +1964,7 @@ template <typename URV>
 bool
 Mcm<URV>::processFence(Hart<URV>& hart, const McmInstr& instr)
 {
-  if (not instr.retired_ or not instr.di_.isValid())
-    {
-      cerr << "Mcm::processFence: Invalid/undecoded instruction\n";
-      assert(0 && "Mcm::processFence: Invalid/undecoded instruction\n");
-      return false;
-    }
+  assert(instr.retired_);
 
   unsigned hartIx = hart.sysHartIndex();
 
@@ -2085,12 +2069,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
 {
   // Rule 4: There is a fence that orders A before B.
 
-  if (not instr.retired_ or not instr.di_.isValid())
-    {
-      cerr << "Mcm::ppoRule4: Invalid/undecoded instruction\n";
-      assert(0 && "Mcm::ppoRule4: Invalid/undecoded instruction\n");
-      return false;
-    }
+  assert(instr.retired_);
 
   if (not instr.di_.isFence())
     return true;
@@ -2199,17 +2178,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 5: A has an acquire annotation
 
-  if (instrB.isCanceled())
-    {
-      cerr << "Mcm::ppoRule5: hart-id=" << hart.hartId() << " B instruction canceled tag="
-	   << instrB.tag_ << '\n';
-      return false;
-    }
-
-  if (not instrB.isMemory())
-    return true;
-
-  if (instrB.memOps_.empty())
+  if (not instrB.isMemory() or instrB.memOps_.empty())
     return true;
 
   auto timeB = effectiveReadTime(instrB);
@@ -2222,12 +2191,8 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
       const auto& instrA =  instrVec.at(tag-1);
       if (instrA.isCanceled() or not instrA.isMemory())
 	continue;
-      if (not instrA.isRetired() or not instrA.di_.isValid())
-	{
-	  cerr << "Mcm::ppoRule5: hart-id=" << hart.hartId()
-	       << " Instruction A invalid/not-retired\n";
-	  assert(0 && "Mcm::ppoRule5: Instruction A invalid/not-retired");
-	}
+
+      assert(instrA.isRetired());
 
       bool hasAquire = instrA.di_.isAtomicAcquire();
       if (isTso_)
@@ -2279,12 +2244,6 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 6: B has a release annotation
 
-  if (instrB.isCanceled() or not instrB.di_.isValid())
-    {
-      cerr << "Mcm::ppoRule6: Instr B canceled/invalid\n";
-      assert(0 && "Mcm::ppoRule6: Instr B canceled/invalid");
-    }
-
   bool hasRelease = instrB.di_.isAtomicRelease();
   if (isTso_)
     hasRelease = hasRelease or instrB.di_.isStore() or instrB.di_.isAmo();
@@ -2299,11 +2258,8 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
       const auto& instrA =  instrVec.at(tag-1);
       if (instrA.isCanceled() or not instrA.isMemory())
 	continue;
-      if (not instrA.isRetired() or not instrA.di_.isValid())
-	{
-	  cerr << "Mcm::ppoRule6: Instr A invalid/not-retired\n";
-	  assert(0 && "Mcm::ppoRule6: Instr A invalid/not-retired");
-	}
+
+      assert(not instrA.isRetired());
 
       bool fail = false;
       if (instrA.di_.isAmo())
@@ -2330,11 +2286,6 @@ bool
 Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 7: A and B have RCsc annotations.
-  if (instrB.isCanceled() or not instrB.di_.isValid())
-    {
-      cerr << "Mcm::ppoRule7: Instr B canceled/invalid\n";
-      assert(0 && "Mcm::ppoRule7: Instr B canceled/invalid");
-    }
 
   bool bHasRc = instrB.di_.isAtomicRelease() or instrB.di_.isAtomicAcquire();
   if (isTso_)
@@ -2350,11 +2301,8 @@ Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
       const auto& instrA =  instrVec.at(tag-1);
       if (instrA.isCanceled() or not instrA.isMemory())
 	continue;
-      if (not instrA.isRetired() or not instrA.di_.isValid())
-	{
-	  cerr << "Mcm::ppoRule7: Instr A invalid/not-retired\n";
-	  assert(0 && "Mcm::ppoRule&: Instr A invalid/not-retired");
-	}
+
+      assert(instrA.isRetired());
 
       bool aHasRc = instrA.di_.isAtomicRelease() or instrA.di_.isAtomicAcquire();
       if (isTso_)
@@ -2387,22 +2335,7 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 8: B is a store-conditional, A is a load-reserve paired with B.
 
-  if (instrB.isCanceled())
-    {
-      cerr << "Mcm::ppoRule8: Instr B canceled\n";
-      assert(0 && "Mcm::ppoRule8: Instr B canceled");
-    }
-
-  if (not instrB.isMemory())
-    return true;
-
-  if (not instrB.di_.isValid())
-    {
-      cerr << "Mcm::ppoRule8: Instr B undecoded\n";
-      assert(0 && "Mcm::ppoRule8: Instr B undecoded");
-    }
-
-  if (not instrB.di_.isSc())
+  if (not instrB.isMemory() or not instrB.di_.isSc())
     return true;
 
   uint64_t addr = 0, value = 0;
@@ -2419,11 +2352,7 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
       if (instrA.isCanceled())
 	continue;
 
-      if (not instrA.isRetired() or not instrA.di_.isValid())
-	{
-	  cerr << "Mcm::ppoRule8: Instr A undecoded/invalid\n";
-	  assert(0 && "Mcm::ppoRule8: Instr B undecoded/invalid");
-	}
+      assert(instrA.isRetired());
 
       // Read happen before retire, instrucions retire in program order, if an instruction
       // retires before B performs, no eralier instruction can read after B.
@@ -2454,12 +2383,6 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 9: B has a syntactic address dependency on A
 
-  if (instrB.isCanceled())
-    {
-      cerr << "Mcm::ppoRule9: Instr B canceled: tag=" << instrB.tag_ << "\n";
-      return false;
-    }
-
   if (not instrB.isMemory())
     return true;
 
@@ -2489,12 +2412,6 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 10: B has a syntactic data dependency on A
 
-  if (instrB.isCanceled())
-    {
-      cerr << "Mcm::ppoRule10: Instr B canceled: tag=" << instrB.tag_ << "\n";
-      return false;
-    }
-
   const auto& bdi = instrB.di_;
   if (bdi.isStore() or bdi.isAmo())
     {
@@ -2520,12 +2437,6 @@ bool
 Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 11: B is a store with a control dependency on A
-
-  if (instrB.isCanceled())
-    {
-      cerr << "Mcm::ppoRule11: Instr B canceled\n";
-      assert(0 && "Mcm::ppoRule11: Instr B canceled");
-    }
 
   unsigned hartIx = hart.sysHartIndex();
 
@@ -2563,12 +2474,6 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
   // 1. B loads a value written by M
   // 2. M has an address or data denpendency on A
 
-  if (instrB.isCanceled())
-    {
-      cerr << "Mcm::ppoRule12: Instr B canceled: tag=" << instrB.tag_ << "\n";
-      return false;
-    }
-
   if (not instrB.isLoad_)
     return true;  // NA: B is not a load.
 
@@ -2577,9 +2482,9 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
   if (instrVec.empty() or instrB.tag_ == 0)
     return true;  // Nothing before B in instruction order.
 
-  // Check all preceeding instructions for a store M with address
-  // overlapping that of B. This is expensive. We need to keep set of
-  // non-finished stores.
+  auto earlyB = earliestOpTime(instrB);
+
+  // Check all preceeding instructions for a store M with address overlapping that of B.
   size_t ix = std::min(size_t(instrB.tag_), instrVec.size());
   for ( ; ix ; --ix)
     {
@@ -2587,6 +2492,12 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
       const auto& instrM = instrVec.at(mtag);
       if (instrM.isCanceled() or not instrM.di_.isValid())
 	continue;
+
+      // Quit if we find a load with retire time earlier than B load time. Found load
+      // would be an A that will not fail (all preceeding As will not fail either). M will
+      // only depend on loads and will never depend on a store.
+      if (instrM.isLoad_ and instrM.retireTime_ < earlyB)
+	break;
 
       const auto& mdi = instrM.di_;
       if ((not mdi.isStore() and not mdi.isAmo()) or not instrM.overlaps(instrB))
@@ -2604,7 +2515,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 		cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
 		     << aTag << " tag2=" << instrB.tag_ << " mtag=" << mtag
 		     << " time1=" << latestOpTime(instrA)
-		     << " time2=" << earliestOpTime(instrB) << '\n';
+		     << " time2=" << earlyB << '\n';
 		return false;
 	      }
 	}
