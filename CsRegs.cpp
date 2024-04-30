@@ -2821,23 +2821,23 @@ CsRegs<URV>::defineUserRegs()
   bool imp  = true;    // Implemented.
   URV  wam  = ~URV(0); // Write-all mask: all bits writeable.
 
-  using Csrn = CsrNumber;
+  using CN = CsrNumber;
 
   // User Counter/Timers
-  auto c = defineCsr("cycle", Csrn::CYCLE,    !mand, !imp,  0, wam, wam);
+  auto c = defineCsr("cycle", CN::CYCLE,    !mand, !imp,  0, wam, wam);
   c->setHypervisor(true);
-  c = defineCsr("time",     Csrn::TIME,     !mand, !imp,  0, wam, wam);
+  c = defineCsr("time",       CN::TIME,     !mand, !imp,  0, wam, wam);
   c->setHypervisor(true);
-  c = defineCsr("instret",  Csrn::INSTRET,  !mand, !imp,  0, wam, wam);
+  c = defineCsr("instret",    CN::INSTRET,  !mand, !imp,  0, wam, wam);
   c->setHypervisor(true);
 
-  c = defineCsr("cycleh",   Csrn::CYCLEH,   !mand, !imp, 0, wam, wam);
+  c = defineCsr("cycleh",     CN::CYCLEH,   !mand, !imp, 0, wam, wam);
   c->setHypervisor(true);
   c->markAsHighHalf(true);
-  c = defineCsr("timeh",    Csrn::TIMEH,    !mand, !imp, 0, wam, wam);
+  c = defineCsr("timeh",      CN::TIMEH,    !mand, !imp, 0, wam, wam);
   c->setHypervisor(true);
   c->markAsHighHalf(true);
-  c = defineCsr("instreth", Csrn::INSTRETH, !mand, !imp, 0, wam, wam);
+  c = defineCsr("instreth",   CN::INSTRETH, !mand, !imp, 0, wam, wam);
   c->setHypervisor(true);
   c->markAsHighHalf(true);
 
@@ -2858,6 +2858,10 @@ CsRegs<URV>::defineUserRegs()
       c->setHypervisor(true);
       c->markAsHighHalf(true);
     }
+
+  // Quality of service
+  URV mask = 0x0fff0fff;
+  c = defineCsr("srmcfg", CN::SRMCFG, !mand, !imp, 0, mask, mask);
 
   // add CSR fields
   addUserFields();
@@ -4900,6 +4904,8 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode pm, bool vm) const
 
   int enableBit = -1;
   unsigned offset = 0;
+  if (num == CN::SRMCFG)
+    enableBit = 55;
   if (num == CN::HCONTEXT or num == CN::SCONTEXT)
     enableBit = 57;
   // hgeip hgeie
