@@ -2862,6 +2862,7 @@ CsRegs<URV>::defineUserRegs()
   // Quality of service
   URV mask = 0x0fff0fff;
   c = defineCsr("srmcfg", CN::SRMCFG, !mand, !imp, 0, mask, mask);
+  c->setHypervisor(true);
 
   // add CSR fields
   addUserFields();
