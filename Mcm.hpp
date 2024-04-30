@@ -509,6 +509,9 @@ namespace WdRiscv
     std::vector<RegProducer> hartRegProducers_;  // One vector per hart.
     std::vector<std::set<McmInstrIx>> hartPendingFences_;
 
+    // Retired but not yet darained stores. Candidated for forwarding.
+    std::vector<std::set<McmInstrIx>> hartStores_;
+
     // Dependency time of most recent branch in program order or 0 if
     // branch does not depend on a prior memory instruction.
     std::vector<uint64_t> hartBranchTimes_;

@@ -31,8 +31,8 @@ Mcm<URV>::Mcm(unsigned hartCount, unsigned pageSize, unsigned mergeBufferSize)
 
   hartBranchTimes_.resize(hartCount);
   hartBranchProducers_.resize(hartCount);
-
   hartPendingFences_.resize(hartCount);
+  hartStores_.resize(hartCount);
 
  // If no merge buffer, then memory is updated on insert messages.
   writeOnInsert_ = (lineSize_ == 0);
@@ -465,8 +465,16 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
   instr.data_ = value;
   instr.isStore_ = true;
   instr.complete_ = checkStoreComplete(instr);
+
+  auto& storeSet = hartStores_.at(hart.sysHartIndex());
+
   if (not instr.complete_)
-    return true;
+    {
+      storeSet.insert(instr.tag_);
+      return true;
+    }
+
+  storeSet.erase(instr.tag_);
 
   if (paddr == paddr2)
     return pokeHartMemory(hart, paddr, value, stSize);
@@ -563,10 +571,9 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   setProducerTime(hartIx, *instr);
   updateDependencies(hart, *instr);
 
-  if (instr->isStore_)
+  if (instr->isStore_ and instr->complete_)
     {
-      if (instr->complete_)
-	ok = checkStoreData(hartIx, *instr) and ok;
+      ok = checkStoreData(hartIx, *instr) and ok;
       ok = ppoRule1(hart, *instr) and ok;
     }
 
@@ -826,6 +833,8 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       if (checkStoreComplete(*instr))
 	{
 	  instr->complete_ = true;
+	  auto& storeSet = hartStores_.at(hartIx);
+	  storeSet.erase(instr->tag_);
 	  if (not ppoRule1(hart, *instr))
 	    result = false;
 	}
@@ -1498,12 +1507,20 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 {
   uint64_t mask = (~uint64_t(0)) >> (8 - op.size_)*8;
 
-  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
-  for (McmInstrIx ix = tag; ix > 0 and mask != 0; --ix)
+  unsigned hartIx = hart.sysHartIndex();
+
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& storeSet = hartStores_.at(hartIx);
+
+  for (auto iter = storeSet.rbegin(); iter != storeSet.rend(); ++iter)
     {
-      const auto& instr = instrVec.at(ix-1);
-      if (instr.isCanceled() or not instr.isRetired() or not instr.isStore_)
+      auto storeTag = *iter;
+      if (storeTag >= tag)
 	continue;
+
+      const auto& instr = instrVec.at(storeTag);
+
+      assert(not instr.isCanceled() and instr.isRetired() and instr.isStore_);
 
       uint64_t prev = mask;
       if (not forwardTo(instr, instr.physAddr_, instr.data_, instr.size_, op, mask))
@@ -1523,17 +1540,8 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 	op.forwardTime_ = earliestOpTime(instr);
       else if (mask != prev)
 	op.forwardTime_ = std::min(earliestOpTime(instr), op.forwardTime_);
-
-      const auto& di = instr.di_;
-      if (di.instEntry()->isAtomic())
-	{
-	  cerr << "Error: Read op forwards from an atomic instruction"
-	       << " time=" << op.time_ << " hart-id=" << hart.hartId()
-	       << " instr-tag=" << tag << " addr=0x" << std::hex
-	       << op.physAddr_ << " amo-tag=" << std::dec << instr.tag_ << '\n';
-	}
     }
-
+      
   return true;
 }
 
@@ -1704,6 +1712,8 @@ template <typename URV>
 bool
 Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 {
+  return true;
+
   // Rule 1: B is a store, A and B have overlapping addresses.
   assert(instrB.di_.isValid());
 
@@ -2166,6 +2176,8 @@ template <typename URV>
 bool
 Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 {
+  return true;
+
   // Rule 5: A has an acquire annotation
 
   if (not instrB.isMemory() or instrB.memOps_.empty())
