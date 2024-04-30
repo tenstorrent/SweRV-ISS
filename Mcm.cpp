@@ -1718,13 +1718,7 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
       if (instrA.isCanceled())
 	continue;
 
-      if (not instrA.isRetired())
-	{
-	  cerr << "Error: ppoRule1: hart-id=" << hart.hartId()
-	       << " tag1=" << (tag-1) << " tag2=" << instrB.tag_
-	       << " instruction of tag1 is not retired\n";
-	  return false;
-	}
+      assert(instrA.isRetired());
 
       if (not instrA.isMemory() or not instrA.overlaps(instrB))
 	continue;
@@ -1928,11 +1922,7 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
       const auto& instrA =  instrVec.at(tag-1);
       if (instrA.isCanceled())
 	continue;
-      if (not instrA.isRetired())
-	{
-	  cerr << "Mcm::ppoRule3: Error: Instruction A is not retired.\n";
-	  assert(0 && "Mcm::ppoRule3: Error: Instruction A is not retired.");
-	}
+      assert(instrA.isRetired());
 
       if (not instrA.isStore_ or not instrA.overlaps(instrB))
 	continue;
@@ -1964,7 +1954,7 @@ template <typename URV>
 bool
 Mcm<URV>::processFence(Hart<URV>& hart, const McmInstr& instr)
 {
-  assert(instr.retired_);
+  assert(instr.isRetired());
 
   unsigned hartIx = hart.sysHartIndex();
 
@@ -2069,7 +2059,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
 {
   // Rule 4: There is a fence that orders A before B.
 
-  assert(instr.retired_);
+  assert(instr.isRetired());
 
   if (not instr.di_.isFence())
     return true;
@@ -2259,7 +2249,7 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
       if (instrA.isCanceled() or not instrA.isMemory())
 	continue;
 
-      assert(not instrA.isRetired());
+      assert(instrA.isRetired());
 
       bool fail = false;
       if (instrA.di_.isAmo())
