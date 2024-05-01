@@ -6564,7 +6564,7 @@ InstTable::setupInstVec()
       { "vaesdf.vv", InstId::vaesdf_vv,
 	0b101000'1'00000'00001'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6572,7 +6572,7 @@ InstTable::setupInstVec()
       { "vaesdf.vs", InstId::vaesdf_vs,
 	0b101001'1'00000'00001'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6580,7 +6580,7 @@ InstTable::setupInstVec()
       { "vaesef.vv", InstId::vaesef_vv,
 	0b101000'1'00000'00011'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6588,7 +6588,7 @@ InstTable::setupInstVec()
       { "vaesef.vs", InstId::vaesef_vs,
 	0b101001'1'00000'00011'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6596,7 +6596,7 @@ InstTable::setupInstVec()
       { "vaesem.vv", InstId::vaesem_vv,
 	0b101000'1'00000'00010'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6604,7 +6604,7 @@ InstTable::setupInstVec()
       { "vaesem.vs", InstId::vaesem_vs,
 	0b101001'1'00000'00010'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6612,7 +6612,7 @@ InstTable::setupInstVec()
       { "vaesdm.vv", InstId::vaesdm_vv,
 	0b101000'1'00000'00000'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6620,7 +6620,7 @@ InstTable::setupInstVec()
       { "vaesdm.vs", InstId::vaesdm_vs,
 	0b101001'1'00000'00000'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6628,7 +6628,7 @@ InstTable::setupInstVec()
       { "vaeskf1.vi", InstId::vaeskf1_vi,
 	0b100010'1'00000'00000'010'00000'1110111, // Opcode
         0b111111'1'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
 	OperandType::Imm, OperandMode::None, rs1Mask,
@@ -6637,7 +6637,7 @@ InstTable::setupInstVec()
       { "vaeskf2.vi", InstId::vaeskf2_vi,
 	0b101010'1'00000'00000'010'00000'1110111, // Opcode
         0b111111'1'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
 	OperandType::Imm, OperandMode::None, rs1Mask,
@@ -6646,7 +6646,7 @@ InstTable::setupInstVec()
       { "vaesz.vs", InstId::vaesz_vs,
 	0b101001'1'00000'00111'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
