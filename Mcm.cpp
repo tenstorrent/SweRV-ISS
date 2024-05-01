@@ -386,6 +386,8 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 
       if (not ppoRule1(hart, *instr))
 	result = false;
+      if (not ppoRule3(hart, *instr))
+	result = false;
 
       // We commit the RTL data to memory but we check them against
       // whisper data (checkRtlWrite below). This is simpler than
@@ -450,7 +452,10 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
     {
       result = checkRtlWrite(hart.hartId(), *instr, op) and result;
       if (instr->complete_)
-	result = ppoRule1(hart, *instr) and result;
+	{
+	  result = ppoRule1(hart, *instr) and result;
+	  result = ppoRule3(hart, *instr) and result;
+	}
     }
   else
     {
@@ -587,12 +592,12 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
     {
       ok = checkStoreData(hartIx, *instr) and ok;
       ok = ppoRule1(hart, *instr) and ok;
+      ok = ppoRule3(hart, *instr) and ok;
     }
 
   assert(di.isValid());
 
   ok = ppoRule2(hart, *instr) and ok;
-  ok = ppoRule3(hart, *instr) and ok;
   ok = processFence(hart, *instr) and ok;  // ppo rule 4.
   ok = ppoRule5(hart, *instr) and ok;
   ok = ppoRule6(hart, *instr) and ok;
@@ -1775,9 +1780,26 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.complete_)
     return true;  // We will try again when B is complete.
 
-  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
+  // Identify memory op with time less than that of instrB. Identify corresponding
+  // instruction tag.
+  auto btime = earliestOpTime(instrB);
+  uint64_t minTag = instrB.tag_ + 1;  // Initially after B in program order.
 
-  for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
+  auto hartIx = hart.sysHartIndex();
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+    {
+      const auto& op = *iter;
+      if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < btime)
+	{
+	  minTag = op.instrTag_;
+	  break;
+	}
+    }
+
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+
+  for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
     {
       const auto& instrA =  instrVec.at(tag-1);
       if (instrA.isCanceled())
@@ -1853,36 +1875,44 @@ template <typename URV>
 bool
 Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 {
-  // Rule 2: a and b are loads, x is a byte read by both a and b,
-  // there is no store to x between a and b in program order, and a
-  // and b return values for x written by different memory operations.
+  // Rule 2: a and b are loads, x is a byte read by both a and b, there is no store to x
+  // between a and b in program order, and a and b return values for x written by
+  // different memory operations.
  
   // Instruction B must be a load/amo instruction.
   if (not instrB.isLoad_)
     return true;  // NA: B is not a load.
 
   if (instrB.forwarded_)
-    return true;
+    return true;  // NA: B's data obtained entirely from local hart.
 
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  uint64_t minOpTimeB = earliestOpTime(instrB);
+  // Identify memory op with time less than that of instrB. Identify corresponding
+  // instruction tag.
+  auto btime = earliestOpTime(instrB);
+  uint64_t minTag = instrB.tag_ + 1;  // Initially after B in program order.
 
-  // Bit i of mask is 1 if byte i of data of instruction B is not written by a preceeding
-  // store.
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+    {
+      const auto& op = *iter;
+      if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < btime)
+	{
+	  minTag = op.instrTag_;
+	  break;
+	}
+    }
+
+  // Bit i of mask is 1 if ith byte of data of B is not written by a preceeding store from
+  // the same hart.
   unsigned mask = (1 << instrB.size_) - 1;
 
-  for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
+  for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
     {
       const auto& instrA =  instrVec.at(tag-1);
       if (instrA.isCanceled() or not instrA.isMemory() or not instrA.overlaps(instrB))
 	continue;
-
-      // Read happen before retire, instrucions retire in program order, if an instruction
-      // retires before B performs, no eralier instruction can read after B.
-      if (instrA.retireTime_ < minOpTimeB)
-	break;
 
       // Clear mask bits corresponding to bytes of B written by a preceeding store (A).
       clearMaskBitsForWrite(instrA, instrB, mask);
@@ -1892,13 +1922,11 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
       if (not instrA.isLoad_ or isBeforeInMemoryTime(instrA, instrB))
 	continue;
 
-      // Is there a remote write between A and B memory time that covers non-covered a
-      // byte of B.
+      // Is there a remote write between A and B memory time that covers a byte of B.
       if (instrA.memOps_.empty() or instrB.memOps_.empty())
 	{
-	  cerr << "Error: PPO Rule 2: Instruction with no memory operation: "
-	       << "hart-id=" << hart.hartId() << " tag1=" << instrA.tag_
-	       << " tag2=" << instrB.tag_ << '\n';
+	  cerr << "Error: PPO Rule 2: Instruction with no memory op: hart-id="
+	       << hart.hartId() << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
 	  return false;
 	}
       uint64_t ix0 = instrB.memOps_.front();
@@ -1919,25 +1947,18 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	      if (not overlapsAddr(instrA, addr) or not overlapsAddr(instrB, addr))
 		continue;
 
-	      unsigned byteMask = 0;
-	      if (instrB.physAddr_ == instrB.physAddr2_) // non page crossing
-		byteMask = 1 << (addr - instrB.physAddr_);
-	      else
+	      unsigned byteMask = 1 << (addr - instrB.physAddr_);  // Non page crossing
+	      if (instrB.physAddr_ != instrB.physAddr2_) // Page crossing
 		{
 		  unsigned size1 = offsetToNextPage(instrB.physAddr_);
-		  if (addr > instrB.physAddr_ and addr < instrB.physAddr_ + size1)
-		    byteMask = 1 << (addr - instrB.physAddr_);
-		  else
+		  if (not (addr > instrB.physAddr_ and addr < instrB.physAddr_ + size1))
 		    byteMask = 1 << (size1 + addr - instrB.physAddr2_);
 		}
 
 	      if (not (byteMask & mask))
 		continue;   // Byte of B covered by local store.
 
-	      // Find earliest read time of B overlapping remote byte addr.
 	      auto earlyB = earliestByteTime(instrB, addr);
-
-	      // Find latest read time of A overlapping remote byte addr.
 	      auto lateA = latestByteTime(instrA, addr);
 
 	      auto rot = remoteOp.time_;
@@ -1982,9 +2003,25 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
   // store.
   unsigned mask = (1 << instrB.size_) - 1;
 
-  for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
+  // Identify memory op with time less than that of instrB. Identify corresponding
+  // instruction tag.
+  auto btime = earliestOpTime(instrB);
+  uint64_t minTag = instrB.tag_ + 1;  // Initially after B in program order.
+  auto hartIx = hart.sysHartIndex();
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
-      const auto& instrA =  instrVec.at(tag-1);
+      const auto& op = *iter;
+      if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < btime)
+	{
+	  minTag = op.instrTag_;
+	  break;
+	}
+    }
+
+  for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
+    {
+      const auto& instrA =  instrVec.at(minTag - 1);
       if (instrA.isCanceled())
 	continue;
       assert(instrA.isRetired());
@@ -2236,12 +2273,27 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory() or instrB.memOps_.empty())
     return true;
 
-  auto timeB = effectiveReadTime(instrB);
+  auto btime = effectiveReadTime(instrB);
 
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
-  for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
+  // Identify memory op with time less than that of instrB. Identify corresponding
+  // instruction tag.
+  uint64_t minTag = instrB.tag_ + 1;  // Initially after B in program order.
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+    {
+      const auto& op = *iter;
+      if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < btime)
+	{
+	  minTag = op.instrTag_;
+	  break;
+	}
+    }
+
+
+  for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
     {
       const auto& instrA =  instrVec.at(tag-1);
       if (instrA.isCanceled() or not instrA.isMemory())
@@ -2264,7 +2316,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
       else
 	{
 	  auto timeA = latestOpTime(instrA);
-	  if (timeB <= timeA)
+	  if (btime <= timeA)
 	    {
 	      // B peforms before A -- Allow if there is no write overlapping B 
 	      // between A and B from another core.
@@ -2273,7 +2325,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 		  const auto& op = sysMemOps_.at(ix-1);
 		  if (op.isCanceled() or op.time_ > timeA)
 		    continue;
-		  if (op.time_ < timeB)
+		  if (op.time_ < btime)
 		    break;
 		  if (not op.isRead_ and overlaps(instrB, op) and op.hartIx_ != hartIx)
 		    fail = true;
@@ -2306,9 +2358,25 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory() or not hasRelease)
     return true;
 
+  // Identify memory op with time less than that of instrB. Identify corresponding
+  // instruction tag.
+  auto btime = earliestOpTime(instrB);
+  uint64_t minTag = instrB.tag_ + 1;  // Initially after B in program order.
+  auto hartIx = hart.sysHartIndex();
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+    {
+      const auto& op = *iter;
+      if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < btime)
+	{
+	  minTag = op.instrTag_;
+	  break;
+	}
+    }
+
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
-  for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
+  for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
     {
       const auto& instrA =  instrVec.at(tag-1);
       if (instrA.isCanceled() or not instrA.isMemory())
@@ -2322,7 +2390,7 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
       else
         fail = (not instrA.complete_ or     // Incomplete store might finish after B
 	        (not instrB.memOps_.empty() and
-	         earliestOpTime(instrB) <= latestOpTime(instrA)));  // A finishes after B
+	         btime <= latestOpTime(instrA)));  // A finishes after B
 
       if (fail)
 	{
@@ -2349,9 +2417,25 @@ Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory() or not bHasRc)
     return true;
 
+  // Identify memory op with time less than that of instrB. Identify corresponding
+  // instruction tag.
+  auto btime = earliestOpTime(instrB);
+  uint64_t minTag = instrB.tag_ + 1;  // Initially after B in program order.
+  auto hartIx = hart.sysHartIndex();
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+    {
+      const auto& op = *iter;
+      if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < btime)
+	{
+	  minTag = op.instrTag_;
+	  break;
+	}
+    }
+
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
-  for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
+  for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
     {
       const auto& instrA =  instrVec.at(tag-1);
       if (instrA.isCanceled() or not instrA.isMemory())
@@ -2370,7 +2454,7 @@ Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
 
       bool fail = (incomplete or     // Incomplete store might finish after B
 		   (not instrB.memOps_.empty() and
-		    earliestOpTime(instrB) <= latestOpTime(instrA)));  // A finishes after B
+		    btime <= latestOpTime(instrA)));  // A finishes after B
 
       if (fail)
 	{
@@ -2389,7 +2473,6 @@ bool
 Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 8: B is a store-conditional, A is a load-reserve paired with B.
-
   if (not instrB.isMemory() or not instrB.di_.isSc())
     return true;
 
@@ -2397,7 +2480,7 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
   if (not hart.lastStore(addr, value))
     return true;  // Score conditional was not successful.
 
-  uint64_t minOpTimeB = earliestOpTime(instrB);
+  uint64_t btime = earliestOpTime(instrB);
 
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
@@ -2411,14 +2494,14 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
 
       // Read happen before retire, instrucions retire in program order, if an instruction
       // retires before B performs, no eralier instruction can read after B.
-      if (instrA.retireTime_ < minOpTimeB)
+      if (instrA.retireTime_ < btime)
 	break;
 
       if (not instrA.di_.isLr())
 	continue;
 
       if (not instrA.complete_ or
-          (not instrB.memOps_.empty() and minOpTimeB <= latestOpTime(instrA)))
+          (not instrB.memOps_.empty() and btime <= latestOpTime(instrA)))
 	{
 	  cerr << "Error: PPO rule 8 failed: hart-id=" << hart.hartId()
 	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
