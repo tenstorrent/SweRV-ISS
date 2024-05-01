@@ -265,9 +265,8 @@ namespace WdRiscv
       return mt;
     }
 
-    /// Return the smallest time of the memor operations of the given
-    /// instruction. Adjust read-operation times to account for
-    /// forwarding.
+    /// Return the smallest time of the memor operations of the given instruction. Adjust
+    /// read-operation times to account for forwarding.
     uint64_t effectiveReadTime(const McmInstr& instr) const;
 
     /// Return true if instruction a is before b in memory time.
@@ -290,10 +289,29 @@ namespace WdRiscv
       return aTime < bTime;
     }
 
-    /// Configure checking whole merge buffer line (versus checking
-    /// bytes covered by stores).
+    /// Configure checking whole merge buffer line (versus checking bytes covered by
+    /// stores).
     void setCheckWholeMbLine(bool flag)
     { checkWholeLine_ = flag; }
+
+    /// Return the tag of the instruction with a memory time smaller than that of the
+    /// given instruction tag and associated with the same hart.  Return the tag of the
+    /// given instruction if no instruction with a smaller memory time can be found.
+    McmInstrIx getSmallerMemTimeInstr(unsigned hartIx, const McmInstr& instr) const
+    {
+      assert(not instr.canceled_ and instr.retired_);
+
+      auto eot = earliestOpTime(instr);
+
+      for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+	{
+	  const auto& op = *iter;
+	  if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < eot)
+	    return op.instrTag_;
+	}
+
+      return instr.tag_;
+    }
 
   protected:
 

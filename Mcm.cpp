@@ -1780,23 +1780,8 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.complete_)
     return true;  // We will try again when B is complete.
 
-  // Identify memory op with time less than that of instrB. Identify corresponding
-  // instruction tag.
-  auto btime = earliestOpTime(instrB);
-  uint64_t minTag = instrB.tag_ + 1;  // Initially after B in program order.
-
   auto hartIx = hart.sysHartIndex();
-
-  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
-    {
-      const auto& op = *iter;
-      if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < btime)
-	{
-	  minTag = op.instrTag_;
-	  break;
-	}
-    }
-
+  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
   for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
@@ -1887,22 +1872,8 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
     return true;  // NA: B's data obtained entirely from local hart.
 
   unsigned hartIx = hart.sysHartIndex();
+  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
-
-  // Identify memory op with time less than that of instrB. Identify corresponding
-  // instruction tag.
-  auto btime = earliestOpTime(instrB);
-  uint64_t minTag = instrB.tag_ + 1;  // Initially after B in program order.
-
-  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
-    {
-      const auto& op = *iter;
-      if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < btime)
-	{
-	  minTag = op.instrTag_;
-	  break;
-	}
-    }
 
   // Bit i of mask is 1 if ith byte of data of B is not written by a preceeding store from
   // the same hart.
@@ -1997,27 +1968,14 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.complete_)
     return true;  // We will try again when B is complete.
 
-  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
   // Bit i of mask is 1 if byte i of data of instruction B is not written by a preceeding
   // store.
   unsigned mask = (1 << instrB.size_) - 1;
 
-  // Identify memory op with time less than that of instrB. Identify corresponding
-  // instruction tag.
-  auto btime = earliestOpTime(instrB);
-  uint64_t minTag = instrB.tag_ + 1;  // Initially after B in program order.
-  auto hartIx = hart.sysHartIndex();
-
-  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
-    {
-      const auto& op = *iter;
-      if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < btime)
-	{
-	  minTag = op.instrTag_;
-	  break;
-	}
-    }
+  unsigned hartIx = hart.sysHartIndex();
+  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
 
   for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
     {
@@ -2273,25 +2231,10 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory() or instrB.memOps_.empty())
     return true;
 
-  auto btime = effectiveReadTime(instrB);
-
   unsigned hartIx = hart.sysHartIndex();
-  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
-
-  // Identify memory op with time less than that of instrB. Identify corresponding
-  // instruction tag.
-  uint64_t minTag = instrB.tag_ + 1;  // Initially after B in program order.
-
-  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
-    {
-      const auto& op = *iter;
-      if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < btime)
-	{
-	  minTag = op.instrTag_;
-	  break;
-	}
-    }
-
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
+  auto btime = effectiveReadTime(instrB);
 
   for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
     {
@@ -2358,23 +2301,10 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory() or not hasRelease)
     return true;
 
-  // Identify memory op with time less than that of instrB. Identify corresponding
-  // instruction tag.
-  auto btime = earliestOpTime(instrB);
-  uint64_t minTag = instrB.tag_ + 1;  // Initially after B in program order.
   auto hartIx = hart.sysHartIndex();
-
-  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
-    {
-      const auto& op = *iter;
-      if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < btime)
-	{
-	  minTag = op.instrTag_;
-	  break;
-	}
-    }
-
-  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
+  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  auto btime = earliestOpTime(instrB);
 
   for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
     {
@@ -2417,23 +2347,10 @@ Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory() or not bHasRc)
     return true;
 
-  // Identify memory op with time less than that of instrB. Identify corresponding
-  // instruction tag.
-  auto btime = earliestOpTime(instrB);
-  uint64_t minTag = instrB.tag_ + 1;  // Initially after B in program order.
   auto hartIx = hart.sysHartIndex();
-
-  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
-    {
-      const auto& op = *iter;
-      if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < btime)
-	{
-	  minTag = op.instrTag_;
-	  break;
-	}
-    }
-
-  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
+  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  auto btime = earliestOpTime(instrB);
 
   for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
     {
@@ -2480,11 +2397,12 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
   if (not hart.lastStore(addr, value))
     return true;  // Score conditional was not successful.
 
-  uint64_t btime = earliestOpTime(instrB);
+  auto hartIx = hart.sysHartIndex();
+  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  auto btime = earliestOpTime(instrB);
 
-  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
-
-  for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
+  for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
     {
       const auto& instrA =  instrVec.at(tag-1);
       if (instrA.isCanceled())
