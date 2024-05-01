@@ -548,6 +548,8 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
     return readSie(value);
   else if (num == CN::SIP)
     return readSip(value);
+  else if (num == CN::MVIP)
+    return readMvip(value);
 
   value = csr->read();
 
@@ -1828,6 +1830,8 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
     return writeSip(value);
   if (num == CN::SIE)
     return writeSie(value);
+  if (num == CN::MVIP)
+    return writeMvip(value);
 
   if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
     return writeSstateen(num, value);
@@ -3360,6 +3364,8 @@ CsRegs<URV>::peek(CsrNumber num, URV& value, bool virtMode) const
     return readSip(value);
   else if (num == CN::SIE)
     return readSie(value);
+  else if (num == CN::MVIP)
+    return readMvip(value);
 
   value = csr->read();
 
