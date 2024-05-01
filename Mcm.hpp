@@ -265,9 +265,8 @@ namespace WdRiscv
       return mt;
     }
 
-    /// Return the smallest time of the memor operations of the given
-    /// instruction. Adjust read-operation times to account for
-    /// forwarding.
+    /// Return the smallest time of the memor operations of the given instruction. Adjust
+    /// read-operation times to account for forwarding.
     uint64_t effectiveReadTime(const McmInstr& instr) const;
 
     /// Return true if instruction a is before b in memory time.
@@ -290,10 +289,29 @@ namespace WdRiscv
       return aTime < bTime;
     }
 
-    /// Configure checking whole merge buffer line (versus checking
-    /// bytes covered by stores).
+    /// Configure checking whole merge buffer line (versus checking bytes covered by
+    /// stores).
     void setCheckWholeMbLine(bool flag)
     { checkWholeLine_ = flag; }
+
+    /// Return the tag of the instruction with a memory time smaller than that of the
+    /// given instruction tag and associated with the same hart.  Return the tag of the
+    /// given instruction if no instruction with a smaller memory time can be found.
+    McmInstrIx getSmallerMemTimeInstr(unsigned hartIx, const McmInstr& instr) const
+    {
+      assert(not instr.canceled_ and instr.retired_);
+
+      auto eot = earliestOpTime(instr);
+
+      for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+	{
+	  const auto& op = *iter;
+	  if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < eot)
+	    return op.instrTag_;
+	}
+
+      return instr.tag_;
+    }
 
   protected:
 
@@ -331,22 +349,24 @@ namespace WdRiscv
 			      uint64_t lineSize, const std::vector<bool>& rtlMask,
 			      MemoryOpVec& coveredWrites);
 
-    /// Forward from a store to a read op. Return true on success.
-    /// Return false if instr is not retired, is canceled, is not a
-    /// store (amo couts as store), or does not match range address of
-    /// op.  Mask is the mask of bits of op to be updated by the
-    /// forward (bypass) operartion and is updated (bits cleared) if
-    /// some parts of op, covered by the mask, are successfully
-    /// updated.
-    bool forwardTo(const McmInstr& instr, uint64_t iaddr, uint64_t idata,
-		   unsigned isize, MemoryOp& op, uint64_t& mask);
+    /// Forward to the given read op from the stores of the retired instructions ahead of
+    /// the instruction (in program order) of the read op.
+    bool forwardToRead(Hart<URV>& hart, MemoryOp& op);
 
-    /// Forward to the given read op from the stores of the retired
-    /// instructions ahead of tag.
-    bool forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op);
+    /// Forward from a write to a read op. Return true on success.  Mask is the mask of
+    /// bits of op to be updated by the forward operartion and is updated (bits cleared)
+    /// if some parts of op are successfully updated. This a helper to forwardToRead.
+    bool writeToReadForward(const MemoryOp& writOp, MemoryOp& readOp, uint64_t& mask);
 
-    /// Determine the source and destination registers of the given
+    /// Forward from a store instrution to a read-operation. Mask is the mast of bits of
+    /// op to be updated by the forward operation and is updated (bits cleared) if some
+    /// parts of op are successfully ipdated. This is a helper to to forwardToRead.
+    /// Addr/data/size are the physical-address/data-value/data-size of the store
     /// instruction.
+    bool storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask,
+			    uint64_t addr, uint64_t data, unsigned size);
+
+    /// Determine the source and destination registers of the given instruction.
     void identifyRegisters(const DecodedInst& di,
 			   std::vector<unsigned>& sourceRegs,
 			   std::vector<unsigned>& destRegs);
@@ -508,6 +528,9 @@ namespace WdRiscv
     std::vector<RegTimeVec> hartRegTimes_;  // One vector per hart.
     std::vector<RegProducer> hartRegProducers_;  // One vector per hart.
     std::vector<std::set<McmInstrIx>> hartPendingFences_;
+
+    // Retired but not yet darained stores. Candidated for forwarding.
+    std::vector<std::set<McmInstrIx>> hartStores_;
 
     // Dependency time of most recent branch in program order or 0 if
     // branch does not depend on a prior memory instruction.
