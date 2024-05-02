@@ -32,6 +32,14 @@ namespace WdRiscv
     bool       failRead_  : 1  = false;
     bool       canceled_  : 1  = false;
 
+    /// Return true if address range of this operation overlaps that of the given one.
+    bool overlaps(const MemoryOp& other) const
+    { return physAddr_ + size_ > other.physAddr_ and physAddr_ < other.physAddr_ + other.size_; }
+
+    /// Return true if address range of this operation overlaps given address.
+    bool overlaps(uint64_t addr) const
+    { return addr >= physAddr_ and addr < physAddr_ + size_; }
+
     bool isCanceled() const { return canceled_; }
     void cancel() { canceled_ = true; }
   };
@@ -107,8 +115,8 @@ namespace WdRiscv
       return virtAddr_ - other.virtAddr_ < other.size_;
     }
 
-    /// Return true if address of the data memory referenced by this
-    /// instruction is aligned.
+    /// Return true if address of the data memory referenced by this instruction is
+    /// aligned.
     bool isAligned() const
     { return (physAddr_ & (size_ - 1)) == 0; }
 

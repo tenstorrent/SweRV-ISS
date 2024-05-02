@@ -870,32 +870,26 @@ Mcm<URV>::writeToReadForward(const MemoryOp& writeOp, MemoryOp& readOp, uint64_t
   if (mask == 0)
     return true;  // No bytes left to forward.
 
-  // Low and high addresses of read and write ops.
-  uint64_t rol = readOp.physAddr_, roh = readOp.physAddr_ + readOp.size_ - 1;
-  uint64_t wol = writeOp.physAddr_, woh = writeOp.physAddr_ + writeOp.size_ - 1;
-
-  if (roh < wol or rol > woh)
-    return false;  // no overlap
+  if (not readOp.overlaps(writeOp))
+    return false;
 
   unsigned count = 0; // Count of forwarded bytes
-  for (unsigned rix = 0; rix < readOp.size_; ++rix)
+  for (unsigned rix = 0; rix < readOp.size_ and mask != 0; ++rix)
     {
-      uint64_t byteAddr = rol + rix;
-      if (byteAddr < wol or byteAddr > woh)
+      uint64_t byteAddr = readOp.physAddr_ + rix;
+      if (not writeOp.overlaps(byteAddr))
 	continue;  // Read-op byte does not overlap write-op.
 
       uint64_t byteMask = uint64_t(0xff) << (rix * 8);
       if ((byteMask & mask) == 0)
 	continue;  // Byte forwarded by another instruction.
 
-      uint8_t byteVal = writeOp.rtlData_ >> (byteAddr - wol)*8;
+      uint8_t byteVal = writeOp.rtlData_ >> (byteAddr - writeOp.physAddr_)*8;
       uint64_t aligned = uint64_t(byteVal) << 8*rix;
 	
       readOp.data_ = (readOp.data_ & ~byteMask) | aligned;
       mask = mask & ~byteMask;
       count++;
-      if (mask == 0)
-	break;
     }
 
   return count > 0;
