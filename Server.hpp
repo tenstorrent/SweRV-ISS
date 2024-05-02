@@ -78,7 +78,7 @@ namespace WdRiscv
     bool interact(const WhisperMessage& msg, WhisperMessage& reply,
                   FILE* traceFile, FILE* commandLog);
 
-  protected:
+  private:
 
     /// Process changes of a single-step command. Put the changes in the
     /// pendingChanges vector (which is cleared on entry). Put the
@@ -91,8 +91,6 @@ namespace WdRiscv
 			    std::vector<WhisperMessage>& pendingChanges,
 			    bool interrupted, bool hasPre, bool hasPost,
 			    WhisperMessage& reply);
-
-  private:
 
     /// Check if target hart id is valid. Return true if it is, and
     /// false otherwise setting reply to invalid.
