@@ -498,7 +498,7 @@ collectSyscallMemChanges(Hart<URV>& hart,
 
 template <typename URV>
 void
-Server<URV>::processStepCahnges(Hart<URV>& hart,
+Server<URV>::processStepChanges(Hart<URV>& hart,
 				uint32_t inst,
 				std::vector<WhisperMessage>& pendingChanges,
 				bool interrupted, bool hasPre, bool hasPost,
@@ -766,7 +766,7 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   bool hasPre = preCount > 0;
   bool hasPost = postCount > 0;
 
-  processStepCahnges(hart, inst, pendingChanges, interrupted, hasPre,
+  processStepChanges(hart, inst, pendingChanges, interrupted, hasPre,
 		     hasPost, reply);
 
   // Send privilege mode (2 bits), incremental floating point flags (4 bits),
