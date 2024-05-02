@@ -1784,9 +1784,9 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
   auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
+  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
     {
-      const auto& instrA =  instrVec.at(tag-1);
+      const auto& instrA =  instrVec.at(tag);
       if (instrA.isCanceled())
 	continue;
 
@@ -1879,9 +1879,9 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   // the same hart.
   unsigned mask = (1 << instrB.size_) - 1;
 
-  for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
+  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
     {
-      const auto& instrA =  instrVec.at(tag-1);
+      const auto& instrA =  instrVec.at(tag);
       if (instrA.isCanceled() or not instrA.isMemory() or not instrA.overlaps(instrB))
 	continue;
 
@@ -1977,9 +1977,9 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
   auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
+  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
     {
-      const auto& instrA =  instrVec.at(minTag - 1);
+      const auto& instrA =  instrVec.at(tag);
       if (instrA.isCanceled())
 	continue;
       assert(instrA.isRetired());
@@ -2236,9 +2236,9 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
   auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   auto btime = effectiveReadTime(instrB);
 
-  for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
+  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
     {
-      const auto& instrA =  instrVec.at(tag-1);
+      const auto& instrA =  instrVec.at(tag);
       if (instrA.isCanceled() or not instrA.isMemory())
 	continue;
 
@@ -2306,9 +2306,9 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
   const auto& instrVec = hartInstrVecs_.at(hartIx);
   auto btime = earliestOpTime(instrB);
 
-  for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
+  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
     {
-      const auto& instrA =  instrVec.at(tag-1);
+      const auto& instrA =  instrVec.at(tag);
       if (instrA.isCanceled() or not instrA.isMemory())
 	continue;
 
@@ -2352,9 +2352,9 @@ Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
   const auto& instrVec = hartInstrVecs_.at(hartIx);
   auto btime = earliestOpTime(instrB);
 
-  for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
+  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
     {
-      const auto& instrA =  instrVec.at(tag-1);
+      const auto& instrA =  instrVec.at(tag);
       if (instrA.isCanceled() or not instrA.isMemory())
 	continue;
 
@@ -2402,9 +2402,9 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
   const auto& instrVec = hartInstrVecs_.at(hartIx);
   auto btime = earliestOpTime(instrB);
 
-  for (McmInstrIx tag = instrB.tag_; tag >= minTag; --tag)
+  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
     {
-      const auto& instrA =  instrVec.at(tag-1);
+      const auto& instrA =  instrVec.at(tag);
       if (instrA.isCanceled())
 	continue;
 
