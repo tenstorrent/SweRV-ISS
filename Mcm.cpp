@@ -2068,14 +2068,14 @@ Mcm<URV>::finalChecks(Hart<URV>& hart)
   uint64_t toHost = 0;
   bool hasToHost = hart.getToHostAddress(toHost);
 
-  auto& vec = hartInstrVecs_.at(hartIx);
-  for (auto& instr : vec)
-    if (instr.isRetired() and instr.isStore_ and not instr.complete_)
-      {
-	if (not hasToHost or toHost != instr.virtAddr_)
-	  cerr << "Warning: Hart-id=" << hart.hartId() << " tag=" << instr.tag_
-	       << " Store instruction is not drained at end of run.\n";
-      }
+  const auto& storeSet = hartUndrainedStores_.at(hartIx);
+  for (auto tag : storeSet)
+    {
+      const auto& instr = instrVec.at(tag);
+      if (not hasToHost or toHost != instr.virtAddr_)
+	cerr << "Warning: Hart-id=" << hart.hartId() << " tag=" << instr.tag_
+	     << " Store instruction is not drained at end of run.\n";
+    }
 
   return ok;
 }
