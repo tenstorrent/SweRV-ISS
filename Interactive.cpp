@@ -2686,6 +2686,8 @@ Interactive<URV>::interact(FILE* traceFile, FILE* commandLog)
         hartId_ = value;
     }
 
+  bool tty = isatty(STDIN_FILENO);
+
   bool done = false;
   while (not done)
     {
@@ -2699,7 +2701,8 @@ Interactive<URV>::interact(FILE* traceFile, FILE* commandLog)
 	  continue;
 	}
 
-      linenoise::AddHistory(line.c_str());
+      if (tty)
+	linenoise::AddHistory(line.c_str());
 
       if (not executeLine(line, traceFile, commandLog,
 			  replayStream, done))

@@ -32,7 +32,7 @@ Mcm<URV>::Mcm(unsigned hartCount, unsigned pageSize, unsigned mergeBufferSize)
   hartBranchTimes_.resize(hartCount);
   hartBranchProducers_.resize(hartCount);
   hartPendingFences_.resize(hartCount);
-  hartStores_.resize(hartCount);
+  hartUndrainedStores_.resize(hartCount);
 
  // If no merge buffer, then memory is updated on insert messages.
   writeOnInsert_ = (lineSize_ == 0);
@@ -364,7 +364,7 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       return false;
     }
 
-  auto& storeSet = hartStores_.at(hart.sysHartIndex());
+  auto& storeSet = hartUndrainedStores_.at(hart.sysHartIndex());
   storeSet.insert(instrTag);
 
   bool result = true;
@@ -433,7 +433,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       return false;
     }
 
-  auto& storeSet = hartStores_.at(hart.sysHartIndex());
+  auto& storeSet = hartUndrainedStores_.at(hart.sysHartIndex());
 
   if (not instr->retired_)
     storeSet.insert(instrTag);
@@ -483,7 +483,7 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
   instr.isStore_ = true;
   instr.complete_ = checkStoreComplete(instr);
 
-  auto& storeSet = hartStores_.at(hart.sysHartIndex());
+  auto& storeSet = hartUndrainedStores_.at(hart.sysHartIndex());
 
   if (not instr.complete_)
     {
@@ -841,7 +841,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       if (checkStoreComplete(*instr))
 	{
 	  instr->complete_ = true;
-	  auto& storeSet = hartStores_.at(hartIx);
+	  auto& storeSet = hartUndrainedStores_.at(hartIx);
 	  storeSet.erase(instr->tag_);
 	  if (not ppoRule1(hart, *instr))
 	    result = false;
@@ -1553,7 +1553,7 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, MemoryOp& readOp)
   auto hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  const auto& storeSet = hartStores_.at(hartIx);
+  const auto& storeSet = hartUndrainedStores_.at(hartIx);
 
   for (auto iter = storeSet.rbegin(); iter != storeSet.rend() and mask != 0; ++iter)
     {
