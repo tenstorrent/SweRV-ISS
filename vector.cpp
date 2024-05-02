@@ -13225,7 +13225,7 @@ template <typename URV>
 void
 Hart<URV>::execVsuxsegei64_v(const DecodedInst* di)
 {
-  execVsoxsegei32_v(di);
+  execVsoxsegei64_v(di);
 }
 
 
