@@ -2688,11 +2688,14 @@ Interactive<URV>::interact(FILE* traceFile, FILE* commandLog)
 
   bool tty = isatty(STDIN_FILENO);
 
+  std::string line;
+
   bool done = false;
   while (not done)
     {
       errno = 0;
-      std::string line = linenoise::Readline(prompt);
+      line.clear();
+      linenoise::Readline(prompt, line);
 
       if (line.empty())
 	{
@@ -2704,8 +2707,7 @@ Interactive<URV>::interact(FILE* traceFile, FILE* commandLog)
       if (tty)
 	linenoise::AddHistory(line.c_str());
 
-      if (not executeLine(line, traceFile, commandLog,
-			  replayStream, done))
+      if (not executeLine(line, traceFile, commandLog, replayStream, done))
 	errors++;
     }
 
