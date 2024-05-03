@@ -824,9 +824,23 @@ Hart<URV>::checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned 
   unsigned sew = vecRegs_.elemWidthInBits();
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
 
-  bool ok = (di->ithOperandMode(0) == OperandMode::Write)?
-    checkDestSourceOverlap(vd, sew, groupX8*fieldCount, vi, offsetWidth, offsetGroupX8) :
-    checkSourceOverlap(vd, sew, groupX8*fieldCount, vi, offsetWidth, offsetGroupX8);
+  // From 7.8.3 of spec, for indexed segment loads, no overlap between
+  // destination and source is allowed.
+  bool ok;
+  if (di->ithOperandMode(0) == OperandMode::Write)
+    {
+      if (fieldCount > 1)
+        {
+          unsigned offsetGroup = offsetGroupX8 >= 8 ? offsetGroupX8/8 : 1;
+          unsigned group = (groupX8*fieldCount) >= 8 ? (groupX8*fieldCount)/8 : 1;
+
+          ok = (vi >= vd + group or vd >= vi + offsetGroup);
+        }
+      else
+        ok = checkDestSourceOverlap(vd, sew, groupX8, vi, offsetWidth, offsetGroupX8);
+    }
+  else
+    ok = checkSourceOverlap(vd, sew, groupX8*fieldCount, vi, offsetWidth, offsetGroupX8);
 
   if (not ok)
     postVecFail(di);
