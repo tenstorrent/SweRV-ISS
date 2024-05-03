@@ -815,7 +815,8 @@ Hart<URV>::checkVecFpMaskInst(const DecodedInst* di, unsigned dest,
 template <typename URV>
 bool
 Hart<URV>::checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned vi,
-                                    unsigned offsetWidth, unsigned offsetGroupX8)
+                                   unsigned offsetWidth, unsigned offsetGroupX8,
+                                   unsigned fieldCount)
 {
   if (not checkVecLdStInst(di))
     return false;
@@ -824,8 +825,8 @@ Hart<URV>::checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
 
   bool ok = (di->ithOperandMode(0) == OperandMode::Write)?
-    checkDestSourceOverlap(vd, sew, groupX8, vi, offsetWidth, offsetGroupX8) :
-    checkSourceOverlap(vd, sew, groupX8, vi, offsetWidth, offsetGroupX8);
+    checkDestSourceOverlap(vd, sew, groupX8*fieldCount, vi, offsetWidth, offsetGroupX8) :
+    checkSourceOverlap(vd, sew, groupX8*fieldCount, vi, offsetWidth, offsetGroupX8);
 
   if (not ok)
     postVecFail(di);
@@ -11988,7 +11989,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
     return false;
 
-  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8))
+  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8, 1 /* fieldCount */))
     return false;
 
   uint64_t addr = intRegs_.read(rs1);
@@ -12191,7 +12192,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
     return false;
 
-  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8))
+  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8, 1 /* fieldCount */))
     return false;
 
   uint64_t addr = intRegs_.read(rs1);
@@ -12933,7 +12934,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
     return false;
 
-  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8))
+  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8, fieldCount))
     return false;
 
   uint64_t addr = intRegs_.read(rs1);
@@ -13097,7 +13098,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
     return false;
 
-  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8))
+  if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8, fieldCount))
     return false;
 
   uint64_t addr = intRegs_.read(rs1);

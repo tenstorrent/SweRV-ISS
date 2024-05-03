@@ -2960,7 +2960,8 @@ namespace WdRiscv
     /// Similar to the above but for vector load/store indexed.
     /// Checks overlap for vd/vs3 and index registers.
     bool checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned vi,
-                                  unsigned offsetWidth, unsigned offsetGroupX8);
+                                  unsigned offsetWidth, unsigned offsetGroupX8,
+                                  unsigned fieldCount);
 
     /// Check reduction vector operand against the group multiplier. Return true
     /// if operand is a multiple of multiplier and false otherwise. Record group
