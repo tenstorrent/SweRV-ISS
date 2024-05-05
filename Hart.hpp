@@ -1655,13 +1655,13 @@ namespace WdRiscv
     void setFaultOnFirstAccessStage2(bool flag)
     { virtMem_.setFaultOnFirstAccessStage2(flag); }
 
-    /// Translate virtual address without updating TLB or
-    /// updating/checking A/D bits of PTE. Return ExceptionCause::NONE
-    /// on success or fault/access exception on failure. If succesful
-    /// set pa to the physical address.
-    ExceptionCause transAddrNoUpdate(uint64_t va, PrivilegeMode pm, bool r,
+    /// Translate virtual address without updating TLB or updating/checking A/D bits of
+    /// PTE. Return ExceptionCause::NONE on success or fault/access exception on
+    /// failure. If succesful set pa to the physical address.
+    ExceptionCause transAddrNoUpdate(uint64_t va, PrivilegeMode pm,
+				     bool twoStage, bool r,
 				     bool w, bool x, uint64_t& pa)
-    { return virtMem_.transAddrNoUpdate(va, pm, false /*twoStage*/, r, w, x, pa); }
+    { return virtMem_.transAddrNoUpdate(va, pm, twoStage, r, w, x, pa); }
 
     /// Return the paging mode before last executed instruction.
     VirtMem::Mode lastPageMode() const

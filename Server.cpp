@@ -811,9 +811,10 @@ Server<URV>::translateCommand(const WhisperMessage& req,
   uint64_t va = req.address;
   bool r = req.flags & 1, w = (req.flags & 2) != 0, x = (req.flags & 4) != 0;
   PrivilegeMode pm = (req.flags & 8) ? PrivilegeMode::Supervisor : PrivilegeMode::User;
+  bool twoStage = req.flags & 16;
 
   uint64_t pa = 0;
-  auto ec = hart.transAddrNoUpdate(va, pm, r, w, x, pa);
+  auto ec = hart.transAddrNoUpdate(va, pm, twoStage, r, w, x, pa);
   if (ec != ExceptionCause::NONE)
     {
       reply.type = Invalid;

@@ -589,7 +589,7 @@ PerfApi::translateInstrAddr(unsigned hartIx, uint64_t iva, uint64_t& ipa)
   auto hart = checkHart("Translate-instr-addr", hartIx);
   bool r = false, w = false, x = true;
   auto pm = hart->privilegeMode();
-  return  hart->transAddrNoUpdate(iva, pm, r, w, x, ipa);
+  return  hart->transAddrNoUpdate(iva, pm, hart->virtMode(), r, w, x, ipa);
 }
 
 
@@ -599,7 +599,7 @@ PerfApi::translateLoadAddr(unsigned hartIx, uint64_t iva, uint64_t& ipa)
   auto hart = checkHart("translate-load-addr", hartIx);
   bool r = true, w = false, x = false;
   auto pm = hart->privilegeMode();
-  return  hart->transAddrNoUpdate(iva, pm, r, w, x, ipa);
+  return  hart->transAddrNoUpdate(iva, pm, hart->virtMode(), r, w, x, ipa);
 }
 
 
@@ -609,7 +609,7 @@ PerfApi::translateStoreAddr(unsigned hartIx, uint64_t iva, uint64_t& ipa)
   auto hart = checkHart("translate-store-addr", hartIx);
   bool r = false, w = true, x = false;
   auto pm = hart->privilegeMode();
-  return  hart->transAddrNoUpdate(iva, pm, r, w, x, ipa);
+  return  hart->transAddrNoUpdate(iva, pm, hart->virtMode(), r, w, x, ipa);
 }
 
 

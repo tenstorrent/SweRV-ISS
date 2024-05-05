@@ -1342,7 +1342,7 @@ printInteractiveHelp()
   cout << "  Translate given virtual address <va> to a physical address assuming given\n";
   cout << "  permission (defaults to read) and privilege mode (defaults to user)\n";
   cout << "  Allowed permission: r for read, w for write, or x for execute.\n";
-  cout << "  Allowed privilege: u to user or s for supervisor\n\n";
+  cout << "  Allowed privilege: u, s, vu, or vs for user, supervisor, guest-user, or guest-supervisor\n";
   cout << "perf_model_fetch tag vpc\n";
   cout << "  Perf model API only command. Constructs and fetches instruction packet\n";
   cout << "perf_model_decode tag opcode\n";
@@ -2307,7 +2307,7 @@ Interactive<URV>::translateCommand(Hart<URV>& hart, const std::string& line,
   if (tokens.size() < 3)
     {
       std::cerr << "Invalid translate command: " << line << '\n';
-      std::cerr << "Expecting: translate <vaddr> [r|w|x [s|u]]\n";
+      std::cerr << "Expecting: translate <vaddr> [r|w|x [s|u|vs|vu]]\n";
     }
 
   uint64_t va = 0;
@@ -2329,20 +2329,24 @@ Interactive<URV>::translateCommand(Hart<URV>& hart, const std::string& line,
   else
     read = true;
 
+  bool twoStage = false;
+
   PrivilegeMode pm = PrivilegeMode::User;
   if (tokens.size() > 3)
     {
-      if      (tokens.at(3) == "u") pm = PrivilegeMode::User;
-      else if (tokens.at(3) == "s") pm = PrivilegeMode::Supervisor;
+      if      (tokens.at(3) == "u")  { pm = PrivilegeMode::User; }
+      else if (tokens.at(3) == "s")  { pm = PrivilegeMode::Supervisor; }
+      else if (tokens.at(3) == "vu") { pm = PrivilegeMode::User; twoStage = true; }
+      else if (tokens.at(3) == "vs") { pm = PrivilegeMode::Supervisor; twoStage = true; }
       else
 	{
-	  std::cerr << "Invalid privilege mode: " << tokens.at(3) << " -- expecting s, or u\n";
+	  std::cerr << "Invalid privilege mode: " << tokens.at(3) << " -- expecting u, s, vu, or vs\n";
 	  return false;
 	}
     }
 
   uint64_t pa = 0;
-  auto ec = hart.transAddrNoUpdate(va, pm, read, write, exec, pa);
+  auto ec = hart.transAddrNoUpdate(va, pm, twoStage, read, write, exec, pa);
   if (ec == ExceptionCause::NONE)
     {
       std::cout << "0x" << std::hex << pa << std::dec << '\n';
