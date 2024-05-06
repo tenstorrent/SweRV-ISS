@@ -3668,7 +3668,7 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
       bool external = (vs & (URV(1) << unsigned(IC::VS_EXTERNAL))) != 0;
 
       auto csr = getImplementedCsr(CsrNumber::HVICTL);
-      HvictlFields hvictl(csr->read());
+      HvictlFields hvictl = csr? csr->read() : 0;
       unsigned iprio = hvictl.bits_.IPRIO;
       unsigned dpr = hvictl.bits_.DPR;
       unsigned iid = hvictl.bits_.IID;
