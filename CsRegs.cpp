@@ -296,6 +296,7 @@ CsRegs<URV>::writeMvip(URV value)
   else
     mvip->write(value);
 
+  recordWrite(CsrNumber::MVIP);
   return true;
 }
 
