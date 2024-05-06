@@ -5295,9 +5295,11 @@ bool
 Hart<URV>::isInterruptPossible(InterruptCause& cause) const
 {
   URV mip = csRegs_.peekMip();
+  URV mvip = csRegs_.peekMvip() & ~csRegs_.peekMideleg();
 
   // MIP read value is ored with supervisor external interrupt pin.
   mip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  mip |= mvip;
 
   mip &= ~deferredInterrupts_;  // Inhibited by test-bench.
 

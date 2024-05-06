@@ -245,12 +245,13 @@ CsRegs<URV>::readMvip(URV& value) const
     return false;
   value = mvip->read();
 
-  // Bit 1/9 of MVIP is an alias to bit 1/9 in MIP if bit 1/9 is set in MVIEN.
+  // Bit 1/9 of MVIP is an alias to bit 1/9 in MIP if bit 1/9 is not set in MVIEN.
   auto mvien = getImplementedCsr(CsrNumber::MVIEN);
   auto mip = getImplementedCsr(CsrNumber::MIP);
   if (mvien and mip)
     {
       URV mask = mvien->read();
+      mask ^= 0x2 | 0x200;
       value = (value & ~mask) | (mip->read() & mask);
     }
 
@@ -271,7 +272,6 @@ template <typename URV>
 bool
 CsRegs<URV>::writeMvip(URV value)
 {
-  value = 0;
   auto mvip = getImplementedCsr(CsrNumber::MVIP);
   if (not mvip)
     return false;
@@ -280,8 +280,9 @@ CsRegs<URV>::writeMvip(URV value)
   auto mip = getImplementedCsr(CsrNumber::MIP);
   if (mvien and mip)
     {
-      // Bit 1/9 of MVIP is an alias to bit 1/9 in MIP if bit 1/9 is set in MVIEN.
+      // Bit 1/9 of MVIP is an alias to bit 1/9 in MIP if bit 1/9 is not set in MVIEN.
       URV mask = mvien->read();
+      mask ^= 0x2 | 0x200;
 
       // Bit STIE (5) of MVIP is an alias to bit 5 of MIP if bit 5 of MIP is writable.
       // Othrwise, it is zero.
@@ -295,6 +296,7 @@ CsRegs<URV>::writeMvip(URV value)
   else
     mvip->write(value);
 
+  recordWrite(CsrNumber::MVIP);
   return true;
 }
 
