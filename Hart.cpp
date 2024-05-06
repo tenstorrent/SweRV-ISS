@@ -996,6 +996,28 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
 
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
 
+  URV adjusted = val;
+  if (hasAclint() and ((addr >= aclintSwStart_ and addr < aclintSwEnd_) or
+      (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_)))
+    {
+      processClintWrite(addr, sizeof(val), adjusted);
+      val = adjusted;
+    }
+  else if ((addr >= imsicMbase_ and addr < imsicMend_) or
+	   (addr >= imsicSbase_ and addr < imsicSend_))
+    {
+      if (imsicWrite_)
+        imsicWrite_(addr, sizeof(val), val);
+    }
+  else if (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
+                    (addr >= pciMmioBase_ and addr < pciMmioEnd_)))
+    {
+      if (addr >= pciConfigBase_ and addr < pciConfigEnd_)
+        pci_->config_mmio<uint64_t>(addr, val, true);
+      else
+        pci_->mmio<uint64_t>(addr, val, true);
+    }
+
   if (memory_.poke(addr, val, usePma))
     {
       invalidateDecodeCache(addr, sizeof(val));
