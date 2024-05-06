@@ -258,6 +258,8 @@ Memory::loadFile(const std::string& filename)
 {
   std::streampos length;
   std::ifstream f(filename, std::ios::binary);
+  if (f.fail())
+    throw std::runtime_error("Failed to load LZ4 file");
 
   f.seekg(0, std::ios::end);
   length = f.tellg();
