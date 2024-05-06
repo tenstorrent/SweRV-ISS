@@ -1739,7 +1739,21 @@ readCharNonBlocking(int fd)
   char c = 0;
   std::ptrdiff_t code = ::read(fd, &c, sizeof(c));
   if (code == 1)
-    return c;
+    {
+      if (isatty(fd))
+	{
+	  static char prev = 0;
+
+	  // Force a stop if control-a x is seen.
+	  if (prev == 1 and c == 'x')
+	    throw CoreException(CoreException::Stop, "Keyboard stop", 0, 3);
+
+	  fprintf(stderr, "char code: 0x%x\n", c);
+	  prev = c;
+	}	  
+	
+      return c;
+    }
 
   if (code == 0)
     return 0;
