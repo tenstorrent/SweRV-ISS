@@ -1747,8 +1747,6 @@ readCharNonBlocking(int fd)
 	  // Force a stop if control-a x is seen.
 	  if (prev == 1 and c == 'x')
 	    throw CoreException(CoreException::Stop, "Keyboard stop", 0, 3);
-
-	  fprintf(stderr, "char code: 0x%x\n", c);
 	  prev = c;
 	}	  
 	
