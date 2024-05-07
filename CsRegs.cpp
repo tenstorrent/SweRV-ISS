@@ -3092,6 +3092,9 @@ CsRegs<URV>::defineDebugRegs()
 	    isDebug);
   defineCsr("dscratch1", CsrNumber::DSCRATCH1, !mand, !imp, 0, wam, wam,
 	    isDebug);
+
+  // Add CSR fields.
+  addDebugFields();
 }
 
 
@@ -4527,6 +4530,30 @@ CsRegs<URV>::addAiaFields()
       {{"prio", 11}, {"identity", 11}, {"zero", xlen - 22}});
   setCsrFields(Csrn::VSTOPEI,
       {{"prio", 11}, {"identity", 11}, {"zero", xlen - 22}});
+}
+
+template <typename URV>
+void
+CsRegs<URV>::addDebugFields()
+{
+  using Csrn = CsrNumber;
+  constexpr unsigned xlen = sizeof(URV)*8;
+
+  setCsrFields(Csrn::TDATA1,
+      {{"data", xlen - 5}, {"dmode", 1}, {"type", 4}});
+  setCsrFields(Csrn::TCONTROL,
+      {{"zero", 3}, {"mte", 1}, {"zero", 3}, {"zero", xlen - 8}});
+
+  if (rv32_)
+    {
+      setCsrFields(Csrn::TINFO,
+          {{"info", 16}, {"zero", 8}, {"version", 8}});
+    }
+  else
+    {
+      setCsrFields(Csrn::TINFO,
+          {{"info", 16}, {"zero", 8}, {"version", 8}, {"zero", xlen - 32}});
+    }
 }
 
 
