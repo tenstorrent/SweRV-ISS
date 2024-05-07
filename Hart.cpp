@@ -2773,6 +2773,12 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
   if (isRvs() and origMode != PM::Machine)
     {
       URV delegVal = peekCsr(interrupt? CsrNumber::MIDELEG : CsrNumber::MEDELEG);
+      if (isRvaia())
+        {
+          URV mvienVal = peekCsr(CsrNumber::MVIEN);
+          if (interrupt)
+            delegVal |= mvienVal;
+        }
       if (delegVal & (URV(1) << cause))
 	{
 	  nextMode = PM::Supervisor;
@@ -5317,11 +5323,14 @@ bool
 Hart<URV>::isInterruptPossible(InterruptCause& cause) const
 {
   URV mip = csRegs_.peekMip();
-  URV mvip = csRegs_.peekMvip() & ~csRegs_.peekMideleg();
+  if (isRvaia())
+    {
+      URV mvip = csRegs_.peekMvip() & ~csRegs_.peekMideleg();
+      mip |= mvip;
+    }
 
   // MIP read value is ored with supervisor external interrupt pin.
   mip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
-  mip |= mvip;
 
   mip &= ~deferredInterrupts_;  // Inhibited by test-bench.
 
