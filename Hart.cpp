@@ -2103,6 +2103,13 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
 
   invalidateDecodeCache(virtAddr, ldStSize_);
 
+  if (ooo_)
+    {
+      if (perfApi_)
+	perfApi_->setStoreData(hartIx_, instCounter_, storeVal);
+      return true;  // Memory updated & lr-canceled when merge buffer is written.
+    }
+
   if (isAclintAddr(addr1))
     {
       assert(addr1 == addr2);
@@ -2132,13 +2139,6 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
         pci_->mmio<STORE_TYPE>(addr1, storeVal, true);
       memWrite(addr1, addr2, storeVal);
       return true;
-    }
-
-  if (ooo_)
-    {
-      if (perfApi_)
-	perfApi_->setStoreData(hartIx_, instCounter_, storeVal);
-      return true;  // Memory updated & lr-canceled when merge buffer is written.
     }
 
   memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);

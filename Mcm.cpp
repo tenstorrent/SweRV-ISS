@@ -779,7 +779,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       line.push_back(byte);
     }
 
-  // Apply pending writes to our line.
+  // Apply pending writes to our line and to memory.
   for (const auto& write : coveredWrites)
     {
       if ((write.physAddr_ < physAddr) or (write.physAddr_ + write.size_ > lineEnd))
@@ -787,43 +787,42 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	  cerr << "Mcm::mergeBufferWrite: Store address out of line bound\n";
 	  return false;
 	}
+      
+      switch (write.size_)
+	{
+	case 1:
+	  hart.pokeMemory(write.physAddr_, uint8_t(write.rtlData_), true);
+	  break;
+	case 2:
+	  hart.pokeMemory(write.physAddr_, uint16_t(write.rtlData_), true);
+	  break;
+	case 4:
+	  hart.pokeMemory(write.physAddr_, uint32_t(write.rtlData_), true);
+	  break;
+	case 8:
+	  hart.pokeMemory(write.physAddr_, uint64_t(write.rtlData_), true);
+	  break;
+	default:
+	  for (unsigned i = 0; i < write.size_; ++i)
+	    hart.pokeMemory(write.physAddr_ + i, uint8_t(write.rtlData_ >> 8*i), true);
+	  break;
+	}
+
       unsigned ix = write.physAddr_ - physAddr;
       for (unsigned i = 0; i < write.size_; ++i)
 	line.at(ix+i) = ((uint8_t*) &(write.rtlData_))[i];
     }
 
-  // Put our line back in memory (use poke words to accomodate clint).
-  assert((line.size() % 4) == 0);
-  for (unsigned i = 0; i < line.size(); i += 4)
-    {
-      uint32_t word = *((uint32_t*) (line.data() + i));
-      hart.pokeMemory(physAddr + i, word, true);
-    }
-
-  // Compare our line to RTL line.
+  // Compare covered writes.
   bool result = true;
-  if (checkWholeLine_ or rtlMask.empty())
-    {
-      auto iterPair = std::mismatch(rtlData.begin(), rtlData.end(), line.begin());
-      if (iterPair.first != rtlData.end())
-	{
-	  size_t offset = iterPair.first - rtlData.begin();
-	  reportMismatch(hart.hartId(), time, "merge buffer write", physAddr + offset,
-			 rtlData.at(offset), line.at(offset));
-	  result = false;
-	}
-    }
-  else
-    {   // Compare covered writes.
-      for (unsigned i = 0; i < line.size(); ++i)
-	if (rtlMask.at(i) and (line.at(i) != rtlData.at(i)))
-	  {
-	    reportMismatch(hart.hartId(), time, "merge buffer write", physAddr + i,
-			   rtlData.at(i), line.at(i));
-	    result = false;
-	    break;
-	  }
-    }
+  for (unsigned i = 0; i < line.size(); ++i)
+    if (rtlMask.at(i) and (line.at(i) != rtlData.at(i)))
+      {
+	reportMismatch(hart.hartId(), time, "merge buffer write", physAddr + i,
+		       rtlData.at(i), line.at(i));
+	result = false;
+	break;
+      }
 
   auto& instrVec = hartInstrVecs_.at(hartIx);
 
