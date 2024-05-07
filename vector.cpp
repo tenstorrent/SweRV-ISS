@@ -4740,9 +4740,11 @@ Hart<URV>::vslideup(unsigned vd, unsigned vs1, URV amount, unsigned group,
   if (start >= vecRegs_.elemCount())
     return;
 
+  unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
+
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
+      if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
 	  if (ix >= amount)
 	    {
@@ -4751,7 +4753,7 @@ Hart<URV>::vslideup(unsigned vd, unsigned vs1, URV amount, unsigned group,
 	      dest = e1;
 	    }
 	}
-      vecRegs_.write(vd, ix, group, dest);
+      vecRegs_.write(vd, ix, destGroup, dest);
     }
 }
 
@@ -4767,7 +4769,7 @@ Hart<URV>::execVslideup_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.vlmax();
+  unsigned elems = vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (hasDestSourceOverlap(vd, group, vs1, group))
@@ -4805,7 +4807,7 @@ Hart<URV>::execVslideup_vi(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(), imm = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.vlmax();
+  unsigned elems = vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (hasDestSourceOverlap(vd, group, vs1, group))
@@ -4842,7 +4844,7 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.vlmax();
+  unsigned elems = vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (hasDestSourceOverlap(vd, group, vs1, group))
@@ -4869,7 +4871,8 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
 	int8_t dest = int8_t{};
 	if (vecRegs_.isDestActive(vd, 0, group, masked, dest))
 	  dest = int8_t(replacement);
-	vecRegs_.write(vd, 0, group, dest);
+        if (not start)
+          vecRegs_.write(vd, 0, group, dest);
       }
       break;
 
@@ -4877,9 +4880,10 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
       {
 	vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked);
 	int16_t dest = int16_t{};
-	if (vecRegs_.isDestActive(vd, 0, group, masked, dest))
+	if (vecRegs_.isDestActive(vd, 0, group, masked, dest) and not start)
 	  dest = int16_t(replacement);
-	vecRegs_.write(vd, 0, group, dest);
+        if (not start)
+          vecRegs_.write(vd, 0, group, dest);
       }
       break;
 
@@ -4887,9 +4891,10 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
       {
 	vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked);
 	int32_t dest = int32_t{};
-	if (vecRegs_.isDestActive(vd, 0, group, masked, dest))
+	if (vecRegs_.isDestActive(vd, 0, group, masked, dest) and not start)
 	  dest = int32_t(replacement);
-	vecRegs_.write(vd, 0, group, dest);
+        if (not start)
+          vecRegs_.write(vd, 0, group, dest);
       }
       break;
 
@@ -4897,9 +4902,10 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
       {
       vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked);
       int64_t dest = int64_t{};
-	if (vecRegs_.isDestActive(vd, 0, group, masked, dest))
+	if (vecRegs_.isDestActive(vd, 0, group, masked, dest) and not start)
 	  dest = int64_t(replacement);
-	vecRegs_.write(vd, 0, group, dest);
+        if (not start)
+          vecRegs_.write(vd, 0, group, dest);
       }
       break;
 
@@ -4920,9 +4926,11 @@ Hart<URV>::vslidedown(unsigned vd, unsigned vs1, URV amount, unsigned group,
   if (start >= vecRegs_.elemCount())
     return;
 
+  unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
+
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
+      if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
 	  e1 = 0;
 	  if (amount < vecRegs_.bytesInRegisterFile())
@@ -4933,7 +4941,7 @@ Hart<URV>::vslidedown(unsigned vd, unsigned vs1, URV amount, unsigned group,
 	    }
 	  dest = e1;
 	}
-      vecRegs_.write(vd, ix, group, dest);
+      vecRegs_.write(vd, ix, destGroup, dest);
     }
 }
 
@@ -4948,7 +4956,7 @@ Hart<URV>::execVslidedown_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.vlmax();
+  unsigned elems = vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   URV amount = intRegs_.read(rs2);
@@ -4980,7 +4988,7 @@ Hart<URV>::execVslidedown_vi(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(), imm = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.vlmax();
+  unsigned elems = vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   URV amount = imm;
@@ -5011,7 +5019,7 @@ Hart<URV>::execVslide1down_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.vlmax();
+  unsigned elems = vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
@@ -5067,7 +5075,7 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.vlmax();
+  unsigned elems = vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (hasDestSourceOverlap(vd, group, vs1, group))
@@ -5092,7 +5100,7 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
     case ElementWidth::Half:
       {
 	vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked);
-	if (not masked or vecRegs_.isActive(0, 0))
+	if (not start and (not masked or vecRegs_.isActive(0, 0)))
           {
             Float16 f = fpRegs_.readHalf(rs2);
             vecRegs_.write(vd, 0, group, std::bit_cast<uint16_t>(f));
@@ -5103,7 +5111,7 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
     case ElementWidth::Word:
       {
 	vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked);
-	if (not masked or vecRegs_.isActive(0, 0))
+	if (not start and (not masked or vecRegs_.isActive(0, 0)))
 	  {
             float f = fpRegs_.readSingle(rs2);
             vecRegs_.write(vd, 0, group, std::bit_cast<uint32_t>(f));
@@ -5114,7 +5122,7 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
     case ElementWidth::Word2:
       {
 	vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked);
-	if (not masked or vecRegs_.isActive(0, 0))
+	if (not start and (not masked or vecRegs_.isActive(0, 0)))
 	  {
             double d = fpRegs_.readDouble(rs2);
             vecRegs_.write(vd, 0, group, std::bit_cast<uint64_t>(d));
@@ -5140,7 +5148,7 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.vlmax();
+  unsigned elems = vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
