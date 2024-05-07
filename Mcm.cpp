@@ -1541,19 +1541,43 @@ template <typename URV>
 bool
 Mcm<URV>::forwardToRead(Hart<URV>& hart, MemoryOp& readOp)
 {
-  uint64_t mask = (~uint64_t(0)) >> (8 - readOp.size_)*8;
-
   auto hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  const auto& storeSet = hartUndrainedStores_.at(hartIx);
+  const auto& undrained = hartUndrainedStores_.at(hartIx);
 
-  for (auto iter = storeSet.rbegin(); iter != storeSet.rend() and mask != 0; ++iter)
+  std::set<McmInstrIx> stores;
+
+  for (auto iter = undrained.rbegin(); iter != undrained.rend(); ++iter)
     {
       auto storeTag = *iter;
       const auto& store = instrVec.at(storeTag);
       if (store.isCanceled() or store.tag_ > readOp.instrTag_)
 	continue;
+      if (overlaps(store, readOp))
+	stores.insert(store.tag_);
+    }
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+    {
+      const auto& writeOp = *iter;
+      if (writeOp.time_ < readOp.time_)
+	break;
+
+      if (writeOp.isCanceled()  or  writeOp.isRead_  or writeOp.hartIx_ != readOp.hartIx_  or
+	  writeOp.instrTag_ >= readOp.instrTag_)
+	continue;
+
+      if (readOp.overlaps(writeOp))
+	stores.insert(writeOp.instrTag_);
+    }
+
+  uint64_t mask = (~uint64_t(0)) >> (8 - readOp.size_)*8;
+
+  for (auto iter = stores.rbegin(); iter != stores.rend() and mask != 0; ++iter)
+    {
+      auto storeTag = *iter;
+      const auto& store = instrVec.at(storeTag);
 
       uint64_t prev = mask;
 
@@ -1567,29 +1591,6 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, MemoryOp& readOp)
 	  uint64_t data2 = store.data_ >> size1 * 8;
 	  storeToReadForward(store, readOp, mask, store.physAddr2_, data2, size2);
 	}
-
-      if (readOp.forwardTime_ == 0)
-	readOp.forwardTime_ = earliestOpTime(store);
-      else if (mask != prev)
-	readOp.forwardTime_ = std::min(earliestOpTime(store), readOp.forwardTime_);
-    }
-
-  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend() and mask != 0; ++iter)
-    {
-      const auto& writeOp = *iter;
-      if (writeOp.time_ < readOp.time_)
-	break;
-
-      if (writeOp.isCanceled()  or  writeOp.isRead_  or
-	  writeOp.hartIx_ != readOp.hartIx_  or
-	  writeOp.instrTag_ >= readOp.instrTag_)
-	continue;
-
-      const auto& store = instrVec.at(writeOp.instrTag_);
-
-      uint64_t prev = mask;
-      if (not writeToReadForward(writeOp, readOp, mask))
-	continue;
 
       if (readOp.forwardTime_ == 0)
 	readOp.forwardTime_ = earliestOpTime(store);
