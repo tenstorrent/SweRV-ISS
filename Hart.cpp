@@ -5232,6 +5232,11 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   using PM = PrivilegeMode;
 
   URV delegVal = csRegs_.peekMideleg();
+  if (isRvaia())
+    {
+      URV mvienVal = peekCsr(CsrNumber::MVIEN);
+      delegVal |= mvienVal;
+    }
   URV hDelegVal = csRegs_.peekHideleg();
 
   // Non-delegated interrupts are destined for machine mode.
