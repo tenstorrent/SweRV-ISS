@@ -69,7 +69,7 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, false /*isLoad*/))
+      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/))
 	triggerTripped_ = true;
     }
 
@@ -104,7 +104,7 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
     uval = mcmVal;
   else
     memRead(addr, addr, uval);
-    
+
   value = SRV(int32_t(uval)); // Sign extend.
   return true;  // Success.
 }
@@ -127,7 +127,7 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, false /*isLoad*/))
+      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/))
 	triggerTripped_ = true;
     }
 
@@ -299,7 +299,8 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
-  if (hasTrig and ldStAddrTriggerHit(virtAddr, timing, isLd))
+  if (hasTrig and (ldStAddrTriggerHit(virtAddr, timing, isLd) or
+                   ldStDataTriggerHit(storeVal, timing, isLd)))
     triggerTripped_ = true;
 
   // Misaligned store causes an exception.
@@ -331,10 +332,6 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
 	cause = EC::STORE_ACC_FAULT;
     }
 
-  // If no exception: consider store-data  trigger
-  if (cause == EC::NONE and hasTrig)
-    if (ldStDataTriggerHit(storeVal, timing, isLd))
-      triggerTripped_ = true;
   if (triggerTripped_)
     return false;
 
@@ -364,17 +361,16 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   if (mcm_)
     return true;  // Memory updated when merge buffer is written.
 
-  if (addr1 >= clintStart_ and addr1 < clintEnd_)
+  if (isAclintAddr(addr1))
     {
       assert(addr1 == addr2);
       URV val = storeVal;
       processClintWrite(addr1, ldStSize_, val);
       storeVal = val;
     }
-  else if (hasInterruptor_ and addr1 == interruptor_ and ldStSize_ == 4)
+  else if (isInterruptorAddr(addr1, ldStSize_))
     processInterruptorWrite(storeVal);
-  else if (imsic_ and ((addr1 >= imsicMbase_ and addr1 < imsicMend_) or
-		       (addr1 >= imsicSbase_ and addr1 < imsicSend_)))
+  else if (isImsicAddr(addr1))
     {
       imsicWrite_(addr1, sizeof(storeVal), storeVal);
       storeVal = 0;  // Reads from IMSIC space will yield zero.
@@ -413,7 +409,8 @@ Hart<URV>::execSc_w(const DecodedInst* di)
   // If there is an exception then reservation may/may-not be dropped
   // depending on config.
   if (not keepReservOnScException_ or not hasException_)
-    cancelLr(CancelLrCause::SC); // Clear LR reservation (if any).
+    if (not perfApi_)
+      cancelLr(CancelLrCause::SC); // Clear LR reservation (if any).
 
   if (ok)
     {
@@ -620,7 +617,8 @@ Hart<URV>::execSc_d(const DecodedInst* di)
   // If there is an exception then reservation may/may-not be dropped
   // depending on config.
   if (not keepReservOnScException_ or not hasException_)
-    cancelLr(CancelLrCause::SC); // Clear LR reservation (if any).
+    if (not perfApi_)
+      cancelLr(CancelLrCause::SC); // Clear LR reservation (if any).
 
   if (ok)
     {

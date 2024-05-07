@@ -81,6 +81,9 @@ Session<URV>::defineSystem(const Args& args, const HartConfig& config)
 
   if (args.hexFiles.empty() and args.expandedTargets.empty()
       and args.binaryFiles.empty() and args.kernelFile.empty()
+#ifdef LZ4_COMPRESS
+      and args.lz4Files.empty()
+#endif
       and not args.interactive)
     {
       std::cerr << "No program file specified.\n";
@@ -499,7 +502,7 @@ Session<URV>::determineIsa(const HartConfig& config, const Args& args, bool clib
     {
       if (args.verbose)
 	std::cerr << "No ISA specified: Defaulting to imac\n";
-      isa = "imac";
+      isa = "imacfd";
     }
 
   return true;
@@ -672,6 +675,11 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
       if (not system.loadBinaryFiles(args.binaryFiles, offset, args.verbose))
 	errors++;
 
+#ifdef LZ4_COMPRESS
+      if (not system.loadLz4Files(args.lz4Files, offset, args.verbose))
+	errors++;
+#endif
+
       if (not args.kernelFile.empty())
 	{
 	  // Default kernel file offset. FIX: make a parameter.
@@ -688,9 +696,8 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
   if (args.clint)
     {
       uint64_t swAddr = *args.clint;
-      uint64_t timerAddr = swAddr + 0x4000;
-      uint64_t clintEnd = swAddr + 0xc000;
-      config.configClint(system, hart, swAddr, clintEnd, timerAddr);
+      config.configAclint(system, hart, swAddr, 0 /* swOffset */, true /* hasMswi */,
+                          0x4000 /* timerOffset */, 0xbff8 /* timeOffset */, true /* hasMtimer */);
     }
 
   uint64_t window = 1000000;
@@ -832,6 +839,14 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
 	checkAll = true;
       if (not system.enableMcm(mcmLineSize, checkAll))
 	errors++;
+    }
+
+  if (args.perfApi)
+    {
+      if (not system.enablePerfApi(traceFiles_))
+        errors++;
+      if (not args.interactive and commandLog_)
+        system.perfApiCommandLog(commandLog_);
     }
 
   if (not args.snapshotPeriods.empty())
@@ -1216,6 +1231,58 @@ Session<URV>::determineRegisterWidth(const Args& args, const HartConfig& config)
     std::cerr << "Using default for xlen: " << xlen << "\n";
   
   return xlen;
+}
+
+
+template <typename URV>
+static
+bool
+reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
+{
+  FILE* outFile = fopen(outPath.c_str(), "w");
+  if (not outFile)
+    {
+      std::cerr << "Failed to open instruction frequency file '" << outPath
+		<< "' for output.\n";
+      return false;
+    }
+
+  hart.reportInstructionFrequency(outFile);
+  hart.reportTrapStat(outFile);
+  fprintf(outFile, "\n");
+  hart.reportLrScStat(outFile);
+
+  fclose(outFile);
+  return true;
+}
+
+
+template <typename URV>
+bool
+Session<URV>::cleanup(const Args& args)
+{
+  bool result = true;
+
+  auto& hart0 = *system_->ithHart(0);
+  if (not args.instFreqFile.empty())
+    result = reportInstructionFrequency(hart0, args.instFreqFile) and result;
+
+  if (not args.testSignatureFile.empty())
+    result = system_->produceTestSignatureFile(args.testSignatureFile) and result;
+
+  if (args.reportub)
+    {
+      uint64_t bytes = 0;
+      std::vector<std::pair<uint64_t, uint64_t>> blocks;
+      if (not system_->getSparseMemUsedBlocks(blocks))
+        assert(false && "Not compiled with sparse memory");
+      for (const auto& [_, size] : blocks)
+        bytes += size;
+      std::cerr << "Used blocks: 0x" << std::hex << bytes << std::endl;
+    }
+
+  closeUserFiles();
+  return result;
 }
 
 

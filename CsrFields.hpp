@@ -725,4 +725,48 @@ namespace WdRiscv
       unsigned res2  : 30;
     } bits_;
   };
+
+
+  /// Structure used to unpack/pack the fields of the TCONTROL register
+  template <typename URV>
+  union TcontrolFields;
+
+  template <>
+  union TcontrolFields<uint32_t>
+  {
+    TcontrolFields(uint32_t value = 0)
+      : value_(value)
+    { }
+
+    uint32_t value_;
+    struct
+    {
+      unsigned           : 3;    // Bits 2-0  : Reserved -- hardwired to zero.
+      unsigned mte_      : 1;    // Bits 3    : Machine mode trigger enable.
+      unsigned           : 3;    // Bits 4-6  : Reserved -- hardwired to zero.
+      unsigned mpte_     : 1;    // Bits 7    : Machine mode previous trigger enable.
+      unsigned           : 24;   // Bits 31-8 : Rserved -- hardwired to zero.
+    } bits_;
+  };
+
+
+  template <>
+  union TcontrolFields<uint64_t>
+  {
+    TcontrolFields(uint64_t value = 0)
+      : value_(value)
+    { }
+
+    uint64_t value_;
+    struct
+    {
+      unsigned           : 3;    // Bits 2-0  : Reserved -- hardwired to zero.
+      unsigned mte_      : 1;    // Bits 3    : Machine mode trigger enable.
+      unsigned           : 3;    // Bits 4-6  : Reserved -- hardwired to zero.
+      unsigned mpte_     : 1;    // Bits 7    : Machine mode previous trigger enable.
+      unsigned           : 24;   // Bits 31-8 : Reserved -- hardwired to zero.
+      unsigned           : 32;   // Bits 63-32: Reserved -- hardwired to zero.
+    } bits_;
+  };
+
 }

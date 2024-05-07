@@ -227,8 +227,14 @@ PmaManager::printRegion(std::ostream& os, Region region) const
 {
   const auto& pma = region.pma_;
   os << "valid: " << std::hex << region.valid_ << "\n";
-  os << "base addr: " << std::hex << region.firstAddr_ << "\n";
-  os << "last addr: " << std::hex << region.lastAddr_ << "\n";
+
+  if (not region.valid_)
+    return;
+
+  os << std::hex;
+  os << "base addr: 0x" << region.firstAddr_ << "\n";
+  os << "last addr: 0x" << region.lastAddr_ << "\n";
+  os << std::dec;
 
   os << "attributes: " << Pma::attributesToString(pma.attrib_) << "\n";
 }
@@ -245,9 +251,11 @@ PmaManager::printPmas(std::ostream& os, uint64_t address) const
 void
 PmaManager::printPmas(std::ostream& os) const
 {
-  for (const auto& region : regions_)
+  for (size_t i = 0; i < regions_.size(); ++i)
     {
-      if (region.valid_)
-        printRegion(os, region);
+      os << "Region " << i << '\n';
+      auto& region = regions_.at(i);
+      printRegion(os, region);
+      os << '\n';
     }
 }

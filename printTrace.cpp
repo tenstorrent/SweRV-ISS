@@ -418,39 +418,25 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       // We always record the real csr number for VS/S mappings
       if (not csRegs_.peek(csr, value, false))
         continue;
-      if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TDATA3)
+      if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TINFO)
         continue; // Debug trigger values collected below.
       cvps.push_back(CVP(URV(csr), value));
     }
 
-  // Collect trigger CSRs and their values. A synthetic CSR number
-  // is used encoding the trigger number and the trigger component.
+  // Collect trigger CSRs and their values. A synthetic CSR number is used encoding the
+  // trigger number and the trigger component.
   for (unsigned trigger : triggers)
     {
-      uint64_t data1(0), data2(0), data3(0);
-      if (not peekTrigger(trigger, data1, data2, data3))
-        continue;
+      // Components of trigger that were changed by instruction.
+      std::vector<std::pair<CsrNumber, uint64_t>> trigChanges;
+      getTriggerChange(trigger, trigChanges);
 
-      // Components of trigger that changed.
-      bool t1 = false, t2 = false, t3 = false;
-      getTriggerChange(trigger, t1, t2, t3);
-
-      if (t1)
-        {
-          URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA1);
-          cvps.push_back(CVP(ecsr, data1));
-        }
-
-      if (t2)
-        {
-          URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA2);
-          cvps.push_back(CVP(ecsr, data2));
-        }
-
-      if (t3)
-        {
-          URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA3);
-          cvps.push_back(CVP(ecsr, data3));
+      for (auto& pair : trigChanges)
+	{
+	  auto csrn = pair.first;
+	  auto val = pair.second;
+          URV ecsr = (trigger << 16) | URV(csrn);
+          cvps.push_back(CVP(ecsr, URV(val)));
         }
     }
 

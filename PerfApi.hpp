@@ -1,4 +1,4 @@
-// Copyright 2022 Tenstorrent Corporation.
+// Copyright 2024 Tenstorrent Corporation.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,11 +15,12 @@
 #pragma once
 
 #include <iostream>
+#include <vector>
 #include "System.hpp"
 #include "Hart.hpp"
 #include "DecodedInst.hpp"
 
-namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
+namespace TT_PERF         // Tenstorrent Whisper Performance Model API
 {
 
   using System64 = WdRiscv::System<uint64_t>;
@@ -33,20 +34,19 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
 
     friend class PerfApi;
 
-    InstrPac(uint64_t tag, uint64_t iva, uint64_t ipa)
-      : tag_(tag), iva_(iva), ipa_(ipa)
+    /// Constructor: iva/ipa are the instruction virtual/physical addresses.  For
+    /// instruction crossing page boundary, ipa2 is the physical address of the other
+    /// page. I not crossing page boundary ipa2 is same as ipa.
+    InstrPac(uint64_t tag, uint64_t iva, uint64_t ipa, uint64_t ipa2)
+      : tag_(tag), iva_(iva), ipa_(ipa), ipa2_(ipa2)
     { }
 
-    /// This must be called by the performance model after a call to execute. If it
-    /// returns true, then the performance model subsequent call must be a flush to cause
-    /// whisper to flush.
+    ~InstrPac()
+    { }
+
+    /// This supports PerfApi::shouldFlush. It is not meant to be called directly.
     bool shouldFlush() const
-    {
-      if (not executed_ or not predicted_ or not isBranch())
-	return false;
-      bool taken = nextIva_ != iva_ + di_.instSize();
-      return prTaken_ != taken or prTarget_ == nextIva_;
-    }
+    { return shouldFlush_; }
 
     /// Return the instruction virtual address.
     uint64_t instrVa() const
@@ -56,15 +56,24 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     uint64_t instrPa() const
     { return ipa_; }
 
+    /// For non-page crossing fetch return the same value as instrPa. For page-crossing
+    /// return the physical address of the other page.
+    uint64_t instrPa2() const
+    { return ipa2_; }
+
     /// Return the data virtual address of a load/store instruction. Return 0 if
     /// instruction is not load/store.
     uint64_t dataVa() const
     { return dva_; }
-    
+
     /// Return the data physical address of a load/store instruction. Return 0 if
     /// instruction is not load/store.
     uint64_t dataPa() const
     { return dpa_; }
+
+    /// Return the size of the instruction (2 or 4 bytes). Instruction must be fetched.
+    uint64_t instrSize() const
+    { assert(fetched_); return di_.instSize(); }
 
     /// Return the data size of a load/store instruction. Return 0 if instruction
     /// is not load/store.
@@ -82,6 +91,7 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     {
       if (not decoded_ or not isBranch())
 	return false;
+      predicted_ = true;
       prTaken_ = taken;
       prTarget_ = target;
       return true;
@@ -90,11 +100,18 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     /// Return true if this instruction depends on the given instruction.
     bool dependsOn(const InstrPac& other) const
     {
-      for (auto& sp : sourceProducers_)
+      assert(decoded_);
+      for (unsigned i = 0; i < di_.operandCount(); ++i)
 	{
-	  auto producer = sp.second;
-	  if (producer and producer->tag_ == other.tag_)
-	    return true;
+	  using OM = WdRiscv::OperandMode;
+
+	  auto mode = di_.ithOperandMode(i);
+	  if (mode == OM::Read or mode == OM::ReadWrite)
+	    {
+	      auto producer = opProducers_.at(i);
+	      if (producer and producer->tag_ == other.tag_)
+		return true;
+	    }
 	}
       return false;
     }
@@ -108,68 +125,92 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     uint64_t nextPc() const
     { assert(executed_); return nextIva_; }
 
+    /// Return true if instruction fetch or execute encountered a trap.
     bool trapped() const
     { return trap_; }
 
+    /// Return true if a branch prediction was made for this instruction.
     bool predicted() const
     { return predicted_; }
 
+    /// Return true if instruction is decoded.
     bool decoded() const
     { return decoded_; }
 
+    /// Return true if instruction is executed.
     bool executed() const
     { return executed_; }
 
+    /// Return true if instruction is retired.
     bool retired() const
-    { return executed_; }
+    { return retired_; }
 
+    /// Return true if this is a store instruction and the store is drained.
     bool drained() const
     { return drained_; }
 
+    /// Return the tag of this instruction.
     uint64_t tag() const
     { return tag_; }
+
+    /// Return true if this a load instruction.  Packet must be decoded.
+    bool isLoad() const
+    { return di_.isLoad(); }
+
+    /// Return true if this a load instruction.  Packet must be decoded.
+    bool isStore() const
+    { return di_.isStore(); }
+
+    /// Return true if this an AMO instruction (does not include lr/sc).  Packet must be
+    /// decoded.
+    bool isAmo() const
+    { return di_.isAmo(); }
+
+    /// Return true if this a store conditional (sc) instruction.  Packet must be decoded.
+    bool isSc() const
+    { return di_.isSc(); }
 
   private:
 
     uint64_t tag_ = 0;
-    uint64_t iva_ = 0;        // instruction virtual address
-    uint64_t ipa_ = 0;        // instruction physical address
-    uint64_t nextIva_ = 0;    // virtual address of subsequent instruction in prog order
+    uint64_t iva_ = 0;        // Instruction virtual address (from performance model)
+    uint64_t ipa_ = 0;        // Instruction physical address
+    uint64_t ipa2_ = 0;       // Instruction physical address on other page
+    uint64_t nextIva_ = 0;    // Virtual address of subsequent instruction in prog order
 
     uint64_t dva_ = 0;        // ld/st data virtual address
     uint64_t dpa_ = 0;        // ld/st data physical address
     uint64_t dsize_ = 0;      // ld/st data size (total)
+    uint64_t storeData_ = 0;  // Store data.
 
     WdRiscv::DecodedInst di_; // decoded instruction.
 
     uint64_t execTime_ = 0;   // Execution time
     uint64_t prTarget_ = 0;   // Predicted branch target
 
-    std::array<uint64_t, 3> opVal_;       // Operand values (count and types are in di)
+    std::array<uint64_t, 3> opVal_;       // Operand values (count and types are in di_)
 
-    // Each entry is a global register number of a source operand and the
-    // corresponding in-flight packet that produced that opernad
-    typedef std::pair<unsigned, std::shared_ptr<InstrPac>> SourceProducer;
-    std::array<SourceProducer, 3> sourceProducers_;
+    // Entry i is the in-flight producer of the ith operand.
+    std::array<std::shared_ptr<InstrPac>, 3> opProducers_;
 
-    /// Global register index of a destination register and its corresponding
-    /// value.
+    // Global register index of a destination register and its corresponding value.
     typedef std::pair<unsigned, uint64_t> DestValue;
     std::array<DestValue, 2> destValues_;
 
-    /// Previous writer of the global destination register written by this instruction.
-    std::array<std::shared_ptr<InstrPac>, 2> prevDestWriter_;
+    uint32_t opcode_ = 0;
 
     // Following applicable if instruction is a branch
-    bool predicted_  : 1 = false;  // true if predicted to be a branch
-    bool prTaken_    : 1 = false;  // true if predicted branch/jump is taken
+    bool predicted_    : 1 = false;  // true if predicted to be a branch
+    bool prTaken_      : 1 = false;  // true if predicted branch/jump is taken
+    bool mispredicted_ : 1 = false;
+    bool shouldFlush_  : 1 = false;
 
-    bool fetched_    : 1 = false;  // true if instruction fetched
-    bool decoded_    : 1 = false;  // true if instruction decoded
-    bool executed_   : 1 = false;  // true if instruction executed
-    bool retired_    : 1 = false;  // true if instruction retired (committed)
-    bool drained_    : 1 = false;  // true if a store that has been drained
-    bool trap_       : 1 = false;  // true if instruction trapped
+    bool fetched_      : 1 = false;  // true if instruction fetched
+    bool decoded_      : 1 = false;  // true if instruction decoded
+    bool executed_     : 1 = false;  // true if instruction executed
+    bool retired_      : 1 = false;  // true if instruction retired (committed)
+    bool drained_      : 1 = false;  // true if a store that has been drained
+    bool trap_         : 1 = false;  // true if instruction trapped
   };
 
 
@@ -177,16 +218,7 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
   {
   public:
 
-    PerfApi(System64& system)
-      : system_(system)
-    {
-      unsigned n = system.hartCount();
-      hartPacketMaps_.resize(n);
-      hartLastRetired_.resize(n);
-      hartRegProducers_.resize(n);
-      for (auto& producers : hartRegProducers_)
-	producers.resize(totalRegCount_);
-    }
+    PerfApi(System64& system);
 
     /// Called by the performance model to affect a fetch in whisper. The
     /// instruction tag must be monotonically increasing for a particular
@@ -196,6 +228,8 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     /// left unmodified. If a trap happens, whisper will expect the trapPc as the
     /// the vpc on the subsequent call to fetch.
     /// Return true on success and false if given tag has already been fetched.
+    /// The tag is a sequence number. It must be monotonically increasing and
+    /// must not be zero. Tags of flushed intructions may be reusede.
     bool fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
 	       bool& trap, ExceptionCause& cause, uint64_t& trapPC);
 
@@ -203,11 +237,11 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     /// will return false if the instruction has not been fetched; otherwise, it
     /// will return true after decoding the instruction, updating the di field of
     /// the corresponding packet, and marking the packed as decoded.
-    bool decode(unsigned hartIx, uint64_t time, uint64_t tag, uint32_t opcode);
+    bool decode(unsigned hartIx, uint64_t time, uint64_t tag);
 
     /// Optionally called by performance model after decode to inform Whisper of branch
     /// prediction. Returns true on success and false on error (tag was never decoded).
-    bool branchPredict(unsigned hart, uint64_t tag, bool prTaken, uint64_t prTarget)
+    bool predictBranch(unsigned hart, uint64_t tag, bool prTaken, uint64_t prTarget)
     {
       auto packet = getInstructionPacket(hart, tag);
       if (not packet)
@@ -220,10 +254,10 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     /// if the given tag has not yet been fetched or if it has been flushed.
     bool execute(unsigned hart, uint64_t time, uint64_t tag);
 
-    /// Helper to above execute: Excecute packet instrction without cahging hart state.
-    /// Poke packet source register values into hart, execute, collect dstination
+    /// Helper to above execute: Execute packet instruction without changing hart state.
+    /// Poke packet source register values into hart, execute, collect destination
     /// values. Restore hart state.
-    bool execute(Hart64& hart, InstrPac& packet);
+    bool execute(unsigned hartIx, InstrPac& packet);
 
     /// Retire given instruction at the given hart. Commit all related state
     /// changes. SC/AMO instructions are executed at this stage and write memory
@@ -241,6 +275,18 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
 	return iter->second;
       return nullptr;
     }
+
+    /// Flush an instruction and all older instructions at the given hart. Restore
+    /// dependency chain (register renaming) to the way it was before the flushed
+    /// instructions were decoded.
+    bool flush(unsigned hartIx, uint64_t time, uint64_t tag);
+
+    /// Called by performance model to determine whether or not it should redirect
+    /// fetch. Return true on success and false on failure. If successful set flush to
+    /// true if flush is required and false otherwise. If flush is required, the new fetch
+    /// address will be in addr.
+    bool shouldFlush(unsigned hartIx, uint64_t time, uint64_t tag, bool& flush,
+		     uint64_t& addr);
 
     /// Translate an instruction virtual address into a physical address. Return
     /// ExceptionCause::NONE on success and actual cause on failure.
@@ -262,19 +308,37 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
     /// Set data to the load value of the given instruction tag and return true on
     /// success. Return false on failure leaving data unmodified: tag is not valid or
     /// corresponding instruction is not executed or is not a load.
-    bool getLoadData(unsigned hart, uint64_t tag, uint64_t& data);
+    bool getLoadData(unsigned hart, uint64_t tag, uint64_t vaddr, unsigned size, uint64_t& data);
+
+    /// Set the data value of a store/amo instruction to be commited to memory
+    /// at drain/retire time.
+    bool setStoreData(unsigned hart, uint64_t tag, uint64_t value);
 
     /// Return a pointer of the hart having the given index or null if no such hart.
     std::shared_ptr<Hart64> getHart(unsigned hartIx)
-    {
-      return system_.ithHart(hartIx);
-    }
+    { return system_.ithHart(hartIx); }
+
+    /// Return number of harts int the system.
+    unsigned hartCount() const
+    { return system_.hartCount(); }
+
+    /// Enable command log: Log API calls for replay.
+    void enableCommandLog(FILE* log)
+    { commandLog_ = log; }
+
+    /// Enable instruction tracing to the log file(s).
+    void enableTraceLog(std::vector<FILE*>& files)
+    { traceFiles_ = files; }
 
   protected:
+
+    bool commitMemoryWrite(Hart64& hart, unsigned addr, unsigned size, uint64_t value);
 
     void insertPacket(unsigned hartIx, uint64_t tag, std::shared_ptr<InstrPac> ptr)
     {
       auto& packetMap = hartPacketMaps_.at(hartIx);
+      if (not packetMap.empty() and packetMap.rbegin()->first >= tag)
+	assert(0 and "Inserted packet with tag newer than oldest tag.");
       packetMap[tag] = ptr;
     }
 
@@ -302,16 +366,16 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
       return ~unsigned(0);
     }
 
-    bool peekRegister(std::shared_ptr<Hart64>& hart, WdRiscv::OperandType type,
-		      unsigned regNum, uint64_t& value)
+    bool peekRegister(Hart64& hart, WdRiscv::OperandType type, unsigned regNum,
+		      uint64_t& value)
     {
       using OT = WdRiscv::OperandType;
       switch(type)
 	{
-	case OT::IntReg: return hart->peekIntReg(regNum, value);
-	case OT::FpReg:  return hart->peekFpReg(regNum, value);
-	case OT::CsReg:  return hart->peekCsr(WdRiscv::CsrNumber(regNum), value);
-	case OT::VecReg: 
+	case OT::IntReg: return hart.peekIntReg(regNum, value);
+	case OT::FpReg:  return hart.peekFpReg(regNum, value);
+	case OT::CsReg:  return hart.peekCsr(WdRiscv::CsrNumber(regNum), value);
+	case OT::VecReg:
 	case OT::Imm:
 	case OT::None:   assert(0); return ~unsigned(0);
 	}
@@ -321,9 +385,10 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
 
     /// Get from the producing packet, the value of the register with the given
     /// global register index.
-    uint64_t getDestValue(std::shared_ptr<InstrPac>& producer, unsigned gri)
+    uint64_t getDestValue(const InstrPac& producer, unsigned gri) const
     {
-      for (auto& p : producer->destValues_)
+      assert(producer.executed());
+      for (auto& p : producer.destValues_)
 	if (p.first == gri)
 	  return p.second;
       assert(0);
@@ -332,31 +397,38 @@ namespace TT_PERFA         // Tenstorrent Whisper Performance Model API
 
   private:
 
+    /// Map an instruction tag to corresponding packet.
     typedef std::map<uint64_t, std::shared_ptr<InstrPac>> PacketMap;
-
-    System64& system_;
-    std::shared_ptr<InstrPac> prevFetch_;
-
-    /// Map a hart index to the corresponding instruction packet map.
-    std::vector<PacketMap> hartPacketMaps_;
-
-    /// Map a hart index to the tag of the last retired instruction.
-    std::vector<uint64_t> hartLastRetired_;
 
     /// Map a global register index to the in-flight instruction producing that
     /// register. This is register renaming.
     typedef std::vector<std::shared_ptr<InstrPac>> RegProducers;
 
-    /// Map a hart index to the register renaming-table.
+    System64& system_;
+    std::shared_ptr<InstrPac> prevFetch_;
+
+    /// Per-hart map of in flight instruction packets.
+    std::vector<PacketMap> hartPacketMaps_;
+
+    /// Per-hart map of in flight executed store packets.
+    std::vector<PacketMap> hartStoreMaps_;
+
+    /// Per-hart index tag the last retired instruction.
+    std::vector<uint64_t> hartLastRetired_;
+
+    /// Per-hart register renaming table (indexed by global register index).
     std::vector<RegProducers> hartRegProducers_;
 
     uint64_t time_ = 0;
+
+    FILE* commandLog_ = nullptr;
+    std::vector<FILE*> traceFiles_;   // One per hart.
 
     /// Global indexing for all registers.
     const unsigned intRegOffset_ = 0;
     const unsigned fpRegOffset_ = 32;
     const unsigned csRegOffset_ = 64;
-    const unsigned totalRegCount_ = csRegOffset_ + 4096; // 4096: max csr count.
+    const unsigned totalRegCount_ = csRegOffset_ + 4096; // 4096: max CSR count.
   };
 
 }

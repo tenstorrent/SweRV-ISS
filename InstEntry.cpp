@@ -639,37 +639,37 @@ InstTable::setupInstVec()
 
       // CSR
       { "csrrw", InstId::csrrw, 0x1073, funct3Low7Mask,
-	RvExtension::I, RvFormat::I,
+	RvExtension::Zicsr, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::CsReg, OperandMode::ReadWrite, immTop12 },
 
       { "csrrs", InstId::csrrs, 0x2073, funct3Low7Mask,
-	RvExtension::I, RvFormat::I,
+	RvExtension::Zicsr, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::CsReg, OperandMode::ReadWrite, immTop12 },
 
       { "csrrc", InstId::csrrc, 0x3073, funct3Low7Mask,
-	RvExtension::I, RvFormat::I,
+	RvExtension::Zicsr, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::CsReg, OperandMode::ReadWrite, immTop12 },
 
       { "csrrwi", InstId::csrrwi,  0x5073, funct3Low7Mask,
-	RvExtension::I, RvFormat::I,
+	RvExtension::Zicsr, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::Imm, OperandMode::None, rs1Mask,
 	OperandType::CsReg, OperandMode::ReadWrite, immTop12 },
 
       { "csrrsi", InstId::csrrsi, 0x6073, funct3Low7Mask,
-	RvExtension::I, RvFormat::I,
+	RvExtension::Zicsr, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::Imm, OperandMode::None, rs1Mask,
 	OperandType::CsReg, OperandMode::ReadWrite, immTop12 },
 
       { "csrrci", InstId::csrrci, 0x7073, funct3Low7Mask,
-	RvExtension::I, RvFormat::I,
+	RvExtension::Zicsr, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::Imm, OperandMode::None, rs1Mask,
 	OperandType::CsReg, OperandMode::ReadWrite, immTop12 },
@@ -6346,7 +6346,7 @@ InstTable::setupInstVec()
         RvExtension::Zvbb, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
-        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
       { "vbrev.v", InstId::vbrev_v,
@@ -6412,7 +6412,7 @@ InstTable::setupInstVec()
         RvExtension::Zvbb, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
-        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
       { "vror.vv", InstId::vror_vv,
@@ -6430,7 +6430,7 @@ InstTable::setupInstVec()
         RvExtension::Zvbb, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
-        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
       { "vror.vi", InstId::vror_vi,
@@ -6457,7 +6457,7 @@ InstTable::setupInstVec()
         RvExtension::Zvbb, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
-        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
       { "vwsll.vi", InstId::vwsll_vi,
@@ -6521,7 +6521,7 @@ InstTable::setupInstVec()
         RvExtension::Zvbc, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
-        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
       { "vclmulh.vv", InstId::vclmulh_vv,
@@ -6539,7 +6539,7 @@ InstTable::setupInstVec()
         RvExtension::Zvbc, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
-        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
       // Vector crypto (zvkg)
@@ -6564,7 +6564,7 @@ InstTable::setupInstVec()
       { "vaesdf.vv", InstId::vaesdf_vv,
 	0b101000'1'00000'00001'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6572,7 +6572,7 @@ InstTable::setupInstVec()
       { "vaesdf.vs", InstId::vaesdf_vs,
 	0b101001'1'00000'00001'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6580,7 +6580,7 @@ InstTable::setupInstVec()
       { "vaesef.vv", InstId::vaesef_vv,
 	0b101000'1'00000'00011'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6588,7 +6588,7 @@ InstTable::setupInstVec()
       { "vaesef.vs", InstId::vaesef_vs,
 	0b101001'1'00000'00011'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6596,7 +6596,7 @@ InstTable::setupInstVec()
       { "vaesem.vv", InstId::vaesem_vv,
 	0b101000'1'00000'00010'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6604,7 +6604,7 @@ InstTable::setupInstVec()
       { "vaesem.vs", InstId::vaesem_vs,
 	0b101001'1'00000'00010'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6612,7 +6612,7 @@ InstTable::setupInstVec()
       { "vaesdm.vv", InstId::vaesdm_vv,
 	0b101000'1'00000'00000'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6620,7 +6620,7 @@ InstTable::setupInstVec()
       { "vaesdm.vs", InstId::vaesdm_vs,
 	0b101001'1'00000'00000'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -6628,7 +6628,7 @@ InstTable::setupInstVec()
       { "vaeskf1.vi", InstId::vaeskf1_vi,
 	0b100010'1'00000'00000'010'00000'1110111, // Opcode
         0b111111'1'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
 	OperandType::Imm, OperandMode::None, rs1Mask,
@@ -6637,7 +6637,7 @@ InstTable::setupInstVec()
       { "vaeskf2.vi", InstId::vaeskf2_vi,
 	0b101010'1'00000'00000'010'00000'1110111, // Opcode
         0b111111'1'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
 	OperandType::Imm, OperandMode::None, rs1Mask,
@@ -6646,7 +6646,7 @@ InstTable::setupInstVec()
       { "vaesz.vs", InstId::vaesz_vs,
 	0b101001'1'00000'00111'010'00000'1110111, // Opcode
         0b111111'1'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zvkg, RvFormat::R,
+        RvExtension::Zvkned, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
@@ -7464,7 +7464,7 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs1Mask,
         OperandType::IntReg, OperandMode::Read, rs2Mask, },
 
-      { "cmop", InstId::c_mop, 0x6081, 0x6781,
+      { "c.mop", InstId::c_mop, 0x6081, 0x6781,
         RvExtension::Zcmop, RvFormat::I,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask },

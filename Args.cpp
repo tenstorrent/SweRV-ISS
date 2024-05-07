@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,7 +25,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 840;
+  unsigned subversion = 842;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 #ifdef GIT_SHA
@@ -258,6 +258,10 @@ Args::parseCmdLineArgs(std::span<char*> argv)
 	 "An addional suffix of :u may be added to write back the file with the contents of memory "
 	 "at the end of the run. "
 	 "Example: -b file1 -b file2:0x1040 -b file3:0x20000:u")
+#ifdef LZ4_COMPRESS
+	("lz4", po::value(&this->lz4Files)->multitoken(),
+	 "LZ4 file to load into simulator memory.")
+#endif
         ("kernel", po::value(&this->kernelFile),
          "Kernel binary file to load into simulator memory. File will be loaded at 0x400000 for "
         "rv32 or 0x200000 for rv64 unless an explicit address is specified after a colon suffix "
@@ -409,14 +413,15 @@ Args::parseCmdLineArgs(std::span<char*> argv)
          "corresponding values. A zero/zero pair will indicate the end of "
          "sequence.")
 	("mcm", po::bool_switch(&this->mcm),
-	 "Enable memory consistency checks. This is meaningful in server/interactive "
-	 "mode.")
+	 "Enable memory consistency checks. This is meaningful in server/interactive mode.")
 	("mcmca", po::bool_switch(&this->mcmca),
 	 "Check all bytes of the memory consistency check merge buffer. If not used "
 	 "we only check the bytes inserted into the merge buffer.")
 	("mcmls", po::value<std::string>(),
 	 "Memory consistency checker merge buffer line size. If set to zero then "
 	 "write operations are not buffered and will happen as soon a received.")
+	("perfapi", po::bool_switch(&this->perfApi),
+	 "Enable performance mode API.")
 #ifdef MEM_CALLBACKS
         ("reportusedblocks", po::bool_switch(&this->reportub),
          "Report used blocks with sparse memory. Useful for finding memory footprint of program")
@@ -531,7 +536,7 @@ Args::parseCmdLineNumber(const std::string& option, const std::string& numberStr
       using STYPE = typename std::make_signed_t<TYPE>;
 
       char* end = nullptr;
-      
+
       bool bad = false;
 
       if (std::is_same<TYPE, STYPE>::value)

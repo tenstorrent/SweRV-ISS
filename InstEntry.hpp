@@ -274,8 +274,7 @@ namespace WdRiscv
     bool isSc() const
     { return id_ == InstId::sc_w or id_ == InstId::sc_d; }
 
-    /// Return true if this is an amo instruction (lr/sc are atomic
-    /// but not amo).
+    /// Return true if this is an amo instruction (lr/sc are atomic but not amo).
     bool isAmo() const
     { return isAtomic() and not isLr() and not isSc(); }
 
@@ -311,10 +310,19 @@ namespace WdRiscv
     unsigned loadSize() const
     { return ldSize_; }
 
-    /// Return the data size in bytes of a store instruction. Return
-    /// zero for a non-store instruction.
+    /// Return the data size in bytes of a store instruction. Return zero for a non-store
+    /// instruction.
     unsigned storeSize() const
     { return stSize_; }
+
+    /// Return the data size in bytes of an AMO instruction (excluding ld/sc). Return zero
+    /// for a non-store instruction.
+    unsigned amoSize() const
+    {
+      if (not isAmo())
+	return 0;
+      return ((code_ >> 12) & 7) == 2 ? 4 : 8;
+    }
 
     /// Return the size with which the immediate bits are to be (left)shifted
     unsigned immediateShiftSize() const 

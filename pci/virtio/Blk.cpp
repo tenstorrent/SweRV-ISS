@@ -7,26 +7,37 @@
 #include "Blk.hpp"
 
 
-Blk::Blk(const std::string& filename, bool readonly) : Virtio(VIRTIO_ID_BLOCK, 0x018000, 1)
+Blk::Blk(bool readonly) : Virtio(VIRTIO_ID_BLOCK, 0x018000, 1)
 {
   if (readonly)
     features_ |= uint64_t(1) << VIRTIO_BLK_F_RO;
+}
 
-  int flags = (readonly)? O_RDONLY : O_RDWR;
+
+bool
+Blk::open_file(const std::string& filename)
+{
+  int flags = (features_ & VIRTIO_BLK_F_RO)? O_RDONLY : O_RDWR;
   fd_ = open(filename.c_str(), flags);
 
   if (fd_ < 0) {
-    std::cerr << "Error opening file as block device " << filename << std::endl;
-    return;
+    std::cerr << "Error: Failed to open file " << filename << " as block device " << std::endl;
+    return false;
   }
+
+  return true;
 }
 
 
 void
 Blk::operator()(unsigned vq)
 {
+  if (not fd_)
+    return;
+
   std::vector<virtqueue::used_ring::elem> elems;
   bool finished = false;
+
   while (not finished) {
     std::vector<virtqueue::descriptor> reads, writes;
     unsigned head;

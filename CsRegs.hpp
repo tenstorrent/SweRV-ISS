@@ -233,6 +233,9 @@ namespace WdRiscv
       // Supervisor Protection and Translation 
       SATP = 0x180,
 
+      // Quality of service
+      SRMCFG = 0x181,
+
       // Hypervisor registers
       HSTATUS = 0x600,
       HEDELEG = 0x602,
@@ -340,14 +343,15 @@ namespace WdRiscv
       HPMCOUNTER31H = 0xc9f,
 
       // Debug/Trace registers.
-      SCONTEXT = 0x5a8,
-      TSELECT  = 0x7a0,
-      TDATA1   = 0x7a1,
-      TDATA2   = 0x7a2,
-      TDATA3   = 0x7a3,
-      TINFO    = 0x7a4,
-      TCONTROL = 0x7a5,
-      MCONTEXT = 0x7a8,
+      SCONTEXT  = 0x5a8,
+      TSELECT   = 0x7a0,
+      TDATA1    = 0x7a1,
+      TDATA2    = 0x7a2,
+      TDATA3    = 0x7a3,
+      TINFO     = 0x7a4,
+      TCONTROL  = 0x7a5,
+      MCONTEXT  = 0x7a8,
+      MSCONTEXT = 0x7aa,
 
       // Debug mode registers.
       DCSR      = 0x7b0,
@@ -502,7 +506,7 @@ namespace WdRiscv
 
     /// Return true if register is implemented.
     bool isImplemented() const
-    { return implemented_; }
+    { return implemented_ and not userDisabled_; }
 
     /// Return true if register is mandatory (not optional).
     bool isMandatory() const
@@ -673,6 +677,10 @@ namespace WdRiscv
     void setImplemented(bool flag)
     { implemented_ = flag; }
 
+    /// Mark register as disabled by user configuration.
+    void setUserDisabled(bool flag)
+    { userDisabled_ = flag; }
+
     /// Set initial value.
     void setInitialValue(URV v)
     { initialValue_ = v; }
@@ -777,13 +785,14 @@ namespace WdRiscv
 
     std::string name_;
     unsigned number_ = 0;
-    bool mandatory_ = false;   // True if mandated by architecture.
-    bool implemented_ = false; // True if register is implemented.
-    bool hyper_ = false;       // True if hypervisor CSR.
+    bool mandatory_ = false;     // True if mandated by architecture.
+    bool implemented_ = false;   // True if register is implemented.
+    bool userDisabled_ = false;  // True if disabled by user in config file.
+    bool hyper_ = false;         // True if hypervisor CSR.
     bool mapsToVirtual_ = false; // True if CSR maps to a virtual supervisor CSR.
     bool defined_ = false;
-    bool debug_ = false;       // True if this is a debug-mode register.
-    bool shared_ = false;      // True if this is shared among harts.
+    bool debug_ = false;         // True if this is a debug-mode register.
+    bool shared_ = false;        // True if this is shared among harts.
     URV initialValue_ = 0;
     PrivilegeMode privMode_ = PrivilegeMode::Machine;
     URV value_ = 0;
@@ -955,10 +964,12 @@ namespace WdRiscv
     void configExecOpcodeTrigger(bool flag)
     { triggers_.enableExecOpcode(flag); }
 
-    /// Restrict chaining only to pairs of consecutive (even-numbered followed
-    /// by odd) triggers.
-    void configEvenOddTriggerChaining(bool flag)
-    { triggers_.setEvenOddChaining(flag); }
+    /// Enable triggers.
+    void enableTriggers(bool flag);
+
+    /// Enable/disable firing of triggers in machine mode when interrupts are enabled.
+    void enableMmodeTriggersWithIe(bool flag)
+    { triggers_.enableMmodeWithIe(flag); }
 
     /// Return true if one more debug triggers are enabled.
     bool hasActiveTrigger() const
@@ -992,17 +1003,15 @@ namespace WdRiscv
     bool pokeTrigger(URV trigger, URV data1, URV data2, URV data3)
     { return triggers_.poke(trigger, data1, data2, data3); }
 
-    /// Return true if any of the load (store if isLoad is false)
-    /// triggers trips. A load/store trigger trips if it matches the
-    /// given address and timing and if all the remaining triggers in
-    /// its chain have tripped. Set the local-hit bit of any
-    /// load/store trigger that matches. If a matching load/store
-    /// trigger causes its chain to trip, then set the hit bit of all
-    /// the triggers in that chain.
+    /// Return true if any of the load (store if isLoad is false) triggers trips. A
+    /// load/store trigger trips if it matches the given address and timing and if all the
+    /// remaining triggers in its chain have tripped. Set the local-hit bit of any
+    /// load/store trigger that matches. If a matching load/store trigger causes its chain
+    /// to trip, then set the hit bit of all the triggers in that chain.
     bool ldStAddrTriggerHit(URV addr, TriggerTiming t, bool isLoad,
-                            PrivilegeMode mode, bool ie)
+                            PrivilegeMode mode, bool virtMode, bool ie)
     {
-      bool chainHit = triggers_.ldStAddrTriggerHit(addr, t, isLoad, mode, ie);
+      bool chainHit = triggers_.ldStAddrTriggerHit(addr, t, isLoad, mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))
@@ -1012,9 +1021,9 @@ namespace WdRiscv
 
     /// Similar to ldStAddrTriggerHit but for data match.
     bool ldStDataTriggerHit(URV data, TriggerTiming t, bool isLoad,
-                            PrivilegeMode mode, bool ie)
+                            PrivilegeMode mode, bool virtMode, bool ie)
     {
-      bool chainHit = triggers_.ldStDataTriggerHit(data, t, isLoad, mode, ie);
+      bool chainHit = triggers_.ldStDataTriggerHit(data, t, isLoad, mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))
@@ -1024,9 +1033,9 @@ namespace WdRiscv
 
     /// Similar to ldStAddrTriggerHit but for instruction address.
     bool instAddrTriggerHit(URV addr, TriggerTiming t, PrivilegeMode mode,
-                            bool ie)
+                            bool virtMode, bool ie)
     {
-      bool chainHit = triggers_.instAddrTriggerHit(addr, t, mode, ie);
+      bool chainHit = triggers_.instAddrTriggerHit(addr, t, mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))
@@ -1036,9 +1045,9 @@ namespace WdRiscv
 
     /// Similar to instAddrTriggerHit but for instruction opcode.
     bool instOpcodeTriggerHit(URV opcode, TriggerTiming t, PrivilegeMode mode,
-                              bool ie)
+                              bool virtMode, bool ie)
     {
-      bool chainHit = triggers_.instOpcodeTriggerHit(opcode, t, mode, ie);
+      bool chainHit = triggers_.instOpcodeTriggerHit(opcode, t, mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))
@@ -1046,14 +1055,36 @@ namespace WdRiscv
       return chainHit;
     }
 
-    /// Make every active icount trigger count down unless it was
-    /// written by the current instruction. Set the hit bit of a
-    /// counted-down register if its value becomes zero. Return true
-    /// if any counted-down register reaches zero; otherwise, return
-    /// false.
-    bool icountTriggerHit(PrivilegeMode mode, bool ie)
+    /// Similar to instAddrTriggerHit but for interrupt triggers.
+    bool intTriggerHit(URV cause, PrivilegeMode mode, bool virtMode, bool ie)
     {
-      bool hit = triggers_.icountTriggerHit(mode, ie);
+      bool chainHit = triggers_.intTriggerHit(cause, mode, virtMode, ie);
+      URV tselect = 0;
+      peek(CsrNumber::TSELECT, tselect);
+      if (triggers_.getLocalHit(tselect))
+	recordWrite(CsrNumber::TDATA1);  // Hit bit in TDATA1 changed.
+      return chainHit;
+    }
+
+    /// Similar to instAddrTriggerHit but for exception triggers.
+    bool expTriggerHit(URV cause, PrivilegeMode mode, bool virtMode, bool ie)
+    {
+      bool chainHit = triggers_.expTriggerHit(cause, mode, virtMode, ie);
+      URV tselect = 0;
+      peek(CsrNumber::TSELECT, tselect);
+      if (triggers_.getLocalHit(tselect))
+	recordWrite(CsrNumber::TDATA1);  // Hit bit in TDATA1 changed.
+      return chainHit;
+    }
+
+    /// Make every active icount trigger count down unless it was written by the current
+    /// instruction. Set the hit bit of a counted-down register if its value becomes
+    /// zero. Return true if any counted-down register reaches zero; otherwise, return
+    /// false.
+    bool icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode,
+                          PrivilegeMode mode, bool virtMode, bool ie)
+    {
+      bool hit = triggers_.icountTriggerHit(prevPrivMode, prevVirtMode, mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))
@@ -1066,11 +1097,22 @@ namespace WdRiscv
     void countTrippedTriggers(unsigned& pre, unsigned& post) const
     { triggers_.countTrippedTriggers(pre, post); }
 
-    /// Set t1, t2, and t3 to true if corresponding component (tdata1,
-    /// tdata2, an tdata3) of given trigger was changed by the current
-    /// instruction.
-    void getTriggerChange(URV trigger, bool& t1, bool& t2, bool& t3) const
-    { triggers_.getTriggerChange(trigger, t1, t2, t3); }
+    /// Set change to the components of the given trigger that were changed by the last
+    /// executed instruction. Each entry is a component number (e.g. TDATA1, TINFO, ...)
+    /// with the corresponding value.
+    void getTriggerChange(URV trigger, std::vector<std::pair<CsrNumber, uint64_t>>& change) const
+    {
+      change.clear();
+      std::vector<std::pair<TriggerOffset, uint64_t>> temp;
+      triggers_.getTriggerChange(trigger, temp);
+      for (auto& tempPair : temp)
+	{
+	  auto offset = tempPair.first;
+	  auto val = tempPair.second;
+	  CsrNumber csrn = CsrNumber(unsigned(offset) + unsigned(CsrNumber::TDATA1));
+	  change.push_back(std::pair<CsrNumber, uint64_t>(csrn, val));
+	}
+    }
 
     /// Associate given event number with given counter.  Subsequent
     /// calls to Hart::updatePerofrmanceCounters will cause given
@@ -1112,6 +1154,12 @@ namespace WdRiscv
     /// Configure CSR. Return true on success and false on failure.
     bool configCsr(std::string_view name, bool implemented, URV resetValue,
                    URV mask, URV pokeMask, bool debug, bool shared);
+
+    /// Configure CSR. Return true on success and false on failure. Mark non-implemented
+    /// csr (implemented == false) as user-disabled so that internal code cannot enable
+    /// them.
+    bool configCsrByUser(std::string_view name, bool implemented, URV resetValue,
+			 URV mask, URV pokeMask, bool debug, bool shared);
 
     /// Configure CSR. Return true on success and false on failure.
     bool configCsr(CsrNumber csr, bool implemented, URV resetValue,
@@ -1221,11 +1269,11 @@ namespace WdRiscv
     /// hypervisor related CSRs.
     void hyperPoke(Csr<URV>* csr);
 
-    bool readTdata(CsrNumber number, PrivilegeMode mode, URV& value) const;
+    bool readTrigger(CsrNumber number, PrivilegeMode mode, URV& value) const;
 
-    bool writeTdata(CsrNumber number, PrivilegeMode mode, URV value);
+    bool writeTrigger(CsrNumber number, PrivilegeMode mode, URV value);
 
-    bool pokeTdata(CsrNumber number, URV value);
+    bool pokeTrigger(CsrNumber number, URV value);
 
     bool readTopi(CsrNumber number, URV& value) const;
 
@@ -1268,10 +1316,24 @@ namespace WdRiscv
       return csr.read();
     }
 
+    /// Fast peek method for MVIP.
+    URV peekMvip() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::MVIP));
+      return csr.read();
+    }
+
     /// Fast peek method for HGEIE.
     URV peekHgeie() const
     {
       const auto& csr = regs_.at(size_t(CsrNumber::HGEIE));
+      return csr.read();
+    }
+
+    /// Fast peek method for HGEIP.
+    URV peekHgeip() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::HGEIP));
       return csr.read();
     }
 
@@ -1384,13 +1446,10 @@ namespace WdRiscv
     /// Configure given trigger with given reset values, write and
     /// poke masks. Return true on success and false on failure.
     bool configTrigger(unsigned trigger,
-                       uint64_t rv1, uint64_t rv2, uint64_t rv3,
-		       uint64_t wm1, uint64_t wm2, uint64_t wm3,
-		       uint64_t pm1, uint64_t pm2, uint64_t pm3)
-    {
-      return triggers_.config(trigger, rv1, rv2, rv3,
-			      wm1, wm2, wm3, pm1, pm2, pm3);
-    }
+                       const std::vector<uint64_t>& resets,
+		       const std::vector<uint64_t>& masks,
+		       const std::vector<uint64_t>& pokeMasks)
+    { return triggers_.config(trigger, resets, masks, pokeMasks); }
 
     bool isInterruptEnabled() const
     { return interruptEnable_; }
@@ -1515,8 +1574,8 @@ namespace WdRiscv
     /// Legalize a PMACFG value.
     URV legalizePmacfgValue(URV current, URV value) const;
 
-    /// Legalize scountovf, matching OF bit of given mhpmevent.
-    void updateScountovfValue(CsrNumber mhpm, uint64_t value);
+    /// Legalize scountovf, matching OF bit of given mhpmevent CSR.
+    void updateScountovfValue(CsrNumber mhpmevent);
 
     /// Return true if given CSR number is a PMPADDR register and if
     /// that register is locked.  Return false otherwise.
@@ -1662,6 +1721,9 @@ namespace WdRiscv
     /// helper to add fields of AIA CSRs
     void addAiaFields();
 
+    /// helper to add fields of debug CSRs
+    void addDebugFields();
+
     /// Return true if given CSR is a hypervisor CSR.
     bool isHypervisor(CsrNumber csrn) const
     { auto csr = getImplementedCsr(csrn); return csr and csr->isHypervisor(); }
@@ -1674,8 +1736,8 @@ namespace WdRiscv
     /// otherwise, bit is readable.
     void enableMenvcfgStce(bool flag);
 
-    /// Return the value of the STCE bit of the MENVCFG CSR. Return
-    /// false if CSR is not implemented or if SSTC extension is off.
+    /// Return the value of the STCE bit of the MENVCFG CSR. Return false if CSR is not
+    /// implemented or if SSTC extension is off.
     bool menvcfgStce()
     {
       auto csr = getImplementedCsr(rv32_? CsrNumber::MENVCFGH : CsrNumber::MENVCFG);
@@ -1691,6 +1753,43 @@ namespace WdRiscv
 	}
       MenvcfgFields<uint64_t> fields(value);
       return fields.bits_.STCE;
+    }
+
+    /// Return the MTE bit of the TCONTROL CSR. Return false if CSR is not implemented.
+    bool tcontrolMte()
+    {
+      auto csr = getImplementedCsr(CsrNumber::TCONTROL);
+      if (not csr)
+	return false;
+      TcontrolFields<URV> tcf{csr->read()};
+      return tcf.bits_.mte_;
+    }      
+
+    /// Save TCONTROL.MTE into TCONTROL.MPTE. This is called on traps to machine mode.
+    void saveTcontrolMte()
+    {
+      auto csr = getImplementedCsr(CsrNumber::TCONTROL);
+      if (not csr)
+	return;
+      TcontrolFields<URV> tcf{csr->read()};
+      tcf.bits_.mpte_ = tcf.bits_.mte_;
+      tcf.bits_.mte_ = 0;
+      csr->poke(tcf.value_);
+      triggers_.enableMachineMode(tcontrolMte());
+      recordWrite(CsrNumber::TCONTROL);
+    }
+
+    /// Restore TCONTROL.MTE from TCONTROL.MPTE. This is called by mret.
+    void restoreTcontrolMte()
+    {
+      auto csr = getImplementedCsr(CsrNumber::TCONTROL);
+      if (not csr)
+	return;
+      TcontrolFields<URV> tcf{csr->read()};
+      tcf.bits_.mte_ = tcf.bits_.mpte_;
+      csr->poke(tcf.value_);
+      triggers_.enableMachineMode(tcontrolMte());
+      recordWrite(CsrNumber::TCONTROL);
     }
 
     /// If flag is false, bit HENVCFG.PBMTE becomes read-only ero;
@@ -1935,6 +2034,7 @@ namespace WdRiscv
     bool sstcEnabled_ = false;    // Supervisor time compare
     bool cofEnabled_ = false;     // Counter overflow
     bool stateenOn_ = false;      // Mstateen extension.
+    bool triggersOn_ = false;     // Stdtrig (debug triggers) extension.
     bool pmpTor_ = true;          // Top-of-range PMP mode enabled
     bool pmpNa4_ = true;          // Na4 PMP mode enabled
     bool aiaEnabled_ = false;     // Aia extension.

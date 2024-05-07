@@ -143,6 +143,9 @@ namespace WdRiscv
     bool updateCounters(EventNumber event, uint32_t perfControl,
                         PrivilegeMode mode, bool isVirt)
     {
+      if (not activeCounter_)
+	return true;   // No counter is assigned a valid event.
+
       uint32_t mask = privModeToMask(mode, isVirt);
 
       for (unsigned counterIx = 0; counterIx < eventOfCounter_.size(); ++counterIx)
@@ -202,6 +205,11 @@ namespace WdRiscv
     void enableOverflow(bool flag)
     { ovfEnabled_ = flag; }
 
+    /// Return true if one or more counters is assigned a valid event. Return false
+    /// if all counters are assigned no event (event None).
+    bool hasActiveCounter() const
+    { return activeCounter_; }
+
     /// Set id to event-id (tag from enum EventNumber) coresponding to the
     /// given event name returning true. Return false leaving id unmodified
     /// if given string is not an event name.
@@ -255,6 +263,8 @@ namespace WdRiscv
     unsigned pendingCounter_ = 0;
     uint32_t pendingMask_ = 0;
     bool hasPending_ = false;
+
+    bool activeCounter_ = false; // True if any counter is assigned a vlid event.
 
     // Called with counter index (0 corresponds to mhpmcounter3) on overflow.
     std::function<void(unsigned)> ovfCallback_ = nullptr;

@@ -44,11 +44,18 @@
 #include "Stee.hpp"
 
 
+namespace TT_PERF
+{
+  class PerfApi;
+}
+
+
 namespace WdRiscv
 {
 
   template <typename URV>
   class Mcm;
+  
 
   class DecodedInst;
   class InstEntry;
@@ -123,8 +130,8 @@ namespace WdRiscv
   {
   public:
 
-    // Alias the template parameter to allow it to be used outside this
-    // template.
+    /// Alias the template parameter to allow it to be used outside this
+    /// template.
     using URV = URV_;
 
     /// Signed register type corresponding to URV. For example, if URV
@@ -289,11 +296,13 @@ namespace WdRiscv
     const Csr<URV>* findCsr(CsrNumber number)
     { return csRegs_.findCsr(number); }
 
-    /// Configure given CSR. Return true on success and false if
-    /// no such CSR.
-    bool configCsr(std::string_view name, bool implemented,
-		   URV resetValue, URV mask, URV pokeMask,
-		   bool isDebug, bool shared);
+    /// Configure given CSR. Return true on success and false if no such CSR.
+    bool configCsrByUser(std::string_view name, bool implemented, URV resetValue, URV mask,
+			 URV pokeMask, bool isDebug, bool shared);
+
+    /// Configure given CSR. Return true on success and false if no such CSR.
+    bool configCsr(std::string_view name, bool implemented, URV resetValue, URV mask,
+		   URV pokeMask, bool isDebug, bool shared);
 
     /// Define a new CSR (beyond the standard CSRs defined by the
     /// RISCV spec). Return true on success and false if name/number
@@ -305,13 +314,10 @@ namespace WdRiscv
     /// Configure given trigger with given reset values, write and
     /// poke masks. Return true on success and false on failure.
     bool configTrigger(unsigned trigger,
-                       uint64_t rv1, uint64_t rv2, uint64_t rv3,
-		       uint64_t wm1, uint64_t wm2, uint64_t wm3,
-		       uint64_t pm1, uint64_t pm2, uint64_t pm3)
-    {
-      return csRegs_.configTrigger(trigger, rv1, rv2, rv3,
-				   wm1, wm2, wm3, pm1, pm2, pm3);
-    }
+                       const std::vector<uint64_t>& resets,
+		       const std::vector<uint64_t>& masks,
+		       const std::vector<uint64_t>& pokeMasks)
+    { return csRegs_.configTrigger(trigger, resets, masks, pokeMasks); }
 
     /// Enable the extensions defined by the given string. If
     /// updateMisa is true then the MISA CSR reset value is updated to
@@ -326,11 +332,6 @@ namespace WdRiscv
     /// Enable/disable exec-opcode triggering (disabled by default).
     void configExecOpcodeTrigger(bool flag)
     { csRegs_.configExecOpcodeTrigger(flag); }
-
-    /// Restrict chaining only to pairs of consecutive (even-numbered followed
-    /// by odd) triggers.
-    void configEvenOddTriggerChaining(bool flag)
-    { csRegs_.configEvenOddTriggerChaining(flag); }
 
     /// Configure machine mode performance counters returning true on
     /// success and false on failure. N consecutive counters starting
@@ -398,6 +399,7 @@ namespace WdRiscv
 	  flag = flag and csRegs_.menvcfgPbmte();
 	  bool adu = csRegs_.menvcfgAdue();
 	  virtMem_.setFaultOnFirstAccess(not adu);
+	  virtMem_.setFaultOnFirstAccessStage2(not adu);
 	}
       virtMem_.enablePbmt(flag);
       auto henv = csRegs_.getImplementedCsr(CsrNumber::HENVCFG);
@@ -405,7 +407,7 @@ namespace WdRiscv
 	{
           flag = flag and csRegs_.henvcfgPbmte();
 	  bool adu = csRegs_.henvcfgAdue();
-	  virtMem_.setFaultOnFirstAccessStage2(not adu);
+	  virtMem_.setFaultOnFirstAccessStage1(not adu);
 	}
       virtMem_.enableVsPbmt(flag);
     }
@@ -593,13 +595,25 @@ namespace WdRiscv
     { ownTrace_ = flag; }
 
     /// Define memory mapped locations for CLINT.
-    void configClint(uint64_t clintStart, uint64_t clintEnd,
-		     bool softwareInterruptOnReset,
-                     std::function<Hart<URV>*(unsigned ix)> indexToHart)
+    void configAclint(uint64_t mswiOffset, bool hasMswi,
+                      uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
+		      bool softwareInterruptOnReset,
+                      std::function<Hart<URV>*(unsigned ix)> indexToHart)
     {
-      clintStart_ = clintStart;
-      clintEnd_ = clintEnd;
-      clintSiOnReset_ = softwareInterruptOnReset;
+      if (hasMswi)
+        {
+          aclintSwStart_ = mswiOffset;
+          aclintSwEnd_ = mswiOffset + 0x4000;
+        }
+
+      if (hasMtimer)
+        {
+          aclintMtimerStart_ = mtimerOffset;
+          aclintMtimerEnd_ = mtimerOffset + 0x8000;
+          aclintMtimeStart_ = mtimeOffset;
+          aclintMtimeEnd_ = mtimeOffset + 0x8;
+        }
+      aclintSiOnReset_ = softwareInterruptOnReset;
       indexToHart_ = indexToHart;
     }
 
@@ -956,11 +970,11 @@ namespace WdRiscv
     void countTrippedTriggers(unsigned& pre, unsigned& post) const
     { csRegs_.countTrippedTriggers(pre, post); }
 
-    /// Set t1, t2, and t3 to true if corresponding component (tdata1,
-    /// tdata2, an tdata3) of given trigger was changed by the current
-    /// instruction.
-    void getTriggerChange(URV trigger, bool& t1, bool& t2, bool& t3) const
-    { csRegs_.getTriggerChange(trigger, t1, t2, t3); }
+    /// Set change to the components of the given trigger that were changed by the last
+    /// executed instruction. Each entry is a component number (e.g. TDATA1, TINFO, ...)
+    /// with the corresponding value.
+    void getTriggerChange(URV trigger, std::vector<std::pair<CsrNumber, uint64_t>>& change) const
+    { csRegs_.getTriggerChange(trigger, change); }
 
     /// Enable collection of instruction frequencies.
     void enableInstructionFrequency(bool b);
@@ -1086,13 +1100,17 @@ namespace WdRiscv
     /// instruction.)
     void clearTraceData();
 
-    /// Enable debug-triggers. Without this, triggers will not trip
-    /// and will not cause exceptions.
+    /// Enable debug-triggers. Without this, triggers will not trip and will not cause
+    /// exceptions.
     void enableTriggers(bool flag)
-    { enableTriggers_ = flag;  }
+    { enableTriggers_ = flag; csRegs_.enableTriggers(flag);  }
 
-    /// Enable performance counters (count up for some enabled
-    /// performance counters when their events do occur).
+    /// Enable/disable firing of triggers in machine mode when interrupts are enabled.
+    void enableMmodeTriggersWithIe(bool flag)
+    { csRegs_.enableMmodeTriggersWithIe(flag); }
+
+    /// Enable performance counters (count up for some enabled performance counters when
+    /// their events do occur).
     void enablePerformanceCounters(bool flag)
     { enableCounters_ = flag;  }
 
@@ -1542,6 +1560,11 @@ namespace WdRiscv
     void enableClearMprvOnRet(bool flag)
     { clearMprvOnRet_ = flag; }
 
+    /// Make hfence.gvma ignore guest physical addresses (over-invalidate) when flag is
+    /// true.
+    void hfenceGvmaIgnoresGpa(bool flag)
+    { hfenceGvmaIgnoresGpa_ = flag; }
+
     /// Clear MTVAL on illegal instruction exception if flag is true.
     /// Otherwise, set MTVAL to the opcode of the illegal instruction.
     void enableClearMtvalOnIllInst(bool flag)
@@ -1622,18 +1645,23 @@ namespace WdRiscv
     void setFaultOnFirstAccess(bool flag)
     { virtMem_.setFaultOnFirstAccess(flag); }
 
+    /// Similar to setFaultOnFirstAccess but applies to the first stage
+    /// of 2-stage translation.
+    void setFaultOnFirstAccessStage1(bool flag)
+    { virtMem_.setFaultOnFirstAccessStage1(flag); }
+
     /// Similar to setFaultOnFirstAccess but applies to the second stage
     /// of 2-stage translation.
     void setFaultOnFirstAccessStage2(bool flag)
     { virtMem_.setFaultOnFirstAccessStage2(flag); }
 
-    /// Translate virtual address without updating TLB or
-    /// updating/checking A/D bits of PTE. Return ExceptionCause::NONE
-    /// on success or fault/access exception on failure. If succesful
-    /// set pa to the physical address.
-    ExceptionCause transAddrNoUpdate(uint64_t va, PrivilegeMode pm, bool r,
+    /// Translate virtual address without updating TLB or updating/checking A/D bits of
+    /// PTE. Return ExceptionCause::NONE on success or fault/access exception on
+    /// failure. If succesful set pa to the physical address.
+    ExceptionCause transAddrNoUpdate(uint64_t va, PrivilegeMode pm,
+				     bool twoStage, bool r,
 				     bool w, bool x, uint64_t& pa)
-    { return virtMem_.transAddrNoUpdate(va, pm, false /*twoStage*/, r, w, x, pa); }
+    { return virtMem_.transAddrNoUpdate(va, pm, twoStage, r, w, x, pa); }
 
     /// Return the paging mode before last executed instruction.
     VirtMem::Mode lastPageMode() const
@@ -1693,10 +1721,6 @@ namespace WdRiscv
     {
       walks.clear();
       walks = isInstr? virtMem_.getFetchWalks() : virtMem_.getDataWalks();
-      for (auto& i : walks)
-        for (auto& entry: i)
-            if (entry.type_ == VirtMem::WalkEntry::Type::PA)
-                peekMemory(entry.addr_, entry.addr_, true);
     }
 
     /// Return PMP manager associated with this hart.
@@ -1824,6 +1848,11 @@ namespace WdRiscv
     /// Enable memory consistency model.
     void setMcm(std::shared_ptr<Mcm<URV>> mcm);
 
+    typedef TT_PERF::PerfApi PerfApi;
+
+    /// Enable performance model API.
+    void setPerfApi(std::shared_ptr<PerfApi> perfApi);
+
     /// Enable instruction line address tracing.
     void enableInstructionLineTrace(bool flag)
     { instrLineTrace_ = flag; }
@@ -1865,6 +1894,11 @@ namespace WdRiscv
     // before the timer expires. This is relevant to the clint.
     void setTimeShift(unsigned shift)
     { timeShift_ = shift; }
+
+    // Define time scaling factor such that the time value increment period
+    // is scaled down by 2^N.
+    void setTimeDownSample(unsigned n)
+    { timeDownSample_ = n; }
 
     /// Return true if external interrupts are enabled and one or more
     /// external interrupt that is pending is also enabled. Set cause
@@ -1932,26 +1966,16 @@ namespace WdRiscv
         });
 
       imsic_->attachGInterrupt([this] (bool flag, unsigned guest) {
-          URV mipVal = csRegs_.peekMip();
-          URV prev = mipVal;
-
-	  URV gip;
-          csRegs_.peek(CsrNumber::HGEIP, gip);
-
-          if (flag)
-            gip |= (URV(1) << guest);
-          else
-            gip &= ~(URV(1) << guest);
-
+	  URV gip = csRegs_.peekHgeip();
+	  gip = flag ? (gip | (URV(1) << guest)) :  (gip & ~(URV(1) << guest));
 	  csRegs_.poke(CsrNumber::HGEIP, gip);
-	  URV gie = csRegs_.peekHgeie();
-          if (gip & gie)
-	    mipVal = mipVal | (URV(1) << URV(IC::G_EXTERNAL));
-	  else
-	    mipVal = mipVal & ~(URV(1) << URV(IC::G_EXTERNAL));
 
-          if (mipVal != prev)
-            csRegs_.poke(CsrNumber::MIP, mipVal);
+	  URV gie = csRegs_.peekHgeie();
+	  URV gmask = URV(1) << URV(IC::G_EXTERNAL);
+	  URV mipVal = csRegs_.peekMip();
+          mipVal = (gip & gie) ? (mipVal | gmask) : (mipVal & ~gmask);
+
+	  csRegs_.poke(CsrNumber::MIP, mipVal);
         });
     }
 
@@ -2034,37 +2058,65 @@ namespace WdRiscv
     void enableStee(bool flag)
     { steeEnabled_ = flag; }
 
-    /// Return true if CLINT is configured.
-    bool hasClint() const
-    { return clintStart_ < clintEnd_; }
+    /// Return true if ACLINT is configured.
+    bool hasAclint() const
+    { return (aclintSwStart_ < aclintSwEnd_) or (aclintMtimerStart_ < aclintMtimerEnd_); }
 
-    /// Return true if CLINT is configured setting address to the clint address.
-    /// Return false otherwise leaving address unmodified.
-    bool hasClint(uint64_t& addr) const
+    /// Set the ACLINT alarm to the given value.
+    bool hasAclintTimer(uint64_t& addr) const
     {
-      if (clintStart_ < clintEnd_)
+      if (aclintMtimerStart_ < aclintMtimerEnd_)
 	{
-	  addr = clintStart_;
+	  addr = aclintMtimerStart_;
 	  return true;
 	}
       return false;
     }
 
     /// Set the CLINT alarm to the given value.
-    void setClintAlarm(uint64_t value)
+    void setAclintAlarm(uint64_t value)
     {
-      if (hasClint())
-	clintAlarm_ = value;
+      if (hasAclint())
+	aclintAlarm_ = value;
     }
 
-    /// Fetch an instruction from the given virtual address. Return
-    /// ExceptionCause::None on success. Return exception cause on
-    /// fail. If successful set pysAddr to the physical address
-    /// corresponding to the given virtual address, gPhysAddr to the
-    /// guest physical address (0 if not in VS/VU mode), and
-    /// instr to the fetched instruction.
-    ExceptionCause fetchInstNoTrap(uint64_t& virAddr, uint64_t& physAddr,
+    /// Fetch an instruction from the given virtual address. Return ExceptionCause::None
+    /// on success. Return exception cause on fail. If successful set pysAddr to the
+    /// physical address corresponding to the given virtual address, gPhysAddr to the
+    /// guest physical address (0 if not in VS/VU mode), and instr to the fetched
+    /// instruction. If a fetch crosses a page boundary then physAddr2 will be the address
+    /// of the other paget, otherwise physAddr2 will be the same as physAddr.
+    ExceptionCause fetchInstNoTrap(uint64_t& virAddr, uint64_t& physAddr, uint64_t& physAddr2,
 				   uint64_t& gPhysAddr, uint32_t& instr);
+
+    bool isAclintAddr(uint64_t addr) const
+    {
+      return hasAclint() and ((addr >= aclintSwStart_ and addr < aclintSwEnd_) or
+                              (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_));
+    }
+
+    bool isAclintMtimeAddr(uint64_t addr) const
+    { return addr >= aclintMtimeStart_ and addr < aclintMtimeEnd_; }
+
+    bool isInterruptorAddr(uint64_t addr, unsigned size) const
+    { return hasInterruptor_ and addr == interruptor_ and size == 4; }
+
+    bool isImsicAddr(uint64_t addr) const
+    {
+      return (imsic_ and ((addr >= imsicMbase_ and addr < imsicMend_) or
+			  (addr >= imsicSbase_ and addr < imsicSend_)));
+    }
+
+    bool isPciAddr(uint64_t addr) const
+    {
+      return (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
+			(addr >= pciMmioBase_ and addr < pciMmioEnd_)));
+    }
+
+    /// Return true if there is one or more active performance counter (a counter that is
+    /// assigned a valid event).
+    bool hasActivePerfCounter() const
+    { return csRegs_.mPerfRegs_.hasActiveCounter(); }
 
   protected:
 
@@ -2123,6 +2175,7 @@ namespace WdRiscv
 
       unsigned size = sizeof(value);
       unsigned size1 = size - (pa1 & (size - 1));
+
       unsigned size2 = size - size1;
 
       value = 0;
@@ -2193,6 +2246,9 @@ namespace WdRiscv
 	  value |= LOAD_TYPE(byte) << 8*destIx;
     }
 
+    /// Get the data value for an out of order read (mcm or perfApi).
+    bool getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
+			 uint64_t& value);
 
     /// Set current privilege mode.
     void setPrivilegeMode(PrivilegeMode m)
@@ -2569,75 +2625,75 @@ namespace WdRiscv
     /// false otherwise.
     bool imsicAccessible(const DecodedInst* di, CsrNumber csr, PrivilegeMode mode, bool virtMode);
 
-    /// Helper to CSR instructions: return true if given CSR is
-    /// writebale in the given privielge level and virtual (V) mode
-    /// and false otherwise.
+    /// Helper to CSR instructions: return true if given CSR is writebale in the given
+    /// privielge level and virtual (V) mode and false otherwise.
     bool isCsrWriteable(CsrNumber csr, PrivilegeMode mode, bool virtMode) const;
 
-    /// Helper to CSR instructions: Write csr and integer register if csr
-    /// is writeable.
+    /// Helper to CSR instructions: Write csr and integer register if csr is writeable.
     void doCsrWrite(const DecodedInst* di, CsrNumber csr, URV csrVal,
                     unsigned intReg, URV intRegVal);
 
-    /// Helper to CSR instructions: Read CSR register returning true
-    /// on success and false on failure (CSR does not exist or is not
-    /// accessible). The isWrite flags should be set to true if
-    /// doCsrRead is called from a CSR instruction that would write
-    /// the CSR register when the read is successful.
+    /// Helper to CSR instructions: Read CSR register returning true on success and false
+    /// on failure (CSR does not exist or is not accessible). The isWrite flags should be
+    /// set to true if doCsrRead is called from a CSR instruction that would write the CSR
+    /// register when the read is successful.
     bool doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& csrVal);
+
+    /// Helper to doCsrWrite/doCsrRead.
+    bool checkCsrAccess(const DecodedInst* di, CsrNumber csr, bool isWrite);
 
     /// This is called after a csr is written/poked to update the
     /// procerssor state as a side effect to the csr change.
     void postCsrUpdate(CsrNumber csr, URV val, URV lastVal);
 
-    /// Return true if one or more load-address/store-address trigger
-    /// has a hit on the given address and given timing
-    /// (before/after). Set the hit bit of all the triggers that trip.
+    /// Return true if one or more load-address/store-address trigger has a hit on the
+    /// given address and given timing (before/after). Set the hit bit of all the triggers
+    /// that trip.
     bool ldStAddrTriggerHit(URV addr, TriggerTiming t, bool isLoad)
     {
-      return csRegs_.ldStAddrTriggerHit(addr, t, isLoad, privilegeMode(),
+      return csRegs_.ldStAddrTriggerHit(addr, t, isLoad, privilegeMode(), virtMode(),
 					isInterruptEnabled());
     }
 
-    /// Return true if one or more load-address/store-address trigger
-    /// has a hit on the given data value and given timing
-    /// (before/after). Set the hit bit of all the triggers that trip.
+    /// Return true if one or more load-address/store-address trigger has a hit on the
+    /// given data value and given timing (before/after). Set the hit bit of all the
+    /// triggers that trip.
     bool ldStDataTriggerHit(URV value, TriggerTiming t, bool isLoad)
     {
-      return csRegs_.ldStDataTriggerHit(value, t, isLoad, privilegeMode(),
+      return csRegs_.ldStDataTriggerHit(value, t, isLoad, privilegeMode(), virtMode(),
 					isInterruptEnabled());
     }
 
-    /// Return true if one or more execution trigger has a hit on the
-    /// given address and given timing (before/after). Set the hit bit
-    /// of all the triggers that trip.
+    /// Return true if one or more execution trigger has a hit on the given address and
+    /// given timing (before/after). Set the hit bit of all the triggers that trip.
     bool instAddrTriggerHit(URV addr, TriggerTiming t)
     {
-      return csRegs_.instAddrTriggerHit(addr, t, privilegeMode(),
+      return csRegs_.instAddrTriggerHit(addr, t, privilegeMode(), virtMode(),
 					isInterruptEnabled());
     }
 
-    /// Return true if one or more execution trigger has a hit on the
-    /// given opcode value and given timing (before/after). Set the
-    /// hit bit of all the triggers that trip.
+    /// Return true if one or more execution trigger has a hit on the given opcode value
+    /// and given timing (before/after). Set the hit bit of all the triggers that trip.
     bool instOpcodeTriggerHit(URV opcode, TriggerTiming t)
     {
-      return csRegs_.instOpcodeTriggerHit(opcode, t, privilegeMode(),
+      return csRegs_.instOpcodeTriggerHit(opcode, t, privilegeMode(), virtMode(),
 					  isInterruptEnabled());
     }
 
-    /// Make all active icount triggers count down, return true if
-    /// any of them counts down to zero.
+    /// Make all active icount triggers count down, return true if any of them counts down
+    /// to zero.
     bool icountTriggerHit()
-    { return csRegs_.icountTriggerHit(privilegeMode(), isInterruptEnabled()); }
+    {
+      return csRegs_.icountTriggerHit(lastPrivMode(), lastVirtMode(), privilegeMode(),
+				      virtMode(), isInterruptEnabled());
+    }
 
-    /// Return true if this hart has one or more active debug
-    /// triggers.
+    /// Return true if this hart has one or more active debug triggers.
     bool hasActiveTrigger() const
     { return (enableTriggers_ and csRegs_.hasActiveTrigger()); }
 
-    /// Return true if this hart has one or more active debug instruction
-    /// (execute) triggers.
+    /// Return true if this hart has one or more active debug instruction (execute)
+    /// triggers.
     bool hasActiveInstTrigger() const
     { return (enableTriggers_ and csRegs_.hasActiveInstTrigger()); }
 
@@ -2651,8 +2707,7 @@ namespace WdRiscv
     /// Update performance counters: Enabled counters tick up
     /// according to the events associated with the most recent
     /// retired instruction.
-    void updatePerformanceCounters(uint32_t inst, const InstEntry&,
-				   uint32_t op0, uint32_t op1);
+    void updatePerformanceCounters(const DecodedInst& di);
 
     // For CSR instruction we need to let the counters count before
     // letting CSR instruction write. Consequently we update the
@@ -2905,7 +2960,8 @@ namespace WdRiscv
     /// Similar to the above but for vector load/store indexed.
     /// Checks overlap for vd/vs3 and index registers.
     bool checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned vi,
-                                  unsigned offsetWidth, unsigned offsetGroupX8);
+                                  unsigned offsetWidth, unsigned offsetGroupX8,
+                                  unsigned fieldCount);
 
     /// Check reduction vector operand against the group multiplier. Return true
     /// if operand is a multiple of multiplier and false otherwise. Record group
@@ -2920,6 +2976,10 @@ namespace WdRiscv
     /// Similar to above but 2 vector operands and 1st operand is wide.
     bool checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned groupX8);
+
+    /// Similar to above but ternary and 1st operand is wide.
+    bool checkVecTernaryOpsVsEmulW0(const DecodedInst* di, unsigned op0, unsigned op1,
+			            unsigned op2, unsigned groupX8);
 
     /// Similar to above but 3 vector operands and 1st 2 operands are wide.
     bool checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0, unsigned op1,
@@ -4134,7 +4194,7 @@ namespace WdRiscv
 
     template <typename ELEM_TYPE>
     [[nodiscard]]
-    bool vectorLoadSegIndexed(const DecodedInst*, ElementWidth);
+    bool vectorLoadSegIndexed(const DecodedInst*, ElementWidth, unsigned fields);
 
     void execVluxsegei8_v(const DecodedInst*);
     void execVluxsegei16_v(const DecodedInst*);
@@ -4147,7 +4207,7 @@ namespace WdRiscv
 
     template <typename ELEM_TYPE>
     [[nodiscard]]
-    bool vectorStoreSegIndexed(const DecodedInst*, ElementWidth);
+    bool vectorStoreSegIndexed(const DecodedInst*, ElementWidth, unsigned fields);
 
     void execVsuxsegei8_v(const DecodedInst*);
     void execVsuxsegei16_v(const DecodedInst*);
@@ -4939,10 +4999,14 @@ namespace WdRiscv
     bool conIoValid_ = false;    // True if conIo_ is valid.
     bool enableConIn_ = true;
 
-    uint64_t clintStart_ = 0;
-    uint64_t clintEnd_ = 0;
-    uint64_t clintAlarm_ = ~uint64_t(0); // Interrupt when timer >= this
-    bool clintSiOnReset_ = false;
+    uint64_t aclintSwStart_ = 0;
+    uint64_t aclintSwEnd_ = 0;
+    uint64_t aclintMtimerStart_ = 0;
+    uint64_t aclintMtimerEnd_ = 0;
+    uint64_t aclintMtimeStart_ = 0;
+    uint64_t aclintMtimeEnd_ = 0;
+    uint64_t aclintAlarm_ = ~uint64_t(0); // Interrupt when timer >= this
+    bool aclintSiOnReset_ = false;
     std::function<Hart<URV>*(unsigned ix)> indexToHart_ = nullptr;
 
     // True if we want to defer an interrupt for later. By default, take immediately.
@@ -4979,6 +5043,8 @@ namespace WdRiscv
     unsigned cacheLineSize_ = 64;
 
     uint64_t& time_;             // Only hart 0 increments this value.
+    uint64_t timeDownSample_ = 0;
+    uint64_t timeSample_ = 0;
 
     uint64_t retiredInsts_ = 0;  // Proxy for minstret CSR.
     uint64_t cycleCount_ = 0;    // Proxy for mcycle CSR.
@@ -5037,6 +5103,9 @@ namespace WdRiscv
 
     bool clearMprvOnRet_ = true;
     bool cancelLrOnTrap_ = true;    // Cancel reservation on traps when true.
+
+    // Make hfence.gvma ignore huest physical addresses when true.
+    bool hfenceGvmaIgnoresGpa_ = false;
 
     VirtMem::Mode lastPageMode_ = VirtMem::Mode::Bare;  // Before current inst
     VirtMem::Mode lastVsPageMode_ = VirtMem::Mode::Bare;
@@ -5165,7 +5234,9 @@ namespace WdRiscv
     };
     boost::circular_buffer<BranchRecord> branchBuffer_;
 
-    std::shared_ptr<Mcm<URV>> mcm_;
+    std::shared_ptr<Mcm<URV>> mcm_;    // Memory consistency model.
+    std::shared_ptr<PerfApi> perfApi_; // Memory consistency model.
+    bool ooo_ = false;                 // Out of order execution (mcm or perfApi).
 
     FILE* initStateFile_ = nullptr;
     std::unordered_set<uint64_t> initInstrLines_;

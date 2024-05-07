@@ -48,6 +48,31 @@ getHexForm()
 }
 
 
+static
+bool
+parseCmdLineBool(const std::string& option,
+		 const std::string& boolStr,
+		 bool& flag)
+{
+  bool good = not boolStr.empty();
+
+  if (good)
+    {
+      if (boolStr == "true" or boolStr == "t" or boolStr == "1")
+	flag = true;
+      else if (boolStr == "false" or boolStr == "f" or boolStr == "0")
+	flag = false;
+      else
+	good = false;
+    }
+
+  if (not good)
+    std::cerr << "Invalid command line " << option << " value: " << boolStr << '\n';
+
+  return good;
+}
+
+
 /// Convert the command line string numberStr to a number using
 /// strotull and a base of zero (prefixes 0 and 0x are
 /// honored). Return true on success and false on failure (string does
@@ -743,6 +768,8 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
 	out << (boost::format("0x%x") % hart.deferredInterrupts()) << std::endl;
       else if (addrStr == "seipin")
 	out << (boost::format("%d") % hart.getSeiPin()) << std::endl;
+      else if (addrStr == "effma")
+	;   // Nothing to do here. In server mode we return the effective memory attribute.
       else
 	ok = false;
 
@@ -1315,7 +1342,23 @@ printInteractiveHelp()
   cout << "  Translate given virtual address <va> to a physical address assuming given\n";
   cout << "  permission (defaults to read) and privilege mode (defaults to user)\n";
   cout << "  Allowed permission: r for read, w for write, or x for execute.\n";
-  cout << "  Allowed privilege: u to user or s for supervisor\n\n";
+  cout << "  Allowed privilege: u, s, vu, or vs for user, supervisor, guest-user, or guest-supervisor\n";
+  cout << "perf_model_fetch tag vpc\n";
+  cout << "  Perf model API only command. Constructs and fetches instruction packet\n";
+  cout << "perf_model_decode tag opcode\n";
+  cout << "  Perf model API only command. Decodes instruction packet\n";
+  cout << "perf_model_execute tag\n";
+  cout << "  Perf model API only command. Executes instruction packet\n";
+  cout << "perf_model_retire tag\n";
+  cout << "  Perf model API only command. Retires instruction packet\n";
+  cout << "perf_model_drain_store tag\n";
+  cout << "  Perf model API only command. Drains store associated with instruction packet\n";
+  cout << "perf_model_predict_branch\n";
+  cout << "  Perf model API only command. Record branch prediction for an instruction\n";
+  cout << "perf_model_flush tag\n";
+  cout << "  Perf model API only command. Flushes instruction packet\n";
+  cout << "perf_model_flush tag\n";
+  cout << "  Perf model API only command. Determines whether flushing is required\n";
   cout << "quit\n";
   cout << "  Terminate the simulator\n\n";
 }
@@ -1851,6 +1894,78 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       return true;
     }
 
+  if (command == "perf_model_fetch")
+    {
+      if (not perfModelFetchCommand(line, tokens))
+        return false;
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "perf_model_decode")
+    {
+      if (not perfModelDecodeCommand(line, tokens))
+        return false;
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "perf_model_execute")
+    {
+      if (not perfModelExecuteCommand(line, tokens))
+        return false;
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "perf_model_retire")
+    {
+      if (not perfModelRetireCommand(line, tokens))
+        return false;
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "perf_model_drain_store")
+    {
+      if (not perfModelDrainStoreCommand(line, tokens))
+        return false;
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "perf_model_predict_branch")
+    {
+      if (not perfModelPredictBranch(line, tokens))
+        return false;
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "perf_model_flush")
+    {
+      if (not perfModelFlushCommand(line, tokens))
+        return false;
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "perf_model_should_flush")
+    {
+      if (not perfModelShouldFlushCommand(line, tokens))
+        return false;
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
   if (command == "h" or command == "?" or command == "help")
     {
       helpCommand(tokens);
@@ -2192,7 +2307,7 @@ Interactive<URV>::translateCommand(Hart<URV>& hart, const std::string& line,
   if (tokens.size() < 3)
     {
       std::cerr << "Invalid translate command: " << line << '\n';
-      std::cerr << "Expecting: translate <vaddr> [r|w|x [s|u]]\n";
+      std::cerr << "Expecting: translate <vaddr> [r|w|x [s|u|vs|vu]]\n";
     }
 
   uint64_t va = 0;
@@ -2214,20 +2329,24 @@ Interactive<URV>::translateCommand(Hart<URV>& hart, const std::string& line,
   else
     read = true;
 
+  bool twoStage = false;
+
   PrivilegeMode pm = PrivilegeMode::User;
   if (tokens.size() > 3)
     {
-      if      (tokens.at(3) == "u") pm = PrivilegeMode::User;
-      else if (tokens.at(3) == "s") pm = PrivilegeMode::Supervisor;
+      if      (tokens.at(3) == "u")  { pm = PrivilegeMode::User; }
+      else if (tokens.at(3) == "s")  { pm = PrivilegeMode::Supervisor; }
+      else if (tokens.at(3) == "vu") { pm = PrivilegeMode::User; twoStage = true; }
+      else if (tokens.at(3) == "vs") { pm = PrivilegeMode::Supervisor; twoStage = true; }
       else
 	{
-	  std::cerr << "Invalid privilege mode: " << tokens.at(3) << " -- expecting s, or u\n";
+	  std::cerr << "Invalid privilege mode: " << tokens.at(3) << " -- expecting u, s, vu, or vs\n";
 	  return false;
 	}
     }
 
   uint64_t pa = 0;
-  auto ec = hart.transAddrNoUpdate(va, pm, read, write, exec, pa);
+  auto ec = hart.transAddrNoUpdate(va, pm, twoStage, read, write, exec, pa);
   if (ec == ExceptionCause::NONE)
     {
       std::cout << "0x" << std::hex << pa << std::dec << '\n';
@@ -2359,6 +2478,199 @@ Interactive<URV>::pmaCommand(Hart<URV>& hart, const std::string& line,
 
 template <typename URV>
 bool
+Interactive<URV>::perfModelFetchCommand(const std::string& line,
+		                        const std::vector<std::string>& tokens)
+{
+  if (tokens.size() == 3)
+    {
+      uint64_t tag, vpc;
+      if (not parseCmdLineNumber("perf-model-fetch-tag", tokens.at(1), tag))
+        return false;
+      if (not parseCmdLineNumber("perf-model-fetch-vpc", tokens.at(2), vpc))
+        return false;
+
+      return system_.perfApiFetch(hartId_, time_, tag, vpc);
+    }
+  else
+    {
+      std::cerr << "Invalid perf_model_fetch command: " << line << '\n';
+      std::cerr << "Expecting: perf_model_fetch <tag> <vpc>\n";
+      return false;
+    }
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::perfModelDecodeCommand(const std::string& line,
+		                         const std::vector<std::string>& tokens)
+{
+  if (tokens.size() == 2)
+    {
+      uint64_t tag;
+      if (not parseCmdLineNumber("perf-model-decode-tag", tokens.at(1), tag))
+        return false;
+      return system_.perfApiDecode(hartId_, time_, tag);
+    }
+  else
+    {
+      std::cerr << "Invalid perf_model_decode command: " << line << '\n';
+      std::cerr << "Expecting: perf_model_decode <tag>\n";
+      return false;
+    }
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::perfModelExecuteCommand(const std::string& line,
+		                          const std::vector<std::string>& tokens)
+{
+  if (tokens.size() == 2)
+    {
+      uint64_t tag;
+      if (not parseCmdLineNumber("perf-model-execute-tag", tokens.at(1), tag))
+        return false;
+
+      return system_.perfApiExecute(hartId_, time_, tag);
+    }
+  else
+    {
+      std::cerr << "Invalid perf_model_execute command: " << line << '\n';
+      std::cerr << "Expecting: perf_model_execute <tag>\n";
+      return false;
+    }
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::perfModelRetireCommand(const std::string& line,
+		                         const std::vector<std::string>& tokens)
+{
+  if (tokens.size() == 2)
+    {
+      uint64_t tag;
+      if (not parseCmdLineNumber("perf-model-retire-tag", tokens.at(1), tag))
+        return false;
+
+      return system_.perfApiRetire(hartId_, time_, tag);
+    }
+  else
+    {
+      std::cerr << "Invalid perf_model_retire command: " << line << '\n';
+      std::cerr << "Expecting: perf_model_retire <tag>\n";
+      return false;
+    }
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::perfModelDrainStoreCommand(const std::string& line,
+		                             const std::vector<std::string>& tokens)
+{
+  if (tokens.size() == 2)
+    {
+      uint64_t tag;
+      if (not parseCmdLineNumber("perf-model-drain-store-tag", tokens.at(1), tag))
+        return false;
+
+      return system_.perfApiDrainStore(hartId_, time_, tag);
+    }
+  else
+    {
+      std::cerr << "Invalid perf_model_drain_store command: " << line << '\n';
+      std::cerr << "Expecting: perf_model_drain_store <tag>\n";
+      return false;
+    }
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::perfModelPredictBranch(const std::string& line,
+					 const std::vector<std::string>& tokens)
+{
+  if (tokens.size() == 4)
+    {
+      uint64_t tag = 0;
+      if (not parseCmdLineNumber("perf-model-predict-branch-tag", tokens.at(1), tag))
+        return false;
+
+      bool flag = false;
+      if (not parseCmdLineBool("perf-model-predict-branch-taken", tokens.at(2), flag))
+	return false;
+
+      uint64_t addr = 0;
+      if (not parseCmdLineNumber("perf-model-branch-prediction-target", tokens.at(3), addr))
+	return false;
+
+      return system_.perfApiPredictBranch(hartId_, time_, tag, flag, addr);
+    }
+  else
+    {
+      std::cerr << "Invalid perf_model_predict_branch command: " << line << '\n';
+      std::cerr << "Expecting: perf_model_predict_branch <tag> <flag> <addr>\n";
+      return false;
+    }
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::perfModelFlushCommand(const std::string& line,
+		                        const std::vector<std::string>& tokens)
+{
+  if (tokens.size() == 2)
+    {
+      uint64_t tag;
+      if (not parseCmdLineNumber("perf-model-flush-tag", tokens.at(1), tag))
+        return false;
+
+      return system_.perfApiFlush(hartId_, time_, tag);
+    }
+  else
+    {
+      std::cerr << "Invalid perf_model_flush command: " << line << '\n';
+      std::cerr << "Expecting: perf_model_flush <tag>\n";
+      return false;
+    }
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::perfModelShouldFlushCommand(const std::string& line,
+					      const std::vector<std::string>& tokens)
+{
+  if (tokens.size() == 2)
+    {
+      uint64_t tag;
+      if (not parseCmdLineNumber("perf-model-should-flush-tag", tokens.at(1), tag))
+        return false;
+
+      bool flag = false;
+      uint64_t addr = 0;
+      bool ok = system_.perfApiShouldFlush(hartId_, time_, tag, flag, addr);
+      std::cout << flag;
+      if (flag)
+	std::cout << " 0x" << std::hex << addr << std::dec;
+      std::cout << '\n';
+      return ok;
+    }
+  else
+    {
+      std::cerr << "Invalid perf_model_flush command: " << line << '\n';
+      std::cerr << "Expecting: perf_model_flush <tag>\n";
+      return false;
+    }
+}
+
+
+
+template <typename URV>
+bool
 Interactive<URV>::interact(FILE* traceFile, FILE* commandLog)
 {
   linenoise::SetHistoryMaxLen(1024);
@@ -2378,11 +2690,16 @@ Interactive<URV>::interact(FILE* traceFile, FILE* commandLog)
         hartId_ = value;
     }
 
+  bool tty = isatty(STDIN_FILENO);
+
+  std::string line;
+
   bool done = false;
   while (not done)
     {
       errno = 0;
-      std::string line = linenoise::Readline(prompt);
+      line.clear();
+      linenoise::Readline(prompt, line);
 
       if (line.empty())
 	{
@@ -2391,10 +2708,10 @@ Interactive<URV>::interact(FILE* traceFile, FILE* commandLog)
 	  continue;
 	}
 
-      linenoise::AddHistory(line.c_str());
+      if (tty)
+	linenoise::AddHistory(line.c_str());
 
-      if (not executeLine(line, traceFile, commandLog,
-			  replayStream, done))
+      if (not executeLine(line, traceFile, commandLog, replayStream, done))
 	errors++;
     }
 

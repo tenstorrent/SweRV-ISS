@@ -246,6 +246,10 @@ namespace WdRiscv
     bool peekCsReg(CsrNumber number, URV& value) const
     { return hart_->peekCsr(number, value); }
 
+    void peekMemory(uint64_t addr, uint64_t &val, bool usePma) {
+      hart_->peekMemory(addr, val, usePma);
+    };
+
     /// TODO: modified regs
     /// Return the list of CSR address-value pairs modified after last executed instruction.
     using CVP = std::pair<URV, URV>;  // CSR-value pair
@@ -265,40 +269,26 @@ namespace WdRiscv
         {
           if (not hart_->peekCsr(csr, value, false))
             continue;
-          if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TDATA3)
+          if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TINFO)
             continue; // Debug trigger values collected below.
           cvps.push_back(CVP(URV(csr), value));
         }
 
-      /// Collect trigger CSRs and their values. A synthetic CSR number
-      /// is used encoding the trigger number and the trigger component.
+      /// Collect trigger CSRs and their values. A synthetic CSR number is used encoding
+      /// the trigger number and the trigger component.
       for (unsigned trigger : triggers)
         {
-          uint64_t data1(0), data2(0), data3(0);
-          if (not hart_->peekTrigger(trigger, data1, data2, data3))
-            continue;
-
           // Components of trigger that changed.
-          bool t1 = false, t2 = false, t3 = false;
-          hart_->getTriggerChange(trigger, t1, t2, t3);
+	  std::vector<std::pair<CsrNumber, uint64_t>> trigChanges;
+          hart_->getTriggerChange(trigger, trigChanges);
 
-          if (t1)
-            {
-              URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA1);
-              cvps.push_back(CVP(ecsr, data1));
-            }
-
-          if (t2)
-            {
-              URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA2);
-              cvps.push_back(CVP(ecsr, data2));
-            }
-
-          if (t3)
-            {
-              URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA3);
-              cvps.push_back(CVP(ecsr, data3));
-            }
+	  for (auto& pair : trigChanges)
+	    {
+	      auto csrn = pair.first;
+	      auto val = pair.second;
+	      URV ecsr = (trigger << 16) | URV(csrn);
+	      cvps.push_back(CVP(ecsr, URV(val)));
+	    }
         }
     }
 

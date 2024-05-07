@@ -149,6 +149,15 @@ Uart8250::monitorStdin()
 		std::cerr << "Uart8250::monitorStdin: unexpected fail on read\n";
 	      putchar(c);
 	      fflush(stdout);
+	      if (isatty(fd))
+		{
+		  static char prev = 0;
+
+		  // Force a stop if control-a x is seen.
+		  if (prev == 1 and c == 'x')
+		    throw std::runtime_error("Keyboard stop");
+		  prev = c;
+		}
 	      byte_ = c;
 	      lsr_ |= 1;  // Set least sig bit of line status.
 	      iir_ &= ~1;  // Clear bit 0 indicating interrupt is pending.

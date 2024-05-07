@@ -11,7 +11,7 @@
 namespace WdRiscv
 {
   class HartConfig;
-  
+
   /// Parse/maintain arguments provided on the command line.
   struct Args
   {
@@ -25,10 +25,21 @@ namespace WdRiscv
     /// otherwise (xlen is left unmodified).
     bool getXlenFromElfFile(unsigned& xlen) const;
 
-    /// Parse command line arguments. Place option values in args. Return true on success
-    /// and false on failure.
+    /// Parse command line arguments and collect option values. Return true on success and
+    /// false on failure.
     bool parseCmdLineArgs(std::span<char*> argv);
 
+    /// Parse command line arguments and collect option vlaues. Return true on success and
+    /// false on failure.
+    bool parseCmdLineArgs(std::vector<std::string>& args)
+    {
+      std::vector<char*> argv;
+      for (auto& arg : args)
+	argv.push_back(arg.data());
+      return parseCmdLineArgs(std::span(argv.data(), argv.size()));
+    }			      
+
+    /// Helper to parseCmdLineArgs.
     bool collectCommandLineValues(const boost::program_options::variables_map& varMap);
 
     /// Convert the command line string numberStr to a number using strotull and a base of
@@ -49,6 +60,9 @@ namespace WdRiscv
 
     StringVec   hexFiles;                  // Hex files to be loaded into simulator memory.
     StringVec   binaryFiles;               // Binary files to be loaded into simulator memory.
+#ifdef LZ4_COMPRESS
+    StringVec   lz4Files;                  // LZ4 files to be loaded into simulator memory.
+#endif
     std::string traceFile;                 // Log of state change after each instruction.
     std::string commandLogFile;            // Log of interactive or socket commands.
     std::string consoleOutFile;            // Console io output file.
@@ -93,8 +107,8 @@ namespace WdRiscv
     std::optional<uint64_t> tlbSize;
     Uint64Vec snapshotPeriods;
     std::optional<uint64_t> alarmInterval;
-    std::optional<uint64_t> clint;  // Core-local-interrupt (Clint) mem mapped address
-    std::optional<uint64_t> interruptor; // Interrupt generator mem mapped address
+    std::optional<uint64_t> clint;        // Advanced core-local-interrupt (CLINT) mem mapped address
+    std::optional<uint64_t> interruptor;  // Interrupt generator mem mapped address
     std::optional<uint64_t> syscallSlam;
     std::optional<uint64_t> instCounter;
     std::optional<uint64_t> branchWindow;
@@ -122,16 +136,17 @@ namespace WdRiscv
     bool triggers = false;   // Enable debug triggers when true.
     bool counters = false;   // Enable performance counters when true.
     bool gdb = false;        // Enable gdb mode when true.
-    std::vector<unsigned> gdbTcpPort;        // Enable gdb mode over TCP when port is positive.
+    std::vector<unsigned> gdbTcpPort;   // Enable gdb mode over TCP when port is positive.
     bool abiNames = false;   // Use ABI register names in inst dis-assembly.
     bool newlib = false;     // True if target program linked with newlib.
     bool linux = false;      // True if target program linked with Linux C-lib.
     bool raw = false;        // True if bare-metal program (no linux no newlib).
     bool elfisa = false;     // Use ELF file RISCV architecture tags to set MISA if true.
     bool unmappedElfOk = false;
-    bool mcm = false;        // Memory consistency checks
-    bool mcmca = false;      // Memory consistency checks: check all bytes of merge buffer
-    bool reportub = false;         // Report used blocks with sparse memory
+    bool mcm = false;        // Memory consistency checks.
+    bool mcmca = false;      // Memory consistency checks: check all bytes of merge buffer.
+    bool perfApi = false;    // Performance model API.
+    bool reportub = false;         // Report used blocks with sparse memory.
     bool quitOnAnyHart = false;    // True if run quits when any hart finishes.
     bool noConInput = false;       // If true console io address is not used for input.
     bool relativeInstCount = false;

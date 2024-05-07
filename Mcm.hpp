@@ -32,6 +32,14 @@ namespace WdRiscv
     bool       failRead_  : 1  = false;
     bool       canceled_  : 1  = false;
 
+    /// Return true if address range of this operation overlaps that of the given one.
+    bool overlaps(const MemoryOp& other) const
+    { return physAddr_ + size_ > other.physAddr_ and physAddr_ < other.physAddr_ + other.size_; }
+
+    /// Return true if address range of this operation overlaps given address.
+    bool overlaps(uint64_t addr) const
+    { return addr >= physAddr_ and addr < physAddr_ + size_; }
+
     bool isCanceled() const { return canceled_; }
     void cancel() { canceled_ = true; }
   };
@@ -47,6 +55,7 @@ namespace WdRiscv
     uint64_t data_ = 0;       // Data for load/sore instructions.
     uint64_t addrTime_ = 0;   // Time address register was produced (for ld/st/amo).
     uint64_t dataTime_ = 0;   // Time data register was produced (for st/amo).
+    uint64_t retireTime_ = 0; // Time instructin was retired.
     McmInstrIx addrProducer_ = 0;
     McmInstrIx dataProducer_ = 0;
     DecodedInst di_;
@@ -106,8 +115,8 @@ namespace WdRiscv
       return virtAddr_ - other.virtAddr_ < other.size_;
     }
 
-    /// Return true if address of the data memory referenced by this
-    /// instruction is aligned.
+    /// Return true if address of the data memory referenced by this instruction is
+    /// aligned.
     bool isAligned() const
     { return (physAddr_ & (size_ - 1)) == 0; }
 
@@ -184,11 +193,6 @@ namespace WdRiscv
     unsigned mergeBufferLineSize() const
     { return lineSize_; }
 
-    /// Skip checking RTL read-op values against this model. This is used
-    /// for items like the CLINT timer where we cannot match the RTL.
-    void skipReadCheck(uint64_t addr)
-    { skipReadCheck_.insert(addr); }
-
     /// Enable/disable total-store-order.
     void enableTso(bool flag)
     { isTso_ = flag; }
@@ -226,6 +230,17 @@ namespace WdRiscv
 
     bool ppoRule12(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check that previous SINVAL.VMA instructions are executed before subsequent
+    /// implicit references to the memory-management data structures. Return true on
+    /// success and false if there are translations between the the current
+    /// SFENCE.INVAL.IR and the most recent SINVAL.VMA instruction.
+    bool checkSfenceInvalIr(Hart<URV>& hart, const McmInstr& instr) const;
+
+    /// The SFENCE.W.INVAL instruction guarantees that any previous stores already visible
+    /// to the current RISC-V hart are ordered before subsequent SINVAL.VMA instructions
+    /// executed by the same hart.
+    bool checkSfenceWInval(Hart<URV>& hart, const McmInstr& instr) const;
+
     /// If given instruction is a fence add it to the set of pending
     /// fences. If oldest pending fence instruction is within window,
     /// then remove it from pending set and check rule 4 on it.
@@ -258,9 +273,8 @@ namespace WdRiscv
       return mt;
     }
 
-    /// Return the smallest time of the memor operations of the given
-    /// instruction. Adjust read-operation times to account for
-    /// forwarding.
+    /// Return the smallest time of the memor operations of the given instruction. Adjust
+    /// read-operation times to account for forwarding.
     uint64_t effectiveReadTime(const McmInstr& instr) const;
 
     /// Return true if instruction a is before b in memory time.
@@ -283,10 +297,29 @@ namespace WdRiscv
       return aTime < bTime;
     }
 
-    /// Configure checking whole merge buffer line (versus checking
-    /// bytes covered by stores).
+    /// Configure checking whole merge buffer line (versus checking bytes covered by
+    /// stores).
     void setCheckWholeMbLine(bool flag)
     { checkWholeLine_ = flag; }
+
+    /// Return the tag of the instruction with a memory time smaller than that of the
+    /// given instruction tag and associated with the same hart.  Return the tag of the
+    /// given instruction if no instruction with a smaller memory time can be found.
+    McmInstrIx getSmallerMemTimeInstr(unsigned hartIx, const McmInstr& instr) const
+    {
+      assert(not instr.canceled_ and instr.retired_);
+
+      auto eot = earliestOpTime(instr);
+
+      for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+	{
+	  const auto& op = *iter;
+	  if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < eot)
+	    return op.instrTag_;
+	}
+
+      return instr.tag_;
+    }
 
   protected:
 
@@ -324,22 +357,24 @@ namespace WdRiscv
 			      uint64_t lineSize, const std::vector<bool>& rtlMask,
 			      MemoryOpVec& coveredWrites);
 
-    /// Forward from a store to a read op. Return true on success.
-    /// Return false if instr is not retired, is canceled, is not a
-    /// store (amo couts as store), or does not match range address of
-    /// op.  Mask is the mask of bits of op to be updated by the
-    /// forward (bypass) operartion and is updated (bits cleared) if
-    /// some parts of op, covered by the mask, are successfully
-    /// updated.
-    bool forwardTo(const McmInstr& instr, uint64_t iaddr, uint64_t idata,
-		   unsigned isize, MemoryOp& op, uint64_t& mask);
+    /// Forward to the given read op from the stores of the retired instructions ahead of
+    /// the instruction (in program order) of the read op.
+    bool forwardToRead(Hart<URV>& hart, MemoryOp& op);
 
-    /// Forward to the given read op from the stores of the retired
-    /// instructions ahead of tag.
-    bool forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op);
+    /// Forward from a write to a read op. Return true on success.  Mask is the mask of
+    /// bits of op to be updated by the forward operartion and is updated (bits cleared)
+    /// if some parts of op are successfully updated. This a helper to forwardToRead.
+    bool writeToReadForward(const MemoryOp& writOp, MemoryOp& readOp, uint64_t& mask);
 
-    /// Determine the source and destination registers of the given
+    /// Forward from a store instrution to a read-operation. Mask is the mast of bits of
+    /// op to be updated by the forward operation and is updated (bits cleared) if some
+    /// parts of op are successfully ipdated. This is a helper to to forwardToRead.
+    /// Addr/data/size are the physical-address/data-value/data-size of the store
     /// instruction.
+    bool storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask,
+			    uint64_t addr, uint64_t data, unsigned size);
+
+    /// Determine the source and destination registers of the given instruction.
     void identifyRegisters(const DecodedInst& di,
 			   std::vector<unsigned>& sourceRegs,
 			   std::vector<unsigned>& destRegs);
@@ -361,6 +396,26 @@ namespace WdRiscv
 	return true;
       unsigned size2 = instr.size_ - size1;
       return rangesOverlap(instr.physAddr2_, size2, op.physAddr_, op.size_);
+    }
+
+    /// Return true if the data memory referenced by given instruction overlpas
+    /// the given address.
+    bool overlapsAddr(const McmInstr& instr, uint64_t addr) const
+    {
+      if (instr.size_ == 0)
+	std::cerr << "Mcm::overlapsAddr: Error: tag1=" << instr.tag_
+		  << " zero data size\n";
+
+      if (instr.physAddr_ == instr.physAddr2_)   // Non-page-crossing
+	return addr >= instr.physAddr_ and addr < instr.physAddr_ +  instr.size_;
+
+      // Page crossing.
+      unsigned size1 = offsetToNextPage(instr.physAddr_);
+      if (addr >= instr.physAddr_ and addr < instr.physAddr_ + size1)
+	return true;
+
+      unsigned size2 = instr.size_ - size1;
+      return addr >= instr.physAddr2_ and addr < instr.physAddr2_ +  size2;
     }
 
     /// Return true if the given address ranges overlap one another.
@@ -409,7 +464,7 @@ namespace WdRiscv
     bool checkRtlWrite(unsigned hartId, const McmInstr& instr,
 		       const MemoryOp& op) const;
 
-    bool checkRtlRead(unsigned hartId, const McmInstr& instr,
+    bool checkRtlRead(Hart<URV>&hart, const McmInstr& instr,
 		      const MemoryOp& op) const;
 
     bool updateTime(const char* method, uint64_t time);
@@ -462,6 +517,8 @@ namespace WdRiscv
     std::vector<MemoryOpVec> hartPendingWrites_; // One vector per hart.
 
     uint64_t time_ = 0;
+    uint64_t sinvalVmaTime_ = 0;
+    uint64_t sinvalVmaTag_ = 0;
     unsigned pageSize_ = 4096;
     unsigned lineSize_ = 64; // Merge buffer line size.
     unsigned windowSize_ = 1000;
@@ -479,6 +536,9 @@ namespace WdRiscv
     std::vector<RegTimeVec> hartRegTimes_;  // One vector per hart.
     std::vector<RegProducer> hartRegProducers_;  // One vector per hart.
     std::vector<std::set<McmInstrIx>> hartPendingFences_;
+
+    // Retired but not yet darained stores. Candidates for forwarding.
+    std::vector<std::set<McmInstrIx>> hartUndrainedStores_;
 
     // Dependency time of most recent branch in program order or 0 if
     // branch does not depend on a prior memory instruction.

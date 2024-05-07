@@ -43,6 +43,7 @@
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
 #include "Mcm.hpp"
+#include "PerfApi.hpp"
 #include "wideint.hpp"
 
 
@@ -669,8 +670,8 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   consecutiveIllegalCount_ = 0;
 
   // Trigger software interrupt in hart 0 on reset.
-  if (clintSiOnReset_ and hartIx_ == 0)
-    pokeMemory(clintStart_, uint32_t(1), true);
+  if (aclintSiOnReset_ and hartIx_ == 0)
+    pokeMemory(aclintSwStart_, uint32_t(1), true);
 
   clearTraceData();
 
@@ -708,7 +709,8 @@ Hart<URV>::resetVector()
   // configure for 128-bits per regiser and 32-bits per elemement.
   if (isRvv())
     {
-      if (vecRegs_.registerCount() == 0)
+      bool configured = vecRegs_.registerCount() > 0;
+      if (not configured)
 	vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/,
 			4 /*maxBytesPerElem*/, nullptr /*minSewPerLmul*/, nullptr);
       unsigned bytesPerReg = vecRegs_.bytesPerRegister();
@@ -718,7 +720,7 @@ Hart<URV>::resetVector()
       auto csr = csRegs_.findCsr(CsrNumber::VSTART);
       if (not csr or csr->getWriteMask() != vstartMask)
 	{
-	  if (hartIx_ == 0)
+	  if (hartIx_ == 0 and configured)
 	    std::cerr << "Warning: Write mask of CSR VSTART changed to 0x" << std::hex
 		      << vstartMask << " to be compatible with VLEN=" << std::dec
 		      << (bytesPerReg*8) << '\n';
@@ -955,7 +957,8 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
 
   URV adjusted = val;
-  if (addr >= clintStart_ and addr < clintEnd_)
+  if (hasAclint() and ((addr >= aclintSwStart_ and addr < aclintSwEnd_) or
+      (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_)))
     {
       processClintWrite(addr, sizeof(val), adjusted);
       val = adjusted;
@@ -992,6 +995,28 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
+
+  URV adjusted = val;
+  if (hasAclint() and ((addr >= aclintSwStart_ and addr < aclintSwEnd_) or
+      (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_)))
+    {
+      processClintWrite(addr, sizeof(val), adjusted);
+      val = adjusted;
+    }
+  else if ((addr >= imsicMbase_ and addr < imsicMend_) or
+	   (addr >= imsicSbase_ and addr < imsicSend_))
+    {
+      if (imsicWrite_)
+        imsicWrite_(addr, sizeof(val), val);
+    }
+  else if (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
+                    (addr >= pciMmioBase_ and addr < pciMmioEnd_)))
+    {
+      if (addr >= pciConfigBase_ and addr < pciConfigEnd_)
+        pci_->config_mmio<uint64_t>(addr, val, true);
+      else
+        pci_->mmio<uint64_t>(addr, val, true);
+    }
 
   if (memory_.poke(addr, val, usePma))
     {
@@ -1560,7 +1585,9 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	  addr1 = va1;  // To report virtual address in MTVAL.
 	  return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
 	}
-      pma = getPma(addr2);
+      uint64_t aligned = addr1 & ~alignMask;
+      uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
+      pma = getPma(next);
       if (not pma.isRead())
 	{
 	  addr1 = va2;
@@ -1689,6 +1716,9 @@ Hart<URV>::dumpInitState(const char* tag, uint64_t vaddr, uint64_t paddr)
       virtMem_.getPrevByte(byteAddr, byte); // Get PTE value before PTE update.
       fprintf(initStateFile_, "%02x", unsigned(byte));
     }
+
+  bool cacheable = memory_.pmaMgr_.getPma(paddr).isCacheable();
+  fprintf(initStateFile_, ",%d", cacheable);
   fprintf(initStateFile_, "\n");
 }
 
@@ -1731,7 +1761,19 @@ readCharNonBlocking(int fd)
   char c = 0;
   std::ptrdiff_t code = ::read(fd, &c, sizeof(c));
   if (code == 1)
-    return c;
+    {
+      if (isatty(fd))
+	{
+	  static char prev = 0;
+
+	  // Force a stop if control-a x is seen.
+	  if (prev == 1 and c == 'x')
+	    throw CoreException(CoreException::Stop, "Keyboard stop", 0, 3);
+	  prev = c;
+	}	  
+	
+      return c;
+    }
 
   if (code == 0)
     return 0;
@@ -1740,6 +1782,22 @@ readCharNonBlocking(int fd)
     std::cerr << "readCharNonBlocking: unexpected fail on read\n";
 
   return -1;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
+			   uint64_t& value)
+{
+  if (not ooo_)
+    return false;
+  if (mcm_)
+    return mcm_->getCurrentLoadValue(*this, va, pa1, pa2, size, value);
+  if (perfApi_)
+    return perfApi_->getLoadData(hartIx_, instCounter_, va, size, value);
+  assert(0);
+  return false;
 }
 
 
@@ -1794,48 +1852,57 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
       return true;
     }
 
-  ULT narrow = 0;   // Unsigned narrow loaded value
-  if (addr1 >= clintStart_ and addr1 < clintEnd_ and addr1 - clintStart_ >= 0xbff8)
+  ULT uval = 0;   // Unsigned loaded value
+  bool device = false;  // True if loading from a device.
+  if (isAclintMtimeAddr(addr1))
     {
       uint64_t tm = time_;
       tm = tm >> (addr1 - 0xbff8) * 8;
-      narrow = tm;
+      uval = tm;
+      device = true;
     }
-  else if (imsic_ and ((addr1 >= imsicMbase_ and addr1 < imsicMend_) or
-	              (addr1 >= imsicSbase_ and addr1 < imsicSend_)))
+  else if (isImsicAddr(addr1))
     {
       uint64_t val = 0;
       if (imsicRead_)
         imsicRead_(addr1, sizeof(val), val);
-      narrow = val;
+      uval = val;
+      device = true;
     }
-  else if (pci_ and ((addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_) or
-                    (addr1 >= pciMmioBase_ and addr1 < pciMmioEnd_)))
+  else if (isPciAddr(addr1))
     {
       if (addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_)
-        pci_->config_mmio<ULT>(addr1, narrow, false);
+        pci_->config_mmio<ULT>(addr1, uval, false);
       else
-        pci_->mmio<ULT>(addr1, narrow, false);
+        pci_->mmio<ULT>(addr1, uval, false);
+      device = true;
+    }
+
+  if (device)
+    {
+      if (ooo_)
+	{
+	  uint64_t oooVal = 0;
+	  getOooLoadValue(virtAddr, addr1, addr2, ldStSize_, oooVal);
+	}
     }
   else
     {
-      bool hasMcmVal = false;
-      if (mcm_)
+      bool hasOooVal = false;
+      if (ooo_)   // Out of order execution (mcm or perfApi)
 	{
-	  uint64_t mcmVal = 0;
-	  if (mcm_->getCurrentLoadValue(*this, virtAddr, addr1, addr2, ldStSize_, mcmVal))
-	    {
-	      narrow = mcmVal;
-	      hasMcmVal = true;
-	    }
+	  uint64_t oooVal = 0;
+	  hasOooVal = getOooLoadValue(virtAddr, addr1, addr2, ldStSize_, oooVal);
+	  if (hasOooVal)
+	    uval = oooVal;
 	}
-      if (not hasMcmVal)
-	memRead(addr1, addr2, narrow);
+      if (not hasOooVal)
+	memRead(addr1, addr2, uval);
     }
 
-  data = narrow;
+  data = uval;
   if (not std::is_same<ULT, LOAD_TYPE>::value)
-    data = int64_t(LOAD_TYPE(narrow)); // Loading signed: Sign extend.
+    data = int64_t(LOAD_TYPE(uval)); // Loading signed: Sign extend.
 
   if (initStateFile_)
     {
@@ -1852,7 +1919,7 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
     {
       TriggerTiming timing = TriggerTiming::Before;
       bool isLoad = true;
-      if (ldStDataTriggerHit(narrow, timing, isLoad))
+      if (ldStDataTriggerHit(uval, timing, isLoad))
 	triggerTripped_ = true;
     }
   if (triggerTripped_)
@@ -1965,7 +2032,8 @@ template <typename URV>
 template <typename STORE_TYPE>
 inline
 bool
-Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal, [[maybe_unused]] bool amoLock)
+Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal,
+		 [[maybe_unused]] bool amoLock)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
@@ -1984,8 +2052,9 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
-  if (hasTrig and ldStAddrTriggerHit(virtAddr, timing, isLd))
-    triggerTripped_ = true;
+  if (hasTrig and (ldStAddrTriggerHit(virtAddr, timing, isLd) or
+                   ldStDataTriggerHit(storeVal, timing, isLd)))
+      triggerTripped_ = true;
 
   // Determine if a store exception is possible.
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
@@ -1994,11 +2063,6 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
 
-  // Consider store-data trigger if there is no trap or if the trap is
-  // due to an external cause.
-  if (hasTrig and cause == ExceptionCause::NONE)
-    if (ldStDataTriggerHit(storeVal, timing, isLd))
-      triggerTripped_ = true;
   if (triggerTripped_)
     return false;
 
@@ -2039,36 +2103,47 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
 
   invalidateDecodeCache(virtAddr, ldStSize_);
 
-  if (mcm_)
-    return true;  // Memory updated & lr-canceled when merge buffer is written.
+  if (ooo_)
+    {
+      if (perfApi_)
+	perfApi_->setStoreData(hartIx_, instCounter_, storeVal);
+      return true;  // Memory updated & lr-canceled when merge buffer is written.
+    }
 
-  memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
-  if (addr2 != addr1)
-    memory_.invalidateOtherHartLr(hartIx_, addr2, ldStSize_);
-
-  if (addr1 >= clintStart_ and addr1 < clintEnd_)
+  if (isAclintAddr(addr1))
     {
       assert(addr1 == addr2);
       URV val = storeVal;
       processClintWrite(addr1, ldStSize_, val);
       storeVal = val;
+      memWrite(addr1, addr2, storeVal);
+      return true;
     }
-  else if (hasInterruptor_ and addr1 == interruptor_ and ldStSize_ == 4)
-    processInterruptorWrite(storeVal);
-  else if (imsic_ and ((addr1 >= imsicMbase_ and addr1 < imsicMend_) or
-		       (addr1 >= imsicSbase_ and addr1 < imsicSend_)))
+  else if (isInterruptorAddr(addr1, ldStSize_))
+    {
+      processInterruptorWrite(storeVal);
+      memWrite(addr1, addr2, storeVal);
+      return true;
+    }
+  else if (isImsicAddr(addr1))
     {
       imsicWrite_(addr1, sizeof(storeVal), storeVal);
-      storeVal = 0;  // Reads from IMSIC space will yield zero.
+      memWrite(addr1, addr2, storeVal);
+      return true;
     }
-  else if (pci_ and ((addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_) or
-                    (addr1 >= pciMmioBase_ and addr1 < pciMmioEnd_)))
+  else if (isPciAddr(addr1))
     {
       if (addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_)
         pci_->config_mmio<STORE_TYPE>(addr1, storeVal, true);
       else
         pci_->mmio<STORE_TYPE>(addr1, storeVal, true);
+      memWrite(addr1, addr2, storeVal);
+      return true;
     }
+
+  memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
+  if (addr2 != addr1)
+    memory_.invalidateOtherHartLr(hartIx_, addr2, ldStSize_);
 
   memWrite(addr1, addr2, storeVal);
 
@@ -2089,9 +2164,9 @@ void
 Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 {
   // We assume that the CLINT device is little endian.
-  if (addr >= clintStart_ and addr < clintStart_ + 0x4000)
+  if (addr >= aclintSwStart_ and addr < aclintSwEnd_)
     {
-      unsigned hartIx = (addr - clintStart_) / 4;
+      unsigned hartIx = (addr - aclintSwStart_) / 4;
       auto hart = indexToHart_(hartIx);
       if (hart and stSize == 4 and (addr & 3) == 0)
 	{
@@ -2100,49 +2175,7 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 	  return;
 	}
     }
-  else if (addr >= clintStart_ + 0x4000 and addr < clintStart_ + 0xbff8) 
-    {
-      // don't expect software to modify clint alarm from two different harts
-      unsigned hartIx = (addr - clintStart_ - 0x4000) / 8;
-      auto hart = indexToHart_(hartIx);
-      if (hart and (stSize == 4 or stSize == 8))
-	{
-	  if (stSize == 4)
-	    {
-	      if ((addr & 7) == 0)  // Multiple of 8
-		{
-		  hart->clintAlarm_ = (hart->clintAlarm_ >> 32) << 32;  // Clear low 32
-		  hart->clintAlarm_ |= uint32_t(storeVal);  // Update low 32.
-		}
-	      else if ((addr & 3) == 0)  // Multiple of 4
-		{
-		  hart->clintAlarm_ = (hart->clintAlarm_ << 32) >> 32;  // Clear high 32
-		  hart->clintAlarm_ |= (uint64_t(storeVal) << 32);  // Update high 32.
-		}
-	    }
-	  else if (stSize == 8)
-	    {
-	      if ((addr & 7) == 0)
-		hart->clintAlarm_ = storeVal + 10000;
-
-	      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
-	      auto inFd = syscall_.effectiveFd(STDIN_FILENO);
-	      if (fromHostValid_ and hasPendingInput(inFd))
-		{
-		  uint64_t v = 0;
-		  peekMemory(fromHost_, v, true);
-		  if (v == 0)
-		    {
-		      int c = char(readCharNonBlocking(inFd));
-		      if (c > 0)
-			memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
-		    }
-		}
-	    }
-	  return;
-	}
-    }
-  else if (addr - clintStart_ >= 0xbff8 and addr <= clintStart_ + 0xbfff)
+  else if (addr >= aclintMtimeStart_ and addr < aclintMtimeEnd_)
     {
       uint64_t tm;
       if (stSize == 4)
@@ -2168,6 +2201,48 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
             }
         }
       return;  // Timer.
+    }
+  else if (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_)
+    {
+      // don't expect software to modify clint alarm from two different harts
+      unsigned hartIx = (addr - aclintMtimerStart_) / 8;
+      auto hart = indexToHart_(hartIx);
+      if (hart and (stSize == 4 or stSize == 8))
+	{
+	  if (stSize == 4)
+	    {
+	      if ((addr & 7) == 0)  // Multiple of 8
+		{
+		  hart->aclintAlarm_ = (hart->aclintAlarm_ >> 32) << 32;  // Clear low 32
+		  hart->aclintAlarm_ |= uint32_t(storeVal);  // Update low 32.
+		}
+	      else if ((addr & 3) == 0)  // Multiple of 4
+		{
+		  hart->aclintAlarm_ = (hart->aclintAlarm_ << 32) >> 32;  // Clear high 32
+		  hart->aclintAlarm_ |= (uint64_t(storeVal) << 32);  // Update high 32.
+		}
+	    }
+	  else if (stSize == 8)
+	    {
+	      if ((addr & 7) == 0)
+		hart->aclintAlarm_ = storeVal + 10000;
+
+	      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
+	      auto inFd = syscall_.effectiveFd(STDIN_FILENO);
+	      if (fromHostValid_ and hasPendingInput(inFd))
+		{
+		  uint64_t v = 0;
+		  peekMemory(fromHost_, v, true);
+		  if (v == 0)
+		    {
+		      int c = char(readCharNonBlocking(inFd));
+		      if (c > 0)
+			memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
+		    }
+		}
+	    }
+	  return;
+	}
     }
 
   // Address did not match any hart entry in clint.
@@ -2256,8 +2331,8 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
 template <typename URV>
 inline
 ExceptionCause
-Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& gPhysAddr,
-			   uint32_t& inst)
+Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& physAddr2,
+			   uint64_t& gPhysAddr, uint32_t& inst)
 {
 #ifdef FAST_SLOPPY
 
@@ -2269,8 +2344,7 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& gPh
 
 #else
 
-  physAddr = virtAddr;
-  assert(not triggerTripped_);
+  physAddr = physAddr2 = virtAddr;
 
   // Inst address translation and memory protection is not affected by MPRV.
 
@@ -2301,6 +2375,8 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& gPh
       if (initStateFile_)
 	dumpInitState("fetch", virtAddr, physAddr);
 
+      if (isCompressedInst(inst))
+	inst = (inst << 16) >> 16;
       return ExceptionCause::NONE;
     }
 
@@ -2326,23 +2402,28 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& gPh
     return ExceptionCause::NONE;
 
   // If we cross page boundary, translate address of other page.
-  uint64_t physAddr2 = physAddr + 2;
+  physAddr2 = physAddr + 2;
   gPhysAddr = physAddr2;
   if (memory_.getPageIx(physAddr) != memory_.getPageIx(physAddr2))
     if (isRvs() and privMode_ != PrivilegeMode::Machine)
       {
-	virtAddr += 2;
-	auto cause = virtMem_.translateForFetch(virtAddr, privMode_, virtMode_, gPhysAddr,
+	auto cause = virtMem_.translateForFetch(virtAddr + 2, privMode_, virtMode_, gPhysAddr,
 						physAddr2);
 	if (cause != ExceptionCause::NONE)
-	  return cause;
+	  {
+	    virtAddr += 2;  // To report faulting portion of fetch.
+	    return cause;
+	  }
       }
 
   if (pmpEnabled_)
     {
       Pmp pmp2 = pmpManager_.accessPmp(physAddr2, PmpManager::AccessReason::Fetch);
       if (not pmp2.isExec(privMode_))
-	return ExceptionCause::INST_ACC_FAULT;
+	{
+	  virtAddr += 2; // To report faulting portion of fetch.
+	  return ExceptionCause::INST_ACC_FAULT;
+	}
     }
 
   uint16_t upperHalf = 0;
@@ -2351,7 +2432,10 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& gPh
     done = readInstFromFetchCache(physAddr2, upperHalf);
 
   if (not done and not memory_.readInst(physAddr2, upperHalf))
-    return ExceptionCause::INST_ACC_FAULT;
+    {
+      virtAddr += 2;  // To report faulting portion of fetch.
+      return ExceptionCause::INST_ACC_FAULT;
+    }
 
   if (initStateFile_)
     dumpInitState("fetch", virtAddr, physAddr2);
@@ -2368,11 +2452,11 @@ inline
 bool
 Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 {
-  uint64_t gPhysAddr = 0, va = virtAddr;
+  uint64_t gPhysAddr = 0, physAddr2 = 0, va = virtAddr;
 
   // If a trap occurs on a page crossing fetch, va is updated with the
   // portion of the access that caused the trap.
-  auto cause = fetchInstNoTrap(va, physAddr, gPhysAddr, inst);
+  auto cause = fetchInstNoTrap(va, physAddr, physAddr2, gPhysAddr, inst);
   if (cause != ExceptionCause::NONE)
     {
       initiateException(cause, virtAddr, va, gPhysAddr);
@@ -2455,7 +2539,7 @@ Hart<URV>::initiateInterrupt(InterruptCause cause, URV pc)
     setSwInterrupt(0);
 #endif
 
-  if (not enableCounters_)
+  if (not enableCounters_ or not hasActivePerfCounter())
     return;
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
@@ -2512,9 +2596,8 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
   initiateTrap(di, interrupt, URV(cause), pc, info, info2);
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
-  if (enableCounters_)
-    pregs.updateCounters(EventNumber::Exception, prevPerfControl_,
-                         lastPriv_, lastVirt_);
+  if (enableCounters_ and hasActivePerfCounter())
+    pregs.updateCounters(EventNumber::Exception, prevPerfControl_, lastPriv_, lastVirt_);
 }
 
 
@@ -2664,7 +2747,8 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
 
 template <typename URV>
 void
-Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pcToSave, URV info, URV info2)
+Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pcToSave,
+			URV info, URV info2)
 {
   if (cancelLrOnTrap_)
     cancelLr(CancelLrCause::TRAP);
@@ -2689,6 +2773,12 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
   if (isRvs() and origMode != PM::Machine)
     {
       URV delegVal = peekCsr(interrupt? CsrNumber::MIDELEG : CsrNumber::MEDELEG);
+      if (isRvaia())
+        {
+          URV mvienVal = peekCsr(CsrNumber::MVIEN);
+          if (interrupt)
+            delegVal |= mvienVal;
+        }
       if (delegVal & (URV(1) << cause))
 	{
 	  nextMode = PM::Supervisor;
@@ -2702,7 +2792,8 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
 		{
 		  virtMode_ = true;
 		  // Remap the cause to non-VS cause (e.g. VSTIME becomes STIME).
-		  if (interrupt and (cause == URV(IC::VS_EXTERNAL) or cause == URV(IC::VS_TIMER) or cause == URV(IC::VS_SOFTWARE)))
+		  if (interrupt and (cause == URV(IC::VS_EXTERNAL) or cause == URV(IC::VS_TIMER)
+				     or cause == URV(IC::VS_SOFTWARE)))
 		    cause--;
 		}
 	    }
@@ -2767,6 +2858,8 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
         assert(0 and "Failed to write MTVAL2 register");
       if (isRvh() and not csRegs_.write(CsrNumber::MTINST, PM::Machine, tinst))
 	assert(0 and "Failed to write MTINST register");
+      if (enableTriggers_)
+	csRegs_.saveTcontrolMte();
     }
   else if (nextMode == PM::Supervisor)
     {
@@ -2835,6 +2928,20 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
 
   if (branchBuffer_.max_size() and not branchTraceFile_.empty())
     traceBranch(nullptr);
+
+  if (hasActiveTrigger())
+    {
+      if (interrupt)
+	{	
+	  if (csRegs_.intTriggerHit(cause, privMode_, virtMode_, isInterruptEnabled()))
+	    initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
+	}
+      else if (cause != URV(ExceptionCause::BREAKP))
+	{
+	  if (csRegs_.expTriggerHit(cause, privMode_, virtMode_, isInterruptEnabled()))
+	    initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
+	}
+    }
 }
 
 
@@ -3476,6 +3583,16 @@ Hart<URV>::configCsr(std::string_view name, bool implemented, URV resetValue,
 
 template <typename URV>
 bool
+Hart<URV>::configCsrByUser(std::string_view name, bool implemented, URV resetValue,
+			   URV mask, URV pokeMask, bool debug, bool shared)
+{
+  return csRegs_.configCsrByUser(name, implemented, resetValue, mask, pokeMask,
+				 debug, shared);
+}
+
+
+template <typename URV>
+bool
 Hart<URV>::defineCsr(std::string name, CsrNumber num,
 		     bool implemented, URV resetVal, URV mask,
 		     URV pokeMask, bool isDebug)
@@ -3761,10 +3878,9 @@ isDebugModeStopCount(const Hart<URV>& hart)
 
 template <typename URV>
 void
-Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
-				     uint32_t op0, uint32_t op1)
+Hart<URV>::updatePerformanceCounters(const DecodedInst& di)
 {
-  InstId id = info.instId();
+  InstId id = di.instId();
 
   if (isDebugModeStopCount(*this))
     return;
@@ -3772,105 +3888,130 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
   if (hasInterrupt_)
     return;
 
-  // We do not update the performance counters if an instruction
-  // causes an exception unless it is an ebreak or an ecall.
-  if (hasException_ and id != InstId::ecall and id != InstId::ebreak and
-      id != InstId::c_ebreak)
+  if (not hasActivePerfCounter())
     return;
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
 
+  // We do not update the performance counters if an instruction causes an exception
+  // unless it is an ebreak or an ecall.
+  if (hasException_)
+    {
+      if (id == InstId::ebreak or id == InstId::c_ebreak or id == InstId::ecall)
+	{
+	  pregs.updateCounters(EventNumber::InstCommited, prevPerfControl_, lastPriv_, lastVirt_);
+	  if (id == InstId::ebreak or id == InstId::c_ebreak)
+	    pregs.updateCounters(EventNumber::Ebreak, prevPerfControl_, lastPriv_, lastVirt_);
+	  else if (id == InstId::ecall)
+	    pregs.updateCounters(EventNumber::Ecall, prevPerfControl_, lastPriv_, lastVirt_);
+	}
+      return;
+    }
+
   pregs.updateCounters(EventNumber::InstCommited, prevPerfControl_, lastPriv_, lastVirt_);
 
-  if (isCompressedInst(inst))
+  if (isCompressedInst(di.inst()))
     pregs.updateCounters(EventNumber::Inst16Commited, prevPerfControl_, lastPriv_, lastVirt_);
   else
     pregs.updateCounters(EventNumber::Inst32Commited, prevPerfControl_, lastPriv_, lastVirt_);
 
-  if (info.extension() == RvExtension::I)
+  switch (di.extension())
     {
-      if (id == InstId::ebreak or id == InstId::c_ebreak)
-	pregs.updateCounters(EventNumber::Ebreak, prevPerfControl_, lastPriv_, lastVirt_);
-      else if (id == InstId::ecall)
-	pregs.updateCounters(EventNumber::Ecall, prevPerfControl_, lastPriv_, lastVirt_);
-      else if (id == InstId::fence)
+    case RvExtension::I:
+      if (id == InstId::fence)
 	pregs.updateCounters(EventNumber::Fence, prevPerfControl_, lastPriv_, lastVirt_);
       else if (id == InstId::fence_i)
 	pregs.updateCounters(EventNumber::Fencei, prevPerfControl_, lastPriv_, lastVirt_);
       else if (id == InstId::mret)
 	pregs.updateCounters(EventNumber::Mret, prevPerfControl_, lastPriv_, lastVirt_);
+      else if (di.isBranch())
+	{
+	  pregs.updateCounters(EventNumber::Branch, prevPerfControl_, lastPriv_, lastVirt_);
+	  if (lastBranchTaken_)
+	    pregs.updateCounters(EventNumber::BranchTaken, prevPerfControl_, lastPriv_, lastVirt_);
+	}
       else if (id != InstId::illegal)
 	pregs.updateCounters(EventNumber::Alu, prevPerfControl_, lastPriv_, lastVirt_);
-    }
-  else if (info.isMultiply())
-    {
-      pregs.updateCounters(EventNumber::Mult, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+
+    case RvExtension::Zmmul:
+    case RvExtension::M:
+      if (di.isMultiply())
+	pregs.updateCounters(EventNumber::Mult, prevPerfControl_, lastPriv_, lastVirt_);
+      else
+	pregs.updateCounters(EventNumber::Div, prevPerfControl_, lastPriv_, lastVirt_);
       pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_, lastPriv_, lastVirt_);
-    }
-  else if (info.isDivide())
-    {
-      pregs.updateCounters(EventNumber::Div, prevPerfControl_, lastPriv_, lastVirt_);
-      pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_, lastPriv_, lastVirt_);
-    }
-  else if (info.isPerfLoad())
-    {
-      pregs.updateCounters(EventNumber::Load, prevPerfControl_, lastPriv_, lastVirt_);
-      if (misalignedLdSt_)
-	pregs.updateCounters(EventNumber::MisalignLoad, prevPerfControl_, lastPriv_, lastVirt_);
-    }
-  else if (info.isPerfStore())
-    {
-      pregs.updateCounters(EventNumber::Store, prevPerfControl_, lastPriv_, lastVirt_);
-      if (misalignedLdSt_)
-	pregs.updateCounters(EventNumber::MisalignStore, prevPerfControl_, lastPriv_, lastVirt_);
-    }
-  else if (info.isBitManipulation())
-    {
-      pregs.updateCounters(EventNumber::Bitmanip, prevPerfControl_, lastPriv_, lastVirt_);
-    }
-  else if (info.isAtomic())
-    {
+      break;
+
+    case RvExtension::A:
       if (id == InstId::lr_w or id == InstId::lr_d)
 	pregs.updateCounters(EventNumber::Lr, prevPerfControl_, lastPriv_, lastVirt_);
       else if (id == InstId::sc_w or id == InstId::sc_d)
 	pregs.updateCounters(EventNumber::Sc, prevPerfControl_, lastPriv_, lastVirt_);
       else
 	pregs.updateCounters(EventNumber::Atomic, prevPerfControl_, lastPriv_, lastVirt_);
-    }
-  else if (info.isCsr() and not hasException_)
-    {
+      break;
+      
+    case RvExtension::F:
+      pregs.updateCounters(EventNumber::FpSingle, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+
+    case RvExtension::D:
+      pregs.updateCounters(EventNumber::FpDouble, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+
+    case RvExtension::Zfh:
+      pregs.updateCounters(EventNumber::FpHalf, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+      
+    case RvExtension::V:
+      pregs.updateCounters(EventNumber::Vector, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+
+    case RvExtension::Zba:
+    case RvExtension::Zbb:
+    case RvExtension::Zbc:
+    case RvExtension::Zbe:
+    case RvExtension::Zbf:
+    case RvExtension::Zbm:
+    case RvExtension::Zbp:
+    case RvExtension::Zbr:
+    case RvExtension::Zbs:
+    case RvExtension::Zbt:
+      pregs.updateCounters(EventNumber::Bitmanip, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+
+    case RvExtension::Zicsr:
       if ((id == InstId::csrrw or id == InstId::csrrwi))
 	{
-	  if (op0 == 0)
-	    pregs.updateCounters(EventNumber::CsrWrite, prevPerfControl_, lastPriv_, lastVirt_);
-	  else
-	    pregs.updateCounters(EventNumber::CsrReadWrite, prevPerfControl_, lastPriv_, lastVirt_);
+	  auto evNum = di.op0() == 0 ? EventNumber::CsrWrite : EventNumber::CsrReadWrite;
+	  pregs.updateCounters(evNum, prevPerfControl_, lastPriv_, lastVirt_);
 	}
       else
 	{
-	  if (op1 == 0)
-	    pregs.updateCounters(EventNumber::CsrRead, prevPerfControl_, lastPriv_, lastVirt_);
-	  else
-	    pregs.updateCounters(EventNumber::CsrReadWrite, prevPerfControl_, lastPriv_, lastVirt_);
+	  auto evNum = di.op1() == 0 ? EventNumber::CsrRead : EventNumber::CsrReadWrite;
+	  pregs.updateCounters(evNum, prevPerfControl_, lastPriv_, lastVirt_);
 	}
       pregs.updateCounters(EventNumber::Csr, prevPerfControl_, lastPriv_, lastVirt_);
-    }
-  else if (info.isBranch())
-    {
-      pregs.updateCounters(EventNumber::Branch, prevPerfControl_, lastPriv_, lastVirt_);
-      if (lastBranchTaken_)
-	pregs.updateCounters(EventNumber::BranchTaken, prevPerfControl_, lastPriv_, lastVirt_);
+      break;
+
+    default:
+      break;
     }
 
   // Some insts (e.g. flw) can be both load/store and FP
-  if (info.extension() == RvExtension::F)
-    pregs.updateCounters(EventNumber::FpSingle, prevPerfControl_, lastPriv_, lastVirt_);
-  else if (info.extension() == RvExtension::D)
-    pregs.updateCounters(EventNumber::FpDouble, prevPerfControl_, lastPriv_, lastVirt_);
-  else if (info.extension() == RvExtension::Zfh)
-    pregs.updateCounters(EventNumber::FpHalf, prevPerfControl_, lastPriv_, lastVirt_);
-  else if (info.extension() == RvExtension::V)
-    pregs.updateCounters(EventNumber::Vector, prevPerfControl_, lastPriv_, lastVirt_);
+  if (di.isPerfLoad())
+    {
+      pregs.updateCounters(EventNumber::Load, prevPerfControl_, lastPriv_, lastVirt_);
+      if (misalignedLdSt_)
+	pregs.updateCounters(EventNumber::MisalignLoad, prevPerfControl_, lastPriv_, lastVirt_);
+    }
+  else if (di.isPerfStore())
+    {
+      pregs.updateCounters(EventNumber::Store, prevPerfControl_, lastPriv_, lastVirt_);
+      if (misalignedLdSt_)
+	pregs.updateCounters(EventNumber::MisalignStore, prevPerfControl_, lastPriv_, lastVirt_);
+    }
 }
 
 
@@ -3878,15 +4019,11 @@ template <typename URV>
 void
 Hart<URV>::updatePerformanceCountersForCsr(const DecodedInst& di)
 {
-  const InstEntry& info = *(di.instEntry());
-
-  if (not enableCounters_)
+  if (not enableCounters_ or not hasActivePerfCounter())
     return;
 
-  if (not info.isCsr())
-    return;
-
-  updatePerformanceCounters(di.inst(), info, di.op0(), di.op1());
+  if (di.isCsr())
+    updatePerformanceCounters(di);
 }
 
 
@@ -3896,13 +4033,13 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 {
   const InstEntry& info = *(di.instEntry());
 
-  if (enableCounters_)
+  if (enableCounters_ and hasActivePerfCounter())
     {
       // For CSR instruction we need to let the counters count before
       // letting CSR instruction write. Consequently we update the counters
       // from within the code executing the CSR instruction.
       if (not info.isCsr())
-        updatePerformanceCounters(di.inst(), info, di.op0(), di.op1());
+        updatePerformanceCounters(di);
     }
 
   prevPerfControl_ = perfControl_;
@@ -4526,7 +4663,10 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	  ++instCounter_;
 
           if (not hartIx_)
-            ++time_;
+            {
+              ++timeSample_;
+              time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+            }
 
 	  if (mcycleEnabled())
 	    ++cycleCount_;
@@ -4558,6 +4698,10 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
                   if (entry.type_ == VirtMem::WalkEntry::Type::PA)
                     dumpInitState("dpt", entry.addr_, entry.addr_);
 	    }
+
+	  if (enableTriggers_ and icountTriggerHit())
+	    if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
+	      return true;
 
 	  if (hasException_)
 	    {
@@ -4591,9 +4735,6 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	    accumulateInstructionStats(*di);
 	  printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
 
-	  if (enableTriggers_ and icountTriggerHit())
-	    if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
-	      return true;
           prevPerfControl_ = perfControl_;
 
 	  if (traceBranchOn and (di->isBranch() or di->isXRet()))
@@ -4698,7 +4839,7 @@ Hart<URV>::simpleRun()
         {
           bool hasLim = (instCountLim_ < ~uint64_t(0));
           if (hasLim or bbFile_ or instrLineTrace_ or not branchTraceFile_.empty() or
-	      isRvs() or isRvu() or isRvv() or hasClint())
+	      isRvs() or isRvu() or isRvv() or hasAclint())
             simpleRunWithLimit();
           else
             simpleRunNoLimit();
@@ -4816,7 +4957,10 @@ Hart<URV>::simpleRunWithLimit()
       ++instCounter_;
 
       if (not hartIx_)
-        ++time_;
+        {
+          ++timeSample_;
+          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+        }
 
       if (mcycleEnabled())
 	++cycleCount_;
@@ -5051,10 +5195,21 @@ void
 Hart<URV>::setMcm(std::shared_ptr<Mcm<URV>> mcm)
 {
   mcm_ = std::move(mcm);
+  ooo_ = mcm_ != nullptr or perfApi_ != nullptr;
+}
 
-  // We cannot match the RTL timer value: We skip checking it.
-  if (hasClint())
-    mcm_->skipReadCheck(clintStart_ + 0xbff8);
+
+template <typename URV>
+void
+Hart<URV>::setPerfApi(std::shared_ptr<TT_PERF::PerfApi> perfApi)
+{
+  if constexpr (sizeof(URV) == 4)
+    assert(0 && "Perf-api not supported in RV32");
+  else
+    {
+      perfApi_ = std::move(perfApi);
+      ooo_ = mcm_ != nullptr or perfApi_ != nullptr;
+    }
 }
 
 
@@ -5168,6 +5323,11 @@ bool
 Hart<URV>::isInterruptPossible(InterruptCause& cause) const
 {
   URV mip = csRegs_.peekMip();
+  if (isRvaia())
+    {
+      URV mvip = csRegs_.peekMvip() & ~csRegs_.peekMideleg();
+      mip |= mvip;
+    }
 
   // MIP read value is ored with supervisor external interrupt pin.
   mip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
@@ -5193,10 +5353,10 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       URV mipVal = csRegs_.peekMip();
       URV prev = mipVal;
 
-      if (hasClint())
+      if (hasAclint())
 	{
 	  // Deliver/clear machine timer interrupt from clint.
-	  if (time_ >= clintAlarm_ + timeShift_)
+	  if (time_ >= aclintAlarm_ + timeShift_)
 	    mipVal = mipVal | (URV(1) << URV(IC::M_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(IC::M_TIMER));
@@ -5355,7 +5515,10 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       ++instCounter_;
 
       if (not hartIx_)
-        ++time_;
+        {
+          ++timeSample_;
+          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+        }
 
       if (processExternalInterrupt(traceFile, instStr))
 	return;  // Next instruction in interrupt handler.
@@ -5372,6 +5535,12 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 
       if (mcycleEnabled())
 	++cycleCount_;
+
+      if (enableTriggers_ and icountTriggerHit())
+        {
+	  takeTriggerAction(traceFile, pc_, pc_, instCounter_, false);
+	  return;
+        }
 
       if (hasException_ or hasInterrupt_)
 	{
@@ -5396,12 +5565,6 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       if (doStats)
 	accumulateInstructionStats(di);
       printInstTrace(inst, instCounter_, instStr, traceFile);
-
-      if (enableTriggers_ and icountTriggerHit())
-	{
-	  takeTriggerAction(traceFile, pc_, pc_, instCounter_, false);
-	  return;
-	}
 
       // If step bit set in dcsr then enter debug mode unless already there.
       if (dcsrStep_ and not ebreakInstDebug_)
@@ -9862,6 +10025,9 @@ namespace WdRiscv
     if (triggerTripped_)
       return;
 
+    if (enableTriggers_)
+      csRegs_.restoreTcontrolMte();
+
     // 1. Restore privilege mode, interrupt enable, and virtual mode.
     uint64_t value = csRegs_.peekMstatus();
 
@@ -10194,7 +10360,7 @@ Hart<URV>::execDret(const DecodedInst* di)
 
 template <typename URV>
 bool
-Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& value)
+Hart<URV>::checkCsrAccess(const DecodedInst* di, CsrNumber csr, bool isWrite)
 {
   using PM = PrivilegeMode;
   using CN = CsrNumber;
@@ -10242,6 +10408,25 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
 	  return false;
         }
     }
+
+  if (isWrite and not isCsrWriteable(csr, privMode_, virtMode_))
+    {
+      if (virtMode_)
+	{
+	  if (csr == CsrNumber::SATP)
+	    virtualInst(di);
+	  else
+	    {
+	      if (csRegs_.isHighHalf(csr) and sizeof(URV) > 4)
+		hsq = false;
+	      if (hsq) virtualInst(di); else illegalInst(di);
+	    }
+	}
+      else
+	illegalInst(di);
+      return false;
+    }
+
 
   // Section 2.3 of AIA, lower priority than stateen. Doesn't follow normal hs-qualified rules.
   if (not imsicAccessible(di, csr, privMode_, virtMode_))
@@ -10304,8 +10489,25 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
         }
     }
 
+  return true;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& value)
+{
+  if (not checkCsrAccess(di, csr, isWrite))
+    return false;
+
   if (csRegs_.read(csr, privMode_, value))
     return true;
+
+  // Check if HS qualified (section 9.6.1 of privileged spec).
+  using PM = PrivilegeMode;
+  bool hsq = isRvs() and csRegs_.isReadable(csr, PM::Supervisor, false /*virtMode*/);
+  if (isWrite)
+    hsq = hsq and isCsrWriteable(csr, PM::Supervisor, false /*virtMode*/);
 
   if (virtMode_ and hsq )
     virtualInst(di);  // HS qualified 
@@ -10456,29 +10658,7 @@ void
 Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
                       unsigned intReg, URV intRegVal)
 {
-  using PM = PrivilegeMode;
-
-  if (not isCsrWriteable(csr, privMode_, virtMode_))
-    {
-      if (virtMode_)
-	{
-	  if (csr == CsrNumber::SATP)
-	    virtualInst(di);
-	  else
-	    {
-	      bool hsq = isRvs() and isCsrWriteable(csr, PM::Supervisor, false); // HS qualified
-	      if (csRegs_.isHighHalf(csr) and sizeof(URV) > 4)
-		hsq = false;
-	      if (hsq) virtualInst(di); else illegalInst(di);
-	    }
-	}
-      else
-	illegalInst(di);
-      return;
-    }
-
-  // Section 2.3 of AIA, lower priority than stateen. Doesn't follow normal hs-qualified rules.
-  if (not imsicAccessible(di, csr, privMode_, virtMode_))
+  if (not checkCsrAccess(di, csr, true /* isWrite */))
     return;
 
   // Make auto-increment happen before CSR write for minstret and cycle.
@@ -11019,7 +11199,9 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	  addr1 = va1;  // To report virtual address in MTVAL.
 	  return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
 	}
-      pma = getPma(addr2);
+      uint64_t aligned = addr1 & ~alignMask;
+      uint64_t next = addr1 == addr2? aligned + stSize : addr2;
+      pma = getPma(next);
       if (not pma.isWrite())
 	{
 	  addr1 = va2;

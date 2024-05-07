@@ -693,6 +693,10 @@ namespace WdRiscv
     void setFaultOnFirstAccess(bool flag)
     { faultOnFirstAccess_ = flag; }
 
+    /// Set behavior if first access to page or store and page not dirty.
+    void setFaultOnFirstAccessStage1(bool flag)
+    { faultOnFirstAccess1_ = flag; }
+
     /// Similar to above but applies to 2nd stage translation.
     void setFaultOnFirstAccessStage2(bool flag)
     { faultOnFirstAccess2_ = flag; }
@@ -742,6 +746,10 @@ namespace WdRiscv
         {
           if (pte.hasNapot())
             {
+	      // Table 6.1 of privileged spec (version 1.12) disallows napot for non-leaf
+	      if (not pte.leaf())
+		return false;
+
               if ((pte.ppn0() & 0xf) != 0x8)
                 return false;
               pte.setPpn0((pte.ppn0() & ~0xf) | (va.vpn0() & 0xf));
@@ -799,7 +807,8 @@ namespace WdRiscv
     bool sum_ = false;  // Supervisor privilege can access user pages.
     bool vsSum_ = false;  // Supervisor privilege can access user pages for VS mode.
     bool faultOnFirstAccess_ = true;
-    bool faultOnFirstAccess2_ = true;
+    bool faultOnFirstAccess1_ = true;    // For stage1
+    bool faultOnFirstAccess2_ = true;    // For stage2
     bool accessDirtyCheck_ = true;  // To be able to supress AD check
 
     bool xForR_ = false;   // True for hlvx.hu and hlvx.wu instructions: use exec for read

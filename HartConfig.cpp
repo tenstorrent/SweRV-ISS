@@ -333,7 +333,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
   if (errors)
     return false;
 
-  if (not hart.configCsr(name, exists, reset, mask, pokeMask, isDebug, shared))
+  if (not hart.configCsrByUser(name, exists, reset, mask, pokeMask, isDebug, shared))
     {
       std::cerr << "Invalid CSR (" << name << ") in config file.\n";
       return false;
@@ -503,7 +503,7 @@ applyTriggerConfig(Hart<URV>& hart, const nlohmann::json& config)
           continue;
         }
 
-      std::vector<URV> resets, masks, pokeMasks;
+      std::vector<uint64_t> resets, masks, pokeMasks;
       ok = (getJsonUnsignedVec(name + ".reset", trig.at("reset"), resets) and
             getJsonUnsignedVec(name + ".mask", trig.at("mask"), masks) and
             getJsonUnsignedVec(name + ".poke_mask", trig.at("poke_mask"), pokeMasks));
@@ -513,36 +513,22 @@ applyTriggerConfig(Hart<URV>& hart, const nlohmann::json& config)
           continue;
         }
 
-      if (resets.size() != 3)
-	{
-	  std::cerr << "Trigger " << name << ": Bad item count (" << resets.size()
-		    << ") for 'reset' field in config file. Expecting 3.\n";
-	  ok = false;
-	}
+      // Each trigger has up to 5 components: tdata1, tdata2, tdata3, tinfo, tcontrol
+      size_t maxSize = std::max(resets.size(), std::max(masks.size(), pokeMasks.size()));
+      if (maxSize > 5)
+	std::cerr << "Trigger " << name << ": Unreasonable item count (" << maxSize
+		  << ") for 'reset/mask/poke_mask' field in config file. "
+		  << " Expecting no more than to 5. Extra fields ignored.\n";
 
-      if (masks.size() != 3)
+      if (resets.size() != maxSize or masks.size() != maxSize or pokeMasks.size() != maxSize)
 	{
-	  std::cerr << "Trigger " << name << ": Bad item count (" << masks.size()
-		    << ") for 'mask' field in config file. Expecting 3.\n";
-	  ok = false;
-	}
-
-      if (pokeMasks.size() != 3)
-	{
-	  std::cerr << "Trigger " << name << ": Bad item count (" << pokeMasks.size()
-		    << ") for 'poke_mask' field in config file. Expecting 3.\n";
-	  ok = false;
-	}
-
-      if (not ok)
-	{
+	  std::cerr << "Trigger " << name << ": Error: reset/mask/poke_mask fields must have "
+		    << " same number of entries.\n";
 	  errors++;
 	  continue;
 	}
-      if (not hart.configTrigger(ix, resets.at(0), resets.at(1), resets.at(2),
-				 masks.at(0), masks.at(1), masks.at(2),
-				 pokeMasks.at(0), pokeMasks.at(1),
-                                 pokeMasks.at(2)))
+
+      if (not hart.configTrigger(ix, resets, masks, pokeMasks))
 	{
 	  std::cerr << "Failed to configure trigger " << std::dec << ix << '\n';
 	  ++errors;
@@ -1352,9 +1338,10 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
 
 template<typename URV>
 bool
-HartConfig::configClint(System<URV>& system, Hart<URV>& hart,
-			uint64_t clintStart, uint64_t clintEnd,
-			bool siOnReset) const
+HartConfig::configAclint(System<URV>& system, Hart<URV>& hart, uint64_t clintStart,
+                         uint64_t mswiOffset, bool hasMswi,
+                         uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
+		         bool siOnReset) const
 {
   // Define callback to recover a hart from a hart index. We do
   // this to avoid having the Hart class depend on the System class.
@@ -1362,7 +1349,8 @@ HartConfig::configClint(System<URV>& system, Hart<URV>& hart,
     return system.ithHart(ix).get();
   };
 
-  hart.configClint(clintStart, clintEnd, siOnReset, indexToHart);
+  hart.configAclint(clintStart + mswiOffset, hasMswi, clintStart + mtimerOffset,
+                   clintStart + mtimeOffset, hasMtimer, siOnReset, indexToHart);
   return true;
 }
 
@@ -1481,6 +1469,14 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enableTriggers(flag);
     }
 
+  // Enable firing triggers in machine mode even when interrupts are enabled.
+  tag = "mmode_triggers_ok_with_ie";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableMmodeTriggersWithIe(flag);
+    }
+
   // Enable performance counters.
   tag = "enable_performance_counters";
   if (config_ -> contains(tag))
@@ -1551,13 +1547,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   applyVectorConfig(hart, *config_) or errors++;
 
   applySteeConfig(hart, *config_) or errors++;
-
-  tag = "even_odd_trigger_chains";
-  if (config_ -> contains(tag))
-    {
-      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
-      hart.configEvenOddTriggerChaining(flag);
-    }
 
   tag = "load_data_trigger";
   if (config_ -> contains(tag))
@@ -1668,7 +1657,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       if (hart.sysHartIndex() == 0)
 	cerr << "Warning: Config tag " << tag << " is deprecated -- "
-	     << "feature is now controlled by bit 61 of the MENVCFG CSR.\n";
+	     << "feature is now controlled by bit 61 of the MENVCFG/HENVCFG CSR.\n";
       getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
       // hart.setFaultOnFirstAccess(flag);
     }
@@ -1758,6 +1747,18 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	errors++;
       else
 	hart.setTimeShift(shift);
+    }
+
+  // Same as above, but this is used to apply a scaling factor
+  // instead of a simple shift.
+  tag = "time_down_sample";
+  if (config_ ->contains(tag))
+    {
+      unsigned n = 0;
+      if (not getJsonUnsigned(tag, config_ -> at(tag), n))
+	errors++;
+      else
+	hart.setTimeDownSample(n);
     }
 
   tag = "cancel_lr_on_ret";
@@ -1958,6 +1959,14 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.setWfiTimeout(timeout);
     }
 
+  tag = "hfence_gvma_ignores_gpa";
+  if (config_ ->contains(tag))
+    {
+      bool flag = false;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.hfenceGvmaIgnoresGpa(flag);
+    }
+
   return errors == 0;
 }
 
@@ -1966,7 +1975,7 @@ template<typename URV>
 bool
 HartConfig::applyClintConfig(System<URV>& system, Hart<URV>& hart) const
 {
-  constexpr std::string_view tag = "clint";
+  std::string_view tag = "clint";
   if (not config_ -> contains(tag))
     return true;
 
@@ -1981,14 +1990,108 @@ HartConfig::applyClintConfig(System<URV>& system, Hart<URV>& hart) const
       return false;
     }
 
-  bool siOnReset = false;
-  constexpr std::string_view siTag = "clint_software_interrupt_on_reset";
-  if (config_ -> contains(siTag))
-    if (not getJsonBoolean(siTag, config_ -> at(siTag), siOnReset))
+  return configAclint(system, hart, addr, 0 /* swOffset */, true /* hasMswi */,
+                      0x4000 /* timerOffset */, 0xbff8 /* timeOffset */, true /* hasMtimer */);
+}
+
+
+template<typename URV>
+bool
+HartConfig::applyAclintConfig(System<URV>& system, Hart<URV>& hart) const
+{
+  std::string_view tag = "aclint";
+  if (not config_ -> contains(tag))
+    return true;
+
+  auto& aclint = config_ -> at("aclint");
+
+  uint64_t base = 0, swOffset = 0, timerOffset = 0, timeOffset = 0;
+
+  tag = "base";
+  if (aclint.contains(tag))
+    if (not getJsonUnsigned("aclint.base", aclint.at(tag), base))
       return false;
 
-  uint64_t clintStart = addr, clintEnd = addr + 0xc000 - 1;
-  return configClint(system, hart, clintStart, clintEnd, siOnReset);
+  bool hasMswi = false;
+  tag = "sw_offset";
+  if (aclint.contains(tag))
+    {
+      if (not getJsonUnsigned("aclint.sw_offset", aclint.at(tag), swOffset))
+        return false;
+      hasMswi = true;
+    }
+  uint64_t swEnd = swOffset + 0x4000;
+
+  bool hasMtimer = false;
+  tag = "timer_offset";
+  if (aclint.contains(tag))
+    {
+      if (not getJsonUnsigned("aclint.timer_offset", aclint.at(tag), timerOffset))
+        return false;
+      hasMtimer = true;
+    }
+  uint64_t timerEnd = timerOffset + 0x8000;
+
+  tag = "time_offset";
+  if (aclint.contains(tag))
+    {
+      if (not hasMtimer)
+        {
+          std::cerr << "Error: aclint specified time_offset, but no timer_offset\n";
+          return false;
+        }
+      if (not getJsonUnsigned("aclint.time_offset", aclint.at(tag), timeOffset))
+        return false;
+    }
+  else if (hasMtimer)
+    {
+      std::cerr << "Error: aclint specified timer_offset, but no time_offset\n";
+      return false;
+    }
+
+  if ((base & 7) != 0 or (swOffset & 7) != 0 or (timerOffset & 7) != 0 or
+      (timeOffset & 7) != 0)
+    {
+      std::cerr << "Error: Config file aclint addresses and offsets\n"
+                << "(0x" << std::hex << base << ")\n"
+                << "(0x" << swOffset << ")\n"
+                << "(0x" << timerOffset << ")\n"
+                << "(0x" << timeOffset << std::dec << ")\n"
+                << "must be a multiple of 8\n";
+      return false;
+    }
+
+  // Check overlap.
+  if (hasMswi and (timeOffset >= swOffset and timeOffset < swEnd))
+    {
+      std::cerr << "Error: aclint MTIME cannot sit in MSWI region.\n";
+      return false;
+    }
+
+  if (hasMswi and hasMtimer and
+      ((timerOffset >= swOffset and timerOffset < swEnd) or
+       (swOffset >= timerOffset and swOffset < timerEnd)))
+    {
+      std::cerr << "Error: aclint MTIMER and MSWI regions cannot overlap.\n";
+      return false;
+    }
+
+  bool siOnReset = false;
+  tag = "software_interrupt_on_reset";
+  if (aclint.contains(tag))
+    {
+      if (not getJsonBoolean("aclint.software_interrupt_on_reset", aclint.at(tag), siOnReset))
+        return false;
+      if (not hasMswi)
+        {
+          std::cerr << "Error: aclint software_interrupt_on_reset configured"
+                    << " without software device enabled.\n";
+          return false;
+        }
+    }
+
+  return configAclint(system, hart, base, swOffset, hasMswi,
+                     timerOffset, timeOffset, hasMtimer, siOnReset);
 }
 
 
@@ -2094,6 +2197,9 @@ HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
 	return false;
 
       if (not applyClintConfig(system, hart))
+        return false;
+
+      if (not applyAclintConfig(system, hart))
 	return false;
     }
 
@@ -2471,14 +2577,15 @@ template bool
 HartConfig::finalizeCsrConfig<uint64_t>(System<uint64_t>&) const;
 
 template bool
-HartConfig::configClint<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,
-				  uint64_t clintStart, uint64_t clintEnd,
-				  bool siOnReset) const;
-
+HartConfig::configAclint<uint32_t>(System<uint32_t>&, Hart<uint32_t>&, uint64_t clintStart,
+                                   uint64_t mswiOffset, bool hasMswi,
+                                   uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
+		                   bool siOnReset = false) const;
 template bool
-HartConfig::configClint<uint64_t>(System<uint64_t>& system, Hart<uint64_t>& hart,
-				  uint64_t clintStart, uint64_t clintEnd,
-				  bool siOnReset) const;
+HartConfig::configAclint<uint64_t>(System<uint64_t>&, Hart<uint64_t>&, uint64_t clintStart,
+                                   uint64_t mswiOffset, bool hasMswi,
+                                   uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
+		                   bool siOnReset = false) const;
 
 template bool
 HartConfig::configInterruptor<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,

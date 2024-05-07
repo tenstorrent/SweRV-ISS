@@ -86,7 +86,7 @@ riscof-job:
     - make -s -j32
     - cd ../..
     # Run riscof
-    - PATH=$PATH:$PWD/riscv-isa-sim/build:$PWD/../../build-Linux riscof run --suite riscv-arch-test/riscv-test-suite --env riscv-arch-test/riscv-test-suite/env --no-browser
+    - PATH=$PATH:$PWD/riscv-isa-sim/build:$PWD/../../build-Linux riscof --verbose debug run --suite riscv-arch-test/riscv-test-suite --env riscv-arch-test/riscv-test-suite/env --no-browser
   timeout: 6 hours
 
 notify-risc-p-cores:

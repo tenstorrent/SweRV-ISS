@@ -26,7 +26,7 @@
 #include "pci/virtio/Blk.hpp"
 
 
-namespace TT_PERFA
+namespace TT_PERF
 {
   class PerfApi;
 }
@@ -273,13 +273,15 @@ namespace WdRiscv
 		     unsigned guests, unsigned ids,
                      bool trace);
 
-    /// Enable memory consistency model. This is relevant in
-    /// server/interactive where RTL monitor or interactive command
-    /// may initiate out of order memory transactions. Behavior is
-    /// undefined if used in non-server/non-interactive mode or if
-    /// used after execution has started. The mergeBuffserSize is
-    /// the merge buffer line size in bytes.
+    /// Enable memory consistency model. This is relevant in server/interactive where RTL
+    /// monitor or interactive command may initiate out of order memory
+    /// transactions. Behavior is undefined if used in non-server/non-interactive mode or
+    /// if used after execution has started. The mergeBuffserSize is the merge buffer line
+    /// size in bytes.
     bool enableMcm(unsigned mergeBufferSize, bool mbLineCheckAll);
+
+    /// Enable the performance mode API.
+    bool enablePerfApi(std::vector<FILE*>& traceFiles);
 
     /// Enable/disable total-store-order: Valid only if mcm is enabled.
     void enableTso(bool);
@@ -287,9 +289,6 @@ namespace WdRiscv
     /// Configure PCIe host-root-complex and construct associated devices
     /// which use transport.
     bool configPci(uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize, unsigned buses, unsigned slots);
-
-    /// Define a virtio-blk device.
-    std::shared_ptr<PciDev> defineVirtioBlk(std::string_view filename, bool ro) const;
 
     /// Add PCIe devices specified by the user.
     bool addPciDevices(const std::vector<std::string>& devs);
@@ -348,6 +347,33 @@ namespace WdRiscv
 
     bool mcmSetCurrentInstruction(Hart<URV>& hart, uint64_t tag);
 
+
+    /// Perf model APIs.
+    void perfApiCommandLog(FILE* log);
+
+    void perfApiTraceLog(std::vector<FILE*>& files);
+
+    bool perfApiFetch(unsigned hart, uint64_t time, uint64_t tag, uint64_t vpc);
+
+    bool perfApiDecode(unsigned hart, uint64_t time, uint64_t tag);
+
+    bool perfApiExecute(unsigned hart, uint64_t time, uint64_t tag);
+
+    bool perfApiRetire(unsigned hart, uint64_t time, uint64_t tag);
+
+    bool perfApiDrainStore(unsigned hart, uint64_t time, uint64_t tag);
+
+    bool perfApiPredictBranch(unsigned hart, uint64_t time, uint64_t tag, bool taken,
+			      uint64_t addr);
+
+    bool perfApiFlush(unsigned hart, uint64_t time, uint64_t tag);
+
+    bool perfApiShouldFlush(unsigned hart, uint64_t time, uint64_t tag, bool& flush,
+			    uint64_t& addr);
+
+    std::shared_ptr<TT_PERF::PerfApi> getPerfApi()
+    { return perfApi_; }
+
     /// Produce a signature file used to score tests from the
     /// riscv-arch-tests project.  The file is written to the
     // path specified in the parameter.
@@ -387,7 +413,7 @@ namespace WdRiscv
     std::shared_ptr<Memory> memory_;
     std::unique_ptr<SparseMem> sparseMem_;
     std::shared_ptr<Mcm<URV>> mcm_;
-    std::shared_ptr<TT_PERFA::PerfApi> perfApi_;
+    std::shared_ptr<TT_PERF::PerfApi> perfApi_;
     unsigned mbSize_ = 64;  // Merge buffer size.
     std::string toHostSym_ = "tohost";   // ELF symbol to use as "tohost" addr.
     std::string fromHostSym_ = "fromhost";
