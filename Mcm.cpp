@@ -1979,7 +1979,6 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.complete_)
     return true;  // We will try again when B is complete.
 
-
   // Bit i of mask is 1 if byte i of data of instruction B is not written by a preceeding
   // store.
   unsigned mask = (1 << instrB.size_) - 1;
@@ -2324,10 +2323,8 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 
 template <typename URV>
 bool
-Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
+Mcm<URV>::ppoRule6(const McmInstr& instrA, const McmInstr& instrB) const
 {
-  // Rule 6: B has a release annotation
-
   bool hasRelease = instrB.di_.isAtomicRelease();
   if (isTso_)
     hasRelease = hasRelease or instrB.di_.isStore() or instrB.di_.isAmo();
@@ -2335,28 +2332,54 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory() or not hasRelease)
     return true;
 
+  if (instrA.isCanceled() or not instrA.isMemory())
+    return true;
+
+  assert(instrA.isRetired());
+
+  if (instrA.di_.isAmo())
+    return instrA.memOps_.size() == 2; // Fail if incomplete amo (finishes afrer B).
+
+  if (not instrA.complete_)
+    return false;       // Fail if incomplete store (finishes after B).
+
+  if (instrB.memOps_.empty())
+    return true;   // Undrained store.
+
+  auto btime = earliestOpTime(instrB);
+  return latestOpTime(instrA) < btime;  // A finishes brefore B.
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Rule 6: B has a release annotation
+
+
   auto hartIx = hart.sysHartIndex();
   auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
-  auto btime = earliestOpTime(instrB);
 
   for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
     {
       const auto& instrA =  instrVec.at(tag);
-      if (instrA.isCanceled() or not instrA.isMemory())
-	continue;
+      if (not ppoRule6(instrA, instrB))
+	{
+	  cerr << "Error: PPO rule 6 failed: hart-id=" << hart.hartId()
+	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+	  return false;
+	}
+    }
 
-      assert(instrA.isRetired());
-
-      bool fail = false;
-      if (instrA.di_.isAmo())
-	fail = instrA.memOps_.size() != 2; // Incomplete amo might finish afrer B
-      else
-        fail = (not instrA.complete_ or     // Incomplete store might finish after B
-	        (not instrB.memOps_.empty() and
-	         btime <= latestOpTime(instrA)));  // A finishes after B
-
-      if (fail)
+  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  for (auto& tag : undrained)
+    {
+      if (tag >= instrB.tag_)
+	break;
+      const auto& instrA =  instrVec.at(tag);
+      if (not ppoRule6(instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 6 failed: hart-id=" << hart.hartId()
 	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
