@@ -827,8 +827,9 @@ namespace WdRiscv
 
     /// Support for tracing: Return incremental changes to fp flags and vxsat,
     /// but for vector instructions on per-element basis.
-    void lastIncVec(std::vector<uint8_t>& fpFlags, std::vector<uint8_t>& vxsat) const
-    { return vecRegs_.lastIncVec(fpFlags, vxsat); }
+    void lastIncVec(std::vector<uint8_t>& fpFlags, std::vector<uint8_t>& vxsat,
+                    std::vector<VecRegs::Step>& steps) const
+    { return vecRegs_.lastIncVec(fpFlags, vxsat, steps); }
 
     /// Return true if the last executed instruction triggered a trap
     /// (had an exception or encoutered an interrupt).

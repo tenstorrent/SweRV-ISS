@@ -337,7 +337,8 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
           case WhisperSpecialResource::IncrementalVec:
             {
               std::vector<uint8_t> fpFlags; std::vector<uint8_t> vxsat;
-              hart.lastIncVec(fpFlags, vxsat);
+              std::vector<VecRegs::Step> steps;
+              hart.lastIncVec(fpFlags, vxsat, steps);
               assert((fpFlags.size() != 0 and vxsat.size() == 0) or
                      (fpFlags.size() == 0 and vxsat.size() != 0));
               for (unsigned i = 0; i < fpFlags.size(); ++i)

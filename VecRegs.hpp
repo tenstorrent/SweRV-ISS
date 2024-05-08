@@ -535,10 +535,43 @@ namespace WdRiscv
     const std::vector<bool>& maskedAddrs() const
     { return maskedAddr_; }
 
-    void lastIncVec(std::vector<uint8_t>& fpFlags, std::vector<uint8_t>& vxsat) const
+    struct Step
+    {
+      enum Operation { CrossRegRed, AdjacRed, ScalarRed, None };
+
+      template <typename ET, typename RT>
+      Step(Operation op, ET e1, ET e2, RT res)
+        : op_(op)
+      {
+        using uint_fsize_et = typename getSameWidthUintType<ET>::type;
+        using uint_fsize_rt = typename getSameWidthUintType<RT>::type;
+
+        operands_.at(0) = std::bit_cast<uint_fsize_et>(e1);
+        operands_.at(1) = std::bit_cast<uint_fsize_et>(e2);
+        result_ = std::bit_cast<uint_fsize_rt>(res);
+      }
+
+      static constexpr std::string_view opToStr(Operation op)
+      {
+        using namespace std::string_view_literals;
+
+        constexpr auto vec =
+          std::array{"group-wise"sv, "adjacent"sv, "scalar"sv, "none"sv};
+
+        return vec.at(op);
+      }
+
+      Operation op_;
+      std::array<uint64_t, 2> operands_;
+      uint64_t result_;
+    };
+
+    void lastIncVec(std::vector<uint8_t>& fpFlags, std::vector<uint8_t>& vxsat,
+                    std::vector<Step>& steps) const
     {
       fpFlags = fpFlags_;
       vxsat = vxsat_;
+      steps = steps_;
     }
 
   protected:
@@ -553,6 +586,7 @@ namespace WdRiscv
       stData_.clear();
       fpFlags_.clear();
       vxsat_.clear();
+      steps_.clear();
       clearLastWrittenReg();
       opsEmul_.assign(opsEmul_.size(), 1);
     }
@@ -814,8 +848,9 @@ namespace WdRiscv
     std::vector<uint64_t> ldStAddr_;      // Addresses of vector load/store instruction.
     std::vector<uint64_t> ldStPhysAddr_;  // Phys addresses of vector load/store instruction (FIXME: page crosses).
     std::vector<bool> maskedAddr_;        // True if address is masked off (element skipped).
-    std::vector<uint8_t> fpFlags_;        // Incremental fp flags (useful for vector instruction debugging).
-    std::vector<uint8_t> vxsat_;          // VXSAT per-element operation (useful for vector instruction debugging).
+    std::vector<Step> steps_;             // Incremental steps taken by previous instruction (useful for vector instruction debug).
+    std::vector<uint8_t> fpFlags_;        // Incremental fp flags (useful for vector instruction debug).
+    std::vector<uint8_t> vxsat_;          // VXSAT per-element operation (useful for vector instruction debug).
     std::vector<uint64_t> stData_;        // Data of vector store instruction.
     std::vector<unsigned> opsEmul_;       // Effective grouping of vector operands.
   };
