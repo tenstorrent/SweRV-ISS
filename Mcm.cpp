@@ -2393,6 +2393,38 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
 
 template <typename URV>
 bool
+Mcm<URV>::ppoRule7(const McmInstr& instrA, const McmInstr& instrB) const
+{
+  if (instrA.isCanceled() or not instrA.isMemory())
+    return true;
+
+  assert(instrA.isRetired());
+
+  bool bHasRc = instrB.di_.isAtomicRelease() or instrB.di_.isAtomicAcquire();
+  if (isTso_)
+    bHasRc = bHasRc or instrB.di_.isLoad() or instrB.di_.isStore() or instrB.di_.isAmo();
+
+  bool aHasRc = instrA.di_.isAtomicRelease() or instrA.di_.isAtomicAcquire();
+  if (isTso_)
+    aHasRc = bHasRc or instrA.di_.isLoad() or instrA.di_.isStore() or instrA.di_.isAmo();
+
+  if (not aHasRc or not bHasRc)
+    return true;
+
+  bool incomplete = not instrA.complete_ or (instrA.di_.isAmo() and instrA.memOps_.size() != 2);
+  if (incomplete)
+    return false;   // Incomplete amo finishes afrer B.
+
+  if (instrB.memOps_.empty())
+    return true;    // Undrained store will finish later.
+
+  auto btime = earliestOpTime(instrB);
+  return latestOpTime(instrA) < btime;  // A finishes before B
+}
+
+
+template <typename URV>
+bool
 Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 7: A and B have RCsc annotations.
@@ -2407,30 +2439,25 @@ Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
   auto hartIx = hart.sysHartIndex();
   auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
-  auto btime = earliestOpTime(instrB);
 
   for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
     {
       const auto& instrA =  instrVec.at(tag);
-      if (instrA.isCanceled() or not instrA.isMemory())
-	continue;
+      if (not ppoRule7(instrA, instrB))
+	{
+	  cerr << "Error: PPO rule 7 failed: hart-id=" << hart.hartId()
+	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+	  return false;
+	}
+    }
 
-      assert(instrA.isRetired());
-
-      bool aHasRc = instrA.di_.isAtomicRelease() or instrA.di_.isAtomicAcquire();
-      if (isTso_)
-	aHasRc = bHasRc or instrA.di_.isLoad() or instrA.di_.isStore() or instrA.di_.isAmo();
-      if (not aHasRc)
-	continue;
-
-      bool incomplete = not instrA.complete_ or 
-	(instrA.di_.isAmo() and instrA.memOps_.size() != 2); // Incomplete amo might finish afrer B
-
-      bool fail = (incomplete or     // Incomplete store might finish after B
-		   (not instrB.memOps_.empty() and
-		    btime <= latestOpTime(instrA)));  // A finishes after B
-
-      if (fail)
+  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  for (auto& tag : undrained)
+    {
+      if (tag >= instrB.tag_)
+	break;
+      const auto& instrA =  instrVec.at(tag);
+      if (not ppoRule7(instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 7 failed: hart-id=" << hart.hartId()
 	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';

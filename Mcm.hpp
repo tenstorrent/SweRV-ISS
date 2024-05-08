@@ -253,6 +253,9 @@ namespace WdRiscv
     /// Helper to above ppoRule6.
     bool ppoRule6(const McmInstr& instrA, const McmInstr& instrB) const;
 
+    /// Helper to above ppoRule7.
+    bool ppoRule7(const McmInstr& instrA, const McmInstr& instrB) const;
+
     /// Check that previous SINVAL.VMA instructions are executed before subsequent
     /// implicit references to the memory-management data structures. Return true on
     /// success and false if there are translations between the the current
