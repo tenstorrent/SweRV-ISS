@@ -18816,6 +18816,8 @@ Hart<URV>::doVecFpRedSumGroup(std::vector<ELEM_TYPE>& elems, ElementWidth eew, u
   const unsigned numGroupRed = group >> 1;
   const unsigned elemsPerVec = vecRegs_.singleMax(eew);
 
+  using VSO = VecRegs::Step::Operation;
+
   for (unsigned gn = 0; gn < numGroupRed; gn++)
     {
       for (unsigned ix = 0; ix < elemsPerVec; ix++)
@@ -18830,6 +18832,7 @@ Hart<URV>::doVecFpRedSumGroup(std::vector<ELEM_TYPE>& elems, ElementWidth eew, u
           elems.at(elemIx) = result;
           URV incFlags = activeSimulatorFpFlags();
           vecRegs_.fpFlags_.push_back(incFlags);
+          vecRegs_.steps_.emplace_back(VSO::CrossRegRed, e1, e2, result);
         }
     }
 
@@ -18845,6 +18848,8 @@ Hart<URV>::doVecFpRedSumAdjacent(std::vector<ELEM_TYPE>& elems, unsigned numElem
   if (numElems <= numResult)
     return;
 
+  using VSO = VecRegs::Step::Operation;
+
   for (unsigned ix = 0; ix < numElems; ix+=2)
     {
       ELEM_TYPE e1 = elems.at(ix);
@@ -18854,6 +18859,7 @@ Hart<URV>::doVecFpRedSumAdjacent(std::vector<ELEM_TYPE>& elems, unsigned numElem
       elems.at(ix >> 1) = result;
       URV incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
+      vecRegs_.steps_.emplace_back(VSO::AdjacRed, e1, e2, result);
     }
 
   return doVecFpRedSumAdjacent(elems, numElems >> 1, numResult);
@@ -18916,15 +18922,22 @@ Hart<URV>::vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       // Perform adjacent vec register reduce.
       doVecFpRedSumAdjacent(tree, vecRegs_.singleMax(vecRegs_.elemWidth()), 2);
 
+      using VSO = VecRegs::Step::Operation;
+
       // scalar operand in second-to-last step.
-      result = doFadd(tree.at(0), e2);
+      e1 = tree.at(0);
+      result = doFadd(e1, e2);
       URV incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
+      vecRegs_.steps_.emplace_back(VSO::ScalarRed, e1, e2, result);
 
       // remaining operand in last step.
-      result = doFadd(tree.at(1), result);
+      e1 = tree.at(1);
+      e2 = result;
+      result = doFadd(e1, e2);
       incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
+      vecRegs_.steps_.emplace_back(VSO::AdjacRed, e1, e2, result);
     }
 
   // Note: NaN canonicalization when there are no active elements
@@ -19294,15 +19307,23 @@ Hart<URV>::vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
       // Perform adjacent vec register elements reduce.
       doVecFpRedSumAdjacent(tree, vecRegs_.singleMax(dsew), 2);
 
+      using VSO = VecRegs::Step::Operation;
+
       // scalar operand in second-to-last step.
-      result = doFadd(tree.at(0), result);
+      ELEM_TYPE2X e1dw = tree.at(0);
+      ELEM_TYPE2X e2dw = result;
+      result = doFadd(e1dw, e2dw);
       URV incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
+      vecRegs_.steps_.emplace_back(VSO::ScalarRed, e1dw, e2dw, result);
 
       // remaining operand in last step.
-      result = doFadd(tree.at(1), result);
+      e1dw = tree.at(1);
+      e2dw = result;
+      result = doFadd(e1dw, e2dw);
       incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
+      vecRegs_.steps_.emplace_back(VSO::AdjacRed, e1dw, e2dw, result);
     }
 
   // Note: NaN canonicalization when there are no active elements

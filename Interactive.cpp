@@ -746,7 +746,8 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
       else if (addrStr == "iv")
         {
           std::vector<uint8_t> fpFlags; std::vector<uint8_t> vxsat;
-          hart.lastIncVec(fpFlags, vxsat);
+          std::vector<VecRegs::Step> steps;
+          hart.lastIncVec(fpFlags, vxsat, steps);
           std::reverse(fpFlags.begin(), fpFlags.end());
           std::reverse(vxsat.begin(), vxsat.end());
 
@@ -761,6 +762,24 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
               sep = ",";
             }
           out << "]\n";
+
+          using VS = VecRegs::Step;
+          VS::Operation op = VS::Operation::None;
+          if (not steps.empty())
+            {
+              out << "\nsteps:\n";
+              for (auto step : steps)
+                {
+                  if (op != step.op_)
+                    out << VS::opToStr(step.op_) << "\n";
+
+                  out << "[e1: " << (boost::format("0x%x") % step.operands_.at(0))
+                      << " e2: " << (boost::format("0x%x") % step.operands_.at(1))
+                      << " result: " << (boost::format("0x%x") % step.result_)
+                      << "]\n";
+                  op = step.op_;
+                }
+            }
         }
       else if (addrStr == "trap")
 	out << (hart.lastInstructionTrapped() ? "1" : "0") << std::endl;
