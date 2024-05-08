@@ -1766,6 +1766,66 @@ Mcm<URV>::latestByteTime(const McmInstr& instr, uint64_t addr) const
 
 template <typename URV>
 bool
+Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
+{
+  if (instrA.isCanceled())
+    return true;
+
+  assert(instrA.isRetired());
+
+  if (not instrA.isMemory() or not instrA.overlaps(instrB))
+    return true;
+
+  if (instrA.isAligned() and instrB.isAligned())
+    return isBeforeInMemoryTime(instrA, instrB);
+
+  // Check overlapped bytes.
+  bool ok = true;
+  if (instrB.physAddr_ == instrB.physAddr2_)
+    {    // Non-page crossing.
+      for (unsigned i = 0; i < instrB.size_ and ok; ++i)
+	{
+	  uint64_t byteAddr = instrB.physAddr_ + i;
+	  if (instrOverlapsPhysAddr(instrA, byteAddr))
+	    {
+	      uint64_t ta = latestByteTime(instrA, byteAddr);
+	      uint64_t tb = earliestByteTime(instrB, byteAddr);
+	      ok = ta < tb or (ta == tb and instrA.isStore_);
+	    }
+	}
+    }
+  else
+    {    // Page crossing.
+      unsigned size1 = offsetToNextPage(instrB.physAddr_);
+      unsigned size2 = instrB.size_ - size1;
+      for (unsigned i = 0; i < size1 and ok; ++i)
+	{
+	  uint64_t byteAddr = instrB.physAddr_ + i;
+	  if (instrOverlapsPhysAddr(instrA, byteAddr))
+	    {
+	      uint64_t ta = latestByteTime(instrA, byteAddr);
+	      uint64_t tb = earliestByteTime(instrB, byteAddr);
+	      ok = ta < tb or (ta == tb and instrA.isStore_);
+	    }
+	}
+      for (unsigned i = 0; i < size2 and ok; ++i)
+	{
+	  uint64_t byteAddr = instrB.physAddr2_ + i;
+	  if (instrOverlapsPhysAddr(instrA, byteAddr))
+	    {
+	      uint64_t ta = latestByteTime(instrA, byteAddr);
+	      uint64_t tb = earliestByteTime(instrB, byteAddr);
+	      ok = ta < tb or (ta == tb and instrA.isStore_);
+	    }
+	}
+    }
+
+  return ok;
+}
+
+
+template <typename URV>
+bool
 Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 1: B is a store, A and B have overlapping addresses.
@@ -1781,69 +1841,26 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
   for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
     {
       const auto& instrA =  instrVec.at(tag);
-      if (instrA.isCanceled())
-	continue;
-
-      assert(instrA.isRetired());
-
-      if (not instrA.isMemory() or not instrA.overlaps(instrB))
-	continue;
-
-      if (instrA.isAligned() and instrB.isAligned())
+      if (not ppoRule1(instrA, instrB))
 	{
-	  if (isBeforeInMemoryTime(instrA, instrB))
-	    continue;
+	  cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
+	       << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+	  return false;
 	}
-      else
+    }
+
+  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  for (auto& tag : undrained)
+    {
+      if (tag >= instrB.tag_)
+	break;
+      const auto& instrA =  instrVec.at(tag);
+      if (not ppoRule1(instrA, instrB))
 	{
-	  // Check overlapped bytes.
-	  bool ok = true;
-	  if (instrB.physAddr_ == instrB.physAddr2_)
-	    {    // Non-page crossing.
-	      for (unsigned i = 0; i < instrB.size_ and ok; ++i)
-		{
-		  uint64_t byteAddr = instrB.physAddr_ + i;
-		  if (instrOverlapsPhysAddr(instrA, byteAddr))
-		    {
-		      uint64_t ta = latestByteTime(instrA, byteAddr);
-		      uint64_t tb = earliestByteTime(instrB, byteAddr);
-		      ok = ta < tb or (ta == tb and instrA.isStore_);
-		    }
-		}
-	    }
-	  else
-	    {    // Page crossing.
-	      unsigned size1 = offsetToNextPage(instrB.physAddr_);
-	      unsigned size2 = instrB.size_ - size1;
-	      for (unsigned i = 0; i < size1 and ok; ++i)
-		{
-		  uint64_t byteAddr = instrB.physAddr_ + i;
-		  if (instrOverlapsPhysAddr(instrA, byteAddr))
-		    {
-		      uint64_t ta = latestByteTime(instrA, byteAddr);
-		      uint64_t tb = earliestByteTime(instrB, byteAddr);
-		      ok = ta < tb or (ta == tb and instrA.isStore_);
-		    }
-		}
-	      for (unsigned i = 0; i < size2 and ok; ++i)
-		{
-		  uint64_t byteAddr = instrB.physAddr2_ + i;
-		  if (instrOverlapsPhysAddr(instrA, byteAddr))
-		    {
-		      uint64_t ta = latestByteTime(instrA, byteAddr);
-		      uint64_t tb = earliestByteTime(instrB, byteAddr);
-		      ok = ta < tb or (ta == tb and instrA.isStore_);
-		    }
-		}
-	    }
-
-	  if (ok)
-	    continue;
+	  cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
+	       << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+	  return false;
 	}
-
-      cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
-	   << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
-      return false;
     }
 
   return true;
@@ -2218,6 +2235,53 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
 
 template <typename URV>
 bool
+Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrA, const McmInstr& instrB) const
+{
+  if (instrA.isCanceled() or not instrA.isMemory())
+    return true;
+
+  assert(instrA.isRetired());
+
+  bool hasAquire = instrA.di_.isAtomicAcquire();
+  if (isTso_)
+    hasAquire = hasAquire or instrA.di_.isLoad() or instrA.di_.isAmo();
+
+  if (not hasAquire)
+    return true;
+
+  if (instrA.di_.isAmo())
+    return instrA.memOps_.size() == 2; // Fail if != 2: Incomplete amo might finish afrer B
+
+  if (not instrA.complete_)
+    return false; // Incomplete store might finish after B
+
+  auto timeA = latestOpTime(instrA);
+  auto timeB = effectiveReadTime(instrB);
+
+  if (timeB > timeA)
+    return true;
+
+  auto hartIx = hart.sysHartIndex();
+
+  // B peforms before A -- Allow if there is no write overlapping B between A and B from
+  // another core.
+  for (size_t ix = sysMemOps_.size(); ix != 0; ix--)
+    {
+      const auto& op = sysMemOps_.at(ix-1);
+      if (op.isCanceled() or op.time_ > timeA)
+	continue;
+      if (op.time_ < timeB)
+	break;
+      if (not op.isRead_ and overlaps(instrB, op) and op.hartIx_ != hartIx)
+	return false;
+    }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
 Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 5: A has an acquire annotation
@@ -2228,49 +2292,25 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
   auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
-  auto btime = effectiveReadTime(instrB);
 
   for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
     {
       const auto& instrA =  instrVec.at(tag);
-      if (instrA.isCanceled() or not instrA.isMemory())
-	continue;
-
-      assert(instrA.isRetired());
-
-      bool hasAquire = instrA.di_.isAtomicAcquire();
-      if (isTso_)
-	hasAquire = hasAquire or instrA.di_.isLoad() or instrA.di_.isAmo();
-
-      if (not hasAquire)
-	continue;
-
-      bool fail = false;
-      if (instrA.di_.isAmo())
-	fail = instrA.memOps_.size() != 2; // Incomplete amo might finish afrer B
-      else if (not instrA.complete_)
-	fail  = true; // Incomplete store might finish after B
-      else
+      if (not ppoRule5(hart, instrA, instrB))
 	{
-	  auto timeA = latestOpTime(instrA);
-	  if (btime <= timeA)
-	    {
-	      // B peforms before A -- Allow if there is no write overlapping B 
-	      // between A and B from another core.
-	      for (size_t ix = sysMemOps_.size(); ix != 0 and not fail; ix--)
-		{
-		  const auto& op = sysMemOps_.at(ix-1);
-		  if (op.isCanceled() or op.time_ > timeA)
-		    continue;
-		  if (op.time_ < btime)
-		    break;
-		  if (not op.isRead_ and overlaps(instrB, op) and op.hartIx_ != hartIx)
-		    fail = true;
-		}
-	    }
+	  cerr << "Error: PPO rule 5 failed: hart-id=" << hart.hartId()
+	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+	  return false;
 	}
+    }
 
-      if (fail)
+  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  for (auto& tag : undrained)
+    {
+      if (tag >= instrB.tag_)
+	break;
+      const auto& instrA =  instrVec.at(tag);
+      if (not ppoRule5(hart, instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 5 failed: hart-id=" << hart.hartId()
 	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';

@@ -206,29 +206,49 @@ namespace WdRiscv
     /// instruction.
     uint64_t latestByteTime(const McmInstr& instr, uint64_t addr) const;
 
+    /// Check PPO rule1 for the given instruction as instruction B, all relevant
+    /// preceding instructions (in program order) are considered as instruction A.
+    /// Return true if no violation of rule1 is found and false otherwise.
     bool ppoRule1(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check PPO rule2. See ppoRule1.
     bool ppoRule2(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check PPO rule3. See ppoRule1.
     bool ppoRule3(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check PPO rule4. See ppoRule1.
     bool ppoRule4(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check PPO rule5. See ppoRule1.
     bool ppoRule5(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check PPO rule6. See ppoRule1.
     bool ppoRule6(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check PPO rule7. See ppoRule1.
     bool ppoRule7(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check PPO rule8. See ppoRule1.
     bool ppoRule8(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check PPO rule9. See ppoRule1.
     bool ppoRule9(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check PPO rule10. See ppoRule1.
     bool ppoRule10(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check PPO rule11. See ppoRule1.
     bool ppoRule11(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check PPO rule12. See ppoRule1.
     bool ppoRule12(Hart<URV>& hart, const McmInstr& instr) const;
+
+    /// Helper to above ppoRule1.
+    bool ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const;
+
+    /// Helper to above ppoRule5.
+    bool ppoRule5(Hart<URV>&, const McmInstr& instrA, const McmInstr& instrB) const;
 
     /// Check that previous SINVAL.VMA instructions are executed before subsequent
     /// implicit references to the memory-management data structures. Return true on
