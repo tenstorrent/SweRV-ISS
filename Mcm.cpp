@@ -364,8 +364,8 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       return false;
     }
 
-  auto& storeSet = hartUndrainedStores_.at(hart.sysHartIndex());
-  storeSet.insert(instrTag);
+  auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
+  undrained.insert(instrTag);
 
   bool result = true;
 
@@ -376,7 +376,7 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       sysMemOps_.push_back(op);
       instr->complete_ = checkStoreComplete(*instr);
       if (instr->complete_)
-	storeSet.erase(instrTag);
+	undrained.erase(instrTag);
 
       if (not instr->retired_)
 	{
@@ -433,10 +433,10 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       return false;
     }
 
-  auto& storeSet = hartUndrainedStores_.at(hart.sysHartIndex());
+  auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
 
   if (not instr->retired_)
-    storeSet.insert(instrTag);
+    undrained.insert(instrTag);
 
   // Associate write op with instruction.
   instr->addMemOp(sysMemOps_.size());
@@ -444,7 +444,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 
   instr->complete_ = checkStoreComplete(*instr);
   if (instr->complete_)
-    storeSet.erase(instrTag);
+    undrained.erase(instrTag);
 
   bool result = pokeHartMemory(hart, physAddr, rtlData, size);
 
@@ -483,15 +483,15 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
   instr.isStore_ = true;
   instr.complete_ = checkStoreComplete(instr);
 
-  auto& storeSet = hartUndrainedStores_.at(hart.sysHartIndex());
+  auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
 
   if (not instr.complete_)
     {
-      storeSet.insert(instr.tag_);
+      undrained.insert(instr.tag_);
       return true;
     }
 
-  storeSet.erase(instr.tag_);
+  undrained.erase(instr.tag_);
 
   if (paddr == paddr2)
     return pokeHartMemory(hart, paddr, value, stSize);
@@ -840,8 +840,8 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       if (checkStoreComplete(*instr))
 	{
 	  instr->complete_ = true;
-	  auto& storeSet = hartUndrainedStores_.at(hartIx);
-	  storeSet.erase(instr->tag_);
+	  auto& undrained = hartUndrainedStores_.at(hartIx);
+	  undrained.erase(instr->tag_);
 	  if (not ppoRule1(hart, *instr))
 	    result = false;
 	}
@@ -2084,8 +2084,8 @@ Mcm<URV>::finalChecks(Hart<URV>& hart)
   uint64_t toHost = 0;
   bool hasToHost = hart.getToHostAddress(toHost);
 
-  const auto& storeSet = hartUndrainedStores_.at(hartIx);
-  for (auto tag : storeSet)
+  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  for (auto tag : undrained)
     {
       const auto& instr = instrVec.at(tag);
       if (not hasToHost or toHost != instr.virtAddr_)
