@@ -5085,6 +5085,7 @@ namespace WdRiscv
     uint64_t ldStPhysAddr2_ = 0;    // Physical address of 2nd page across page boundary.
     unsigned ldStSize_ = 0;         // Non-zero if ld/st/atomic.
     uint64_t ldStData_ = 0;         // For tracing
+    uint64_t ldStFaultAddr_ = 0;
     bool ldStWrite_ = false;        // True if memory written by last store.
     bool ldStAtomic_ = false;       // True if amo or lr/sc
 
