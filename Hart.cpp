@@ -2347,17 +2347,17 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& phy
   if (virtAddr & 1)
     return ExceptionCause::INST_ADDR_MISAL;
 
+  if (pmpEnabled_)
+    {
+      Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
+      if (not pmp.isExec(privMode_))
+	return ExceptionCause::INST_ACC_FAULT;
+    }
+
   if ((physAddr & 3) == 0 and not mcm_)   // Word aligned
     {
       if (not memory_.readInst(physAddr, inst))
 	return ExceptionCause::INST_ACC_FAULT;
-
-      if (pmpEnabled_)
-        {
-          Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
-          if (not pmp.isExec(privMode_))
-	    return ExceptionCause::INST_ACC_FAULT;
-        }
 
       if (initStateFile_)
 	dumpInitState("fetch", virtAddr, physAddr);
@@ -2365,13 +2365,6 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& phy
       if (isCompressedInst(inst))
 	inst = (inst << 16) >> 16;
       return ExceptionCause::NONE;
-    }
-
-  if (pmpEnabled_)
-    {
-      Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
-      if (not pmp.isExec(privMode_))
-	return ExceptionCause::INST_ACC_FAULT;
     }
 
   uint16_t half = 0;
