@@ -724,21 +724,20 @@ CsRegs<URV>::updateSstc()
 
   auto vstimecmp = findCsr(CsrNumber::VSTIMECMP);
   vstimecmp->setImplemented(sstcEnabled_ and hyperEnabled_);
-  vstimecmp->setHypervisor(stce);
   vstimecmp->setPrivilegeMode(mode);
   if (rv32_)
     {
       auto vstimecmph = findCsr(CsrNumber::VSTIMECMPH);
       vstimecmph->setImplemented(sstcEnabled_ and hyperEnabled_);
-      vstimecmph->setHypervisor(stce);
       vstimecmph->setPrivilegeMode(mode);
     }
 
-  if (stce and not (hstce and hTm))
+  if (stce)
     {
-      stimecmp->setHypervisor(true);
+      bool noVs = not (hstce and hTm);
+      stimecmp->setHypervisor(noVs);
       if (rv32_)
-	findCsr(CsrNumber::STIMECMPH)->setHypervisor(true);
+	findCsr(CsrNumber::STIMECMPH)->setHypervisor(noVs);
     }
 
   auto hip = findCsr(CsrNumber::HIP);
