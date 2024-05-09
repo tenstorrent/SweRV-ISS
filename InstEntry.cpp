@@ -6473,7 +6473,7 @@ InstTable::setupInstVec()
       { "vfncvtbf16.f.f.w", InstId::vfncvtbf16_f_f_w,
         0b010010'0'00000'11101'001'00000'1010111, // Opcode
         0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::V, RvFormat::R,
+        RvExtension::Zvfbfmin, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask
       },
@@ -6481,7 +6481,7 @@ InstTable::setupInstVec()
       { "vfwcvtbf16.f.f.v", InstId::vfwcvtbf16_f_f_v,
         0b010010'0'00000'01101'001'00000'1010111, // Opcode
         0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
-        RvExtension::V, RvFormat::R,
+        RvExtension::Zvfbfmin, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs2Mask
       },
@@ -6490,7 +6490,7 @@ InstTable::setupInstVec()
       { "vfwmaccbf16.vv", InstId::vfwmaccbf16_vv,
         0b100011'0'00000'00000'001'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::V, RvFormat::R,
+        RvExtension::Zvfbfwma, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs1Mask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
@@ -6499,7 +6499,7 @@ InstTable::setupInstVec()
       { "vfwmaccbf16.vf", InstId::vfwmaccbf16_vf,
         0b100011'0'00000'00000'101'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::V, RvFormat::R,
+        RvExtension::Zvfbfwma, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::FpReg, OperandMode::Read, rs1Mask,
         OperandType::VecReg, OperandMode::Read, rs2Mask,
