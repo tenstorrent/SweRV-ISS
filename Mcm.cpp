@@ -2618,26 +2618,16 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
     return true;  // NA: B is not a load.
 
   unsigned hartIx = hart.sysHartIndex();
+  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
-  if (instrVec.empty() or instrB.tag_ == 0)
-    return true;  // Nothing before B in instruction order.
-
   auto earlyB = earliestOpTime(instrB);
 
   // Check all preceeding instructions for a store M with address overlapping that of B.
-  size_t ix = std::min(size_t(instrB.tag_), instrVec.size());
-  for ( ; ix ; --ix)
+  for (McmInstrIx mtag = instrB.tag_ - 1; mtag > minTag; --mtag)
     {
-      size_t mtag = ix - 1;
       const auto& instrM = instrVec.at(mtag);
       if (instrM.isCanceled() or not instrM.di_.isValid())
 	continue;
-
-      // Quit if we find a load with retire time earlier than B load time. Found load
-      // would be an A that will not fail (all preceeding As will not fail either). M will
-      // only depend on loads and will never depend on a store.
-      if (instrM.isLoad_ and instrM.retireTime_ < earlyB)
-	break;
 
       const auto& mdi = instrM.di_;
       if ((not mdi.isStore() and not mdi.isAmo()) or not instrM.overlaps(instrB))
@@ -2661,6 +2651,35 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	}
     }
 
+  // Check all preceeding undrained stores for an M with address overlapping that of B.
+  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  for (auto mtag : undrained)
+    {
+      if (mtag >= instrB.tag_)
+	break;
+
+      const auto& instrM = instrVec.at(mtag);
+      if (instrM.isCanceled() or not instrM.di_.isValid() or not instrM.overlaps(instrB))
+	continue;
+
+      auto apTag = instrM.addrProducer_;
+      auto dpTag = instrM.dataProducer_;
+
+      for (auto aTag : { apTag, dpTag } )
+	{
+	  const auto& instrA = instrVec.at(aTag);
+	  if (instrA.di_.isValid())
+	    if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
+	      {
+		cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
+		     << aTag << " tag2=" << instrB.tag_ << " mtag=" << mtag
+		     << " time1=" << latestOpTime(instrA)
+		     << " time2=" << earlyB << '\n';
+		return false;
+	      }
+	}
+    }
+  
   return true;
 }
 
