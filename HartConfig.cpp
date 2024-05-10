@@ -1922,7 +1922,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       if (hart.sysHartIndex() == 0)
 	cerr << "Warning: Config tag " << tag << " is deprecated. "
-	     << "Use sstc with --isa instead.\n";
+	     << "Use svinval with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableSvinval(flag);
     }
@@ -1940,6 +1940,9 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_aia";
   if (config_ ->contains(tag))
     {
+      if (hart.sysHartIndex() == 0)
+	cerr << "Warning: Config tag " << tag << " is deprecated. "
+	     << "Use smaia with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableAiaExtension(flag);
     }
@@ -2202,10 +2205,6 @@ HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
       if (not applyAclintConfig(system, hart))
 	return false;
     }
-
-  // System configuration.
-  if (not applyImsicConfig(system))
-    return false;
 
   unsigned mbLineSize = 64;
   std::string_view tag = "merge_buffer_line_size";
@@ -2594,3 +2593,9 @@ HartConfig::configInterruptor<uint32_t>(System<uint32_t>& system, Hart<uint32_t>
 template bool
 HartConfig::configInterruptor<uint64_t>(System<uint64_t>& system, Hart<uint64_t>& hart,
 					uint64_t addr) const;
+
+template bool
+HartConfig::applyImsicConfig(System<uint32_t>&) const;
+
+template bool
+HartConfig::applyImsicConfig(System<uint64_t>&) const;
