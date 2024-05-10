@@ -4377,6 +4377,9 @@ CsRegs<URV>::addUserFields()
           setCsrFields(csrNum, {{name, xlen}});
         }
     }
+
+  setCsrFields(CsrNumber::SRMCFG,
+      {{"RCID", 12}, {"res0", 4}, {"MCID", 12}, {"res1", xlen - 28}});
 }
 
 
