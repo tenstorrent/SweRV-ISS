@@ -537,7 +537,7 @@ namespace WdRiscv
 
     struct Step
     {
-      enum Operation { CrossRegRed, AdjacRed, ScalarRed, None };
+      enum Operation { CrossRegRed, AdjacRed, StrideRed, ScalarRed, None };
 
       template <typename ET, typename RT>
       Step(Operation op, ET e1, ET e2, RT res)
@@ -556,7 +556,7 @@ namespace WdRiscv
         using namespace std::string_view_literals;
 
         constexpr auto vec =
-          std::array{"group-wise"sv, "adjacent"sv, "scalar"sv, "none"sv};
+          std::array{"group-wise"sv, "adjacent"sv, "stride"sv, "scalar"sv, "none"sv};
 
         return vec.at(op);
       }

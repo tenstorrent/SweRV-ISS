@@ -3009,6 +3009,12 @@ namespace WdRiscv
     void doVecFpRedSumAdjacent(std::vector<ELEM_TYPE>& elems, unsigned numElems,
                               unsigned numResult);
 
+    /// Performs an in-place tree sum reduction on every other vector element (starting
+    /// at index 0) until numResult is remaining.
+    template <typename ELEM_TYPE>
+    void doVecFpRedSumStride(std::vector<ELEM_TYPE>& elems, unsigned numElems,
+                              unsigned numResult);
+
     /// Emit a trace record for the given branch instruction or trap in the
     /// branch trace file.
     void traceBranch(const DecodedInst* di);

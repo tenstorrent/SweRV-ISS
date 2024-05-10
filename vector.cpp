@@ -18867,6 +18867,34 @@ Hart<URV>::doVecFpRedSumAdjacent(std::vector<ELEM_TYPE>& elems, unsigned numElem
 
 
 template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::doVecFpRedSumStride(std::vector<ELEM_TYPE>& elems, unsigned numElems, unsigned numResult)
+{
+  if (numElems <= numResult)
+    return;
+
+  using VSO = VecRegs::Step::Operation;
+
+  unsigned stride = 3;
+  for (unsigned ix = 0; ix < numElems; ix+=stride)
+    {
+      ELEM_TYPE e1 = elems.at(ix);
+      ELEM_TYPE e2 = elems.at(ix + 2);
+
+      ELEM_TYPE result = doFadd(e1, e2);
+      elems.at(ix >> 1) = result;
+      URV incFlags = activeSimulatorFpFlags();
+      vecRegs_.fpFlags_.push_back(incFlags);
+      vecRegs_.steps_.emplace_back(VSO::StrideRed, e1, e2, result);
+      stride ^= 2;
+    }
+
+  return doVecFpRedSumStride(elems, numElems >> 1, numResult);
+}
+
+
+template <typename URV>
 template<typename ELEM_TYPE>
 void
 Hart<URV>::vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
@@ -19298,7 +19326,10 @@ Hart<URV>::vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
         }
 
       // Perform reduction first for double-wide on register group.
-      doVecFpRedSumAdjacent(tree, vecRegs_.elemMax(), vecRegs_.elemMax() / 2);
+      if constexpr (not std::is_same_v<ELEM_TYPE, Float16>)
+        doVecFpRedSumAdjacent(tree, vecRegs_.elemMax(), vecRegs_.elemMax() / 2);
+      else
+        doVecFpRedSumStride(tree, vecRegs_.elemMax(), vecRegs_.elemMax() / 2);
 
       // Perform group-wise reduction.
       if (group > 8)
