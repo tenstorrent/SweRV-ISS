@@ -1042,7 +1042,7 @@ namespace WdRiscv
 
     /// Enable/disbale smstaten extension.
     void enableSmstaten(bool flag)
-    { csRegs_.enableStateen(flag); }
+    { csRegs_.enableSmstateen(flag); }
 
     /// Enable/disable the resumable non maskable interrupt (Smrnmi) extension.
     void enableSmrnmi(bool flag)

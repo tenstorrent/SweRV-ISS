@@ -671,7 +671,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 
   updateSstc();  // To activate/deactivate STIMECMP.
   enableSscofpmf(cofEnabled_);  // To activate/deactivate SCOUNTOVF.
-  enableStateen(stateenOn_);  // To activate/deactivate STATEEN CSRs.
+  enableSmstateen(stateenOn_);  // To activate/deactivate STATEEN CSRs.
   enableTriggers(triggersOn_);  // To activate/deactivate SCONTEXT.
 }
 
@@ -867,7 +867,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
     }
 
   updateSstc();                // To activate/deactivate VSTIMECMP.
-  enableStateen(stateenOn_);   // To activate/deactivate STATEEN CSRs.
+  enableSmstateen(stateenOn_); // To activate/deactivate STATEEN CSRs.
   enableAia(aiaEnabled_);      // To activate/deactivate AIA hypervisor CSRs.
   enableTriggers(triggersOn_); // To activate/deactivate HCONTEXT.
 }
@@ -1078,7 +1078,7 @@ CsRegs<URV>::enableZihpm(bool flag)
 
 template <typename URV>
 void
-CsRegs<URV>::enableStateen(bool flag)
+CsRegs<URV>::enableSmstateen(bool flag)
 {
   using CN = CsrNumber;
 

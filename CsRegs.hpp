@@ -1649,7 +1649,7 @@ namespace WdRiscv
     void enableSscofpmf(bool flag);
 
     /// Enable/disable access to certain CSRs from non-machine mode.
-    void enableStateen(bool flag);
+    void enableSmstateen(bool flag);
 
     /// Enable/disable resubale non maskable interrupt extension.
     void enableSmrnmi(bool flag);
