@@ -392,6 +392,7 @@ Hart<URV>::processExtensions(bool verbose)
 
   enableSsnpm(isa_.isEnabled(RvExtension::Ssnpm));
   enableSmnpm(isa_.isEnabled(RvExtension::Smnpm));
+  enableAiaExtension(isa_.isEnabled(RvExtension::Smaia));
 
   stimecmpActive_ = csRegs_.menvcfgStce();
   vstimecmpActive_ = csRegs_.henvcfgStce();
