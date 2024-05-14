@@ -4990,15 +4990,12 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode pm, bool vm) const
     }
 
   if (enableBit < 0)
-    return true;  // CSR not affected by STTEND
+    return true;  // CSR not affected by STATEEN
 
   csrn = advance(csrn, offset);
   auto csr = getImplementedCsr(csrn);
   if (not csr)
-    {
-      assert(0);
-      return false;
-    }
+    return true;
 
   if (rv32_) enableBit -= 8*sizeof(URV);
   URV value = csr->read();

@@ -1040,8 +1040,8 @@ namespace WdRiscv
     void enableSscofpmf(bool flag)
     { csRegs_.enableSscofpmf(flag); }
 
-    /// Enable/disbale smstaten extension.
-    void enableSmstaten(bool flag)
+    /// Enable/disbale smstateen extension.
+    void enableSmstateen(bool flag)
     { csRegs_.enableSmstateen(flag); }
 
     /// Enable/disable the resumable non maskable interrupt (Smrnmi) extension.

@@ -1951,7 +1951,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   if (config_ ->contains(tag))
     {
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
-      hart.enableSmstaten(flag);
+      hart.enableSmstateen(flag);
     }
 
   tag = "wfi_timeout";
