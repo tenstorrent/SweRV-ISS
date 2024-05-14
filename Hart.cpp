@@ -1570,7 +1570,10 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
           if (disablePointerMask)
             virtMem_.enablePointerMasking(prevPmm, pm, virt);
           if (cause != EC::NONE)
-	    return cause;
+	    {
+	      ldStFaultAddr_ = addr1;
+	      return cause;
+	    }
         }
     }
 
@@ -11171,7 +11174,10 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
           if (disablePointerMask)
             virtMem_.enablePointerMasking(prevPmm, pm, virt);
           if (cause != EC::NONE)
-	    return cause;
+	    {
+	      ldStFaultAddr_ = addr1;
+	      return cause;
+	    }
         }
     }
 
@@ -11228,7 +11234,10 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       if (not stee_.isValidAccess(addr1, stSize))
 	return EC::STORE_ACC_FAULT;
       if (addr2 != addr1 and not stee_.isValidAccess(addr2, stSize))
-	return EC::STORE_ACC_FAULT;
+	{
+	  ldStFaultAddr_ = va2;
+	  return EC::STORE_ACC_FAULT;
+	}
     }
 
   if (not misal)
