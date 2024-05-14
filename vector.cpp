@@ -4673,7 +4673,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  elems = vecRegs_.elemMax();
 
-  if (masked and vd == 0)
+  if ((masked and vd == 0) or di->op1() != 0)
     {
       postVecFail(di);
       return;
