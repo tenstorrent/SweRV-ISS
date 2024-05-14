@@ -227,9 +227,13 @@ namespace WdRiscv
     unsigned top4() const
     { return uimmed() >> 8; }
 
-    /// Return top 5-bits of instruction (for slli.uw).
+    /// Return top 5-bits of instruction (for clzw, ctzw, cpopw).
     unsigned top5() const
     { return uimmed() >> 7; }
+
+    /// Return top 6-bits of instruction (for slli.uw).
+    unsigned top6() const
+    { return uimmed() >> 6; }
 
     /// Return the rs1 bits (for sfence.vma).
     unsigned rs1() const
