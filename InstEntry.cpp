@@ -6488,7 +6488,7 @@ InstTable::setupInstVec()
 
       // Vector BF16 widening mul-add (Zvfbfwma)
       { "vfwmaccbf16.vv", InstId::vfwmaccbf16_vv,
-        0b100011'0'00000'00000'001'00000'1010111, // Opcode
+        0b111011'0'00000'00000'001'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::Zvfbfwma, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -6497,7 +6497,7 @@ InstTable::setupInstVec()
       },
 
       { "vfwmaccbf16.vf", InstId::vfwmaccbf16_vf,
-        0b100011'0'00000'00000'101'00000'1010111, // Opcode
+        0b111011'0'00000'00000'101'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::Zvfbfwma, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
