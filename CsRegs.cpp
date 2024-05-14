@@ -569,13 +569,6 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
     value = adjustHstateenValue(num, value);
   else if (num == CN::SCOUNTOVF)
     value = adjustScountovfValue(value);
-  else if (num == CsrNumber::VSIP or num == CsrNumber::VSIE)
-    {
-      // Bit VSEIP/VSTIP/VSSIP read-only-zero if bit 10/6/2 of hideleg is zero.
-      auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
-      if (hideleg)
-	value &= hideleg->read() >> 1;
-    }
 
   return true;
 }
@@ -834,6 +827,21 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
       auto mask = csr->getReadMask();
       mask &= ~URV(0x1444);
       csr->setReadMask(mask);
+    }
+
+  if (flag)
+    {
+      auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
+      assert(hideleg);
+
+      auto vsip = getImplementedCsr(CsrNumber::VSIP);
+      auto vsie = getImplementedCsr(CsrNumber::VSIE);
+      URV mask = 0x222;   // Bits VSEIP, VSTIP, and VSSIP of VSIP
+      mask &= (hideleg->read() >> 1);
+      if (vsip)
+	vsip->setReadMask(mask);
+      if (vsie)
+	vsie->setReadMask(mask);
     }
 
   // Re-enable once RTL is ready.
@@ -3387,13 +3395,6 @@ CsRegs<URV>::peek(CsrNumber num, URV& value, bool virtMode) const
     value = adjustHstateenValue(num, value);
   else if (num == CN::SCOUNTOVF)
     value = adjustScountovfValue(value);
-  else if (num == CsrNumber::VSIP or num == CsrNumber::VSIE)
-    {
-      // Bit VSEIP/VSTIP/VSSIP read-only-zero if bit 10/6/2 of hideleg is zero.
-      auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
-      if (hideleg)
-	value &= hideleg->read() >> 1;
-    }
 
   return true;
 }
@@ -4573,12 +4574,23 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
   auto hvip = getImplementedCsr(CsrNumber::HVIP);
   auto mip = getImplementedCsr(CsrNumber::MIP);
   auto vsip = getImplementedCsr(CsrNumber::VSIP);
+  auto vsie = getImplementedCsr(CsrNumber::VSIE);
   auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
 
   bool hipUpdated = num == CsrNumber::HIP;
   URV hieMask = 0x1444; // SGEIE, VSEIE, VSTIE and VSSIE.
 
-  if (num == CsrNumber::MIP)
+  if (num == CsrNumber::HIDELEG)
+    {
+      assert(hideleg);
+      URV mask = 0x222;   // Bits VSEIP, VSTIP, and VSSIP of VSIP
+      mask &= (hideleg->read() >> 1);
+      if (vsip)
+	vsip->setReadMask(mask);
+      if (vsie)
+	vsie->setReadMask(mask);
+    }
+  else if (num == CsrNumber::MIP)
     {
       // Updating MIP is reflected into HIP/VSIP.
       URV val = mip->read() & hieMask;
@@ -4590,8 +4602,6 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	}
       if (vsip)
 	{
-	  if (hideleg)
-	    val &= hideleg->read();
 	  vsip->poke(val >> 1);
 	  recordWrite(CsrNumber::VSIP);
 	}
@@ -4607,8 +4617,6 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	}
       if (vsip)
 	{
-	  if (hideleg)
-	    val &= hideleg->read();
 	  vsip->poke(val >> 1);
 	  recordWrite(CsrNumber::VSIP);
 	}
@@ -4634,8 +4642,6 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	}
       if (vsip)
 	{
-	  if (hideleg)
-	    value &= hideleg->read();
 	  vsip->poke(value >> 1);
 	  recordWrite(CsrNumber::VSIP);
 	}
@@ -4708,7 +4714,6 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 
   auto hie = getImplementedCsr(CsrNumber::HIE);
   auto mie = getImplementedCsr(CsrNumber::MIE);
-  auto vsie = getImplementedCsr(CsrNumber::VSIE);
   if (num == CsrNumber::HIE)
     {
       URV val = hie->read() & hieMask;
@@ -4735,8 +4740,6 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	}
       if (vsie)
         {
-	  if (hideleg)
-	    val &= hideleg->read();
           vsie->poke(val >> 1);
           recordWrite(CsrNumber::VSIE);
         }
