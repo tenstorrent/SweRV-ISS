@@ -2247,7 +2247,22 @@ HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
       if (not getJsonUnsigned(util::join("", tag, ".address"), uart.at("address"), addr) or
           not getJsonUnsigned(util::join("", tag, ".size"), uart.at("size"), size))
 	return false;
-      system.defineUart(addr, size);
+
+      std::string type = "uart8250";
+      if (not uart.contains("type"))
+	std::cerr << "Missing uart type. Using uart250. Valid types: uart8250, usartsf.\n";
+      else
+	{
+	  type = uart.at("type").get<std::string>();
+	  if (type != "uartsf" and type != "uart8250")
+	    {
+	      std::cerr << "Invalid uart type: " << type << ". Valid types: uartsf, uart8250.\n";
+	      return false;
+	    }
+	}
+		
+      if (not system.defineUart(type, addr, size))
+	return false;
     }
 
   if (not applyPciConfig(system))
