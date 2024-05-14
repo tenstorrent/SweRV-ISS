@@ -353,7 +353,8 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       return true;
     }
 
-    /// Check if IMSIC should deliver an interrupt.
+    /// Poke MIP in the associated hart to clear/assert an interrupt based on IMSIC state
+    /// change.
     void checkMInterrupt()
     {
       if (mInterrupt_)
@@ -365,6 +366,8 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
         }
     }
 
+    /// Set/clear the supervisor external interupt pin (SEI pin) in the associated hart to
+    /// assert/cleaer a supervisor external interrupt on IMSIC state change.
     void checkSInterrupt()
     {
       if (sInterrupt_)
@@ -376,6 +379,8 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
         }
     }
 
+    /// Poke HGEIP and MIP in the associated hart to to clear/assert a guest external
+    /// interrupt based on IMSIC state change.
     void checkGInterrupt(unsigned guest)
     {
       if (guest >= gfiles_.size())
