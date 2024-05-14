@@ -401,11 +401,7 @@ printVecInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di
       return;
     }
 
-  std::string      nameStr = di.name();
-  std::string_view name    = nameStr;
-  if (id >= InstId::vmadc_vvm and id <= InstId::vmsbc_vxm and not di.isMasked())
-    name = name.substr(0, name.size() - 1);
-  out << name;
+  out << di.name();
 
   std::string_view sep = " ";
 
