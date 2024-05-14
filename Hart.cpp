@@ -9909,7 +9909,6 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
 
   auto& tlb = virtMode_ ? virtMem_.vsTlb_ : virtMem_.tlb_;
 
-  // Invalidate whole TLB. This is overkill. 
   if (di->op0() == 0 and di->op1() == 0)
     tlb.invalidate();
   else if (di->op0() == 0 and di->op1() != 0)
@@ -9933,6 +9932,7 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       tlb.invalidateVirtualPageAsid(vpn, asid);
     }
 
+#if 0
   if (mcm_)
     fetchCache_.clear();
 
@@ -9946,6 +9946,7 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       for (uint64_t addr = pageStart; addr < last; addr += 4)
         invalidateDecodeCache(addr, 4);
     }
+#endif
 }
 
 
