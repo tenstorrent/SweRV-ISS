@@ -4646,9 +4646,9 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	  recordWrite(CsrNumber::VSIP);
 	}
     }
-  else if (num == CsrNumber::HGEIP)
+  else if (num == CsrNumber::HGEIP or num == CsrNumber::HSTATUS)
     {
-      // Updating HGEIP is reflected in HIP
+      // Updating HGEIP or HSTATUS.VGEIN is reflected in HIP
       if (hip)
         {
 	  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
@@ -4833,9 +4833,10 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 	  vsip->poke(value >> 1);
 	}
     }
-  else if (num == CsrNumber::HGEIP)
+  else if (num == CsrNumber::HGEIP or num == CsrNumber::HSTATUS)
     {
-      // Updating HGEIP is reflected in HIP
+      // Updating HGEIP or HSTATUS.VGEIN is reflected in HIP
+      // FIX: only do this when VGEIN is updated
       if (hip)
         {
 	  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
