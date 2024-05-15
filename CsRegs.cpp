@@ -4432,7 +4432,7 @@ CsRegs<URV>::addHypervisorFields()
       {{"zero", 2}, {"VSSIP", 1}, {"zero", 3}, {"VSTIP", 1}, {"zero", 3},
        {"VSEIP", 1}, {"zero", 1}, {"SGEIP", 1}, {"zero", xlen - 14}});
   setCsrFields(Csrn::HGEIE, {{"zero", 1}, {"hgeie", xlen - 1}});
-  setCsrFields(Csrn::HGEIP, {{"zero", 1}, {"hgeie", xlen - 1}});
+  setCsrFields(Csrn::HGEIP, {{"zero", 1}, {"hgeip", xlen - 1}});
 
   std::vector<typename Csr<URV>::Field> hcount = {{"CY", 1}, {"TM", 1}, {"IR", 1}};
   std::vector<typename Csr<URV>::Field> hpm;

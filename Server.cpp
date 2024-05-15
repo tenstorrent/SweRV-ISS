@@ -364,7 +364,7 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
               {
                 auto pma = hart.getPma(pa);
                 auto effpbmt = VirtMem::effectivePbmt(hart.lastVirtMode(), hart.lastVsPageMode(),
-                                                      hart.virtMem().lastPbmt(), hart.virtMem().lastPbmt());
+                                                      hart.virtMem().lastVsPbmt(), hart.virtMem().lastPbmt());
                 pma = VirtMem::overridePmaWithPbmt(pma, effpbmt);
                 reply.value = pma.attributesToInt();
               }
