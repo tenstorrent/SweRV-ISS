@@ -1881,7 +1881,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	  int immed16 = cif.addi16spImmed();
 	  if (immed16 == 0)
 	    { // could be c.mop
-	      if (cif.bits.rd & 1)
+	      if (cif.bits.rd <= 15 and (cif.bits.rd & 1))
 		{
 		  op0 = cif.bits.rd ; op1 = 0; op2 = 0;
 		  encodeLui(op0, op1, op2, expanded);
