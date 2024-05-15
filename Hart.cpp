@@ -1008,7 +1008,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
 	   (addr >= imsicSbase_ and addr < imsicSend_))
     {
       if (imsicWrite_)
-        imsicWrite_(addr, sizeof(val), val);
+        imsicWrite_(addr, sizeof(uint32_t), uint32_t(val));
     }
   else if (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
                     (addr >= pciMmioBase_ and addr < pciMmioEnd_)))
@@ -5272,35 +5272,37 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 
   // Check for interrupts destined to VS privilege.
   // Possible if pending (mie), enabled (mip), delegated, and h-delegated.
+  bool vsEnabled = vsstatus_.bits_.SIE  or  (virtMode_ and privMode_ == PM::User);
+  if (not vsEnabled)
+    return false;
+
+#if 0
   if (isRvaia())
     {
       // TODO: cache this
       URV vstopi;
-      if (peekCsr(CsrNumber::VSTOPI, vstopi))
+      if (peekCsr(CsrNumber::VSTOPI, vstopi) and vstopi != 0)
         {
-          if (vstopi != 0 and (vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User)))
-            {
-              cause = static_cast<InterruptCause>(vstopi >> 16);
-              return true;
-            }
+	  cause = static_cast<InterruptCause>(vstopi >> 16);
+	  return true;
         }
     }
-  else
+#endif
+
+  URV vsMask = possible & delegVal & hDelegVal;
+  if (vsMask)
     {
-      URV vs = possible & delegVal & hDelegVal;
-      if ((vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User)) and vs != 0)
-        {
-	  // Only VS interrupts can be delegated in HIDELEG.
-          for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
-            {
-              URV mask = URV(1) << unsigned(ic);
-              if ((vs & mask) != 0)
-                {
-                  cause = ic;
-                  return true;
-                }
-            }
-        }
+      // Only VS interrupts can be delegated in HIDELEG.
+      for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
+				 IC::VS_TIMER } )
+	{
+	  URV mask = URV(1) << unsigned(ic);
+	  if ((vsMask & mask) != 0)
+	    {
+	      cause = ic;
+	      return true;
+	    }
+	}
     }
 
   return false;

@@ -675,7 +675,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// word aligned or if size is not 4.
     bool read(uint64_t addr, unsigned size, uint64_t& data) const
     {
-      if (not coversAddress(addr) or size != 4 or (size & 3) != 0)
+      if (not coversAddress(addr) or size != 4)
 	return false;
       data = 0;
       return true;
@@ -688,7 +688,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// index associated with the targeted IMSIC.
     bool write(uint64_t addr, unsigned size, uint64_t data, unsigned& hartIx)
     {
-      if (size != 4 or (size & 3) != 0)
+      if (size != 4)
 	return false;
       unsigned ix = 0;
       if (isMachineAddr(addr))
@@ -707,7 +707,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// Same as above but without a hart-index parameter.
     bool write(uint64_t addr, unsigned size, uint64_t data)
     {
-      if (size != 4 or (size & 3) != 0)
+      if (size != 4)
 	return false;
       unsigned ix = 0;
       if (isMachineAddr(addr))
