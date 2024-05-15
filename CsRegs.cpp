@@ -4567,6 +4567,9 @@ template <typename URV>
 void
 CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 {
+  if (not hyperEnabled_)
+    return;
+
   auto num = csr->getNumber();
   auto value = csr->read();
 
@@ -4577,8 +4580,17 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
   auto vsie = getImplementedCsr(CsrNumber::VSIE);
   auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
 
-  bool hipUpdated = num == CsrNumber::HIP;
+  URV prevHipVal = hip->prevValue();
+
   URV hieMask = 0x1444; // SGEIE, VSEIE, VSTIE and VSSIE.
+
+  auto updateCsr = [this](Csr<URV>* csr, URV val) {
+    if (csr and csr->read() != val)
+      {
+	csr->poke(val);
+	recordWrite(csr->getNumber());
+      }
+  };
 
   if (num == CsrNumber::HIDELEG)
     {
@@ -4594,38 +4606,20 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
     {
       // Updating MIP is reflected into HIP/VSIP.
       URV val = mip->read() & hieMask;
-      if (hip)
-	{
-	  hip->poke(val | (hip->read() & ~hieMask));
-	  hipUpdated = true;
-	  recordWrite(CsrNumber::HIP);
-	}
-      if (vsip)
-	{
-	  vsip->poke(val >> 1);
-	  recordWrite(CsrNumber::VSIP);
-	}
+      hip->poke(val | (hip->read() & ~hieMask));
+      updateCsr(vsip, val >> 1);
     }
   else if (num == CsrNumber::HIP)
     {
-      URV val = hip->read() & hieMask;
       // Updating HIP is reflected into MIP/VSIP.
-      if (mip)
-	{
-	  mip->poke(val | (mip->read() & ~hieMask));
-	  recordWrite(CsrNumber::MIP);
-	}
-      if (vsip)
-	{
-	  vsip->poke(val >> 1);
-	  recordWrite(CsrNumber::VSIP);
-	}
-      hipUpdated = true;
+      URV val = hip->read() & hieMask;
+      updateCsr(mip, val | (mip->read() & ~hieMask));
+      updateCsr(vsip, val >> 1);
     }
   else if (num == CsrNumber::HVIP)
     {
-      // Writing HVIP injects values into HIP. FIX : Need to
-      // logical-or external values for VSEIP and VSTIP.
+      // Writing HVIP injects values into HIP. FIX : Need to logical-or external values
+      // for VSEIP and VSTIP.
       if (hip)
 	{
 	  // Bit 10 (VSEIP) of HIP is the or of bit 10 of HVIP and HGEIP bit
@@ -4637,14 +4631,9 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
 	  value = value | (bit << 10);  // Or HGEIP bit selected by GVEIN.
 	  hip->poke(value);
-	  hipUpdated = true;
-	  recordWrite(CsrNumber::HIP);
 	}
-      if (vsip)
-	{
-	  vsip->poke(value >> 1);
-	  recordWrite(CsrNumber::VSIP);
-	}
+
+      updateCsr(vsip, value >> 1);
     }
   else if (num == CsrNumber::HGEIP or num == CsrNumber::HSTATUS)
     {
@@ -4662,8 +4651,6 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	  if (hvip)
 	    mask |= (hvip->read() & (1 << 10));  // Or bit 10 of HVIP.
           hip->poke(hip->read() | mask);  // Set HIP bit 10 to or of HVIP and HGEIP bits.
-          hipUpdated = true;
-	  recordWrite(CsrNumber::HIP);
         }
     }
   else if (num == CsrNumber::VSIP)
@@ -4671,7 +4658,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       // Updating VSIP injects values into writeable bits of HIP
       if (hip)
         {
-	  value = value << 1;  // Aliased bits shifter in HIP
+	  value = value << 1;  // Aliased bits shifted in HIP
 	  if (hideleg)
 	    {
 	      URV newVal = (hip->read() & ~hideleg->read()) | (value & hideleg->read());
@@ -4679,9 +4666,14 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	    }
 	  else
 	    hip->poke(value);
-          hipUpdated = true;
-	  recordWrite(CsrNumber::HIP);
         }
+    }
+
+  bool hipUpdated = false;
+  if (hip->read() != prevHipVal)
+    {
+      hipUpdated = true;
+      recordWrite(CsrNumber::HIP);
     }
 
   if (hipUpdated)
@@ -4691,24 +4683,21 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	{
 	  URV mask = 0x4; // Bit VSSIP
 	  URV newVal = (hip->read() & mask) | (hvip->read() & ~mask);
-	  hvip->poke(newVal);
-	  recordWrite(CsrNumber::HVIP);
+	  updateCsr(hvip, newVal);
 	}
 
       // Updating HIP is reflected in VSIP.
       if (vsip and num != CsrNumber::VSIP)
 	{
 	  URV val = hip->read() & ~ URV(0x1000);  // Clear bit 12 (SGEIP)
-	  vsip->poke(val >> 1);
-	  recordWrite(CsrNumber::VSIP);
+	  updateCsr(vsip, val >> 1);
 	}
 
       // Updating HIP is reflected in MIP.
       if (mip and num != CsrNumber::MIP)
 	{
 	  URV newVal = (mip->read() & ~hieMask) | (hip->read() & hieMask);
-	  mip->poke(newVal);
-	  recordWrite(CsrNumber::MIP);
+	  updateCsr(mip, newVal);
 	}
     }
 
@@ -4716,50 +4705,32 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
   auto mie = getImplementedCsr(CsrNumber::MIE);
   if (num == CsrNumber::HIE)
     {
-      URV val = hie->read() & hieMask;
       // Updating HIE is reflected into MIE/VSIE.
-      if (mie)
-	{
-	  mie->poke((mie->read() & ~hieMask) | val);
-	  recordWrite(CsrNumber::MIE);
-	}
-      if (vsie)
-        {
-	  // Update vsie regadless of hideleg.  
-          vsie->poke(val >> 1);
-          recordWrite(CsrNumber::VSIE);
-        }
+      URV val = hie->read() & hieMask;
+      URV mieVal = (mie->read() & ~hieMask) | val;
+      updateCsr(mie, mieVal);
+      updateCsr(vsie, val >> 1);
     }
   else if (num == CsrNumber::MIE)
     {
+      // Updating MIE is reflected into HIE/VSIE.
       URV val = (mie->read() & hieMask);
-      if (hie)
-	{
-	  hie->poke(val | (hie->read() & ~hieMask));
-	  recordWrite(CsrNumber::HIE);
-	}
-      if (vsie)
-        {
-          vsie->poke(val >> 1);
-          recordWrite(CsrNumber::VSIE);
-        }
+      URV hieVal = val | (hie->read() & ~hieMask);
+      updateCsr(hie, hieVal);
+      updateCsr(vsie, val >> 1);
     }
   else if (num == CsrNumber::VSIE)
     {
       URV vsMask = 0x444;  // VSEIP, VSTIP and VSSIP.
       if (hideleg)
 	vsMask = vsMask & hideleg->read();
+
       URV val = ((vsie->read() << 1) & vsMask);
-      if (mie)
-	{
-	  mie->poke((mie->read() & ~vsMask) | val);
-	  recordWrite(CsrNumber::MIE);
-	}
-      if (hie)
-	{
-	  hie->poke((hie->read() & ~vsMask) | val);
-	  recordWrite(CsrNumber::HIE);
-	}
+      URV mieVal = (mie->read() & ~vsMask) | val;
+      updateCsr(mie, mieVal);
+
+      URV hieVal = (hie->read() & ~vsMask) | val;
+      updateCsr(hie, hieVal);
     }
 }
 
