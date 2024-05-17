@@ -414,7 +414,10 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   auto& di = packet.decodedInst();
   if (di.isLoad())
-    packet.dsize_ = di.loadSize();
+    {
+      hart.lastLdStAddress(packet.dva_, packet.dpa_);  // FIX TODO : handle page corrsing
+      packet.dsize_ = di.loadSize();
+    }
   else if (di.isStore() or di.isAmo())
     {
       uint64_t sva = 0, spa1 = 0, spa2 = 0, sval = 0;
