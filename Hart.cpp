@@ -168,11 +168,10 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory, uint64_t& time)
   csRegs_.findCsr(CsrNumber::FCSR)->tie(&fcsrValue_);
 
   // Configure MHARTID CSR.
-  bool implemented = true, debug = false, shared = false;
+  bool implemented = true, shared = false;
   URV mask = 0, pokeMask = 0;
 
-  csRegs_.configCsr(CsrNumber::MHARTID, implemented, hartId, mask, pokeMask,
-                    debug, shared);
+  csRegs_.configCsr(CsrNumber::MHARTID, implemented, hartId, mask, pokeMask, shared);
 
   // Give disassembler a way to get abi-names of CSRs.
   auto callback = [this](unsigned ix) {
@@ -715,7 +714,7 @@ Hart<URV>::resetVector()
 	vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/,
 			4 /*maxBytesPerElem*/, nullptr /*minSewPerLmul*/, nullptr);
       unsigned bytesPerReg = vecRegs_.bytesPerRegister();
-      csRegs_.configCsr(CsrNumber::VLENB, true, bytesPerReg, 0, 0, false, false);
+      csRegs_.configCsr(CsrNumber::VLENB, true, bytesPerReg, 0, 0, false /*shared*/);
       uint32_t vstartBits = static_cast<uint32_t>(std::log2(bytesPerReg*8));
       URV vstartMask = (URV(1) << vstartBits) - 1;
       auto csr = csRegs_.findCsr(CsrNumber::VSTART);
@@ -725,7 +724,7 @@ Hart<URV>::resetVector()
 	    std::cerr << "Warning: Write mask of CSR VSTART changed to 0x" << std::hex
 		      << vstartMask << " to be compatible with VLEN=" << std::dec
 		      << (bytesPerReg*8) << '\n';
-	  csRegs_.configCsr(CsrNumber::VSTART, true, 0, vstartMask, vstartMask, false, false);
+	  csRegs_.configCsr(CsrNumber::VSTART, true, 0, vstartMask, vstartMask, false);
 	}
     }
 
@@ -3558,32 +3557,29 @@ Hart<URV>::findCsr(std::string_view name)
 template <typename URV>
 bool
 Hart<URV>::configCsr(std::string_view name, bool implemented, URV resetValue,
-                     URV mask, URV pokeMask, bool debug, bool shared)
+                     URV mask, URV pokeMask, bool shared)
 {
-  return csRegs_.configCsr(name, implemented, resetValue, mask, pokeMask,
-			   debug, shared);
+  return csRegs_.configCsr(name, implemented, resetValue, mask, pokeMask, shared);
 }
 
 
 template <typename URV>
 bool
 Hart<URV>::configCsrByUser(std::string_view name, bool implemented, URV resetValue,
-			   URV mask, URV pokeMask, bool debug, bool shared)
+			   URV mask, URV pokeMask, bool shared)
 {
-  return csRegs_.configCsrByUser(name, implemented, resetValue, mask, pokeMask,
-				 debug, shared);
+  return csRegs_.configCsrByUser(name, implemented, resetValue, mask, pokeMask, shared);
 }
 
 
 template <typename URV>
 bool
-Hart<URV>::defineCsr(std::string name, CsrNumber num,
-		     bool implemented, URV resetVal, URV mask,
-		     URV pokeMask, bool isDebug)
+Hart<URV>::defineCsr(std::string name, CsrNumber num, bool implemented, URV resetVal,
+		     URV mask, URV pokeMask)
 {
   bool mandatory = false, quiet = true;
   auto c = csRegs_.defineCsr(std::move(name), num, mandatory, implemented, resetVal,
-			     mask, pokeMask, isDebug, quiet);
+			     mask, pokeMask, quiet);
   return c != nullptr;
 }
 
@@ -3618,10 +3614,9 @@ Hart<URV>::configIsa(std::string_view isa, bool updateMisa)
 	misaReset |= URV(0x200000);
   
       URV mask = 0, pokeMask = 0;
-      bool implemented = true, isDebug = false, shared = true;
+      bool implemented = true, shared = true;
 
-      if (not this->configCsr("misa", implemented, misaReset, mask, pokeMask,
-			      isDebug, shared))
+      if (not this->configCsr("misa", implemented, misaReset, mask, pokeMask, shared))
 	return false;
     }
 

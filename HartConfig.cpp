@@ -228,7 +228,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 {
   unsigned errors = 0;
   URV reset = 0, mask = 0, pokeMask = 0;
-  bool isDebug = false, exists = true, shared = false;
+  bool exists = true, shared = false;
 
   std::string name(nm);
   if (name == "dscratch")
@@ -240,7 +240,6 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
       reset = csr->getResetValue();
       mask = csr->getWriteMask();
       pokeMask = csr->getPokeMask();
-      isDebug = csr->isDebug();
     }
 
   if (conf.contains("reset"))
@@ -259,9 +258,6 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 
   if (conf.contains("poke_mask"))
     getJsonUnsigned(name + ".poke_mask", conf.at("poke_mask"), pokeMask) or errors++;
-
-  if (conf.contains("debug"))
-    getJsonBoolean(name + ".debug", conf.at("debug"), isDebug) or errors++;
 
   if (conf.contains("exists"))
     getJsonBoolean(name + ".exists", conf.at("exists"), exists) or errors++;
@@ -291,8 +287,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 		}
 	      // If number matches we configure below
 	    }
-	  else if (hart.defineCsr(name, CsrNumber(number), exists,
-				  reset, mask, pokeMask, isDebug))
+	  else if (hart.defineCsr(name, CsrNumber(number), exists, reset, mask, pokeMask))
 	    {
 	      csr = hart.findCsr(name);
 	      assert(csr);
@@ -313,7 +308,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 		<< name << '\n';
       return false;
     }
-  bool exists0 = csr->isImplemented(), isDebug0 = csr->isDebug();
+  bool exists0 = csr->isImplemented();
   bool shared0 = csr->isShared();
   URV reset0 = csr->getResetValue(), mask0 = csr->getWriteMask();
   URV pokeMask0 = csr->getPokeMask();
@@ -333,7 +328,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
   if (errors)
     return false;
 
-  if (not hart.configCsrByUser(name, exists, reset, mask, pokeMask, isDebug, shared))
+  if (not hart.configCsrByUser(name, exists, reset, mask, pokeMask, shared))
     {
       std::cerr << "Invalid CSR (" << name << ") in config file.\n";
       return false;
@@ -365,8 +360,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 
   if (verbose)
     {
-      if (exists0 != exists or isDebug0 != isDebug or reset0 != reset or
-	  mask0 != mask or pokeMask0 != pokeMask)
+      if (exists0 != exists or reset0 != reset or mask0 != mask or pokeMask0 != pokeMask)
 	{
 	  std::cerr << "Configuration of CSR (" << name <<
 	    ") changed in config file:\n";
@@ -374,10 +368,6 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 	  if (exists0 != exists)
 	    std::cerr << "  implemented: " << exists0 << " to "
 		      << exists << '\n';
-
-	  if (isDebug0 != isDebug)
-	    std::cerr << "  debug: " << isDebug0 << " to "
-		      << isDebug << '\n';
 
 	  if (shared0 != shared)
 	    std::cerr << "  shared: " << shared0 << " to "

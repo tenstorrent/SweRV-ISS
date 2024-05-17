@@ -298,18 +298,17 @@ namespace WdRiscv
 
     /// Configure given CSR. Return true on success and false if no such CSR.
     bool configCsrByUser(std::string_view name, bool implemented, URV resetValue, URV mask,
-			 URV pokeMask, bool isDebug, bool shared);
+			 URV pokeMask, bool shared);
 
     /// Configure given CSR. Return true on success and false if no such CSR.
     bool configCsr(std::string_view name, bool implemented, URV resetValue, URV mask,
-		   URV pokeMask, bool isDebug, bool shared);
+		   URV pokeMask, bool shared);
 
     /// Define a new CSR (beyond the standard CSRs defined by the
     /// RISCV spec). Return true on success and false if name/number
     /// already in use.
-    bool defineCsr(std::string name, CsrNumber number,
-		   bool implemented, URV resetValue, URV mask,
-		   URV pokeMask, bool isDebug);
+    bool defineCsr(std::string name, CsrNumber number, bool implemented, URV resetValue,
+		   URV mask, URV pokeMask);
 
     /// Configure given trigger with given reset values, write and
     /// poke masks. Return true on success and false on failure.
@@ -2044,6 +2043,9 @@ namespace WdRiscv
     void configVectorLegalizeVsetvliAvl(bool flag)
     { vecRegs_.configVectorLegalizeVsetvliAvl(flag); }
 
+    /// Support memory consistency model (MCM) instruction cache. Read 2 bytes from the
+    /// given address (must be even) into inst. Return true on success.  Return false if
+    /// the line of the given address is not in the cache.
     bool readInstFromFetchCache(uint64_t addr, uint16_t& inst) const
     { return fetchCache_.read(addr, inst); }
 

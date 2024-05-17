@@ -58,7 +58,7 @@ template <typename URV>
 Csr<URV>*
 CsRegs<URV>::defineCsr(std::string name, CsrNumber csrn, bool mandatory,
 		       bool implemented, URV resetValue, URV writeMask,
-		       URV pokeMask, bool isDebug, bool quiet)
+		       URV pokeMask, bool quiet)
 {
   size_t ix = size_t(csrn);
 
@@ -95,8 +95,7 @@ CsRegs<URV>::defineCsr(std::string name, CsrNumber csrn, bool mandatory,
 
   csr.setDefined(true);
 
-  csr.config(name, csrn, mandatory, implemented, resetValue, writeMask,
-	     pokeMask, isDebug);
+  csr.config(name, csrn, mandatory, implemented, resetValue, writeMask, pokeMask);
 
   nameToNumber_.insert_or_assign(std::move(name), csrn);
   return &csr;
@@ -2026,7 +2025,7 @@ CsRegs<URV>::reset()
 template <typename URV>
 bool
 CsRegs<URV>::configCsr(std::string_view name, bool implemented, URV resetValue,
-                       URV mask, URV pokeMask, bool isDebug, bool shared)
+                       URV mask, URV pokeMask, bool shared)
 {
   auto iter = nameToNumber_.find(name);
   if (iter == nameToNumber_.end())
@@ -2036,15 +2035,14 @@ CsRegs<URV>::configCsr(std::string_view name, bool implemented, URV resetValue,
   if (num >= regs_.size())
     return false;
 
-  return configCsr(CsrNumber(num), implemented, resetValue, mask, pokeMask,
-		   isDebug, shared);
+  return configCsr(CsrNumber(num), implemented, resetValue, mask, pokeMask, shared);
 }
 
 
 template <typename URV>
 bool
 CsRegs<URV>::configCsrByUser(std::string_view name, bool implemented, URV resetValue,
-			     URV mask, URV pokeMask, bool isDebug, bool shared)
+			     URV mask, URV pokeMask, bool shared)
 {
   auto iter = nameToNumber_.find(name);
   if (iter == nameToNumber_.end())
@@ -2054,8 +2052,7 @@ CsRegs<URV>::configCsrByUser(std::string_view name, bool implemented, URV resetV
   if (num >= regs_.size())
     return false;
 
-  bool ok = configCsr(CsrNumber(num), implemented, resetValue, mask, pokeMask,
-		      isDebug, shared);
+  bool ok = configCsr(CsrNumber(num), implemented, resetValue, mask, pokeMask, shared);
 
   // Make user choice to disable a CSR sticky.
   if (not implemented)
@@ -2077,7 +2074,7 @@ CsRegs<URV>::configCsrByUser(std::string_view name, bool implemented, URV resetV
 template <typename URV>
 bool
 CsRegs<URV>::configCsr(CsrNumber csrNum, bool implemented, URV resetValue,
-                       URV mask, URV pokeMask, bool isDebug, bool shared)
+                       URV mask, URV pokeMask, bool shared)
 {
   if (size_t(csrNum) >= regs_.size())
     {
@@ -2099,7 +2096,7 @@ CsRegs<URV>::configCsr(CsrNumber csrNum, bool implemented, URV resetValue,
   csr.setWriteMask(mask);
   csr.setPokeMask(pokeMask);
   csr.pokeNoMask(resetValue);
-  csr.setIsDebug(isDebug);
+  csr.setIsDebug(csrNum >= CsrNumber::_MIN_DBG and csrNum <= CsrNumber::_MAX_DBG);
   csr.setIsShared(shared);
 
   // Cache interrupt enable.
@@ -2153,22 +2150,18 @@ CsRegs<URV>::configMachineModePerfCounters(unsigned numCounters, bool cof)
 	mask = pokeMask = evMask = evPokeMask = 0;
 
       CsrNumber csrNum = advance(CsrNumber::MHPMCOUNTER3, i);
-      bool isDebug = false;
-      if (not configCsr(csrNum, true, resetValue, mask, pokeMask, isDebug,
-                        shared))
+      if (not configCsr(csrNum, true, resetValue, mask, pokeMask, shared))
 	errors++;
 
       if (rv32_)
          {
 	   csrNum = advance(CsrNumber::MHPMCOUNTER3H, i);
-	   if (not configCsr(csrNum, true, resetValue, mask, pokeMask,
-                             isDebug, shared))
+	   if (not configCsr(csrNum, true, resetValue, mask, pokeMask, shared))
 	     errors++;
 	 }
 
       csrNum = advance(CsrNumber::MHPMEVENT3, i);
-      if (not configCsr(csrNum, true, resetValue, evMask, evPokeMask, isDebug,
-                        shared))
+      if (not configCsr(csrNum, true, resetValue, evMask, evPokeMask, shared))
 	errors++;
     }
 
@@ -2206,16 +2199,13 @@ CsRegs<URV>::configUserModePerfCounters(unsigned numCounters)
 	mask = pokeMask = 0;
 
       CsrNumber csrNum = advance(CsrNumber::HPMCOUNTER3, i);
-      bool isDebug = false;
-      if (not configCsr(csrNum, false, resetValue, mask, pokeMask, isDebug,
-                        shared))
+      if (not configCsr(csrNum, false, resetValue, mask, pokeMask, shared))
 	errors++;
 
       if (rv32_)
          {
 	   csrNum = advance(CsrNumber::HPMCOUNTER3H, i);
-	   if (not configCsr(csrNum, false, resetValue, mask, pokeMask,
-                             isDebug, shared))
+	   if (not configCsr(csrNum, false, resetValue, mask, pokeMask, shared))
 	     errors++;
 	 }
     }
@@ -3087,18 +3077,14 @@ CsRegs<URV>::defineDebugRegs()
   URV dcsrVal = 0x40000003;
   URV dcsrMask = 0x00008e04;
   URV dcsrPokeMask = dcsrMask | 0x1cf; // Cause field modifiable
-  bool isDebug = true;
-  defineCsr("dcsr", Csrn::DCSR, !mand, imp, dcsrVal, dcsrMask,
-	    dcsrPokeMask, isDebug);
+  defineCsr("dcsr", Csrn::DCSR, !mand, imp, dcsrVal, dcsrMask, dcsrPokeMask);
 
   // Least sig bit of dpc is not writeable.
   URV dpcMask = ~URV(1);
-  defineCsr("dpc", CsrNumber::DPC, !mand, imp, 0, dpcMask, dpcMask, isDebug);
+  defineCsr("dpc", CsrNumber::DPC, !mand, imp, 0, dpcMask, dpcMask);
 
-  defineCsr("dscratch0", CsrNumber::DSCRATCH0, !mand, !imp, 0, wam, wam,
-	    isDebug);
-  defineCsr("dscratch1", CsrNumber::DSCRATCH1, !mand, !imp, 0, wam, wam,
-	    isDebug);
+  defineCsr("dscratch0", CsrNumber::DSCRATCH0, !mand, !imp, 0, wam, wam);
+  defineCsr("dscratch1", CsrNumber::DSCRATCH1, !mand, !imp, 0, wam, wam);
 
   // Add CSR fields.
   addDebugFields();

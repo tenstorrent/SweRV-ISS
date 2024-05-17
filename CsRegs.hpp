@@ -354,10 +354,12 @@ namespace WdRiscv
       MSCONTEXT = 0x7aa,
 
       // Debug mode registers.
+      _MIN_DBG  = 0x7b0,
       DCSR      = 0x7b0,
       DPC       = 0x7b1,
       DSCRATCH0 = 0x7b2,
       DSCRATCH1 = 0x7b3,
+      _MAX_DBG  = 0x7bf,
 
       // Vector extension register.
       VSTART   = 0x008,
@@ -648,12 +650,17 @@ namespace WdRiscv
 
     /// Configure.
     void config(std::string name, CsrNumber num, bool mandatory,
-		bool implemented, URV value, URV writeMask, URV pokeMask,
-		bool isDebug)
-    { name_ = std::move(name); number_ = unsigned(num); mandatory_ = mandatory;
-      implemented_ = implemented; initialValue_ = value;
-      writeMask_ = writeMask; pokeMask_ = pokeMask;
-      debug_ = isDebug; *valuePtr_ = value; }
+		bool implemented, URV value, URV writeMask, URV pokeMask)
+    {
+      name_ = std::move(name);
+      number_ = unsigned(num);
+      mandatory_ = mandatory;
+      implemented_ = implemented;
+      initialValue_ = value;
+      writeMask_ = writeMask;
+      pokeMask_ = pokeMask;
+      *valuePtr_ = value;
+    }
 
     /// Define the mask used by the poke method to write this
     /// register. The mask defined the register bits that are
@@ -924,8 +931,7 @@ namespace WdRiscv
     /// already defined CSR.
     Csr<URV>* defineCsr(std::string name, CsrNumber number,
 			bool mandatory, bool implemented, URV value,
-			URV writeMask, URV pokeMask, bool isDebug = false,
-			bool quiet = false);
+			URV writeMask, URV pokeMask, bool quiet = false);
 
     /// Return pointer to CSR with given number. Return nullptr if
     /// number is out of bounds or if corresponding CSR is not
@@ -1153,17 +1159,17 @@ namespace WdRiscv
 
     /// Configure CSR. Return true on success and false on failure.
     bool configCsr(std::string_view name, bool implemented, URV resetValue,
-                   URV mask, URV pokeMask, bool debug, bool shared);
+                   URV mask, URV pokeMask, bool shared);
 
     /// Configure CSR. Return true on success and false on failure. Mark non-implemented
     /// csr (implemented == false) as user-disabled so that internal code cannot enable
     /// them.
     bool configCsrByUser(std::string_view name, bool implemented, URV resetValue,
-			 URV mask, URV pokeMask, bool debug, bool shared);
+			 URV mask, URV pokeMask, bool shared);
 
     /// Configure CSR. Return true on success and false on failure.
     bool configCsr(CsrNumber csr, bool implemented, URV resetValue,
-                   URV mask, URV pokeMask, bool debug, bool shared);
+                   URV mask, URV pokeMask, bool shared);
 
     /// Configure machine mode performance counters returning true on
     /// success and false on failure. N consecutive counters starting
