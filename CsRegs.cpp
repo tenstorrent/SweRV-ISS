@@ -1782,6 +1782,47 @@ CsRegs<URV>::enableMenvcfgPbmte(bool flag)
 
 template <typename URV>
 void
+CsRegs<URV>::enableHenvcfgAdue(bool flag)
+{
+  using CN = CsrNumber;
+
+  if (not rv32_)
+    {
+      HenvcfgFields<uint64_t> hf{regs_.at(size_t(CN::HENVCFG)).getReadMask()};
+      hf.bits_.ADUE = flag;
+      regs_.at(size_t(CN::HENVCFG)).setReadMask(hf.value_);
+
+      hf = regs_.at(size_t(CN::HENVCFG)).getWriteMask();
+      hf.bits_.ADUE = flag;
+      regs_.at(size_t(CN::HENVCFG)).setWriteMask(hf.value_);
+    }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableMenvcfgAdue(bool flag)
+{
+  using CN = CsrNumber;
+
+  if (not rv32_)
+    {
+      HenvcfgFields<uint64_t> hf{regs_.at(size_t(CN::MENVCFG)).getReadMask()};
+      hf.bits_.ADUE = flag;
+      regs_.at(size_t(CN::MENVCFG)).setReadMask(hf.value_);
+
+      hf = regs_.at(size_t(CN::MENVCFG)).getWriteMask();
+      hf.bits_.ADUE = flag;
+      regs_.at(size_t(CN::MENVCFG)).setWriteMask(hf.value_);
+    }
+
+  bool adue = menvcfgAdue();
+  enableHenvcfgAdue(adue);
+}
+
+
+template <typename URV>
+void
 CsRegs<URV>::enableTriggers(bool flag)
 {
   using CN = CsrNumber;
@@ -1924,6 +1965,9 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
 
       bool pbmte = menvcfgPbmte();
       enableHenvcfgPbmte(pbmte);
+
+      bool adue = menvcfgAdue();
+      enableHenvcfgAdue(adue);
     }
   else if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
 	   (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
@@ -3457,6 +3501,9 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
 
       bool pbmte = menvcfgPbmte();
       enableHenvcfgPbmte(pbmte);
+
+      bool adue = menvcfgAdue();
+      enableHenvcfgAdue(adue);
     }
   if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
       (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))

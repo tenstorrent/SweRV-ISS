@@ -1798,13 +1798,21 @@ namespace WdRiscv
       recordWrite(CsrNumber::TCONTROL);
     }
 
-    /// If flag is false, bit HENVCFG.PBMTE becomes read-only ero;
-    /// otherwise, bit is readable.
+    /// If flag is false, bit HENVCFG.PBMTE becomes read-only-zero; otherwise, bit is
+    /// readable.
     void enableHenvcfgPbmte(bool flag);
 
-    /// If flag is false, bit MENVCFG.PBMTE becomes read-only-zero;
-    /// otherwise, bit is readable.
+    /// If flag is false, bit MENVCFG.PBMTE becomes read-only-zero; otherwise, bit is
+    /// readable.
     void enableMenvcfgPbmte(bool flag);
+
+    /// If flag is false, bit HENVCFG.ADUE becomes read-only-zero; otherwise, bit is
+    /// readable.
+    void enableHenvcfgAdue(bool flag);
+
+    /// If flag is false, bit MENVCFG.ADUE becomes read-only-zero; otherwise, bit is
+    /// readable.
+    void enableMenvcfgAdue(bool flag);
 
     /// Return the value of the PBMTE bit of the MENVCFG CSR. Return
     /// false if CSR is not implemented.
