@@ -134,6 +134,10 @@ namespace WdRiscv
 
     /// Encode "remuw rd, rs1, rs2" into this object.
     bool encodeRemuw(unsigned rd, unsigned rs1, unsigned rs2);
+
+    /// Encode "andn rd, rs1, rs2" into this object.
+    bool encodeAndn(unsigned rd, unsigned rs1, unsigned rs2);
+
     uint32_t code;
 
     struct
@@ -1257,6 +1261,11 @@ namespace WdRiscv
   /// Return true on success and false if any of the arguments
   /// are out of bounds.
   bool encodeRemuw(uint32_t, uint32_t, uint32_t, uint32_t& inst);
+
+  /// Encode "andn rd, rs1, rs2" into inst: encodeAndn(rd, rs1, rs2, inst).
+  /// Return true on success and false if any of the arguments
+  /// are out of bounds.
+  bool encodeAndn(uint32_t, uint32_t, uint32_t, uint32_t& inst);
 
   /// Encode "c.beqz rs1p, imm" into inst: encodeCbeqz(rs1, imm, 0, inst).
   /// The third argument (x) is ignored.

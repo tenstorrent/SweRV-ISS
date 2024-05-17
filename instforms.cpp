@@ -312,6 +312,16 @@ RFormInst::encodeRemuw(unsigned rd, unsigned rs1, unsigned rs2)
 
 
 bool
+RFormInst::encodeAndn(unsigned rd, unsigned rs1, unsigned rs2)
+{
+  if (not encodeSub(rd, rs1, rs2))
+    return false;
+  bits.funct3 = 7;
+  return true;
+}
+
+
+bool
 BFormInst::encodeBeq(unsigned rs1v, unsigned rs2v, int imm)
 {
   if (imm & 0x1)
@@ -2226,6 +2236,17 @@ WdRiscv::encodeRemuw(uint32_t rd, uint32_t rs1, uint32_t rs2, uint32_t& inst)
 
 
 bool
+WdRiscv::encodeAndn(uint32_t rd, uint32_t rs1, uint32_t rs2, uint32_t& inst)
+{
+  RFormInst rfi(0);
+  if (not rfi.encodeAndn(rd, rs1, rs2))
+    return false;
+  inst = rfi.code;
+  return true;
+}
+
+
+bool
 WdRiscv::encodeCbeqz(uint32_t rs1p, uint32_t imm, uint32_t, uint32_t& inst)
 {
   CbFormInst cb(0);
@@ -2245,5 +2266,3 @@ WdRiscv::encodeCbnez(uint32_t rs1p, uint32_t imm, uint32_t, uint32_t& inst)
   inst = cb.code;
   return false;
 }
-
-
