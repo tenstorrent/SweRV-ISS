@@ -880,3 +880,56 @@ PerfApi::shouldFlush(unsigned hartIx, uint64_t time, uint64_t tag, bool& flush,
 
   return true;
 }
+
+
+unsigned
+InstrPac::getSourceOperands(std::array<Operand, 3>& ops)
+{
+  assert(decoded_);
+  if (not decoded_)
+    return 0;
+  
+  unsigned count = 0;
+
+  using OM = WdRiscv::OperandMode;
+
+  for (unsigned i = 0; i < di_.operandCount(); ++i)
+    {
+      if (di_.ithOperandMode(i) == OM::Read or di_.ithOperandMode(i) == OM::ReadWrite)
+	{
+	  auto& op = ops.at(count);
+	  op.type = di_.ithOperandType(i);
+	  op.value = opVal_.at(i);
+	  ++count;
+	}
+    }
+
+  return count;
+}
+
+
+unsigned
+InstrPac::getDestOperands(std::array<Operand, 2>& ops)
+{
+  assert(decoded_);
+  if (not decoded_)
+    return 0;
+  
+  unsigned count = 0;
+
+  using OM = WdRiscv::OperandMode;
+
+  for (unsigned i = 0; i < di_.operandCount(); ++i)
+    {
+      if (di_.ithOperandMode(i) == OM::Write or di_.ithOperandMode(i) == OM::ReadWrite)
+	{
+	  auto& op = ops.at(count);
+	  op.type = di_.ithOperandType(i);
+	  op.value = destValues_.at(count).second;
+	  op.prevValue = opVal_.at(i);
+	  ++count;
+	}
+    }
+
+  return count;
+}

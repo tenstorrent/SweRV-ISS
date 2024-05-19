@@ -26,6 +26,17 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
   using System64 = WdRiscv::System<uint64_t>;
   using Hart64 = WdRiscv::Hart<uint64_t>;
   using ExceptionCause = WdRiscv::ExceptionCause;
+  using OperandType = WdRiscv::OperandType;
+
+  /// Strucuture to recover the source/destination operands of an instruction packet.
+  struct Operand
+  {
+    OperandType type = OperandType::IntReg;
+    unsigned number = 0;                  // Register number.
+    uint64_t value = 0;
+    uint64_t prevValue = 0;               // Used for modified registers.
+  };
+
 
   /// Instruction packet.
   class InstrPac
@@ -170,6 +181,16 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     bool isSc() const
     { return di_.isSc(); }
 
+    /// Fill the given array with the source operands of this instruction (which must be
+    /// decoded). Value of each operand will be zero unless the instruction is executed.
+    /// Return the number of operands written into the array.
+    unsigned getSourceOperands(std::array<Operand, 3>& ops);
+
+    /// Fill the given array with the destination operands of this instruction (which must
+    /// be decoded). Value of each operand will be zero unless the instruction is
+    /// executed.  Return the number of operands written into the array.
+    unsigned getDestOperands(std::array<Operand, 2>& ops);
+
   private:
 
     uint64_t tag_ = 0;
@@ -188,10 +209,10 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     uint64_t execTime_ = 0;   // Execution time
     uint64_t prTarget_ = 0;   // Predicted branch target
 
-    std::array<uint64_t, 3> opVal_;       // Operand values (count and types are in di_)
+    std::array<uint64_t, 4> opVal_;       // Operand values (count and types are in di_)
 
     // Entry i is the in-flight producer of the ith operand.
-    std::array<std::shared_ptr<InstrPac>, 3> opProducers_;
+    std::array<std::shared_ptr<InstrPac>, 4> opProducers_;
 
     // Global register index of a destination register and its corresponding value.
     typedef std::pair<unsigned, uint64_t> DestValue;
