@@ -308,6 +308,9 @@ template <typename URV>
 static bool
 pokeHartMemory(Hart<URV>& hart, uint64_t physAddr, uint64_t data, unsigned size)
 {
+  if (hart.isImsicAddr(physAddr))
+    return true;   // IMSIC memory poked explicity by the test bench.
+
   if (size == 1)
     return hart.pokeMemory(physAddr, uint8_t(data), true);
 
@@ -389,9 +392,9 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       if (not ppoRule3(hart, *instr))
 	result = false;
 
-      // We commit the RTL data to memory but we check them against
-      // whisper data (checkRtlWrite below). This is simpler than
-      // committing part of whisper instruction data.
+      // We commit the RTL data to memory but we check them against whisper data
+      // (checkRtlWrite below). This is simpler than committing part of whisper
+      // instruction data.
       if (not pokeHartMemory(hart, physAddr, rtlData, op.size_))
 	result = false;
     }
