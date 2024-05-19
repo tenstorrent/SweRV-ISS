@@ -937,7 +937,7 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 
   if (resource == "m")
     {
-      unsigned size = sizeof(URV);
+      unsigned size = 4;  // Default size is 4 bytes.
       if (tokens.size() > 4)
 	if (not parseCmdLineNumber("size", tokens.at(4), size))
 	  return false;

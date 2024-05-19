@@ -186,13 +186,8 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
 
 	if (req.size == 0)
 	  {
-	    if constexpr (sizeof(URV) == 4)
-	      {
-		// Poke a word in 32-bit harts.
-		if (hart.pokeMemory(req.address, uint32_t(req.value), usePma))
-		  return true;
-	      }
-	    else if (hart.pokeMemory(req.address, req.value, usePma))
+	    // Default size is 4 bytes.
+	    if (hart.pokeMemory(req.address, uint32_t(req.value), usePma))
 	      return true;
 	  }
 	else

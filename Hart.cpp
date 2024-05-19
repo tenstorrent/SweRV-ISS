@@ -1007,7 +1007,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
 	   (addr >= imsicSbase_ and addr < imsicSend_))
     {
       if (imsicWrite_)
-        imsicWrite_(addr, sizeof(uint32_t), uint32_t(val));
+        imsicWrite_(addr, sizeof(val), val);
     }
   else if (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
                     (addr >= pciMmioBase_ and addr < pciMmioEnd_)))
