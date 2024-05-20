@@ -421,52 +421,89 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
     return false;
 
   unsigned hartIx = hart.sysHartIndex();
-
-  MemoryOp op = {};
-  op.time_ = time;
-  op.physAddr_ = physAddr;
-  op.rtlData_ = rtlData;
-  op.instrTag_ = instrTag;
-  op.hartIx_ = hartIx;
-  op.size_ = size;
-  op.isRead_ = false;
-
-  // If corresponding insruction is retired, compare to its data.
   McmInstr* instr = findOrAddInstr(hartIx, instrTag);
   if (not instr)
     {
-      cerr << "Mcm::bypassOp: Error: Unknown instr tag\n";
-      assert(0 && "Mcm::BypassOp: Unknown instr tag");
+      std::cerr << "Mcm::bypassOp: Error: hart-id=" << hart.hartId() << " time=" << time
+		<< " tag=" << instrTag << " unknown instr tag\n";
+      return false;
+    }
+
+  // Instruction must be retired.
+  if (not instr->retired_)
+    {
+      std::cerr << "Error: hart-id=" << hart.hartId() << " time=" << time << " tag="
+		<< instrTag << " bypass operation for a non-retired instruction\n";
       return false;
     }
 
   auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
+  undrained.insert(instrTag);
 
-  if (not instr->retired_)
-    undrained.insert(instrTag);
+  bool result = true;
 
-  // Associate write op with instruction.
-  instr->addMemOp(sysMemOps_.size());
-  sysMemOps_.push_back(op);
-
-  instr->complete_ = checkStoreComplete(*instr);
-  if (instr->complete_)
-    undrained.erase(instrTag);
-
-  bool result = pokeHartMemory(hart, physAddr, rtlData, size);
-
-  if (instr->retired_)
+  if (size > 8)
     {
-      result = checkRtlWrite(hart.hartId(), *instr, op) and result;
-      if (instr->complete_)
+      if (instr->di_.instId() != InstId::cbo_zero or (size % 8) != 0)
 	{
-	  result = ppoRule1(hart, *instr) and result;
-	  result = ppoRule3(hart, *instr) and result;
+	  std::cerr << "Mcm::byppassOp: Error: hart-id=" << hart.hartId() << " time=" << time
+		    << " invalid size: " << size << '\n';
+	  return false;
+	}
+      uint64_t lineStart = physAddr & ~(uint64_t(lineSize_) - 1);
+      if (physAddr + size - lineStart > lineSize_)
+	return false;
+
+      if ((physAddr % 8) != 0)
+	return false;
+
+      if (rtlData != 0)
+	return false;
+
+      for (unsigned i = 0; i < size; i += 8)
+	{
+	  uint64_t addr = physAddr + i;
+	  MemoryOp op = {};
+	  op.time_ = time;
+	  op.physAddr_ = addr;
+	  op.rtlData_ = rtlData;
+	  op.instrTag_ = instrTag;
+	  op.hartIx_ = hartIx;
+	  op.size_ = 8;
+	  op.isRead_ = false;
+
+	  // Associate write op with instruction.
+	  instr->addMemOp(sysMemOps_.size());
+	  sysMemOps_.push_back(op);
+
+	  result = pokeHartMemory(hart, addr, 0, 8) and result;
 	}
     }
   else
     {
-      // TODO: Mark instruction to avoid poking memory in retireStore
+      MemoryOp op = {};
+      op.time_ = time;
+      op.physAddr_ = physAddr;
+      op.rtlData_ = rtlData;
+      op.instrTag_ = instrTag;
+      op.hartIx_ = hartIx;
+      op.size_ = size;
+      op.isRead_ = false;
+
+      // Associate write op with instruction.
+      instr->addMemOp(sysMemOps_.size());
+      sysMemOps_.push_back(op);
+
+      result = pokeHartMemory(hart, physAddr, rtlData, size) and result;
+      result = checkRtlWrite(hart.hartId(), *instr, op) and result;
+    }
+
+  instr->complete_ = checkStoreComplete(*instr);
+  if (instr->complete_)
+    {
+      undrained.erase(instrTag);
+      result = ppoRule1(hart, *instr) and result;
+      result = ppoRule3(hart, *instr) and result;
     }
 
   return result;
