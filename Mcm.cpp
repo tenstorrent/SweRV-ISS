@@ -429,14 +429,6 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       return false;
     }
 
-  // Instruction must be retired.
-  if (not instr->retired_)
-    {
-      std::cerr << "Error: hart-id=" << hart.hartId() << " time=" << time << " tag="
-		<< instrTag << " bypass operation for a non-retired instruction\n";
-      return false;
-    }
-
   auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
   undrained.insert(instrTag);
 
@@ -495,15 +487,23 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       sysMemOps_.push_back(op);
 
       result = pokeHartMemory(hart, physAddr, rtlData, size) and result;
-      result = checkRtlWrite(hart.hartId(), *instr, op) and result;
     }
 
   instr->complete_ = checkStoreComplete(*instr);
   if (instr->complete_)
     {
       undrained.erase(instrTag);
-      result = ppoRule1(hart, *instr) and result;
-      result = ppoRule3(hart, *instr) and result;
+      if (instr->retired_)
+	{
+	  for (auto opIx : instr->memOps_)
+	    {
+	      auto& op = sysMemOps_.at(opIx);
+	      if (not op.isCanceled() and not op.isRead_)
+		result = checkRtlWrite(hart.hartId(), *instr, op) and result;
+	    }
+	  result = ppoRule1(hart, *instr) and result;
+	  result = ppoRule3(hart, *instr) and result;
+	}
     }
 
   return result;
