@@ -269,8 +269,12 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   assert(di.operandCount() <= packet.opVal_.size());
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
-      if (di.ithOperandMode(i) == WdRiscv::OperandMode::None)
-	continue;
+      if (di.ithOperandType(i) == WdRiscv::OperandType::Imm)
+	{
+	  packet.opVal_.at(i) = di.ithOperand(i);
+	  continue;
+	}
+      assert(di.ithOperandMode(i) != WdRiscv::OperandMode::None);
       unsigned regNum = di.ithOperand(i);
       unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
       uint64_t value = 0;
