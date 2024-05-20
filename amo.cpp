@@ -851,7 +851,7 @@ Hart<uint32_t>::execAmocas_d(const DecodedInst* di)
       if (temp0 == rdVal0 and temp1 == rdVal1)
 	{
 	  storeOk = store<uint32_t>(di, addr, false /*hyper*/, uint32_t(rs2Val0), false);
-	  storeOk = storeOk and store<uint32_t>(di, addr, false, uint32_t(rs2Val1), false);
+	  storeOk = storeOk and store<uint32_t>(di, addr + 4, false, uint32_t(rs2Val1), false);
 	}
 
       if (storeOk and not triggerTripped_ and rd != 0)
@@ -944,6 +944,7 @@ Hart<uint64_t>::execAmocas_q(const DecodedInst* di)
       return;
     }
 
+  // FIX: This needs to be fixed for correct tracing
   bool loadOk = (amoLoad64(di, addr, attrib, temp0) and
 		 amoLoad64(di, addr + 8, attrib, temp1));
   if (loadOk)
@@ -961,7 +962,7 @@ Hart<uint64_t>::execAmocas_q(const DecodedInst* di)
       if (temp0 == rdVal0 and temp1 == rdVal1)
 	{
 	  storeOk = store<uint64_t>(di, addr, false /*hyper*/, uint64_t(rs2Val0), false);
-	  storeOk = storeOk and store<uint32_t>(di, addr, false, uint64_t(rs2Val1), false);
+	  storeOk = storeOk and store<uint64_t>(di, addr + 8, false, uint64_t(rs2Val1), false);
 	}
 
       if (storeOk and not triggerTripped_ and rd != 0)
