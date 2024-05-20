@@ -137,6 +137,7 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
   uint64_t physAddr = virtAddr;
   bool isZero = false;
   ldStAddr_ = virtAddr;
+  ldStSize_ = cacheLineSize_;
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
@@ -183,6 +184,7 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
   uint64_t physAddr = virtAddr;
   bool isZero = false;
   ldStAddr_ = virtAddr;
+  ldStSize_ = cacheLineSize_;
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
@@ -249,6 +251,7 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
   ldStAddr_ = virtAddr;
+  ldStSize_ = cacheLineSize_;
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
@@ -300,6 +303,7 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
   ldStAddr_ = virtAddr;
+  ldStSize_ = cacheLineSize_;
 
   bool isZero = true;
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
