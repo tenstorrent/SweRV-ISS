@@ -367,6 +367,10 @@ namespace WdRiscv
     /// Return true if instuction is not a a store.
     bool retireStore(Hart<URV>& hart, McmInstr& instr);
 
+    /// Helper to retire method: Retire a CMO instruction. Return false on
+    /// failure. Return true on success or if given instruction is not CMO.
+    bool retireCmo(Hart<URV>& hart, McmInstr& instr);
+
     /// Return the page number corresponding to the given address
     uint64_t pageNum(uint64_t addr) const
     { return addr >> 12; }

@@ -887,6 +887,18 @@ namespace WdRiscv
       return ldStSize_;
     }
 
+    /// If last executed instruction is a CMO (cache maintenance operation), then set
+    /// vadd/paddr to the corresponding data virtual/physical address returning the
+    /// cache line size. Return 0 otherwise leaving vadd/paddr unmodified.
+    unsigned lastCmo(uint64_t& vaddr, uint64_t& paddr) const
+    {
+      if (ldStSize_ != cacheLineSize_)
+	return 0;
+      vaddr = ldStAddr_;
+      paddr = ldStPhysAddr1_;
+      return ldStSize_;
+    }
+
     bool getLastVectorMemory(std::vector<uint64_t>& addresses,
 			     std::vector<uint64_t>& data,
 			     unsigned& elementSize) const

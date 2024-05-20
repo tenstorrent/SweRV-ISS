@@ -136,6 +136,7 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
   bool isZero = false;
+  ldStAddr_ = virtAddr;
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
@@ -181,10 +182,13 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
   bool isZero = false;
+  ldStAddr_ = virtAddr;
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
     initiateStoreException(di, cause, virtAddr, gPhysAddr);
+
+  ldStPhysAddr1_ = ldStPhysAddr2_ = physAddr;
 }
 
 
@@ -244,10 +248,13 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
   uint64_t virtAddr = intRegs_.read(di->op0());
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
+  ldStAddr_ = virtAddr;
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
     initiateStoreException(di, cause, virtAddr, gPhysAddr);
+
+  ldStPhysAddr1_ = ldStPhysAddr2_ = physAddr;
 }
 
 
@@ -292,6 +299,7 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
 
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
+  ldStAddr_ = virtAddr;
 
   bool isZero = true;
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
@@ -300,6 +308,11 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
       initiateStoreException(di, cause, virtAddr, gPhysAddr);
       return;
     }
+
+  ldStPhysAddr1_ = ldStPhysAddr2_ = physAddr;
+
+  if (mcm_)
+    return;   // We update memory when we get bypass message from test bench.
 
   for (unsigned i = 0; i < cacheLineSize_; i+= 8)
     pokeMemory(physAddr + i, uint64_t(0), true /*usePma*/);

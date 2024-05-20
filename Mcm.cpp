@@ -516,6 +516,60 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 
 template <typename URV>
 bool
+Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
+{
+  uint64_t vaddr = 0, paddr = 0;
+  if (not hart.lastCmo(vaddr, paddr))
+    assert(0);
+
+  instrB.size_ = lineSize_;
+  instrB.virtAddr_ = vaddr;
+  instrB.physAddr_ = paddr;
+  instrB.physAddr2_ = paddr;
+  instrB.data_ = 0;   // Determined at bypass time.
+
+  // All preceeding (in program order) overlapping stores/amos must have drained.
+  unsigned hartIx = hart.sysHartIndex();
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& pendingWrites = hartPendingWrites_.at(hartIx);
+
+  McmInstrIx limit = instrB.tag_ >= windowSize_ ? instrB.tag_ - windowSize_ : 0;
+  bool ok = true;
+
+  // Check for preceding incomplete stores (not all bytes written). Check for
+  // stores still in the store buffer.
+  for (McmInstrIx tag = instrB.tag_; tag > limit; --tag)
+    {
+      const auto& instrA =  instrVec.at(tag - 1);
+      if (instrA.isCanceled() or not instrA.isStore_ or not instrA.di_.isAmo())
+	continue;
+
+      if (not instrA.isRetired() or not instrA.di_.isValid())
+	{
+	  cerr << "Mcm::retireCmo: Instruction A invalid/not-retired\n";
+	  assert(0 && "Mcm::retireCmo: Instruction A invalid/not-retired");
+	}
+
+      if (not instrA.complete_)
+	ok = false;
+      else
+	{	  // Check for preceding stores still in store buffer.
+	  for (auto& op : pendingWrites)
+	    if (op.instrTag_ == instrA.tag_)
+	      ok = false;
+	}
+
+      if (not ok)
+	cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
+	     << instrA.tag_ << " tag2=" << instrB.tag_ << " (CMO)\n";
+    }
+
+  return ok;
+}
+
+
+template <typename URV>
+bool
 Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		 const DecodedInst& di, bool trapped)
 {
@@ -553,9 +607,13 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (instr->di_.instId() == InstId::sfence_w_inval)
     return checkSfenceWInval(hart, *instr);
 
+  if (di.isCmo())
+    return retireCmo(hart, *instr);
 
   // If instruction is a store, save address, size, and written data.
-  bool ok = retireStore(hart, *instr);
+  bool ok = true;
+  if (di.isStore() or di.isAmo())
+    ok = retireStore(hart, *instr);
 
   // Check read operations of instruction comparing RTL values to
   // memory model (whisper) values.
@@ -572,19 +630,21 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
     }
 
   // Amo sanity check.
-  if (di.instEntry()->isAmo())
+  if (di.isAmo())
     {
+      URV hartId = hart.hartId();
+
       // Must have a read.  Must not have a write.
       if (not instrHasRead(*instr))
 	{
-	  cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << tag
+	  cerr << "Error: Hart-id=" << hartId << " tag=" << tag
 	       << " amo instruction retired before read op.\n";
 	  ok = false;
 	}
 
       if (not instrHasWrite(*instr))
 	{
-	  cerr << "Warning: Hart-id=" << hart.hartId() << " tag=" << tag
+	  cerr << "Warning: Hart-id=" << hartId << " tag=" << tag
 	       << " amo instruction retired without a write op.\n";
 	  return false;
 	}
