@@ -895,10 +895,11 @@ InstrPac::getSourceOperands(std::array<Operand, 3>& ops)
 
   for (unsigned i = 0; i < di_.operandCount(); ++i)
     {
-      if (di_.ithOperandMode(i) == OM::Read or di_.ithOperandMode(i) == OM::ReadWrite)
+      if (di_.ithOperandMode(i) == OM::Read or di_.ithOperandMode(i) == OM::ReadWrite or di_.ithOperandType(i) == OperandType::Imm)
 	{
 	  auto& op = ops.at(count);
 	  op.type = di_.ithOperandType(i);
+	  op.number = (di_.ithOperandType(i) == OperandType::Imm) ? 0 : di_.ithOperand(i);
 	  op.value = opVal_.at(i);
 	  ++count;
 	}
@@ -925,6 +926,7 @@ InstrPac::getDestOperands(std::array<Operand, 2>& ops)
 	{
 	  auto& op = ops.at(count);
 	  op.type = di_.ithOperandType(i);
+	  op.number = di_.ithOperand(i);
 	  op.value = destValues_.at(count).second;
 	  op.prevValue = opVal_.at(i);
 	  ++count;
