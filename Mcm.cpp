@@ -566,6 +566,8 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
   instrB.physAddr_ = paddr;
   instrB.physAddr2_ = paddr;
   instrB.data_ = 0;   // Determined at bypass time.
+  if (instrB.di_.instId() == InstId::cbo_zero)
+    instrB.isStore_ = true;
 
   // All preceeding (in program order) overlapping stores/amos must have drained.
   unsigned hartIx = hart.sysHartIndex();
