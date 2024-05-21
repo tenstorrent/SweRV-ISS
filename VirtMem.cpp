@@ -253,16 +253,13 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
       if ((read and not ra) or (write and not wa) or (exec and not xa))
         return stage1PageFaultType(read, write, exec);
       if (not entry->accessed_ or (write and not entry->dirty_))
-        {
-          if (faultOnFirstAccess_)
-            return stage1PageFaultType(read, write, exec);
-          entry->accessed_ = true;
-          if (write)
-            entry->dirty_ = true;
-        }
-      pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
-      pbmt_ = Pbmt(entry->pbmt_);
-      return ExceptionCause::NONE;
+	entry->valid_ = false;
+      if (entry->valid_)
+	{
+	  pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
+	  pbmt_ = Pbmt(entry->pbmt_);
+	  return ExceptionCause::NONE;
+	}
     }
 
   TlbEntry tlbEntry;
@@ -416,16 +413,13 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
       if ((read and not ra) or (write and not wa) or (exec and not xa))
         return stage2PageFaultType(read, write, exec);
       if (not entry->accessed_ or (write and not entry->dirty_))
-        {
-          if (faultOnFirstAccess2_)
-            return stage2PageFaultType(read, write, exec);
-          entry->accessed_ = true;
-          if (write)
-            entry->dirty_ = true;
-        }
-      pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
-      pbmt_ = Pbmt(entry->pbmt_);
-      return ExceptionCause::NONE;
+	entry->valid_ = false;
+      if (entry->valid_)
+	{
+	  pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
+	  pbmt_ = Pbmt(entry->pbmt_);
+	  return ExceptionCause::NONE;
+	}
     }
 
   TlbEntry tlbEntry;
@@ -471,16 +465,13 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 	  if ((read and not ra) or (write and not wa) or (exec and not xa))
             return stage1PageFaultType(read, write, exec);
 	  if (not entry->accessed_ or (write and not entry->dirty_))
+	    entry->valid_ = false;
+	  if (entry->valid_)
 	    {
-	      if (faultOnFirstAccess1_)
-                return stage1PageFaultType(read, write, exec);
-	      entry->accessed_ = true;
-	      if (write)
-		entry->dirty_ = true;
+	      // Use TLB entry.
+	      pbmt_ = Pbmt(entry->pbmt_);
+	      gpa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
 	    }
-	  // Use TLB entry.
-          pbmt_ = Pbmt(entry->pbmt_);
-	  gpa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
 	}
       else
 	{

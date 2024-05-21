@@ -249,9 +249,10 @@ namespace WdRiscv
     void setConsoleIoSymbol(const std::string& sym)
     { consoleIoSym_ = sym; }
 
-    /// Device a UART device at given address reserving given
-    /// size (in bytes) of address space for it.
-    void defineUart(uint64_t addr, uint64_t size);
+    /// Device a UART device at given address reserving given size (in bytes) of address
+    /// space for it. Return true on success and false if type is not supported (supported
+    /// types: uartsf, uart8250).
+    bool defineUart(const std::string& type, uint64_t addr, uint64_t size);
 
     /// Return the memory page size.
     size_t pageSize() const

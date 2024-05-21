@@ -89,12 +89,25 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
 
 
 template <typename URV>
-void
-System<URV>::defineUart(uint64_t addr, uint64_t size)
+bool
+System<URV>::defineUart(const std::string& type, uint64_t addr, uint64_t size)
 {
-  auto uart = std::make_shared<Uartsf>(addr, size);
-  memory_->registerIoDevice(uart);
-  ioDevs_.push_back(std::move(uart));
+  std::shared_ptr<IoDevice> dev;
+
+  if (type == "uartsf")
+    dev = std::make_shared<Uartsf>(addr, size);
+  else if (type == "uart8250")
+    dev = std::make_shared<Uart8250>(addr, size);
+  else
+    {
+      std::cerr << "System::defineUart: Invalid uadrt type: " << type << "\n";
+      return false;
+    }
+
+  memory_->registerIoDevice(dev);
+  ioDevs_.push_back(std::move(dev));
+
+  return true;
 }
 
 

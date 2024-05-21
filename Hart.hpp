@@ -298,18 +298,17 @@ namespace WdRiscv
 
     /// Configure given CSR. Return true on success and false if no such CSR.
     bool configCsrByUser(std::string_view name, bool implemented, URV resetValue, URV mask,
-			 URV pokeMask, bool isDebug, bool shared);
+			 URV pokeMask, bool shared);
 
     /// Configure given CSR. Return true on success and false if no such CSR.
     bool configCsr(std::string_view name, bool implemented, URV resetValue, URV mask,
-		   URV pokeMask, bool isDebug, bool shared);
+		   URV pokeMask, bool shared);
 
     /// Define a new CSR (beyond the standard CSRs defined by the
     /// RISCV spec). Return true on success and false if name/number
     /// already in use.
-    bool defineCsr(std::string name, CsrNumber number,
-		   bool implemented, URV resetValue, URV mask,
-		   URV pokeMask, bool isDebug);
+    bool defineCsr(std::string name, CsrNumber number, bool implemented, URV resetValue,
+		   URV mask, URV pokeMask);
 
     /// Configure given trigger with given reset values, write and
     /// poke masks. Return true on success and false on failure.
@@ -827,8 +826,9 @@ namespace WdRiscv
 
     /// Support for tracing: Return incremental changes to fp flags and vxsat,
     /// but for vector instructions on per-element basis.
-    void lastIncVec(std::vector<uint8_t>& fpFlags, std::vector<uint8_t>& vxsat) const
-    { return vecRegs_.lastIncVec(fpFlags, vxsat); }
+    void lastIncVec(std::vector<uint8_t>& fpFlags, std::vector<uint8_t>& vxsat,
+                    std::vector<VecRegs::Step>& steps) const
+    { return vecRegs_.lastIncVec(fpFlags, vxsat, steps); }
 
     /// Return true if the last executed instruction triggered a trap
     /// (had an exception or encoutered an interrupt).
@@ -884,6 +884,18 @@ namespace WdRiscv
       pa1 = ldStPhysAddr1_;
       pa2 = ldStPhysAddr2_;
       value = ldStData_;
+      return ldStSize_;
+    }
+
+    /// If last executed instruction is a CMO (cache maintenance operation), then set
+    /// vaddr/paddr to the corresponding data virtual/physical address returning the
+    /// cache line size. Return 0 otherwise leaving vadd/paddr unmodified.
+    unsigned lastCmo(uint64_t& vaddr, uint64_t& paddr) const
+    {
+      if (ldStSize_ != cacheLineSize_)
+	return 0;
+      vaddr = ldStAddr_;
+      paddr = ldStPhysAddr1_;
       return ldStSize_;
     }
 
@@ -1039,9 +1051,9 @@ namespace WdRiscv
     void enableSscofpmf(bool flag)
     { csRegs_.enableSscofpmf(flag); }
 
-    /// Enable/disbale smstaten extension.
-    void enableSmstaten(bool flag)
-    { csRegs_.enableStateen(flag); }
+    /// Enable/disbale smstateen extension.
+    void enableSmstateen(bool flag)
+    { csRegs_.enableSmstateen(flag); }
 
     /// Enable/disable the resumable non maskable interrupt (Smrnmi) extension.
     void enableSmrnmi(bool flag)
@@ -1553,7 +1565,7 @@ namespace WdRiscv
 
     /// Enable Advance Interrupt Architecture (AIA) extension.
     void enableAiaExtension(bool flag)
-    { enableExtension(RvExtension::Smaia, flag); csRegs_.enableAia(flag); }
+    { isa_.enable(RvExtension::Smaia, flag); enableExtension(RvExtension::Smaia, flag); csRegs_.enableAia(flag); }
 
     /// For privileged spec v1.12, we clear mstatus.MPRV if xRET
     /// causes us to enter a privilege mode not Machine.
@@ -2043,6 +2055,9 @@ namespace WdRiscv
     void configVectorLegalizeVsetvliAvl(bool flag)
     { vecRegs_.configVectorLegalizeVsetvliAvl(flag); }
 
+    /// Support memory consistency model (MCM) instruction cache. Read 2 bytes from the
+    /// given address (must be even) into inst. Return true on success.  Return false if
+    /// the line of the given address is not in the cache.
     bool readInstFromFetchCache(uint64_t addr, uint16_t& inst) const
     { return fetchCache_.read(addr, inst); }
 
@@ -3006,6 +3021,12 @@ namespace WdRiscv
     /// at index 0) until numResult is remaining.
     template <typename ELEM_TYPE>
     void doVecFpRedSumAdjacent(std::vector<ELEM_TYPE>& elems, unsigned numElems,
+                              unsigned numResult);
+
+    /// Performs an in-place tree sum reduction on every other vector element (starting
+    /// at index 0) until numResult is remaining.
+    template <typename ELEM_TYPE>
+    void doVecFpRedSumStride(std::vector<ELEM_TYPE>& elems, unsigned numElems,
                               unsigned numResult);
 
     /// Emit a trace record for the given branch instruction or trap in the
@@ -5084,6 +5105,7 @@ namespace WdRiscv
     uint64_t ldStPhysAddr2_ = 0;    // Physical address of 2nd page across page boundary.
     unsigned ldStSize_ = 0;         // Non-zero if ld/st/atomic.
     uint64_t ldStData_ = 0;         // For tracing
+    uint64_t ldStFaultAddr_ = 0;
     bool ldStWrite_ = false;        // True if memory written by last store.
     bool ldStAtomic_ = false;       // True if amo or lr/sc
 

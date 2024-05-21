@@ -269,8 +269,12 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   assert(di.operandCount() <= packet.opVal_.size());
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
-      if (di.ithOperandMode(i) == WdRiscv::OperandMode::None)
-	continue;
+      if (di.ithOperandType(i) == WdRiscv::OperandType::Imm)
+	{
+	  packet.opVal_.at(i) = di.ithOperand(i);
+	  continue;
+	}
+      assert(di.ithOperandMode(i) != WdRiscv::OperandMode::None);
       unsigned regNum = di.ithOperand(i);
       unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
       uint64_t value = 0;
@@ -414,7 +418,10 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   auto& di = packet.decodedInst();
   if (di.isLoad())
-    packet.dsize_ = di.loadSize();
+    {
+      hart.lastLdStAddress(packet.dva_, packet.dpa_);  // FIX TODO : handle page corrsing
+      packet.dsize_ = di.loadSize();
+    }
   else if (di.isStore() or di.isAmo())
     {
       uint64_t sva = 0, spa1 = 0, spa2 = 0, sval = 0;
@@ -876,4 +883,59 @@ PerfApi::shouldFlush(unsigned hartIx, uint64_t time, uint64_t tag, bool& flush,
     }
 
   return true;
+}
+
+
+unsigned
+InstrPac::getSourceOperands(std::array<Operand, 3>& ops)
+{
+  assert(decoded_);
+  if (not decoded_)
+    return 0;
+  
+  unsigned count = 0;
+
+  using OM = WdRiscv::OperandMode;
+
+  for (unsigned i = 0; i < di_.operandCount(); ++i)
+    {
+      if (di_.ithOperandMode(i) == OM::Read or di_.ithOperandMode(i) == OM::ReadWrite or di_.ithOperandType(i) == OperandType::Imm)
+	{
+	  auto& op = ops.at(count);
+	  op.type = di_.ithOperandType(i);
+	  op.number = (di_.ithOperandType(i) == OperandType::Imm) ? 0 : di_.ithOperand(i);
+	  op.value = opVal_.at(i);
+	  ++count;
+	}
+    }
+
+  return count;
+}
+
+
+unsigned
+InstrPac::getDestOperands(std::array<Operand, 2>& ops)
+{
+  assert(decoded_);
+  if (not decoded_)
+    return 0;
+  
+  unsigned count = 0;
+
+  using OM = WdRiscv::OperandMode;
+
+  for (unsigned i = 0; i < di_.operandCount(); ++i)
+    {
+      if (di_.ithOperandMode(i) == OM::Write or di_.ithOperandMode(i) == OM::ReadWrite)
+	{
+	  auto& op = ops.at(count);
+	  op.type = di_.ithOperandType(i);
+	  op.number = di_.ithOperand(i);
+	  op.value = destValues_.at(count).second;
+	  op.prevValue = opVal_.at(i);
+	  ++count;
+	}
+    }
+
+  return count;
 }

@@ -58,17 +58,29 @@ DecodedInst::name() const
 {
   if (entry_)
     {
-      auto id   = entry_->instId();
+      auto id   = instId();
       auto name = std::string(entry_->name());
-      if (id >= InstId::vlre8_v and id <= InstId::vlre1024_v)
-        name = insertFieldCountInName(name, vecFieldCount(), 2);
-      else if ((id >= InstId::vlsege8_v and id <= InstId::vssege1024_v) or
-               (id >= InstId::vlsege8ff_v and id <= InstId::vlsege1024ff_v))
-        name = insertFieldCountInName(name, vecFieldCount(), 5);
-      else if (id >= InstId::vlssege8_v and id <= InstId::vsssege1024_v)
-        name = insertFieldCountInName(name, vecFieldCount(), 6);
-      else if (id >= InstId::vluxsegei8_v and id <= InstId::vsoxsegei1024_v)
-        name = insertFieldCountInName(name, vecFieldCount(), 7);
+
+      if (isVector())
+	{
+	  auto fields = vecFieldCount();
+	  if (fields)
+	    {
+	      // A name like vlre8_v becomes vlrXe8_v where X is the field count.
+	      if (id >= InstId::vlre8_v and id <= InstId::vlre1024_v)
+		name = insertFieldCountInName(name, fields, 2);
+	      else if ((id >= InstId::vlsege8_v and id <= InstId::vssege1024_v) or
+		       (id >= InstId::vlsege8ff_v and id <= InstId::vlsege1024ff_v))
+		name = insertFieldCountInName(name, fields, 5);
+	      else if (id >= InstId::vlssege8_v and id <= InstId::vsssege1024_v)
+		name = insertFieldCountInName(name, fields, 6);
+	      else if (id >= InstId::vluxsegei8_v and id <= InstId::vsoxsegei1024_v)
+		name = insertFieldCountInName(name, fields, 7);
+	    }
+	  else if (id >= InstId::vmadc_vvm and id <= InstId::vmsbc_vxm and not isMasked())
+	    name = name.substr(0, name.size() - 1);  // Remove trailing 'm' if not masked.
+	}
+
       return name;
     }
 

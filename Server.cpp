@@ -186,13 +186,8 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
 
 	if (req.size == 0)
 	  {
-	    if constexpr (sizeof(URV) == 4)
-	      {
-		// Poke a word in 32-bit harts.
-		if (hart.pokeMemory(req.address, uint32_t(req.value), usePma))
-		  return true;
-	      }
-	    else if (hart.pokeMemory(req.address, req.value, usePma))
+	    // Default size is 4 bytes.
+	    if (hart.pokeMemory(req.address, uint32_t(req.value), usePma))
 	      return true;
 	  }
 	else
@@ -337,7 +332,8 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
           case WhisperSpecialResource::IncrementalVec:
             {
               std::vector<uint8_t> fpFlags; std::vector<uint8_t> vxsat;
-              hart.lastIncVec(fpFlags, vxsat);
+              std::vector<VecRegs::Step> steps;
+              hart.lastIncVec(fpFlags, vxsat, steps);
               assert((fpFlags.size() != 0 and vxsat.size() == 0) or
                      (fpFlags.size() == 0 and vxsat.size() != 0));
               for (unsigned i = 0; i < fpFlags.size(); ++i)
@@ -363,7 +359,7 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
               {
                 auto pma = hart.getPma(pa);
                 auto effpbmt = VirtMem::effectivePbmt(hart.lastVirtMode(), hart.lastVsPageMode(),
-                                                      hart.virtMem().lastPbmt(), hart.virtMem().lastPbmt());
+                                                      hart.virtMem().lastVsPbmt(), hart.virtMem().lastPbmt());
                 pma = VirtMem::overridePmaWithPbmt(pma, effpbmt);
                 reply.value = pma.attributesToInt();
               }

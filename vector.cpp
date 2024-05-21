@@ -4673,7 +4673,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  elems = vecRegs_.elemMax();
 
-  if (masked and vd == 0)
+  if ((masked and vd == 0) or di->op1() != 0)
     {
       postVecFail(di);
       return;
@@ -11075,14 +11075,14 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 	  if (faultFirst)
 	    {
 	      if (ix == 0)
-		initiateLoadException(di, cause, pa1, gpa1);
+		initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
 	      else
 		csRegs_.write(CsrNumber::VL, PrivilegeMode::Machine, ix);
 	    }
 	  else
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateLoadException(di, cause, pa1, gpa1);
+	      initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
 	    }
           return false;
         }
@@ -11230,7 +11230,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(di, cause, pa1, gpa1);
+          initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
           return false;
         }
     }
@@ -11434,7 +11434,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateLoadException(di, cause, pa1, gpa1);
+          initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
           return false;
         }
 
@@ -11562,7 +11562,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(di, cause, pa1, gpa1);
+          initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
           return false;
         }
     }
@@ -11754,7 +11754,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateLoadException(di, cause, pa1, gpa1);
+          initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
           return false;
         }
 
@@ -11904,7 +11904,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(di, cause, pa1, gpa1);
+          initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
           return false;
         }
     }
@@ -12060,7 +12060,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateLoadException(di, cause, pa1, gpa1);
+          initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
           return false;
         }
     }
@@ -12289,7 +12289,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       if (cause != ExceptionCause::NONE)
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(di, cause, pa1, gpa1);
+          initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
           return false;
         }
 
@@ -12506,7 +12506,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      if (ix == 0 or not faultFirst)
-		initiateLoadException(di, cause, pa1, gpa1);
+		initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
 	      return false;
 	    }
 
@@ -12677,7 +12677,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	  else
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateStoreException(di, cause, pa1, gpa1);
+	      initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
 	      return false;
 	    }
 	}
@@ -13017,7 +13017,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	  else
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateLoadException(di, cause, pa1, gpa1);
+	      initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
 	      return false;
 	    }
 	}
@@ -13207,7 +13207,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	  if (cause != ExceptionCause::NONE)
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateStoreException(di, cause, pa1, gpa1);
+	      initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
 	      return false;
 	    }
 
@@ -18816,6 +18816,8 @@ Hart<URV>::doVecFpRedSumGroup(std::vector<ELEM_TYPE>& elems, ElementWidth eew, u
   const unsigned numGroupRed = group >> 1;
   const unsigned elemsPerVec = vecRegs_.singleMax(eew);
 
+  using VSO = VecRegs::Step::Operation;
+
   for (unsigned gn = 0; gn < numGroupRed; gn++)
     {
       for (unsigned ix = 0; ix < elemsPerVec; ix++)
@@ -18830,6 +18832,7 @@ Hart<URV>::doVecFpRedSumGroup(std::vector<ELEM_TYPE>& elems, ElementWidth eew, u
           elems.at(elemIx) = result;
           URV incFlags = activeSimulatorFpFlags();
           vecRegs_.fpFlags_.push_back(incFlags);
+          vecRegs_.steps_.emplace_back(VSO::CrossRegRed, e1, e2, result);
         }
     }
 
@@ -18845,6 +18848,8 @@ Hart<URV>::doVecFpRedSumAdjacent(std::vector<ELEM_TYPE>& elems, unsigned numElem
   if (numElems <= numResult)
     return;
 
+  using VSO = VecRegs::Step::Operation;
+
   for (unsigned ix = 0; ix < numElems; ix+=2)
     {
       ELEM_TYPE e1 = elems.at(ix);
@@ -18854,9 +18859,38 @@ Hart<URV>::doVecFpRedSumAdjacent(std::vector<ELEM_TYPE>& elems, unsigned numElem
       elems.at(ix >> 1) = result;
       URV incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
+      vecRegs_.steps_.emplace_back(VSO::AdjacRed, e1, e2, result);
     }
 
   return doVecFpRedSumAdjacent(elems, numElems >> 1, numResult);
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::doVecFpRedSumStride(std::vector<ELEM_TYPE>& elems, unsigned numElems, unsigned numResult)
+{
+  if (numElems <= numResult)
+    return;
+
+  using VSO = VecRegs::Step::Operation;
+
+  unsigned stride = 3;
+  for (unsigned ix = 0; ix < numElems; ix+=stride)
+    {
+      ELEM_TYPE e1 = elems.at(ix);
+      ELEM_TYPE e2 = elems.at(ix + 2);
+
+      ELEM_TYPE result = doFadd(e1, e2);
+      elems.at(ix >> 1) = result;
+      URV incFlags = activeSimulatorFpFlags();
+      vecRegs_.fpFlags_.push_back(incFlags);
+      vecRegs_.steps_.emplace_back(VSO::StrideRed, e1, e2, result);
+      stride ^= 2;
+    }
+
+  return doVecFpRedSumStride(elems, numElems >> 1, numResult);
 }
 
 
@@ -18916,15 +18950,22 @@ Hart<URV>::vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       // Perform adjacent vec register reduce.
       doVecFpRedSumAdjacent(tree, vecRegs_.singleMax(vecRegs_.elemWidth()), 2);
 
+      using VSO = VecRegs::Step::Operation;
+
       // scalar operand in second-to-last step.
-      result = doFadd(tree.at(0), e2);
+      e1 = tree.at(0);
+      result = doFadd(e1, e2);
       URV incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
+      vecRegs_.steps_.emplace_back(VSO::ScalarRed, e1, e2, result);
 
       // remaining operand in last step.
-      result = doFadd(tree.at(1), result);
+      e1 = tree.at(1);
+      e2 = result;
+      result = doFadd(e1, e2);
       incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
+      vecRegs_.steps_.emplace_back(VSO::AdjacRed, e1, e2, result);
     }
 
   // Note: NaN canonicalization when there are no active elements
@@ -19285,7 +19326,10 @@ Hart<URV>::vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
         }
 
       // Perform reduction first for double-wide on register group.
-      doVecFpRedSumAdjacent(tree, vecRegs_.elemMax(), vecRegs_.elemMax() / 2);
+      if constexpr (not std::is_same_v<ELEM_TYPE, Float16>)
+        doVecFpRedSumAdjacent(tree, vecRegs_.elemMax(), vecRegs_.elemMax() / 2);
+      else
+        doVecFpRedSumStride(tree, vecRegs_.elemMax(), vecRegs_.elemMax() / 2);
 
       // Perform group-wise reduction.
       if (group > 8)
@@ -19294,15 +19338,23 @@ Hart<URV>::vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
       // Perform adjacent vec register elements reduce.
       doVecFpRedSumAdjacent(tree, vecRegs_.singleMax(dsew), 2);
 
+      using VSO = VecRegs::Step::Operation;
+
       // scalar operand in second-to-last step.
-      result = doFadd(tree.at(0), result);
+      ELEM_TYPE2X e1dw = tree.at(0);
+      ELEM_TYPE2X e2dw = result;
+      result = doFadd(e1dw, e2dw);
       URV incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
+      vecRegs_.steps_.emplace_back(VSO::ScalarRed, e1dw, e2dw, result);
 
       // remaining operand in last step.
-      result = doFadd(tree.at(1), result);
+      e1dw = tree.at(1);
+      e2dw = result;
+      result = doFadd(e1dw, e2dw);
       incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
+      vecRegs_.steps_.emplace_back(VSO::AdjacRed, e1dw, e2dw, result);
     }
 
   // Note: NaN canonicalization when there are no active elements

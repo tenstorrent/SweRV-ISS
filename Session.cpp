@@ -162,6 +162,10 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
       hart.reset();
     }
 
+  // This needs Smaia extension to be enabled.
+  if (not config.applyImsicConfig(system))
+    return false;
+
   for (unsigned i = 0; i < system.hartCount(); ++i)
     if (not applyCmdLineArgs(args, *system.ithHart(i), config, clib))
       if (not args.interactive)

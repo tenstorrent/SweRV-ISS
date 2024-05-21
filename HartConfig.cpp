@@ -228,7 +228,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 {
   unsigned errors = 0;
   URV reset = 0, mask = 0, pokeMask = 0;
-  bool isDebug = false, exists = true, shared = false;
+  bool exists = true, shared = false;
 
   std::string name(nm);
   if (name == "dscratch")
@@ -240,7 +240,6 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
       reset = csr->getResetValue();
       mask = csr->getWriteMask();
       pokeMask = csr->getPokeMask();
-      isDebug = csr->isDebug();
     }
 
   if (conf.contains("reset"))
@@ -259,9 +258,6 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 
   if (conf.contains("poke_mask"))
     getJsonUnsigned(name + ".poke_mask", conf.at("poke_mask"), pokeMask) or errors++;
-
-  if (conf.contains("debug"))
-    getJsonBoolean(name + ".debug", conf.at("debug"), isDebug) or errors++;
 
   if (conf.contains("exists"))
     getJsonBoolean(name + ".exists", conf.at("exists"), exists) or errors++;
@@ -291,8 +287,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 		}
 	      // If number matches we configure below
 	    }
-	  else if (hart.defineCsr(name, CsrNumber(number), exists,
-				  reset, mask, pokeMask, isDebug))
+	  else if (hart.defineCsr(name, CsrNumber(number), exists, reset, mask, pokeMask))
 	    {
 	      csr = hart.findCsr(name);
 	      assert(csr);
@@ -313,7 +308,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 		<< name << '\n';
       return false;
     }
-  bool exists0 = csr->isImplemented(), isDebug0 = csr->isDebug();
+  bool exists0 = csr->isImplemented();
   bool shared0 = csr->isShared();
   URV reset0 = csr->getResetValue(), mask0 = csr->getWriteMask();
   URV pokeMask0 = csr->getPokeMask();
@@ -333,7 +328,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
   if (errors)
     return false;
 
-  if (not hart.configCsrByUser(name, exists, reset, mask, pokeMask, isDebug, shared))
+  if (not hart.configCsrByUser(name, exists, reset, mask, pokeMask, shared))
     {
       std::cerr << "Invalid CSR (" << name << ") in config file.\n";
       return false;
@@ -365,8 +360,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 
   if (verbose)
     {
-      if (exists0 != exists or isDebug0 != isDebug or reset0 != reset or
-	  mask0 != mask or pokeMask0 != pokeMask)
+      if (exists0 != exists or reset0 != reset or mask0 != mask or pokeMask0 != pokeMask)
 	{
 	  std::cerr << "Configuration of CSR (" << name <<
 	    ") changed in config file:\n";
@@ -374,10 +368,6 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 	  if (exists0 != exists)
 	    std::cerr << "  implemented: " << exists0 << " to "
 		      << exists << '\n';
-
-	  if (isDebug0 != isDebug)
-	    std::cerr << "  debug: " << isDebug0 << " to "
-		      << isDebug << '\n';
 
 	  if (shared0 != shared)
 	    std::cerr << "  shared: " << shared0 << " to "
@@ -965,7 +955,7 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         hart.configVectorTrapVtype(flag);
     }
 
-  tag = "fp_unordered_sum_tree_reduction";
+  tag = "tt_fp_usum_tree_reduction";
   if (vconf.contains(tag))
     {
       bool flag = false;
@@ -1922,7 +1912,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       if (hart.sysHartIndex() == 0)
 	cerr << "Warning: Config tag " << tag << " is deprecated. "
-	     << "Use sstc with --isa instead.\n";
+	     << "Use svinval with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableSvinval(flag);
     }
@@ -1940,6 +1930,9 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_aia";
   if (config_ ->contains(tag))
     {
+      if (hart.sysHartIndex() == 0)
+	cerr << "Warning: Config tag " << tag << " is deprecated. "
+	     << "Use smaia with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableAiaExtension(flag);
     }
@@ -1948,7 +1941,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   if (config_ ->contains(tag))
     {
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
-      hart.enableSmstaten(flag);
+      hart.enableSmstateen(flag);
     }
 
   tag = "wfi_timeout";
@@ -2203,10 +2196,6 @@ HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
 	return false;
     }
 
-  // System configuration.
-  if (not applyImsicConfig(system))
-    return false;
-
   unsigned mbLineSize = 64;
   std::string_view tag = "merge_buffer_line_size";
   if (config_ -> contains(tag))
@@ -2248,7 +2237,22 @@ HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
       if (not getJsonUnsigned(util::join("", tag, ".address"), uart.at("address"), addr) or
           not getJsonUnsigned(util::join("", tag, ".size"), uart.at("size"), size))
 	return false;
-      system.defineUart(addr, size);
+
+      std::string type = "uart8250";
+      if (not uart.contains("type"))
+	std::cerr << "Missing uart type. Using uart250. Valid types: uart8250, usartsf.\n";
+      else
+	{
+	  type = uart.at("type").get<std::string>();
+	  if (type != "uartsf" and type != "uart8250")
+	    {
+	      std::cerr << "Invalid uart type: " << type << ". Valid types: uartsf, uart8250.\n";
+	      return false;
+	    }
+	}
+		
+      if (not system.defineUart(type, addr, size))
+	return false;
     }
 
   if (not applyPciConfig(system))
@@ -2594,3 +2598,9 @@ HartConfig::configInterruptor<uint32_t>(System<uint32_t>& system, Hart<uint32_t>
 template bool
 HartConfig::configInterruptor<uint64_t>(System<uint64_t>& system, Hart<uint64_t>& hart,
 					uint64_t addr) const;
+
+template bool
+HartConfig::applyImsicConfig(System<uint32_t>&) const;
+
+template bool
+HartConfig::applyImsicConfig(System<uint64_t>&) const;

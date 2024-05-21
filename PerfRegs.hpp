@@ -90,8 +90,8 @@ namespace WdRiscv
       DbusError,         // 46: D-bus errors
       IbusBusy,          // 47: Cycles stalled due to Ibus busy 
       DbusBusy,          // 48: Cycles stalled due to Dbus busy 
-      InetrruptDisabled, // 49: Cycles interrupts disabled 
-      InterrutpStall,    // 50: Cycles interrupts stalled while disabled
+      InterruptDisabled, // 49: Cycles interrupts disabled
+      InterruptStall,    // 50: Cycles interrupts stalled while disabled
       Atomic,            // 51: Atomic (amo) instruction
       Lr,                // 52: Load-reserve instruction
       Sc,                // 53: Store-conditional instruction

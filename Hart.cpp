@@ -168,11 +168,10 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory, uint64_t& time)
   csRegs_.findCsr(CsrNumber::FCSR)->tie(&fcsrValue_);
 
   // Configure MHARTID CSR.
-  bool implemented = true, debug = false, shared = false;
+  bool implemented = true, shared = false;
   URV mask = 0, pokeMask = 0;
 
-  csRegs_.configCsr(CsrNumber::MHARTID, implemented, hartId, mask, pokeMask,
-                    debug, shared);
+  csRegs_.configCsr(CsrNumber::MHARTID, implemented, hartId, mask, pokeMask, shared);
 
   // Give disassembler a way to get abi-names of CSRs.
   auto callback = [this](unsigned ix) {
@@ -390,8 +389,16 @@ Hart<URV>::processExtensions(bool verbose)
   if (isa_.isEnabled(RvExtension::Zkr))
     enableZkr(true);
 
+  if (isa_.isEnabled(RvExtension::Zvknha) and
+      isa_.isEnabled(RvExtension::Zvknhb))
+    {
+      std::cerr << "Both Zvknha/b enabled. Using Zvknhb.\n";
+      enableExtension(RvExtension::Zvknha, false);
+    }
+
   enableSsnpm(isa_.isEnabled(RvExtension::Ssnpm));
   enableSmnpm(isa_.isEnabled(RvExtension::Smnpm));
+  enableAiaExtension(isa_.isEnabled(RvExtension::Smaia));
 
   stimecmpActive_ = csRegs_.menvcfgStce();
   vstimecmpActive_ = csRegs_.henvcfgStce();
@@ -714,7 +721,7 @@ Hart<URV>::resetVector()
 	vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/,
 			4 /*maxBytesPerElem*/, nullptr /*minSewPerLmul*/, nullptr);
       unsigned bytesPerReg = vecRegs_.bytesPerRegister();
-      csRegs_.configCsr(CsrNumber::VLENB, true, bytesPerReg, 0, 0, false, false);
+      csRegs_.configCsr(CsrNumber::VLENB, true, bytesPerReg, 0, 0, false /*shared*/);
       uint32_t vstartBits = static_cast<uint32_t>(std::log2(bytesPerReg*8));
       URV vstartMask = (URV(1) << vstartBits) - 1;
       auto csr = csRegs_.findCsr(CsrNumber::VSTART);
@@ -724,7 +731,7 @@ Hart<URV>::resetVector()
 	    std::cerr << "Warning: Write mask of CSR VSTART changed to 0x" << std::hex
 		      << vstartMask << " to be compatible with VLEN=" << std::dec
 		      << (bytesPerReg*8) << '\n';
-	  csRegs_.configCsr(CsrNumber::VSTART, true, 0, vstartMask, vstartMask, false, false);
+	  csRegs_.configCsr(CsrNumber::VSTART, true, 0, vstartMask, vstartMask, false);
 	}
     }
 
@@ -1521,6 +1528,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 {
   uint64_t va1 = URV(addr1);   // Virtual address. Truncate to 32-bits in 32-bit mode.
   uint64_t va2 = va1;
+  ldStFaultAddr_ = va1;
   addr1 = gaddr1 = va1;
   addr2 = gaddr2 = va2;  // Phys addr of 2nd page when crossing page boundary.
 
@@ -1568,36 +1576,11 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
           if (disablePointerMask)
             virtMem_.enablePointerMasking(prevPmm, pm, virt);
           if (cause != EC::NONE)
-	    return cause;
+	    {
+	      ldStFaultAddr_ = addr1;
+	      return cause;
+	    }
         }
-    }
-
-  if (misal)
-    {
-      Pma pma = getPma(addr1);
-      if (not pma.isRead())
-	{
-	  addr1 = va1;
-	  return EC::LOAD_ACC_FAULT;
-	}
-      if (not pma.isMisalignedOk())
-	{
-	  addr1 = va1;  // To report virtual address in MTVAL.
-	  return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
-	}
-      uint64_t aligned = addr1 & ~alignMask;
-      uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
-      pma = getPma(next);
-      if (not pma.isRead())
-	{
-	  addr1 = va2;
-	  return EC::LOAD_ACC_FAULT;
-	}
-      if (not pma.isMisalignedOk())
-	{
-	  addr1 = va2;  // To report virtual address in MTVAL.
-	  return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
-	}
     }
 
   // Physical memory protection. Assuming grain size is >= 8.
@@ -1607,19 +1590,37 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       if (hyper)
 	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
       Pmp pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
-      if (not pmp.isRead(effPm) or (not pmp.isExec(effPm) and virtMem_.isExecForRead()))
+      if (not pmp.isRead(effPm)  or  (virtMem_.isExecForRead() and not pmp.isExec(effPm)))
+	return EC::LOAD_ACC_FAULT;
+    }
+
+  Pma pma = getPma(addr1);
+  if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
+    return EC::LOAD_ACC_FAULT;
+
+  if (misal)
+    {
+      if (not pma.isMisalignedOk())
+	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
+
+      uint64_t aligned = addr1 & ~alignMask;
+      uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
+      ldStFaultAddr_ = va2;
+      pma = getPma(next);
+      if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
+	return EC::LOAD_ACC_FAULT;
+      if (not pma.isMisalignedOk())
+	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
+
+      if (pmpEnabled_)
 	{
-	  addr1 = va1;
-	  return EC::LOAD_ACC_FAULT;
-	}
-      if (misal)
-	{
-	  uint64_t aligned = addr1 & ~alignMask;
-	  uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
+	  auto effPm = effectivePrivilege();
+	  if (hyper)
+	    effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
 	  Pmp pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
-	  if (not pmp2.isRead(effPm) or (not pmp.isExec(effPm) and virtMem_.isExecForRead()))
+	  if (not pmp2.isRead(effPm) or (virtMem_.isExecForRead() and not pmp2.isExec(effPm)))
 	    {
-	      addr1 = va2;
+	      ldStFaultAddr_ = va2;
 	      return EC::LOAD_ACC_FAULT;
 	    }
 	}
@@ -1636,23 +1637,17 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
   if (not misal)
     {
       if (not memory_.checkRead(addr1, ldSize))
-	{
-	  addr1 = va1;
-	  return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
-	}
+	return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
     }
   else
     {
       uint64_t aligned = addr1 & ~alignMask;
       if (not memory_.checkRead(aligned, ldSize))
-	{
-	  addr1 = va1;
-	  return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
-	}
+	return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
       uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
       if (not memory_.checkRead(next, ldSize))
 	{
-	  addr1 = va2;
+	  ldStFaultAddr_ = va2;
 	  return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
 	}
     }
@@ -1833,7 +1828,7 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
     {
       if (triggerTripped_)
         return false;
-      initiateLoadException(di, cause, addr1, gaddr1);
+      initiateLoadException(di, cause, ldStFaultAddr_, gaddr1);
       return false;
     }
   ldStPhysAddr1_ = addr1;
@@ -2032,8 +2027,8 @@ template <typename URV>
 template <typename STORE_TYPE>
 inline
 bool
-Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal,
-		 [[maybe_unused]] bool amoLock)
+Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hyper,
+		 STORE_TYPE storeVal, [[maybe_unused]] bool amoLock)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
@@ -2056,24 +2051,26 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
                    ldStDataTriggerHit(storeVal, timing, isLd)))
       triggerTripped_ = true;
 
-  // Determine if a store exception is possible.
-  uint64_t addr1 = virtAddr, addr2 = virtAddr;
-  uint64_t gaddr1 = virtAddr, gaddr2 = virtAddr;
-  ExceptionCause cause = determineStoreException(addr1, addr2, gaddr1, gaddr2, ldStSize_, hyper);
-  ldStPhysAddr1_ = addr1;
-  ldStPhysAddr2_ = addr2;
+  // Determine if a store exception is possible. Determine sore exception will do address
+  // translation and change pa1/pa2 to physical addresses. Ga1/ga2 are the guest addresses
+  // for 2-stage address translation.
+  uint64_t pa1 = virtAddr, pa2 = virtAddr;
+  uint64_t ga1 = virtAddr, ga2 = virtAddr;
+  ExceptionCause cause = determineStoreException(pa1, pa2, ga1, ga2, ldStSize_, hyper);
+  ldStPhysAddr1_ = pa1;
+  ldStPhysAddr2_ = pa2;
 
   if (triggerTripped_)
     return false;
 
   if (cause != ExceptionCause::NONE)
     {
-      initiateStoreException(di, cause, addr1, gaddr1);
+      initiateStoreException(di, cause, ldStFaultAddr_, ga1);
       return false;
     }
 
   // If addr is special location, then write to console.
-  if (conIoValid_ and addr1 == conIo_)
+  if (conIoValid_ and pa1 == conIo_)
     {
       if (consoleOut_)
 	{
@@ -2086,15 +2083,15 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
 
   if (initStateFile_)
     {
-      dumpInitState("store", virtAddr, addr1);
-      if (addr1 != addr2 or memory_.getLineNumber(addr1) != memory_.getLineNumber(addr1 + ldStSize_))
-	dumpInitState("store", virtAddr + ldStSize_, addr2 + ldStSize_);
+      dumpInitState("store", virtAddr, pa1);
+      if (pa1 != pa2 or memory_.getLineNumber(pa1) != memory_.getLineNumber(pa1 + ldStSize_))
+	dumpInitState("store", virtAddr + ldStSize_, pa2 + ldStSize_);
     }
 
   // If we write to special location, end the simulation.
-  if (toHostValid_ and addr1 == toHost_)
+  if (toHostValid_ and pa1 == toHost_)
     {
-      handleStoreToHost(addr1, storeVal);
+      handleStoreToHost(pa1, storeVal);
       return true;
     }
 
@@ -2110,48 +2107,48 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
       return true;  // Memory updated & lr-canceled when merge buffer is written.
     }
 
-  if (isAclintAddr(addr1))
+  if (isAclintAddr(pa1))
     {
-      assert(addr1 == addr2);
+      assert(pa1 == pa2);
       URV val = storeVal;
-      processClintWrite(addr1, ldStSize_, val);
+      processClintWrite(pa1, ldStSize_, val);
       storeVal = val;
-      memWrite(addr1, addr2, storeVal);
+      memWrite(pa1, pa2, storeVal);
       return true;
     }
-  else if (isInterruptorAddr(addr1, ldStSize_))
+  else if (isInterruptorAddr(pa1, ldStSize_))
     {
       processInterruptorWrite(storeVal);
-      memWrite(addr1, addr2, storeVal);
+      memWrite(pa1, pa2, storeVal);
       return true;
     }
-  else if (isImsicAddr(addr1))
+  else if (isImsicAddr(pa1))
     {
-      imsicWrite_(addr1, sizeof(storeVal), storeVal);
-      memWrite(addr1, addr2, storeVal);
+      imsicWrite_(pa1, sizeof(storeVal), storeVal);
+      memWrite(pa1, pa2, storeVal);
       return true;
     }
-  else if (isPciAddr(addr1))
+  else if (isPciAddr(pa1))
     {
-      if (addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_)
-        pci_->config_mmio<STORE_TYPE>(addr1, storeVal, true);
+      if (pa1 >= pciConfigBase_ and pa1 < pciConfigEnd_)
+        pci_->config_mmio<STORE_TYPE>(pa1, storeVal, true);
       else
-        pci_->mmio<STORE_TYPE>(addr1, storeVal, true);
-      memWrite(addr1, addr2, storeVal);
+        pci_->mmio<STORE_TYPE>(pa1, storeVal, true);
+      memWrite(pa1, pa2, storeVal);
       return true;
     }
 
-  memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
-  if (addr2 != addr1)
-    memory_.invalidateOtherHartLr(hartIx_, addr2, ldStSize_);
+  memory_.invalidateOtherHartLr(hartIx_, pa1, ldStSize_);
+  if (pa2 != pa1)
+    memory_.invalidateOtherHartLr(hartIx_, pa2, ldStSize_);
 
-  memWrite(addr1, addr2, storeVal);
+  memWrite(pa1, pa2, storeVal);
 
   if (dataLineTrace_)
-    memory_.traceDataLine(virtAddr, addr1);
+    memory_.traceDataLine(virtAddr, pa1);
 
   STORE_TYPE temp = 0;
-  memPeek(addr1, addr2, temp, false /*usePma*/);
+  memPeek(pa1, pa2, temp, false /*usePma*/);
   ldStData_ = temp;
   return true;
 
@@ -2360,17 +2357,17 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& phy
   if (virtAddr & 1)
     return ExceptionCause::INST_ADDR_MISAL;
 
+  if (pmpEnabled_)
+    {
+      Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
+      if (not pmp.isExec(privMode_))
+	return ExceptionCause::INST_ACC_FAULT;
+    }
+
   if ((physAddr & 3) == 0 and not mcm_)   // Word aligned
     {
       if (not memory_.readInst(physAddr, inst))
 	return ExceptionCause::INST_ACC_FAULT;
-
-      if (pmpEnabled_)
-        {
-          Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
-          if (not pmp.isExec(privMode_))
-	    return ExceptionCause::INST_ACC_FAULT;
-        }
 
       if (initStateFile_)
 	dumpInitState("fetch", virtAddr, physAddr);
@@ -2378,13 +2375,6 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& phy
       if (isCompressedInst(inst))
 	inst = (inst << 16) >> 16;
       return ExceptionCause::NONE;
-    }
-
-  if (pmpEnabled_)
-    {
-      Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
-      if (not pmp.isExec(privMode_))
-	return ExceptionCause::INST_ACC_FAULT;
     }
 
   uint16_t half = 0;
@@ -3574,32 +3564,29 @@ Hart<URV>::findCsr(std::string_view name)
 template <typename URV>
 bool
 Hart<URV>::configCsr(std::string_view name, bool implemented, URV resetValue,
-                     URV mask, URV pokeMask, bool debug, bool shared)
+                     URV mask, URV pokeMask, bool shared)
 {
-  return csRegs_.configCsr(name, implemented, resetValue, mask, pokeMask,
-			   debug, shared);
+  return csRegs_.configCsr(name, implemented, resetValue, mask, pokeMask, shared);
 }
 
 
 template <typename URV>
 bool
 Hart<URV>::configCsrByUser(std::string_view name, bool implemented, URV resetValue,
-			   URV mask, URV pokeMask, bool debug, bool shared)
+			   URV mask, URV pokeMask, bool shared)
 {
-  return csRegs_.configCsrByUser(name, implemented, resetValue, mask, pokeMask,
-				 debug, shared);
+  return csRegs_.configCsrByUser(name, implemented, resetValue, mask, pokeMask, shared);
 }
 
 
 template <typename URV>
 bool
-Hart<URV>::defineCsr(std::string name, CsrNumber num,
-		     bool implemented, URV resetVal, URV mask,
-		     URV pokeMask, bool isDebug)
+Hart<URV>::defineCsr(std::string name, CsrNumber num, bool implemented, URV resetVal,
+		     URV mask, URV pokeMask)
 {
   bool mandatory = false, quiet = true;
   auto c = csRegs_.defineCsr(std::move(name), num, mandatory, implemented, resetVal,
-			     mask, pokeMask, isDebug, quiet);
+			     mask, pokeMask, quiet);
   return c != nullptr;
 }
 
@@ -3634,10 +3621,9 @@ Hart<URV>::configIsa(std::string_view isa, bool updateMisa)
 	misaReset |= URV(0x200000);
   
       URV mask = 0, pokeMask = 0;
-      bool implemented = true, isDebug = false, shared = true;
+      bool implemented = true, shared = true;
 
-      if (not this->configCsr("misa", implemented, misaReset, mask, pokeMask,
-			      isDebug, shared))
+      if (not this->configCsr("misa", implemented, misaReset, mask, pokeMask, shared))
 	return false;
     }
 
@@ -5232,6 +5218,11 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   using PM = PrivilegeMode;
 
   URV delegVal = csRegs_.peekMideleg();
+  if (isRvaia())
+    {
+      URV mvienVal = peekCsr(CsrNumber::MVIEN);
+      delegVal |= mvienVal;
+    }
   URV hDelegVal = csRegs_.peekHideleg();
 
   // Non-delegated interrupts are destined for machine mode.
@@ -5283,35 +5274,37 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 
   // Check for interrupts destined to VS privilege.
   // Possible if pending (mie), enabled (mip), delegated, and h-delegated.
+  bool vsEnabled = vsstatus_.bits_.SIE  or  (virtMode_ and privMode_ == PM::User);
+  if (not vsEnabled)
+    return false;
+
+#if 0
   if (isRvaia())
     {
       // TODO: cache this
       URV vstopi;
-      if (peekCsr(CsrNumber::VSTOPI, vstopi))
+      if (peekCsr(CsrNumber::VSTOPI, vstopi) and vstopi != 0)
         {
-          if (vstopi != 0 and (vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User)))
-            {
-              cause = static_cast<InterruptCause>(vstopi >> 16);
-              return true;
-            }
+	  cause = static_cast<InterruptCause>(vstopi >> 16);
+	  return true;
         }
     }
-  else
+#endif
+
+  URV vsMask = possible & delegVal & hDelegVal;
+  if (vsMask)
     {
-      URV vs = possible & delegVal & hDelegVal;
-      if ((vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User)) and vs != 0)
-        {
-	  // Only VS interrupts can be delegated in HIDELEG.
-          for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
-            {
-              URV mask = URV(1) << unsigned(ic);
-              if ((vs & mask) != 0)
-                {
-                  cause = ic;
-                  return true;
-                }
-            }
-        }
+      // Only VS interrupts can be delegated in HIDELEG.
+      for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
+				 IC::VS_TIMER } )
+	{
+	  URV mask = URV(1) << unsigned(ic);
+	  if ((vsMask & mask) != 0)
+	    {
+	      cause = ic;
+	      return true;
+	    }
+	}
     }
 
   return false;
@@ -9923,7 +9916,6 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
 
   auto& tlb = virtMode_ ? virtMem_.vsTlb_ : virtMem_.tlb_;
 
-  // Invalidate whole TLB. This is overkill. 
   if (di->op0() == 0 and di->op1() == 0)
     tlb.invalidate();
   else if (di->op0() == 0 and di->op1() != 0)
@@ -9947,6 +9939,7 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       tlb.invalidateVirtualPageAsid(vpn, asid);
     }
 
+#if 0
   if (mcm_)
     fetchCache_.clear();
 
@@ -9960,6 +9953,7 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       for (uint64_t addr = pageStart; addr < last; addr += 4)
         invalidateDecodeCache(addr, 4);
     }
+#endif
 }
 
 
@@ -11137,6 +11131,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 {
   uint64_t va1 = URV(addr1); // Virtual address. Truncate to 32-bits in 32-bit mode.
   uint64_t va2 = va1;        // Used if crossing page boundary
+  ldStFaultAddr_ = va1;
   addr1 = gaddr1 = va1;
   addr2 = gaddr2 = va2;
 
@@ -11146,6 +11141,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 
   using EC = ExceptionCause;
   using PM = PrivilegeMode;
+
 
   // If misaligned exception has priority take exception.
   if (misal)
@@ -11182,36 +11178,11 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
           if (disablePointerMask)
             virtMem_.enablePointerMasking(prevPmm, pm, virt);
           if (cause != EC::NONE)
-	    return cause;
+	    {
+	      ldStFaultAddr_ = addr1;
+	      return cause;
+	    }
         }
-    }
-
-  if (misal)
-    {
-      Pma pma = getPma(addr1);
-      if (not pma.isWrite())
-	{
-	  addr1 = va1;
-	  return EC::STORE_ACC_FAULT;
-	}
-      if (not pma.isMisalignedOk())
-	{
-	  addr1 = va1;  // To report virtual address in MTVAL.
-	  return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
-	}
-      uint64_t aligned = addr1 & ~alignMask;
-      uint64_t next = addr1 == addr2? aligned + stSize : addr2;
-      pma = getPma(next);
-      if (not pma.isWrite())
-	{
-	  addr1 = va2;
-	  return EC::STORE_ACC_FAULT;
-	}
-      if (not pma.isMisalignedOk())
-	{
-	  addr1 = va2;  // To report virtual address in MTVAL.
-	  return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
-	}
     }
 
   // Physical memory protection. Assuming grain size is >= 8.
@@ -11222,18 +11193,41 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
       Pmp pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
       if (not pmp.isWrite(effPm))
+	return EC::STORE_ACC_FAULT;
+    }
+
+  if (misal)
+    {
+      Pma pma = getPma(addr1);
+      if (not pma.isWrite())
+	return EC::STORE_ACC_FAULT;
+
+      if (not pma.isMisalignedOk())
+	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
+
+      uint64_t aligned = addr1 & ~alignMask;
+      uint64_t next = addr1 == addr2? aligned + stSize : addr2;
+      pma = getPma(next);
+      if (not pma.isWrite())
 	{
-	  addr1 = va1;
+	  ldStFaultAddr_ = va2;
 	  return EC::STORE_ACC_FAULT;
 	}
-      if (misal)
+      if (not pma.isMisalignedOk())
 	{
-	  uint64_t aligned = addr1 & ~alignMask;
-	  uint64_t next = addr1 == addr2? aligned + stSize : addr2;
- 	  Pmp pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
+	  ldStFaultAddr_ = va2;  // To report virtual address in MTVAL.
+	  return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
+	}
+
+      if (pmpEnabled_)
+	{
+	  auto effPm = effectivePrivilege();
+	  if (hyper)
+	    effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
+	  Pmp pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
 	  if (not pmp2.isWrite(effPm))
 	    {
-	      addr1 = va2;
+	      ldStFaultAddr_ = va2;
 	      return EC::STORE_ACC_FAULT;
 	    }
 	}
@@ -11244,29 +11238,26 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       if (not stee_.isValidAccess(addr1, stSize))
 	return EC::STORE_ACC_FAULT;
       if (addr2 != addr1 and not stee_.isValidAccess(addr2, stSize))
-	return EC::STORE_ACC_FAULT;
+	{
+	  ldStFaultAddr_ = va2;
+	  return EC::STORE_ACC_FAULT;
+	}
     }
 
   if (not misal)
     {
       if (not memory_.checkWrite(addr1, stSize))
-	{
-	  addr1 = va1;
-	  return EC::STORE_ACC_FAULT;
-	}
+	return EC::STORE_ACC_FAULT;
     }
   else
     {
       uint64_t aligned = addr1 & ~alignMask;
       if (not memory_.checkWrite(aligned, stSize))
-	{
-	  addr1 = va1;
-	  return EC::STORE_ACC_FAULT;
-	}
+	return EC::STORE_ACC_FAULT;
       uint64_t next = addr1 == addr2? aligned + stSize : addr2;
       if (not memory_.checkWrite(next, stSize))
 	{
-	  addr1 = va2;
+	  ldStFaultAddr_ = va2;
 	  return EC::STORE_ACC_FAULT;
 	}
     }

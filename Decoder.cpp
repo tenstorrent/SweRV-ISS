@@ -1495,7 +1495,7 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	  int immed16 = cif.addi16spImmed();
 	  if (immed16 == 0)
 	    { // could be c.mop
-	      if (cif.bits.rd & 1)
+	      if (cif.bits.rd <= 15 and (cif.bits.rd & 1))  // Only odd rd less than or equal 15 is valid.
 		{
 		  op0 = cif.bits.rd ; op1 = cif.addiImmed(); op2 = 0;
 		  return instTable_.getEntry(InstId::c_mop);
@@ -1881,7 +1881,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	  int immed16 = cif.addi16spImmed();
 	  if (immed16 == 0)
 	    { // could be c.mop
-	      if (cif.bits.rd & 1)
+	      if (cif.bits.rd <= 15 and (cif.bits.rd & 1))
 		{
 		  op0 = cif.bits.rd ; op1 = 0; op2 = 0;
 		  encodeLui(op0, op1, op2, expanded);
@@ -2519,7 +2519,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                     op2 = iform.fields2.shamt;
                     return instTable_.getEntry(InstId::slliw);
                   }
-                if (iform.top5() == 1)
+                if (iform.top6() == 2)
                   {
                     op2 = op2 & 0x7f;
                     return instTable_.getEntry(InstId::slli_uw);

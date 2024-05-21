@@ -134,6 +134,10 @@ namespace WdRiscv
 
     /// Encode "remuw rd, rs1, rs2" into this object.
     bool encodeRemuw(unsigned rd, unsigned rs1, unsigned rs2);
+
+    /// Encode "andn rd, rs1, rs2" into this object.
+    bool encodeAndn(unsigned rd, unsigned rs1, unsigned rs2);
+
     uint32_t code;
 
     struct
@@ -227,9 +231,13 @@ namespace WdRiscv
     unsigned top4() const
     { return uimmed() >> 8; }
 
-    /// Return top 5-bits of instruction (for slli.uw).
+    /// Return top 5-bits of instruction (for clzw, ctzw, cpopw).
     unsigned top5() const
     { return uimmed() >> 7; }
+
+    /// Return top 6-bits of instruction (for slli.uw).
+    unsigned top6() const
+    { return uimmed() >> 6; }
 
     /// Return the rs1 bits (for sfence.vma).
     unsigned rs1() const
@@ -1253,6 +1261,11 @@ namespace WdRiscv
   /// Return true on success and false if any of the arguments
   /// are out of bounds.
   bool encodeRemuw(uint32_t, uint32_t, uint32_t, uint32_t& inst);
+
+  /// Encode "andn rd, rs1, rs2" into inst: encodeAndn(rd, rs1, rs2, inst).
+  /// Return true on success and false if any of the arguments
+  /// are out of bounds.
+  bool encodeAndn(uint32_t, uint32_t, uint32_t, uint32_t& inst);
 
   /// Encode "c.beqz rs1p, imm" into inst: encodeCbeqz(rs1, imm, 0, inst).
   /// The third argument (x) is ignored.

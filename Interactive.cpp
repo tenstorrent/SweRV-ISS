@@ -746,7 +746,8 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
       else if (addrStr == "iv")
         {
           std::vector<uint8_t> fpFlags; std::vector<uint8_t> vxsat;
-          hart.lastIncVec(fpFlags, vxsat);
+          std::vector<VecRegs::Step> steps;
+          hart.lastIncVec(fpFlags, vxsat, steps);
           std::reverse(fpFlags.begin(), fpFlags.end());
           std::reverse(vxsat.begin(), vxsat.end());
 
@@ -761,6 +762,24 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
               sep = ",";
             }
           out << "]\n";
+
+          using VS = VecRegs::Step;
+          VS::Operation op = VS::Operation::None;
+          if (not steps.empty())
+            {
+              out << "\nsteps:\n";
+              for (auto step : steps)
+                {
+                  if (op != step.op_)
+                    out << VS::opToStr(step.op_) << "\n";
+
+                  out << "[e1: " << (boost::format("0x%x") % step.operands_.at(0))
+                      << " e2: " << (boost::format("0x%x") % step.operands_.at(1))
+                      << " result: " << (boost::format("0x%x") % step.result_)
+                      << "]\n";
+                  op = step.op_;
+                }
+            }
         }
       else if (addrStr == "trap")
 	out << (hart.lastInstructionTrapped() ? "1" : "0") << std::endl;
@@ -918,7 +937,7 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 
   if (resource == "m")
     {
-      unsigned size = sizeof(URV);
+      unsigned size = 4;  // Default size is 4 bytes.
       if (tokens.size() > 4)
 	if (not parseCmdLineNumber("size", tokens.at(4), size))
 	  return false;
@@ -2242,15 +2261,22 @@ Interactive<URV>::mbbypassCommand(Hart<URV>& hart, const std::string& line,
   if (not parseCmdLineNumber("size", tokens.at(3), size))
     return false;
 
-  if (size > 8)
+  // For the cbo.zero instruction the size may be 8, 32, or 64. Data value must be zero.
+  if (size > 8 and (size % 8) != 0)
     {
-      std::cerr << "Invalid mbbypass size: " << size << " -- Expecting 0 to 8\n";
+      std::cerr << "Invalid mbbypass size: " << size << " -- Expecting 0 to 8 or a multiple of 8\n";
       return false;
     }
 
   uint64_t data = 0;
   if (not parseCmdLineNumber("data", tokens.at(4), data))
     return false;
+
+  if (size > 8 and data != 0)
+    {
+      std::cerr << "Invalid mbbypass data: " << data << " -- Expecting 0 for size grater than 8\n";
+      return false;
+    }
 
   return system_.mcmBypass(hart, this->time_, tag, addr, size, data);
 }

@@ -95,7 +95,7 @@ namespace WdRiscv
     /// page crossing.  On success, gpa1/pa1 will have the physical address
     /// and gpa2/pa2 a copy of pa1 or the physical address of the
     /// subsequent page if the access crosses a page boundary. On
-    /// failuer, either gpa1 or pa1 will have the virtual faulting address
+    /// failure, either gpa1 or pa1 will have the virtual faulting address
     /// depending on if there was a two stage translation and which stage
     /// the fail occured.
     ExceptionCause translateForLdSt2(uint64_t va, unsigned size, PrivilegeMode pm,
