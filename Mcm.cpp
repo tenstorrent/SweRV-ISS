@@ -2706,8 +2706,17 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
   // Rule 10: B has a syntactic data dependency on A
 
   const auto& bdi = instrB.di_;
+
+  if (bdi.isSc() and bdi.op2() == 0)
+    return true;  // No dependency on X0
+
+  if (bdi.isStore() and bdi.op0() == 0)
+    return true;  // No dependency on X0
+
   if (bdi.isStore() or bdi.isAmo())
     {
+      if ((bdi.isSc() and bdi.op1() == 0) or (bdi.isStore() and bdi.op0() == 0))
+	return true;
       uint64_t dataTime = instrB.dataTime_;
 
       for (auto opIx : instrB.memOps_)
