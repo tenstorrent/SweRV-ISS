@@ -1942,12 +1942,21 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
     return true;  // We will try again when B is complete.
 
   auto hartIx = hart.sysHartIndex();
-  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
+  auto earlyB = earliestOpTime(instrB);
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
-      const auto& instrA =  instrVec.at(tag);
+      const auto& op = *iter;
+      if (op.isCanceled()  or  op.hartIx_ != hartIx  or  op.instrTag_ >= instrB.tag_)
+	continue;
+      if (op.time_ < earlyB)
+	break;
+      const auto& instrA =  instrVec.at(op.instrTag_);
+      if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory())
+	continue;
+
       if (not ppoRule1(instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
@@ -2486,14 +2495,22 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 6: B has a release annotation
 
-
   auto hartIx = hart.sysHartIndex();
-  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
+  auto earlyB = earliestOpTime(instrB);
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
-      const auto& instrA =  instrVec.at(tag);
+      const auto& op = *iter;
+      if (op.isCanceled()  or  op.hartIx_ != hartIx  or  op.instrTag_ >= instrB.tag_)
+	continue;
+      if (op.time_ < earlyB)
+	break;
+      const auto& instrA =  instrVec.at(op.instrTag_);
+      if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory())
+	continue;
+
       if (not ppoRule6(instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 6 failed: hart-id=" << hart.hartId()
@@ -2566,12 +2583,21 @@ Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   auto hartIx = hart.sysHartIndex();
-  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
+  auto earlyB = earliestOpTime(instrB);
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
-      const auto& instrA =  instrVec.at(tag);
+      const auto& op = *iter;
+      if (op.isCanceled()  or  op.hartIx_ != hartIx  or  op.instrTag_ >= instrB.tag_)
+	continue;
+      if (op.time_ < earlyB)
+	break;
+      const auto& instrA =  instrVec.at(op.instrTag_);
+      if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory())
+	continue;
+
       if (not ppoRule7(instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 7 failed: hart-id=" << hart.hartId()
@@ -2611,28 +2637,26 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
     return true;  // Score conditional was not successful.
 
   auto hartIx = hart.sysHartIndex();
-  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
-  auto btime = earliestOpTime(instrB);
 
-  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
+  auto earlyB = earliestOpTime(instrB);
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
-      const auto& instrA =  instrVec.at(tag);
-      if (instrA.isCanceled())
+      const auto& op = *iter;
+      if (op.isCanceled()  or  op.hartIx_ != hartIx  or  op.instrTag_ >= instrB.tag_)
 	continue;
-
-      assert(instrA.isRetired());
-
-      // Read happen before retire, instrucions retire in program order, if an instruction
-      // retires before B performs, no eralier instruction can read after B.
-      if (instrA.retireTime_ < btime)
+      if (op.time_ < earlyB)
 	break;
+      const auto& instrA =  instrVec.at(op.instrTag_);
+      if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory())
+	continue;
 
       if (not instrA.di_.isLr())
 	continue;
 
       if (not instrA.complete_ or
-          (not instrB.memOps_.empty() and btime <= latestOpTime(instrA)))
+          (not instrB.memOps_.empty() and earlyB <= latestOpTime(instrA)))
 	{
 	  cerr << "Error: PPO rule 8 failed: hart-id=" << hart.hartId()
 	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
