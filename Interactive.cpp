@@ -2261,15 +2261,22 @@ Interactive<URV>::mbbypassCommand(Hart<URV>& hart, const std::string& line,
   if (not parseCmdLineNumber("size", tokens.at(3), size))
     return false;
 
-  if (size > 8)
+  // For the cbo.zero instruction the size may be 8, 32, or 64. Data value must be zero.
+  if (size > 8 and (size % 8) != 0)
     {
-      std::cerr << "Invalid mbbypass size: " << size << " -- Expecting 0 to 8\n";
+      std::cerr << "Invalid mbbypass size: " << size << " -- Expecting 0 to 8 or a multiple of 8\n";
       return false;
     }
 
   uint64_t data = 0;
   if (not parseCmdLineNumber("data", tokens.at(4), data))
     return false;
+
+  if (size > 8 and data != 0)
+    {
+      std::cerr << "Invalid mbbypass data: " << data << " -- Expecting 0 for size grater than 8\n";
+      return false;
+    }
 
   return system_.mcmBypass(hart, this->time_, tag, addr, size, data);
 }

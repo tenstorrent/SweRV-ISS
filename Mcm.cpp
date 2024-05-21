@@ -393,8 +393,10 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 
       if (not ppoRule1(hart, *instr))
 	result = false;
-      if (not ppoRule3(hart, *instr))
-	result = false;
+
+      if (instr->di_.isAmo())
+	if (not ppoRule3(hart, *instr))
+	  result = false;
 
       // We commit the RTL data to memory but we check them against whisper data
       // (checkRtlWrite below). This is simpler than committing part of whisper
@@ -421,52 +423,89 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
     return false;
 
   unsigned hartIx = hart.sysHartIndex();
-
-  MemoryOp op = {};
-  op.time_ = time;
-  op.physAddr_ = physAddr;
-  op.rtlData_ = rtlData;
-  op.instrTag_ = instrTag;
-  op.hartIx_ = hartIx;
-  op.size_ = size;
-  op.isRead_ = false;
-
-  // If corresponding insruction is retired, compare to its data.
   McmInstr* instr = findOrAddInstr(hartIx, instrTag);
   if (not instr)
     {
-      cerr << "Mcm::bypassOp: Error: Unknown instr tag\n";
-      assert(0 && "Mcm::BypassOp: Unknown instr tag");
+      std::cerr << "Mcm::bypassOp: Error: hart-id=" << hart.hartId() << " time=" << time
+		<< " tag=" << instrTag << " unknown instr tag\n";
       return false;
     }
 
   auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
+  undrained.insert(instrTag);
 
-  if (not instr->retired_)
-    undrained.insert(instrTag);
+  bool result = true;
 
-  // Associate write op with instruction.
-  instr->addMemOp(sysMemOps_.size());
-  sysMemOps_.push_back(op);
-
-  instr->complete_ = checkStoreComplete(*instr);
-  if (instr->complete_)
-    undrained.erase(instrTag);
-
-  bool result = pokeHartMemory(hart, physAddr, rtlData, size);
-
-  if (instr->retired_)
+  if (size > 8)
     {
-      result = checkRtlWrite(hart.hartId(), *instr, op) and result;
-      if (instr->complete_)
+      if (instr->di_.instId() != InstId::cbo_zero or (size % 8) != 0)
 	{
-	  result = ppoRule1(hart, *instr) and result;
-	  result = ppoRule3(hart, *instr) and result;
+	  std::cerr << "Mcm::byppassOp: Error: hart-id=" << hart.hartId() << " time=" << time
+		    << " invalid size: " << size << '\n';
+	  return false;
+	}
+      uint64_t lineStart = physAddr & ~(uint64_t(lineSize_) - 1);
+      if (physAddr + size - lineStart > lineSize_)
+	return false;
+
+      if ((physAddr % 8) != 0)
+	return false;
+
+      if (rtlData != 0)
+	return false;
+
+      for (unsigned i = 0; i < size; i += 8)
+	{
+	  uint64_t addr = physAddr + i;
+	  MemoryOp op = {};
+	  op.time_ = time;
+	  op.physAddr_ = addr;
+	  op.rtlData_ = rtlData;
+	  op.instrTag_ = instrTag;
+	  op.hartIx_ = hartIx;
+	  op.size_ = 8;
+	  op.isRead_ = false;
+
+	  // Associate write op with instruction.
+	  instr->addMemOp(sysMemOps_.size());
+	  sysMemOps_.push_back(op);
+
+	  result = pokeHartMemory(hart, addr, 0, 8) and result;
 	}
     }
   else
     {
-      // TODO: Mark instruction to avoid poking memory in retireStore
+      MemoryOp op = {};
+      op.time_ = time;
+      op.physAddr_ = physAddr;
+      op.rtlData_ = rtlData;
+      op.instrTag_ = instrTag;
+      op.hartIx_ = hartIx;
+      op.size_ = size;
+      op.isRead_ = false;
+
+      // Associate write op with instruction.
+      instr->addMemOp(sysMemOps_.size());
+      sysMemOps_.push_back(op);
+
+      result = pokeHartMemory(hart, physAddr, rtlData, size) and result;
+    }
+
+  instr->complete_ = checkStoreComplete(*instr);
+  if (instr->complete_)
+    {
+      undrained.erase(instrTag);
+      if (instr->retired_)
+	{
+	  for (auto opIx : instr->memOps_)
+	    {
+	      auto& op = sysMemOps_.at(opIx);
+	      if (not op.isCanceled() and not op.isRead_)
+		result = checkRtlWrite(hart.hartId(), *instr, op) and result;
+	    }
+	  result = ppoRule1(hart, *instr) and result;
+	  result = ppoRule3(hart, *instr) and result;
+	}
     }
 
   return result;
@@ -516,6 +555,60 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 
 template <typename URV>
 bool
+Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
+{
+  uint64_t vaddr = 0, paddr = 0;
+  if (not hart.lastCmo(vaddr, paddr))
+    assert(0);
+
+  instrB.size_ = lineSize_;
+  instrB.virtAddr_ = vaddr;
+  instrB.physAddr_ = paddr;
+  instrB.physAddr2_ = paddr;
+  instrB.data_ = 0;   // Determined at bypass time.
+
+  // All preceeding (in program order) overlapping stores/amos must have drained.
+  unsigned hartIx = hart.sysHartIndex();
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& pendingWrites = hartPendingWrites_.at(hartIx);
+
+  McmInstrIx limit = instrB.tag_ >= windowSize_ ? instrB.tag_ - windowSize_ : 0;
+  bool ok = true;
+
+  // Check for preceding incomplete stores (not all bytes written). Check for
+  // stores still in the store buffer.
+  for (McmInstrIx tag = instrB.tag_; tag > limit; --tag)
+    {
+      const auto& instrA =  instrVec.at(tag - 1);
+      if (instrA.isCanceled() or not instrA.isStore_ or not instrA.di_.isAmo())
+	continue;
+
+      if (not instrA.isRetired() or not instrA.di_.isValid())
+	{
+	  cerr << "Mcm::retireCmo: Instruction A invalid/not-retired\n";
+	  assert(0 && "Mcm::retireCmo: Instruction A invalid/not-retired");
+	}
+
+      if (not instrA.complete_)
+	ok = false;
+      else
+	{	  // Check for preceding stores still in store buffer.
+	  for (auto& op : pendingWrites)
+	    if (op.instrTag_ == instrA.tag_)
+	      ok = false;
+	}
+
+      if (not ok)
+	cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
+	     << instrA.tag_ << " tag2=" << instrB.tag_ << " (CMO)\n";
+    }
+
+  return ok;
+}
+
+
+template <typename URV>
+bool
 Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		 const DecodedInst& di, bool trapped)
 {
@@ -553,9 +646,13 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (instr->di_.instId() == InstId::sfence_w_inval)
     return checkSfenceWInval(hart, *instr);
 
+  if (di.isCmo())
+    return retireCmo(hart, *instr);
 
   // If instruction is a store, save address, size, and written data.
-  bool ok = retireStore(hart, *instr);
+  bool ok = true;
+  if (di.isStore() or di.isAmo())
+    ok = retireStore(hart, *instr);
 
   // Check read operations of instruction comparing RTL values to
   // memory model (whisper) values.
@@ -572,19 +669,21 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
     }
 
   // Amo sanity check.
-  if (di.instEntry()->isAmo())
+  if (di.isAmo())
     {
+      URV hartId = hart.hartId();
+
       // Must have a read.  Must not have a write.
       if (not instrHasRead(*instr))
 	{
-	  cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << tag
+	  cerr << "Error: Hart-id=" << hartId << " tag=" << tag
 	       << " amo instruction retired before read op.\n";
 	  ok = false;
 	}
 
       if (not instrHasWrite(*instr))
 	{
-	  cerr << "Warning: Hart-id=" << hart.hartId() << " tag=" << tag
+	  cerr << "Warning: Hart-id=" << hartId << " tag=" << tag
 	       << " amo instruction retired without a write op.\n";
 	  return false;
 	}
@@ -595,16 +694,16 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   setProducerTime(hartIx, *instr);
   updateDependencies(hart, *instr);
 
-  if (instr->isStore_ and instr->complete_)
+  if ((instr->isStore_ or di.isAmo()) and instr->complete_)
     {
       ok = checkStoreData(hartIx, *instr) and ok;
       ok = ppoRule1(hart, *instr) and ok;
-      ok = ppoRule3(hart, *instr) and ok;
     }
 
   assert(di.isValid());
 
   ok = ppoRule2(hart, *instr) and ok;
+  ok = ppoRule3(hart, *instr) and ok;
   ok = processFence(hart, *instr) and ok;  // ppo rule 4.
   ok = ppoRule5(hart, *instr) and ok;
   ok = ppoRule6(hart, *instr) and ok;
@@ -822,8 +921,9 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 
   // Compare covered writes.
   bool result = true;
-  for (unsigned i = 0; i < line.size(); ++i)
-    if (rtlMask.at(i) and (line.at(i) != rtlData.at(i)))
+  size_t count = std::min(line.size(), rtlData.size());
+  for (unsigned i = 0; i < count; ++i)
+    if ((rtlMask.empty() or rtlMask.at(i)) and (line.at(i) != rtlData.at(i)))
       {
 	reportMismatch(hart.hartId(), time, "merge buffer write", physAddr + i,
 		       rtlData.at(i), line.at(i));
@@ -1842,12 +1942,21 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
     return true;  // We will try again when B is complete.
 
   auto hartIx = hart.sysHartIndex();
-  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
+  auto earlyB = earliestOpTime(instrB);
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
-      const auto& instrA =  instrVec.at(tag);
+      const auto& op = *iter;
+      if (op.isCanceled()  or  op.hartIx_ != hartIx  or  op.instrTag_ >= instrB.tag_)
+	continue;
+      if (op.time_ < earlyB)
+	break;
+      const auto& instrA =  instrVec.at(op.instrTag_);
+      if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory())
+	continue;
+
       if (not ppoRule1(instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
@@ -1889,18 +1998,25 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   if (instrB.forwarded_)
     return true;  // NA: B's data obtained entirely from local hart.
 
+  auto earlyB = earliestOpTime(instrB);
+
   unsigned hartIx = hart.sysHartIndex();
-  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
   // Bit i of mask is 1 if ith byte of data of B is not written by a preceeding store from
   // the same hart.
   unsigned mask = (1 << instrB.size_) - 1;
 
-  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
-      const auto& instrA =  instrVec.at(tag);
-      if (instrA.isCanceled() or not instrA.isMemory() or not instrA.overlaps(instrB))
+      const auto& op = *iter;
+      if (op.isCanceled() or op.hartIx_ != hartIx or op.instrTag_ >= instrB.tag_)
+	continue;
+      if (op.time_ < earlyB)
+	break;
+      const auto& instrA =  instrVec.at(op.instrTag_);
+      if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory()  or
+	  not instrA.overlaps(instrB))
 	continue;
 
       // Clear mask bits corresponding to bytes of B written by a preceeding store (A).
@@ -1986,20 +2102,25 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.complete_)
     return true;  // We will try again when B is complete.
 
+  auto earlyB = earliestOpTime(instrB);
+
   // Bit i of mask is 1 if byte i of data of instruction B is not written by a preceeding
   // store.
   unsigned mask = (1 << instrB.size_) - 1;
 
   unsigned hartIx = hart.sysHartIndex();
-  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
-      const auto& instrA =  instrVec.at(tag);
-      if (instrA.isCanceled())
+      const auto& op = *iter;
+      if (op.isCanceled() or op.hartIx_ != hartIx or op.instrTag_ >= instrB.tag_)
 	continue;
-      assert(instrA.isRetired());
+      if (op.time_ < earlyB)
+	break;
+      const auto& instrA =  instrVec.at(op.instrTag_);
+      if (instrA.isCanceled() or not instrA.isRetired())
+	continue;
 
       if (not instrA.isStore_ or not instrA.overlaps(instrB))
 	continue;
@@ -2017,7 +2138,7 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 	{
 	  cerr << "Error: PPO rule 3 failed: hart-id=" << hart.hartId() << " tag1="
 	       << instrA.tag_ << " tag2=" << instrB.tag_ << " time1="
-	       << latestOpTime(instrA) << " time2=" << earliestOpTime(instrB)
+	       << latestOpTime(instrA) << " time2=" << earlyB
 	       << '\n';
 	  return false;
 	}
@@ -2243,6 +2364,7 @@ template <typename URV>
 bool
 Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrA, const McmInstr& instrB) const
 {
+  // Rule 5: A has an acquire annotation.
   if (instrA.isCanceled() or not instrA.isMemory())
     return true;
 
@@ -2297,11 +2419,20 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
-  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
 
-  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
+  auto earlyB = earliestOpTime(instrB);
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
-      const auto& instrA =  instrVec.at(tag);
+      const auto& op = *iter;
+      if (op.isCanceled() or op.hartIx_ != hartIx or op.instrTag_ >= instrB.tag_)
+	continue;
+      if (op.time_ < earlyB)
+	break;
+      const auto& instrA =  instrVec.at(op.instrTag_);
+      if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory())
+	continue;
+
       if (not ppoRule5(hart, instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 5 failed: hart-id=" << hart.hartId()
@@ -2364,14 +2495,22 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 6: B has a release annotation
 
-
   auto hartIx = hart.sysHartIndex();
-  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
+  auto earlyB = earliestOpTime(instrB);
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
-      const auto& instrA =  instrVec.at(tag);
+      const auto& op = *iter;
+      if (op.isCanceled()  or  op.hartIx_ != hartIx  or  op.instrTag_ >= instrB.tag_)
+	continue;
+      if (op.time_ < earlyB)
+	break;
+      const auto& instrA =  instrVec.at(op.instrTag_);
+      if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory())
+	continue;
+
       if (not ppoRule6(instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 6 failed: hart-id=" << hart.hartId()
@@ -2444,12 +2583,21 @@ Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   auto hartIx = hart.sysHartIndex();
-  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
+  auto earlyB = earliestOpTime(instrB);
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
-      const auto& instrA =  instrVec.at(tag);
+      const auto& op = *iter;
+      if (op.isCanceled()  or  op.hartIx_ != hartIx  or  op.instrTag_ >= instrB.tag_)
+	continue;
+      if (op.time_ < earlyB)
+	break;
+      const auto& instrA =  instrVec.at(op.instrTag_);
+      if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory())
+	continue;
+
       if (not ppoRule7(instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 7 failed: hart-id=" << hart.hartId()
@@ -2489,28 +2637,26 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
     return true;  // Score conditional was not successful.
 
   auto hartIx = hart.sysHartIndex();
-  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
-  auto btime = earliestOpTime(instrB);
 
-  for (McmInstrIx tag = instrB.tag_ - 1; tag > minTag; --tag)
+  auto earlyB = earliestOpTime(instrB);
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
-      const auto& instrA =  instrVec.at(tag);
-      if (instrA.isCanceled())
+      const auto& op = *iter;
+      if (op.isCanceled()  or  op.hartIx_ != hartIx  or  op.instrTag_ >= instrB.tag_)
 	continue;
-
-      assert(instrA.isRetired());
-
-      // Read happen before retire, instrucions retire in program order, if an instruction
-      // retires before B performs, no eralier instruction can read after B.
-      if (instrA.retireTime_ < btime)
+      if (op.time_ < earlyB)
 	break;
+      const auto& instrA =  instrVec.at(op.instrTag_);
+      if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory())
+	continue;
 
       if (not instrA.di_.isLr())
 	continue;
 
       if (not instrA.complete_ or
-          (not instrB.memOps_.empty() and btime <= latestOpTime(instrA)))
+          (not instrB.memOps_.empty() and earlyB <= latestOpTime(instrA)))
 	{
 	  cerr << "Error: PPO rule 8 failed: hart-id=" << hart.hartId()
 	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
@@ -2560,8 +2706,17 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
   // Rule 10: B has a syntactic data dependency on A
 
   const auto& bdi = instrB.di_;
+
+  if (bdi.isSc() and bdi.op2() == 0)
+    return true;  // No dependency on X0
+
+  if (bdi.isStore() and bdi.op0() == 0)
+    return true;  // No dependency on X0
+
   if (bdi.isStore() or bdi.isAmo())
     {
+      if ((bdi.isSc() and bdi.op1() == 0) or (bdi.isStore() and bdi.op0() == 0))
+	return true;
       uint64_t dataTime = instrB.dataTime_;
 
       for (auto opIx : instrB.memOps_)
