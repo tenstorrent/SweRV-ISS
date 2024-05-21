@@ -1583,16 +1583,16 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       if (hyper)
 	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
       Pmp pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
-      if (not pmp.isRead(effPm) or (not pmp.isExec(effPm) and virtMem_.isExecForRead()))
+      if (not pmp.isRead(effPm)  or  (virtMem_.isExecForRead() and not pmp.isExec(effPm)))
 	return EC::LOAD_ACC_FAULT;
     }
 
+  Pma pma = getPma(addr1);
+  if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
+    return EC::LOAD_ACC_FAULT;
+
   if (misal)
     {
-      Pma pma = getPma(addr1);
-      if (not pma.isRead())
-	return EC::LOAD_ACC_FAULT;
-
       if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
 
@@ -1600,7 +1600,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
       ldStFaultAddr_ = va2;
       pma = getPma(next);
-      if (not pma.isRead())
+      if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
 	return EC::LOAD_ACC_FAULT;
       if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
@@ -1611,7 +1611,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	  if (hyper)
 	    effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
 	  Pmp pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
-	  if (not pmp2.isRead(effPm) or (not pmp2.isExec(effPm) and virtMem_.isExecForRead()))
+	  if (not pmp2.isRead(effPm) or (virtMem_.isExecForRead() and not pmp2.isExec(effPm)))
 	    {
 	      ldStFaultAddr_ = va2;
 	      return EC::LOAD_ACC_FAULT;
