@@ -444,6 +444,12 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 		    << " invalid size: " << size << '\n';
 	  return false;
 	}
+      if (rtlData != 0)
+	{
+	  std::cerr << "Mcm::byppassOp: Error: hart-id=" << hart.hartId() << " time=" << time
+		    << " invalid data (must be 0) for a cbo.zero instruction: " << rtlData << '\n';
+	  return false;
+	}
       uint64_t lineStart = physAddr & ~(uint64_t(lineSize_) - 1);
       if (physAddr + size - lineStart > lineSize_)
 	return false;
