@@ -11409,6 +11409,9 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
   unsigned vd = di->op0(), rs1 = di->op1();
 
+  if (not checkVecOpsVsEmul(di, vd, groupX8))
+    return false;
+
   unsigned elemBytes = VecRegs::elemWidthInBytes(eew);
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
   URV addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
@@ -11535,6 +11538,9 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
     }
 
   unsigned vd = di->op0(), rs1 = di->op1();
+
+  if (not checkVecOpsVsEmul(di, vd, groupX8))
+    return false;
 
   unsigned elemSize = 1;
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemSize / 8;
