@@ -1044,8 +1044,8 @@ bool
 Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
 		       const MemoryOp& op) const
 {
-  // This is disabled until we resolve discrepancy over CLINT between
-  // whisper config file and RTL.
+  // This is disabled until we resolve discrepancy over CLINT between whisper config file
+  // and RTL.
   return true;
 
   if (op.size_ > instr.size_)
@@ -1387,6 +1387,10 @@ trimOp(MemoryOp& op, uint64_t addr, unsigned size)
       if (op.physAddr_ + op.size_ > addr + size)
 	op.size_ = addr + size - op.physAddr_;  // Trim wide op.
     }
+
+  unsigned n = sizeof(op.data_) - op.size_;  // Unused most sig bytes.
+  op.data_ = ((op.data_) << n*8) >> n*8;
+  op.rtlData_ = ((op.rtlData_) << n*8) >> n*8;
 }
 
 
