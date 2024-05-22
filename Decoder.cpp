@@ -2286,7 +2286,32 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0b10101:
           return decodeVec(inst, op0, op1, op2, op3);
 
-        case 0b10110:
+        case 0b10110:  //  R-form custom vector opcode.
+	  {
+	    RFormInst rform(inst);
+            op0 = rform.bits.rd;
+            op1 = rform.bits.rs2;  // Operand order reversed
+            op2 = rform.bits.rs1;
+	    unsigned f3 = rform.bits.funct3, f6 = rform.top6();
+	    const InstEntry& illegal = instTable_.getEntry(InstId::illegal);
+
+	    if (f3 == 2)
+	      {
+		if (f6 == 0b101100) return instTable_.getEntry(InstId::vqdot_vv);
+		if (f6 == 0b101000) return instTable_.getEntry(InstId::vqdotu_vv);
+		if (f6 == 0b101010) return instTable_.getEntry(InstId::vqdotsu_vv);
+	      }
+	    else if (f3 == 6)
+	      {
+		if (f6 == 0b101100) return instTable_.getEntry(InstId::vqdot_vx);
+		if (f6 == 0b101000) return instTable_.getEntry(InstId::vqdotu_vx);
+		if (f6 == 0b101010) return instTable_.getEntry(InstId::vqdotsu_vx);
+		if (f6 == 0b101110) return instTable_.getEntry(InstId::vqdotsu_vx);
+	      }
+
+	    return illegal;
+	  }
+
         case 0b10111:
         case 0b11010:
           return instTable_.getEntry(InstId::illegal);

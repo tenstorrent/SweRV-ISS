@@ -6983,6 +6983,70 @@ InstTable::setupInstVec()
 	OperandType::Imm, OperandMode::None, 0xc0000000,
       },
 
+      // Vector dot product.
+      { "vqdot.vv", InstId::vqdot_vv,
+        0b101100'0'00000'00000'010'00000'1011011, // Opcode
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        RvExtension::V, RvFormat::R,
+        OperandType::IntReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
+      },
+
+      { "vqdot.vx", InstId::vqdot_vx,
+        0b101100'0'00000'00000'110'00000'1011011, // Opcode
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        RvExtension::V, RvFormat::R,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs2Mask,
+      },
+
+      { "vqdotu.vv", InstId::vqdotu_vv,
+        0b101000'0'00000'00000'010'00000'1011011, // Opcode
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        RvExtension::V, RvFormat::R,
+        OperandType::IntReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
+      },
+
+      { "vqdotu.vx", InstId::vqdotu_vx,
+        0b101000'0'00000'00000'110'00000'1011011, // Opcode
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        RvExtension::V, RvFormat::R,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs2Mask,
+      },
+
+      { "vqdotsu.vv", InstId::vqdotsu_vv,
+        0b101010'0'00000'00000'010'00000'1011011, // Opcode
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        RvExtension::V, RvFormat::R,
+        OperandType::IntReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
+      },
+
+      { "vqdotsu.vx", InstId::vqdotsu_vx,
+        0b101010'0'00000'00000'110'00000'1011011, // Opcode
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        RvExtension::V, RvFormat::R,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs2Mask,
+      },
+
+      { "vqdotus.vx", InstId::vqdotus_vx,
+        0b101110'0'00000'00000'110'00000'1011011, // Opcode
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        RvExtension::V, RvFormat::R,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs2Mask,
+      },
+
       // TLB invalidate (svinval)
 
       { "sinval.vma", InstId::sinval_vma, 0x16000073, 0xfe007fff,

@@ -9050,6 +9050,34 @@ Hart<URV>::execute(const DecodedInst* di)
       execSm4ks(di);
       return;
 
+    case InstId::vqdot_vv:
+      execVqdot_vv(di);
+      return;
+
+    case InstId::vqdot_vx:
+      execVqdot_vx(di);
+      return;
+
+    case InstId::vqdotu_vv:
+      execVqdotu_vv(di);
+      return;
+
+    case InstId::vqdotu_vx:
+      execVqdotu_vx(di);
+      return;
+
+    case InstId::vqdotsu_vv:
+      execVqdotsu_vv(di);
+      return;
+
+    case InstId::vqdotsu_vx:
+      execVqdotsu_vx(di);
+      return;
+
+    case InstId::vqdotus_vx:
+      execVqdotus_vx(di);
+      return;
+
     case InstId::sinval_vma:
       execSinval_vma(di);
       return;

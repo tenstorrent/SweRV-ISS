@@ -1027,6 +1027,15 @@ namespace WdRiscv
      sm4ed,
      sm4ks,
 
+     // Vector dot product.
+     vqdot_vv,
+     vqdot_vx,
+     vqdotu_vv,
+     vqdotu_vx,
+     vqdotsu_vv,
+     vqdotsu_vx,
+     vqdotus_vx,
+
      // TLB invalidate (svinval)
      sinval_vma,
      sfence_w_inval,

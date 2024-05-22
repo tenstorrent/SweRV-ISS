@@ -4838,6 +4838,15 @@ namespace WdRiscv
     void execSm4ed(const DecodedInst*);
     void execSm4ks(const DecodedInst*);
 
+    // Dot product (non standard) exntesion
+    void execVqdot_vv(const DecodedInst*);
+    void execVqdot_vx(const DecodedInst*);
+    void execVqdotu_vv(const DecodedInst*);
+    void execVqdotu_vx(const DecodedInst*);
+    void execVqdotsu_vv(const DecodedInst*);
+    void execVqdotsu_vx(const DecodedInst*);
+    void execVqdotus_vx(const DecodedInst*);
+
     void execSinval_vma(const DecodedInst*);
     void execSfence_w_inval(const DecodedInst*);
     void execSfence_inval_ir(const DecodedInst*);
