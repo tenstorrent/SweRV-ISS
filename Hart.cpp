@@ -1568,13 +1568,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	}
       if (pm != PM::Machine)
         {
-          bool disablePointerMask = not hyper and mstatusMprv() and mstatus_.bits_.MXR;
-          VirtMem::Pmm prevPmm = virtMem_.pmMode(pm, virt);
-          if (disablePointerMask)
-            virtMem_.enablePointerMasking(VirtMem::Pmm::Off, pm, virt);
 	  auto cause = virtMem_.translateForLoad2(va1, ldSize, pm, virt, gaddr1, addr1, gaddr2, addr2);
-          if (disablePointerMask)
-            virtMem_.enablePointerMasking(prevPmm, pm, virt);
           if (cause != EC::NONE)
 	    {
 	      ldStFaultAddr_ = addr1;
@@ -9926,14 +9920,12 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
   else if (di->op0() != 0 and di->op1() == 0)
     {
       URV addr = intRegs_.read(di->op0());
-      addr = virtMem_.applyPointerMask(addr, privMode_, virtMode_);
       uint64_t vpn = virtMem_.pageNumber(addr);
       tlb.invalidateVirtualPage(vpn);
     }
   else
     {
       URV addr = intRegs_.read(di->op0());
-      addr = virtMem_.applyPointerMask(addr, privMode_, virtMode_);
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV asid = intRegs_.read(di->op1());
       tlb.invalidateVirtualPageAsid(vpn, asid);
@@ -11170,13 +11162,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	}
       if (pm != PM::Machine)
         {
-          bool disablePointerMask = not hyper and mstatusMprv() and mstatus_.bits_.MXR;
-          VirtMem::Pmm prevPmm = virtMem_.pmMode(pm, virt);
-          if (disablePointerMask)
-            virtMem_.enablePointerMasking(VirtMem::Pmm::Off, pm, virt);
 	  auto cause = virtMem_.translateForStore2(va1, stSize, pm, virt, gaddr1, addr1, gaddr2, addr2);
-          if (disablePointerMask)
-            virtMem_.enablePointerMasking(prevPmm, pm, virt);
           if (cause != EC::NONE)
 	    {
 	      ldStFaultAddr_ = addr1;

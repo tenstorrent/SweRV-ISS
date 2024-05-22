@@ -233,7 +233,7 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
     }
   else
     {
-      va = (exec or xForR_)? va : applyPointerMaskVa(va, priv, false);
+      va = (exec or xForR_ or execReadable_)? va : applyPointerMaskVa(va, priv, false);
       pa = va;
     }
 
@@ -440,7 +440,9 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
   // Exactly one of read/write/exec must be true.
   assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
-  va = (exec or xForR_)? va : applyPointerMask(va, priv, true);
+  bool mxr = execReadable_ or
+             (vsMode_ != Mode::Bare? s1ExecReadable_ : false);
+  va = (exec or xForR_ or mxr)? va : applyPointerMask(va, priv, true);
 
   if (vsMode_ == Mode::Bare)
     gpa = pa = va;
