@@ -10443,7 +10443,7 @@ Hart<URV>::checkCsrAccess(const DecodedInst* di, CsrNumber csr, bool isWrite)
 
 
   // Section 2.3 of AIA, lower priority than stateen. Doesn't follow normal hs-qualified rules.
-  if (not imsicAccessible(di, csr, privMode_, virtMode_))
+  if (isRvaia() and not imsicAccessible(di, csr, privMode_, virtMode_))
     return false;
 
   if (csr == CN::SATP and privMode_ == PM::Supervisor)
