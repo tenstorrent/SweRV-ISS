@@ -575,47 +575,32 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
   if (instrB.di_.instId() == InstId::cbo_zero)
     instrB.isStore_ = true;
 
+  bool ok = true;
+
   auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
   instrB.complete_ = checkStoreComplete(instrB);
   if (instrB.complete_)
-    undrained.erase(instrB.tag_);
+    {
+      undrained.erase(instrB.tag_);
+      ok = ppoRule1(hart, instrB);
+    }
   else
     undrained.insert(instrB.tag_);
 
   // All preceeding (in program order) overlapping stores/amos must have drained.
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
-  const auto& pendingWrites = hartPendingWrites_.at(hartIx);
 
-  McmInstrIx limit = instrB.tag_ >= windowSize_ ? instrB.tag_ - windowSize_ : 0;
-  bool ok = true;
-
-  // Check for preceding incomplete stores (not all bytes written). Check for
-  // stores still in the store buffer.
-  for (McmInstrIx tag = instrB.tag_; tag > limit; --tag)
+  // Check for preceding incomplete stores (not all bytes written).
+  for (auto storeTag : undrained)
     {
-      const auto& instrA =  instrVec.at(tag - 1);
-      if (instrA.isCanceled() or not instrA.isStore_ or not instrA.di_.isAmo())
-	continue;
+      const auto& instrA =  instrVec.at(storeTag);
+      if (instrA.tag_ >= instrB.tag_)
+	break;
 
-      if (not instrA.isRetired() or not instrA.di_.isValid())
-	{
-	  cerr << "Mcm::retireCmo: Instruction A invalid/not-retired\n";
-	  assert(0 && "Mcm::retireCmo: Instruction A invalid/not-retired");
-	}
-
-      if (not instrA.complete_)
-	ok = false;
-      else
-	{	  // Check for preceding stores still in store buffer.
-	  for (auto& op : pendingWrites)
-	    if (op.instrTag_ == instrA.tag_)
-	      ok = false;
-	}
-
-      if (not ok)
-	cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
-	     << instrA.tag_ << " tag2=" << instrB.tag_ << " (CMO)\n";
+      cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
+	   << instrA.tag_ << " tag2=" << instrB.tag_ << " (CMO)\n";
+      ok = false;
     }
 
   return ok;
