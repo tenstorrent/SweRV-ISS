@@ -575,6 +575,13 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
   if (instrB.di_.instId() == InstId::cbo_zero)
     instrB.isStore_ = true;
 
+  auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
+  instrB.complete_ = checkStoreComplete(instrB);
+  if (instrB.complete_)
+    undrained.erase(instrB.tag_);
+  else
+    undrained.insert(instrB.tag_);
+
   // All preceeding (in program order) overlapping stores/amos must have drained.
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
@@ -1218,6 +1225,17 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
 {
   if (instr.isCanceled() or not instr.isStore_)
     return false;
+
+  if (instr.di_.instId() == InstId::cbo_zero)
+    {
+      unsigned count = 0;
+      for (auto opIx : instr.memOps_)
+	{
+	  const auto& op = sysMemOps_.at(opIx);
+	  count += op.size_;
+	}
+      return count == lineSize_;
+    }
 
   unsigned expectedMask = (1 << instr.size_) - 1;  // Mask of bytes covered by instruction.
   unsigned writeMask = 0;   // Mask of bytes covered by write operations.
