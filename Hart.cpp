@@ -1583,7 +1583,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       auto effPm = effectivePrivilege();
       if (hyper)
 	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-      Pmp pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
+      const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
       if (not pmp.isRead(effPm)  or  (virtMem_.isExecForRead() and not pmp.isExec(effPm)))
 	return EC::LOAD_ACC_FAULT;
     }
@@ -1611,7 +1611,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	  auto effPm = effectivePrivilege();
 	  if (hyper)
 	    effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-	  Pmp pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
+	  const Pmp& pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
 	  if (not pmp2.isRead(effPm) or (virtMem_.isExecForRead() and not pmp2.isExec(effPm)))
 	    {
 	      ldStFaultAddr_ = va2;
@@ -2353,7 +2353,7 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& phy
 
   if (pmpEnabled_)
     {
-      Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
+      const Pmp& pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
       if (not pmp.isExec(privMode_))
 	return ExceptionCause::INST_ACC_FAULT;
     }
@@ -2402,7 +2402,7 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& phy
 
   if (pmpEnabled_)
     {
-      Pmp pmp2 = pmpManager_.accessPmp(physAddr2, PmpManager::AccessReason::Fetch);
+      const Pmp& pmp2 = pmpManager_.accessPmp(physAddr2, PmpManager::AccessReason::Fetch);
       if (not pmp2.isExec(privMode_))
 	{
 	  virtAddr += 2; // To report faulting portion of fetch.
@@ -11205,7 +11205,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       auto effPm = effectivePrivilege();
       if (hyper)
 	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-      Pmp pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
+      const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
       if (not pmp.isWrite(effPm))
 	return EC::STORE_ACC_FAULT;
     }
@@ -11238,7 +11238,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	  auto effPm = effectivePrivilege();
 	  if (hyper)
 	    effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-	  Pmp pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
+	  const Pmp& pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
 	  if (not pmp2.isWrite(effPm))
 	    {
 	      ldStFaultAddr_ = va2;

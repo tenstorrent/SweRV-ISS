@@ -2016,7 +2016,7 @@ namespace WdRiscv
       auto fetchMem =  [this](uint64_t addr, uint32_t& value) -> bool {
 	if (pmpEnabled_)
 	  {
-	    Pmp pmp = pmpManager_.accessPmp(addr, PmpManager::AccessReason::Fetch);
+	    const Pmp& pmp = pmpManager_.accessPmp(addr, PmpManager::AccessReason::Fetch);
 	    if (not pmp.isExec(privMode_))
 	      return false;
 	  }

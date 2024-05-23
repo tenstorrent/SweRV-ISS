@@ -581,7 +581,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
       // already accounts for MPRV.
       if (pmpMgr_.isEnabled())
 	{
-	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	  const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
 	  if (not pmp.isRead(privMode))
 	    return accessFaultType(read, write, exec);
 	}
@@ -650,7 +650,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	  // already accounts for MPRV.
 	  if (pmpMgr_.isEnabled())
 	    {
-	      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	      const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
 	      if (not pmp.isWrite(privMode))
 		return accessFaultType(read, write, exec);
 	    }
@@ -747,7 +747,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       // already accounts for MPRV.
       if (pmpMgr_.isEnabled())
 	{
-	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	  const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
 	  if (not pmp.isRead(privMode))
 	    return accessFaultType(read, write, exec);
 	}
@@ -814,7 +814,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  // already accounts for MPRV.
 	  if (pmpMgr_.isEnabled())
 	    {
-	      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	      const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
 	      if (not pmp.isWrite(privMode))
 		return accessFaultType(read, write, exec);
 	    }
@@ -921,7 +921,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       // already accounts for MPRV.
       if (pmpMgr_.isEnabled())
 	{
-	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	  const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
 	  if (not pmp.isRead(privMode))
 	    return accessFaultType(read, write, exec);
 	}
@@ -992,7 +992,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  // already accounts for MPRV.
 	  if (pmpMgr_.isEnabled())
 	    {
-	      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	      const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
 	      if (not pmp.isWrite(privMode))
 		return accessFaultType(read, write, exec);
 	    }
