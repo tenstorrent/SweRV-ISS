@@ -588,7 +588,7 @@ namespace WdRiscv
       vxsat_.clear();
       steps_.clear();
       clearLastWrittenReg();
-      opsEmul_.assign(opsEmul_.size(), 1);
+      setOpEmul(1, 1, 1);
     }
 
     /// Clear the number denoting the last written register.
