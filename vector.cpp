@@ -882,7 +882,16 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal, bool isVtypeImm)
           if (rd != 0 and rs1 == 0)
             elems = vlmax;
           else if (rd == 0 and rs1 == 0)
-            elems = peekCsr(CsrNumber::VL);  // Keep current value of VL.
+	    {
+	      // Section 6.2 of vector spec. Cannot change VLMAX. This should apply to
+	      // both vsetvl and vsetvli. However the instructions are implemented by
+	      // different tribes. One tribe takes an exception, the other legalizes VL.
+	      unsigned prevVlmax = vecRegs_.vlmax();
+	      if (vlmax != prevVlmax and not isVtypeImm)
+		vill = true;
+
+	      elems = peekCsr(CsrNumber::VL);  // Keep current value of VL.
+	    }
           else  // strip mining
             {
               URV avl = intRegs_.read(rs1);  // Application vector length.
