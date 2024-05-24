@@ -887,7 +887,7 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal, bool isVtypeImm)
 	      // both vsetvl and vsetvli. However the instructions are implemented by
 	      // different tribes. One tribe takes an exception, the other legalizes VL.
 	      unsigned prevVlmax = vecRegs_.vlmax();
-	      if (vlmax != prevVlmax and not isVtypeImm)
+	      if (vlmax != prevVlmax and isVtypeImm)
 		vill = true;
 
 	      elems = peekCsr(CsrNumber::VL);  // Keep current value of VL.
