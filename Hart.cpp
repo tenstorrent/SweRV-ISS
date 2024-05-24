@@ -547,13 +547,9 @@ template <typename URV>
 void
 Hart<URV>::updateAddressTranslation()
 {
-  bool invalidate = false; // Invalidate decode cache.
-
   URV value = 0;
   if (peekCsr(CsrNumber::SATP, value))
     {
-      uint32_t prevAsid = virtMode_ ? virtMem_.vsAsid() : virtMem_.asid();
-
       SatpFields<URV> satp(value);
       if constexpr (sizeof(URV) != 4)
 	if ((satp.bits_.MODE >= 1 and satp.bits_.MODE <= 7) or satp.bits_.MODE >= 12)
@@ -571,15 +567,10 @@ Hart<URV>::updateAddressTranslation()
 	  virtMem_.setAsid(satp.bits_.ASID);
 	  virtMem_.setRootPage(satp.bits_.PPN);
 	}
-
-      if (satp.bits_.ASID != prevAsid)
-	invalidate = true;
     }
 
   if (peekCsr(CsrNumber::VSATP, value))
     {
-      uint32_t prevAsid = virtMem_.vsAsid();
-
       SatpFields<URV> satp(value);
       if constexpr (sizeof(URV) != 4)
 	if ((satp.bits_.MODE >= 1 and satp.bits_.MODE <= 7) or satp.bits_.MODE >= 12)
@@ -588,26 +579,15 @@ Hart<URV>::updateAddressTranslation()
       virtMem_.setVsMode(VirtMem::Mode(satp.bits_.MODE));
       virtMem_.setVsAsid(satp.bits_.ASID);
       virtMem_.setVsRootPage(satp.bits_.PPN);
-
-      if (satp.bits_.ASID != prevAsid)
-	invalidate = true;
     }
 
   if (peekCsr(CsrNumber::HGATP, value))
     {
-      uint32_t prevVmid = virtMem_.vmid();
-
       HgatpFields<URV> hgatp(value);
       virtMem_.setStage2Mode(VirtMem::Mode(hgatp.bits_.MODE));
       virtMem_.setVmid(hgatp.bits_.VMID);
       virtMem_.setStage2RootPage(hgatp.bits_.PPN);
-
-      if (hgatp.bits_.VMID != prevVmid)
-	invalidate = true;
     }
-
-  if (invalidate)
-    invalidateDecodeCache();
 }
 
 
@@ -2092,7 +2072,8 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   ldStWrite_ = true;
   ldStData_ = storeVal;
 
-  invalidateDecodeCache(virtAddr, ldStSize_);
+  invalidateDecodeCache(pa1, ldStSize_); // this could be smaller
+  invalidateDecodeCache(pa2, ldStSize_);
 
   if (ooo_)
     {

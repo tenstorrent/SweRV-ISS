@@ -70,8 +70,6 @@ Hart<URV>::execHfence_vvma(const DecodedInst* di)
       URV asid = intRegs_.read(di->op1());
       tlb.invalidateVirtualPageAsid(vpn, asid);
     }
-
-  invalidateDecodeCache();
 }
 
 
@@ -130,8 +128,6 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
       else
 	tlb.invalidateVmid(vmid);
     }
-
-  invalidateDecodeCache();
 }
 
 
