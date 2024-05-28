@@ -744,7 +744,11 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
   if (args.toHost)
     hart.setToHostAddress(*args.toHost);
   if (args.fromHost)
-    hart.setFromHostAddress(*args.fromHost);
+    hart.setFromHostAddress(*args.fromHost, true);
+
+  // We turn off fromhost when interactive mode is used.
+  if (args.interactive)
+    hart.setFromHostAddress(0, false);
 
   // Command-line entry point overrides that of ELF.
   if (args.startPc)

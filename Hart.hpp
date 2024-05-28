@@ -762,8 +762,8 @@ namespace WdRiscv
     /// address of the instruction is identical to the given address.
     void setToHostAddress(uint64_t address);
 
-    void setFromHostAddress(uint64_t addr)
-    { fromHost_ = addr; fromHostValid_ = true; }
+    void setFromHostAddress(uint64_t addr, bool enabled)
+    { fromHost_ = addr; fromHostValid_ = enabled; }
 
     /// Undefine address to which a write will stop the simulator
     void clearToHostAddress();
