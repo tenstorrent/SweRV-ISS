@@ -363,12 +363,13 @@ Interactive<URV>::peekAllCsrs(Hart<URV>& hart, std::ostream& out)
 	  out << (boost::format("%-23s") % oss.str())
               << (boost::format(hexForm) % val);
 
-	  URV reset = 0, writeMask = 0, pokeMask = 0;
-	  if (hart.peekCsr(csr, val, reset, writeMask, pokeMask))
+	  URV reset = 0, writeMask = 0, pokeMask = 0, readMask = 0;
+	  if (hart.peekCsr(csr, val, reset, writeMask, pokeMask, readMask))
 	    {
 	      out << ' ' << (boost::format(hexForm) % reset);
 	      out << ' ' << (boost::format(hexForm) % writeMask);
 	      out << ' ' << (boost::format(hexForm) % pokeMask);
+	      out << ' ' << (boost::format(hexForm) % readMask);
 	    }
 	  out << '\n';
 	}
@@ -430,9 +431,9 @@ Interactive<URV>::peekAllTriggers(Hart<URV>& hart, std::ostream& out)
 
 
   // value/reset/write-mask/poke-mask
-  URV tselVal = 0, tselReset, tselWm = 0, tselPm = 0;
+  URV tselVal = 0, tselReset, tselWm = 0, tselPm = 0, tselRm;
 
-  if (hart.peekCsr(CsrNumber::TSELECT, tselVal, tselReset, tselWm, tselPm))
+  if (hart.peekCsr(CsrNumber::TSELECT, tselVal, tselReset, tselWm, tselPm, tselRm))
     {
       URV maxTrigger = tselWm;
       for (URV trigger = 0; trigger <= maxTrigger; ++trigger)

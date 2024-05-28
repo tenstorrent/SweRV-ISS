@@ -281,12 +281,13 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
       break;
     case 'c':
       {
-	URV reset = 0, mask = 0, pokeMask = 0;
-	if (hart.peekCsr(CsrNumber(req.address), value, reset, mask, pokeMask))
+	URV reset = 0, mask = 0, pokeMask = 0, readMask = 0;
+	if (hart.peekCsr(CsrNumber(req.address), value, reset, mask, pokeMask, readMask))
 	  {
 	    reply.value = value;
 	    reply.address = mask;
 	    reply.time = pokeMask;
+            reply.instrTag = readMask;
 	    return true;
 	  }
       }

@@ -233,11 +233,11 @@ namespace WdRiscv
     URV peekCsr(CsrNumber csr) const;
 
     /// Set val, reset, writeMask, and pokeMask respectively to the
-    /// value, reset-value, write-mask and poke-mask of the control
-    /// and status register csr returning true on success. Return
-    /// false leaving parameters unmodified if csr is out of bounds.
+    /// value, reset-value, write-mask, poke-mask, and read-mask of
+    /// the control and status register csr returning true on success.
+    /// Return false leaving parameters unmodified if csr is out of bounds.
     bool peekCsr(CsrNumber csr, URV& val, URV& reset, URV& writeMask,
-		 URV& pokeMask) const;
+		 URV& pokeMask, URV& readMask) const;
 
     /// Set val/name to the value/name of the control and status
     /// register csr returning true on success. Return false leaving

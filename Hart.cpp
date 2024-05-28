@@ -3114,7 +3114,7 @@ Hart<URV>::peekCsr(CsrNumber csrn) const
 template <typename URV>
 bool
 Hart<URV>::peekCsr(CsrNumber csrn, URV& val, URV& reset, URV& writeMask,
-		   URV& pokeMask) const
+		   URV& pokeMask, URV& readMask) const
 { 
   const Csr<URV>* csr = csRegs_.getImplementedCsr(csrn);
   if (not csr)
@@ -3126,6 +3126,7 @@ Hart<URV>::peekCsr(CsrNumber csrn, URV& val, URV& reset, URV& writeMask,
   reset = csr->getResetValue();
   writeMask = csr->getWriteMask();
   pokeMask = csr->getPokeMask();
+  readMask = csr->getReadMask();
   return true;
 }
 
