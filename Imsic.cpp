@@ -104,8 +104,9 @@ File::iregWrite(unsigned sel, URV val)
       for (int i = end-1; i >= begin; i--)
         {
           vec[i] = (val >> (i - begin)) & 1;
+
           bool active = pending_[i] and enabled_[i];
-          if (unsigned(i) < topId_ and active)
+          if ((topId_ == 0 or unsigned(i) < topId_) and active)
             topId_ = i;
         }
     }
