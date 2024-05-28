@@ -587,7 +587,11 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
   else
     undrained.insert(instrB.tag_);
 
-  // All preceeding (in program order) overlapping stores/amos must have drained.
+  if (instrB.di_.instId() == InstId::cbo_zero)
+    return ok;
+
+  // For cbo.flush/clean, all preceeding (in program order) overlapping stores/amos must
+  // have drained.
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
@@ -597,6 +601,9 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
       const auto& instrA =  instrVec.at(storeTag);
       if (instrA.tag_ >= instrB.tag_)
 	break;
+
+      if (instrA.isCanceled() or not instrA.overlaps(instrB))
+	continue;
 
       cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
 	   << instrA.tag_ << " tag2=" << instrB.tag_ << " (CMO)\n";
