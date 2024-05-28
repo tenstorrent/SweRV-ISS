@@ -475,7 +475,8 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 	      gpa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
 	    }
 	}
-      else
+
+      if (not entry or not entry->valid_)
 	{
 	  TlbEntry tlbEntry;
 	  auto cause = stage1TranslateNoTlb(va, priv, read, write, exec, gpa, tlbEntry);
