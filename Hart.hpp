@@ -5025,6 +5025,7 @@ namespace WdRiscv
 
     URV fromHost_ = 0;
     bool fromHostValid_ = false;
+    unsigned pendingHtifGetc_ = 0; // Count of pending HTIF get-character requests.
 
     URV conIo_ = 0;              // Writing a byte to this writes to console.
     bool conIoValid_ = false;    // True if conIo_ is valid.

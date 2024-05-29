@@ -1986,14 +1986,12 @@ Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
 	  int ch = readCharNonBlocking(syscall_.effectiveFd(STDIN_FILENO));
 	  if (ch > 0)
 	    memory_.poke(fromHost_, ((val >> 48) << 48) | uint64_t(ch), true);
+	  else
+	    ++pendingHtifGetc_;
 	}
     }
-  else if (dev == 0 and cmd == 0)
-    {
-      if (storeVal & 1)
-	throw CoreException(CoreException::Stop, "write to to-host",
-			    toHost_, val);
-    }
+  else if (dev == 0 and cmd == 0 and (storeVal & 1))
+    throw CoreException(CoreException::Stop, "write to to-host", toHost_, val);
 }
 
 
@@ -2200,9 +2198,9 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 	      if ((addr & 7) == 0 and aclintDeliverInterrupts_)
 		hart->aclintAlarm_ = storeVal + 10000;
 
-	      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
+	      // An htif_getc may be pending, send char back to target.
 	      auto inFd = syscall_.effectiveFd(STDIN_FILENO);
-	      if (fromHostValid_ and hasPendingInput(inFd))
+	      if (pendingHtifGetc_ and hasPendingInput(inFd))
 		{
 		  uint64_t v = 0;
 		  peekMemory(fromHost_, v, true);
@@ -2210,7 +2208,10 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 		    {
 		      int c = char(readCharNonBlocking(inFd));
 		      if (c > 0)
-			memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
+			{
+			  memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
+			  --pendingHtifGetc_;
+			}
 		    }
 		}
 	    }
@@ -3342,9 +3343,9 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 
   if (csr == CN::STIMECMP)
     {
-      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
+      // An htif_getc may be pending, send char back to target.
       auto inFd = syscall_.effectiveFd(STDIN_FILENO);
-      if (fromHostValid_ and hasPendingInput(inFd))
+      if (pendingHtifGetc_ and hasPendingInput(inFd))
         {
           uint64_t v = 0;
           peekMemory(fromHost_, v, true);
@@ -3352,7 +3353,10 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
             {
               int c = char(readCharNonBlocking(inFd));
               if (c > 0)
-                memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
+		{
+		  memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
+		  --pendingHtifGetc_;
+		}
             }
         }
     }
