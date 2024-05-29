@@ -727,6 +727,19 @@ Example:
        "max_bytes_per_lmul" : { "mf8" : 4 }
     }
 ```
+
+###  aclint
+The advanced core local interruptor (aclint) configuration is an object with the following fields:
+* base: base address of the memory area associated with the ACLINT.
+* sw_offset: offset to software interrupt region within the ACLINT area).
+* timer_offset: offset to timer within the ACLINT area.
+* time_offset: offset to time-compare region within the ACLINT area).
+* software_interrupt_on_reset: when set to true, write to software interrupt of core 0 on reset.
+* deliver_interrupts: when set to true, deliver ACLNT interrupts. This supports the
+  test-bench which may decode to deliver ACLINT interrupts by poking the MIP CSR, in which
+  case deliver_interrupts should be set to false.
+
+
 ###  reset_vec
 Defines the program counter (PC) value after reset. The ELF file
 entry point will supersede the reset_vec value unless --raw is
