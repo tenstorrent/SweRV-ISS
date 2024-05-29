@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <vector>
 #include <string>
+#include <bit>
 #include "trapEnums.hpp"
 
 namespace WdRiscv
@@ -647,16 +648,10 @@ namespace WdRiscv
     {
       // Pre-compute mask for a masked compare (match == 1 in mcontrol).
       data2CompareMask_ = ~URV(0);
-      unsigned leastSigZeroBit = 0; // Index of least sig zero bit
-      URV value = data2_;
-      while (value & 1)
-	{
-	  leastSigZeroBit++;
-	  value >>= 1;
-	}
-      if (leastSigZeroBit == 8*sizeof(URV) - 1)
+      unsigned leastSigZeroBit = std::countr_one(data2_); // Index of least sig zero bit
+      if (leastSigZeroBit >= 8*sizeof(URV) - 1)
         data2CompareMask_ = 0;
-      else if (leastSigZeroBit < 8*sizeof(URV))
+      else
         data2CompareMask_ = data2CompareMask_ << (leastSigZeroBit + 1);
     }
 
