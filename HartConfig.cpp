@@ -1331,7 +1331,7 @@ bool
 HartConfig::configAclint(System<URV>& system, Hart<URV>& hart, uint64_t clintStart,
                          uint64_t mswiOffset, bool hasMswi,
                          uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
-		         bool siOnReset) const
+		         bool siOnReset, bool deliverInterrupts) const
 {
   // Define callback to recover a hart from a hart index. We do
   // this to avoid having the Hart class depend on the System class.
@@ -1340,15 +1340,15 @@ HartConfig::configAclint(System<URV>& system, Hart<URV>& hart, uint64_t clintSta
   };
 
   hart.configAclint(clintStart + mswiOffset, hasMswi, clintStart + mtimerOffset,
-                   clintStart + mtimeOffset, hasMtimer, siOnReset, indexToHart);
+		    clintStart + mtimeOffset, hasMtimer, siOnReset, deliverInterrupts,
+		    indexToHart);
   return true;
 }
 
 
 template<typename URV>
 bool
-HartConfig::configInterruptor(System<URV>& system, Hart<URV>& hart,
-			      uint64_t addr) const
+HartConfig::configInterruptor(System<URV>& system, Hart<URV>& hart, uint64_t addr) const
 {
   // Define callback to recover a hart from a hart index. We do
   // this to avoid having the Hart class depend on the System class.
@@ -1984,7 +1984,8 @@ HartConfig::applyClintConfig(System<URV>& system, Hart<URV>& hart) const
     }
 
   return configAclint(system, hart, addr, 0 /* swOffset */, true /* hasMswi */,
-                      0x4000 /* timerOffset */, 0xbff8 /* timeOffset */, true /* hasMtimer */);
+                      0x4000 /* timerOffset */, 0xbff8 /* timeOffset */, true /* hasMtimer */,
+		      false /*siOnReset*/, true /*deliverInterrupts*/);
 }
 
 
@@ -2083,8 +2084,14 @@ HartConfig::applyAclintConfig(System<URV>& system, Hart<URV>& hart) const
         }
     }
 
-  return configAclint(system, hart, base, swOffset, hasMswi,
-                     timerOffset, timeOffset, hasMtimer, siOnReset);
+  bool deliverInterrupts = true;
+  tag = "deliver_interrupts";
+  if (aclint.contains(tag))
+    if (not getJsonBoolean("aclint.deliver_interrupts", aclint.at(tag), deliverInterrupts))
+      return false;
+
+  return configAclint(system, hart, base, swOffset, hasMswi, timerOffset, timeOffset,
+		      hasMtimer, siOnReset, deliverInterrupts);
 }
 
 
@@ -2584,12 +2591,12 @@ template bool
 HartConfig::configAclint<uint32_t>(System<uint32_t>&, Hart<uint32_t>&, uint64_t clintStart,
                                    uint64_t mswiOffset, bool hasMswi,
                                    uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
-		                   bool siOnReset = false) const;
+		                   bool siOnReset = false, bool deliverInterrupts = true) const;
 template bool
 HartConfig::configAclint<uint64_t>(System<uint64_t>&, Hart<uint64_t>&, uint64_t clintStart,
                                    uint64_t mswiOffset, bool hasMswi,
                                    uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
-		                   bool siOnReset = false) const;
+		                   bool siOnReset = false, bool deliverInterrupts = true) const;
 
 template bool
 HartConfig::configInterruptor<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,

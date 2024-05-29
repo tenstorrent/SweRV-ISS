@@ -2143,7 +2143,8 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
       if (hart and stSize == 4 and (addr & 3) == 0)
 	{
 	  storeVal = storeVal & 1;  // Only bit zero is implemented.
-          hart->setSwInterrupt((1 << 1) | storeVal);
+	  if (aclintDeliverInterrupts_)
+	    hart->setSwInterrupt((1 << 1) | storeVal);
 	  return;
 	}
     }
@@ -2181,7 +2182,7 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
       auto hart = indexToHart_(hartIx);
       if (hart and (stSize == 4 or stSize == 8))
 	{
-	  if (stSize == 4)
+	  if (stSize == 4 and aclintDeliverInterrupts_)
 	    {
 	      if ((addr & 7) == 0)  // Multiple of 8
 		{
@@ -2196,7 +2197,7 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 	    }
 	  else if (stSize == 8)
 	    {
-	      if ((addr & 7) == 0)
+	      if ((addr & 7) == 0 and aclintDeliverInterrupts_)
 		hart->aclintAlarm_ = storeVal + 10000;
 
 	      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
@@ -2497,12 +2498,6 @@ Hart<URV>::initiateInterrupt(InterruptCause cause, URV pc)
   bool interrupt = true;
   URV info = 0;  // This goes into mtval.
   initiateTrap(nullptr, interrupt, URV(cause), pc, info);
-
-#if 0
-  // Operating system code does this by writing to CLINT.
-  if (cause == InterruptCause::M_SOFTWARE)
-    setSwInterrupt(0);
-#endif
 
   if (not enableCounters_ or not hasActivePerfCounter())
     return;
@@ -5322,7 +5317,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       URV mipVal = csRegs_.peekMip();
       URV prev = mipVal;
 
-      if (hasAclint())
+      if (hasAclint() and aclintDeliverInterrupts_)
 	{
 	  // Deliver/clear machine timer interrupt from clint.
 	  if (time_ >= aclintAlarm_ + timeShift_)
@@ -5346,7 +5341,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	    }
 	}
 
-      if (swInterrupt_.bits_.alarm_)
+      if (swInterrupt_.bits_.alarm_ and aclintDeliverInterrupts_)
         {
 	  if (swInterrupt_.bits_.flag_)
 	    {

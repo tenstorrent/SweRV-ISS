@@ -79,7 +79,7 @@ namespace WdRiscv
     bool configAclint(System<URV>&, Hart<URV>&, uint64_t clintStart,
                       uint64_t mswiOffset, bool hasMswi,
                       uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
-		      bool siOnReset = false) const;
+		      bool siOnReset = false, bool deliverInterrupts = true) const;
 
     template<typename URV>
     bool configInterruptor(System<URV>&, Hart<URV>&, uint64_t addr) const;

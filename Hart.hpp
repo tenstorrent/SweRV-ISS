@@ -596,7 +596,7 @@ namespace WdRiscv
     /// Define memory mapped locations for CLINT.
     void configAclint(uint64_t mswiOffset, bool hasMswi,
                       uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
-		      bool softwareInterruptOnReset,
+		      bool softwareInterruptOnReset, bool deliverInterrupts,
                       std::function<Hart<URV>*(unsigned ix)> indexToHart)
     {
       if (hasMswi)
@@ -613,6 +613,7 @@ namespace WdRiscv
           aclintMtimeEnd_ = mtimeOffset + 0x8;
         }
       aclintSiOnReset_ = softwareInterruptOnReset;
+      aclintDeliverInterrupts_ = deliverInterrupts;
       indexToHart_ = indexToHart;
     }
 
@@ -5037,6 +5038,7 @@ namespace WdRiscv
     uint64_t aclintMtimeEnd_ = 0;
     uint64_t aclintAlarm_ = ~uint64_t(0); // Interrupt when timer >= this
     bool aclintSiOnReset_ = false;
+    bool aclintDeliverInterrupts_ = true;
     std::function<Hart<URV>*(unsigned ix)> indexToHart_ = nullptr;
 
     // True if we want to defer an interrupt for later. By default, take immediately.
