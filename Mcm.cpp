@@ -574,45 +574,49 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
   instrB.physAddr_ = paddr;
   instrB.physAddr2_ = paddr;
   instrB.data_ = 0;   // Determined at bypass time.
+
   if (instrB.di_.instId() == InstId::cbo_zero)
-    instrB.isStore_ = true;
-
-  bool ok = true;
-
-  auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
-  instrB.complete_ = checkStoreComplete(instrB);
-  if (instrB.complete_)
     {
-      undrained.erase(instrB.tag_);
-      ok = ppoRule1(hart, instrB);
-    }
-  else
-    undrained.insert(instrB.tag_);
+      instrB.isStore_ = true;  // To enable forwarding
 
-  if (instrB.di_.instId() == InstId::cbo_zero)
-    return ok;
+      auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
+      instrB.complete_ = checkStoreComplete(instrB);
+      if (instrB.complete_)
+	{
+	  undrained.erase(instrB.tag_);
+	  return ppoRule1(hart, instrB);
+	}
+      else
+	undrained.insert(instrB.tag_);
+
+      return true;
+    }
 
   // For cbo.flush/clean, all preceeding (in program order) overlapping stores/amos must
   // have drained.
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& undrained = hartUndrainedStores_.at(hartIx);
 
-  // Check for preceding incomplete stores (not all bytes written).
   for (auto storeTag : undrained)
     {
       const auto& instrA =  instrVec.at(storeTag);
       if (instrA.tag_ >= instrB.tag_)
 	break;
 
-      if (instrA.isCanceled() or not instrA.overlaps(instrB))
+      if (instrA.isCanceled())
 	continue;
 
-      cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
-	   << instrA.tag_ << " tag2=" << instrB.tag_ << " (CMO)\n";
-      ok = false;
+      const DecodedInst& di = instrA.di_;
+      if ((di.isStore() or di.isAmo()) and instrA.overlaps(instrB))
+	{
+	  cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
+	       << instrA.tag_ << " tag2=" << instrB.tag_ << " (CMO)\n";
+	  return false;
+	}
     }
 
-  return ok;
+  return true;
 }
 
 
@@ -630,8 +634,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   McmInstr* instr = findOrAddInstr(hartIx, tag);
   if (instr->retired_)
     {
-      cerr << "Mcm::retire: Error: Time=" << time << " hart-id=" << hartIx << " tag="
-	   << tag << " Instruction retired multiple times\n";
+      cerr << "Mcm::retire: Error: Time=" << time << " hart-id=" << hart.hartId()
+	   << " tag=" << tag << " Instruction retired multiple times\n";
       return false;
     }
 
@@ -663,8 +667,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (di.isStore() or di.isAmo())
     ok = retireStore(hart, *instr);
 
-  // Check read operations of instruction comparing RTL values to
-  // memory model (whisper) values.
+  // Check read operations of instruction comparing RTL values to model (whisper) values.
   for (auto opIx : instr->memOps_)
     {
       if (opIx >= sysMemOps_.size())
@@ -672,38 +675,25 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       auto& op = sysMemOps_.at(opIx);
       if (not op.isRead_)
 	continue;
-
       if (not checkRtlRead(hart, *instr, op))
 	ok = false;
     }
 
-  // Amo sanity check.
-  if (di.isAmo())
+  // Amo sanity check: Must have bot read and write ops.
+  if (di.isAmo() and (not instrHasRead(*instr) or not instrHasWrite(*instr)))
     {
-      URV hartId = hart.hartId();
-
-      // Must have a read.  Must not have a write.
-      if (not instrHasRead(*instr))
-	{
-	  cerr << "Error: Hart-id=" << hartId << " tag=" << tag
-	       << " amo instruction retired before read op.\n";
-	  ok = false;
-	}
-
-      if (not instrHasWrite(*instr))
-	{
-	  cerr << "Warning: Hart-id=" << hartId << " tag=" << tag
-	       << " amo instruction retired without a write op.\n";
-	  return false;
-	}
-
-      instr->isStore_ = true;  // AMO is both load and store.
+      cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << tag
+	   << " amo instruction retired before read/write op.\n";
+      return false;
     }
+
+  if (di.isAmo())
+    instr->isStore_ = true;  // AMO is both load and store.
 
   setProducerTime(hartIx, *instr);
   updateDependencies(hart, *instr);
 
-  if ((instr->isStore_ or di.isAmo()) and instr->complete_)
+  if (instr->isStore_ and instr->complete_)
     {
       ok = checkStoreData(hartIx, *instr) and ok;
       ok = ppoRule1(hart, *instr) and ok;
