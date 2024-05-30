@@ -562,9 +562,8 @@ namespace WdRiscv
 
     /// Perform a match on the given item (maybe an address or a value) and the data2
     /// component of this trigger (assumed to be of type Address) according to the match
-    /// field. If clearBit0 is true (this is used for instruction address matching), then
-    /// clear bit0 in item and data2 before perfroming the match.
-    bool doMatch(URV item, bool clearBit0) const;
+    /// field.
+    bool doMatch(URV item) const;
 
     /// Set the hit bit of this trigger. For a chained trigger, this is to be called only
     /// if all the triggers in the chain have tripped.
