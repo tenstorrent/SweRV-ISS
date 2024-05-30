@@ -827,10 +827,11 @@ Trigger<URV>::doMatch(URV item, bool clearBit0) const
       case Match::MaskLowEqualHigh:
         {
           unsigned halfBitCount = 4*sizeof(URV);
-          // Mask high half of item with data2_ low half
-          item = item & (compare << halfBitCount);
-          // Compare high half
-          return (item >> halfBitCount) == (compare >> halfBitCount);
+          // Mask high half of item with high half of tdata2
+          item = item & compare;
+          // Compare high half of item with low half of tdata2
+	  compare = (compare << halfBitCount) >> halfBitCount;  // Clear high half of tdata2
+          return (item >> halfBitCount) == compare;
         }
 
       default:
