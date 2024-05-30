@@ -699,6 +699,9 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       ok = ppoRule1(hart, *instr) and ok;
     }
 
+  if (instr->isLoad_)
+    ok = checkLoadVsPriorCmo(hart, *instr);
+
   assert(di.isValid());
 
   ok = ppoRule2(hart, *instr) and ok;
@@ -2856,6 +2859,48 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	}
     }
   
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // If B is a load and A is cbo.flush/clean instruction that overlaps B.
+
+  if (not instrB.isLoad_)
+    return true;  // NA: B is not a load.
+
+  auto hartIx = hart.sysHartIndex();
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+
+  auto earlyB = earliestOpTime(instrB);
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+    {
+      const auto& op = *iter;
+      if (op.isCanceled()  or  op.hartIx_ != hartIx  or  op.instrTag_ >= instrB.tag_)
+	continue;
+  
+      if (op.time_ < earlyB)
+	break;
+  
+      const auto& instrA =  instrVec.at(op.instrTag_);
+      if (instrA.isCanceled()  or  not instrA.isRetired())
+	continue;
+
+      auto instId = instrA.di_.instId();
+      if (instId == InstId::cbo_flush or instId == InstId::cbo_clean)
+	if (earlyB <= instrA.retireTime_)
+	  {
+	    cerr << "Error: Read op of load instruction happens before retire time of "
+		 << "preceeding overlapping cbo.clean/flush: hart-id=" << hart.hartId()
+		 << " cbo-tag=" << instrA.tag_ << "load-tag=" << instrB.tag_ << '\n';
+	    return false;
+	  }
+    }
+
   return true;
 }
 
