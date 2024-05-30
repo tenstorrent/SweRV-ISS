@@ -1037,7 +1037,7 @@ Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
 {
   // This is disabled until we resolve discrepancy over CLINT between whisper config file
   // and RTL.
-  // return true;
+  return true;
 
   if (op.size_ > instr.size_)
     {
