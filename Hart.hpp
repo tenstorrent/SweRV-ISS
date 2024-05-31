@@ -2062,14 +2062,28 @@ namespace WdRiscv
     bool readInstFromFetchCache(uint64_t addr, uint16_t& inst) const
     { return fetchCache_.read(addr, inst); }
 
+    /// Configure the mask defining which bits of a physical address must be zero for the
+    /// address to be considered valid when STEE (static truested execution environment)
+    /// is enabled. A bit set in the given mask must correspond to a zero bit in a physical
+    /// address; otherwise, the STEE will deem the physical address invalid.
     void configSteeZeroMask(uint64_t mask)
     { stee_.configZeroMask(mask); }
 
+    /// Configure the mask defining the bits of physical address that must be one for the
+    /// address to be considered secure when STEE is enabled. For example if bit 55 of
+    /// the given mask is 1, then an address with bit 55 set will be considered secure.
     void configSteeSecureMask(uint64_t mask)
     { stee_.configSecureMask(mask); }
 
+    /// Configure the region of memory that is considered secure and that requires secure
+    /// access when STEE is enabled. This is purely for testing as the secure region is a
+    /// property of the platform.
     void configSteeSecureRegion(uint64_t low, uint64_t high)
     { stee_.configSecureRegion(low, high); }
+
+    // Configure the address of the memory mappred registers associated with the STEE.
+    bool configSteeAddress(uint64_t addr)
+    { return stee_.configAddress(addr); }
 
     void enableStee(bool flag)
     { steeEnabled_ = flag; }
