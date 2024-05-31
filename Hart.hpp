@@ -2085,8 +2085,9 @@ namespace WdRiscv
     bool configSteeAddress(uint64_t addr)
     { return stee_.configAddress(addr); }
 
+    /// Enable STEE.
     void enableStee(bool flag)
-    { steeEnabled_ = flag; }
+    { steeEnabled_ = flag; csRegs_.enableStee(flag); }
 
     /// Return true if ACLINT is configured.
     bool hasAclint() const

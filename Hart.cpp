@@ -3313,6 +3313,13 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       return;
     }
 
+  if (steeEnabled_ and csr == CN::C_MATP)
+    {
+      unsigned world = val & 1;
+      stee_.setSecureWorld(world);
+      return;
+    }
+
   if (csr == CN::SATP or csr == CN::VSATP or csr == CN::HGATP)
     updateAddressTranslation();
   else if (csr == CN::FCSR or csr == CN::FRM or csr == CN::FFLAGS)
