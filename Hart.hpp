@@ -2129,6 +2129,9 @@ namespace WdRiscv
 			(addr >= pciMmioBase_ and addr < pciMmioEnd_)));
     }
 
+    bool isSteeAddr(uint64_t addr) const
+    { return steeEnabled_ and stee_.hasAddress(addr); }
+
     /// Return true if there is one or more active performance counter (a counter that is
     /// assigned a valid event).
     bool hasActivePerfCounter() const
