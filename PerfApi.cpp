@@ -343,7 +343,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   hart.pokePc(packet.instrVa());
   hart.setInstructionCount(packet.tag_ - 1);
 
-  std::array<uint64_t, 3> prevVal;  // Previous operand values
+  std::array<uint64_t, 4> prevVal;  // Previous operand values
 
   // Save prev value of poperands.
   for (unsigned i = 0; i < packet.di_.operandCount(); ++i)
