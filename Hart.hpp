@@ -2081,10 +2081,6 @@ namespace WdRiscv
     void configSteeSecureRegion(uint64_t low, uint64_t high)
     { stee_.configSecureRegion(low, high); }
 
-    // Configure the address of the memory mappred registers associated with the STEE.
-    bool configSteeAddress(uint64_t addr)
-    { return stee_.configAddress(addr); }
-
     /// Enable STEE.
     void enableStee(bool flag)
     { steeEnabled_ = flag; csRegs_.enableStee(flag); }
@@ -2143,9 +2139,6 @@ namespace WdRiscv
       return (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
 			(addr >= pciMmioBase_ and addr < pciMmioEnd_)));
     }
-
-    bool isSteeAddr(uint64_t addr) const
-    { return steeEnabled_ and stee_.hasAddress(addr); }
 
     /// Return true if there is one or more active performance counter (a counter that is
     /// assigned a valid event).

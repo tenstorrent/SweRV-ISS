@@ -2112,11 +2112,6 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
       memWrite(pa1, pa2, storeVal);
       return true;
     }
-  else if (isSteeAddr(pa1))
-    {
-      stee_.write(pa1, ldStSize_, storeVal);
-      return true;
-    }
 
   memory_.invalidateOtherHartLr(hartIx_, pa1, ldStSize_);
   if (pa2 != pa1)
@@ -11205,8 +11200,6 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	}
       addr1 = stee_.clearSecureBits(addr1);
       addr2 = stee_.clearSecureBits(addr2);
-      if (stee_.hasAddress(addr1) and (stSize != 8 or (addr1 & 7) != 0))
-	return EC::STORE_ACC_FAULT;
     }
 
   // Physical memory protection. Assuming grain size is >= 8.

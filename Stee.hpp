@@ -18,7 +18,7 @@ namespace TT_STEE      // TensTorrent Static Trusted Execution Environment.
     /// all access is insecure. Otherwise, access with bit 55 clear is insecure.
     bool isValidAccess(uint64_t physAddr, unsigned size) const
     {
-      if (not secWorld_  or steecfg_.bits_.sw1dis_)
+      if (not secWorld_)
 	return false;   // Not in secure world.
 
       if ((physAddr & secMask_) != secMask_)
@@ -32,40 +32,9 @@ namespace TT_STEE      // TensTorrent Static Trusted Execution Environment.
       return addr + size - 1 < secLow_ or addr > secHigh_;
     }
 
-    /// Return true if given address falls in the address range of the memory mapped
-    /// registers associated with this Stee controller.
-    bool hasAddress(uint64_t addr) const
-    { return addr >= addr_ and addr < addr_ + size_; }
-
-    /// Write to this Stee controller. Return true on success. Return false if address is
-    /// not within range of this Stee or if address is not aligned or if size is not 8. If
-    /// this controller is locked the write will have no effect (but we will return true).
-    bool write(uint64_t addr, unsigned size, uint64_t value)
-    {
-      if (not hasAddress(addr) or size != 8 or (addr & 7) != 0)
-	return false;
-      if (not steecfg_.bits_.locked_)
-	{
-	  steecfg_.value_ = value;
-	  steecfg_.bits_.res_ = 0;
-	}
-      return true;
-    }
-
     /// Clear the bits corresponding to the secure-mask in the given address.
     uint64_t clearSecureBits(uint64_t addr) const
     { return addr & ~secMask_; }
-
-    /// Read from this Stee controller. Return true on success setting value to the read
-    /// value. Return false leaving value unmodified if address is not within range of
-    /// this Stee or if address is not aligned or if size is not 8.
-    bool read(uint64_t addr, unsigned size, uint64_t& value) const
-    {
-      if (not hasAddress(addr) or size != 8 or (addr & 7) != 0)
-	return false;
-      value = steecfg_.value_;
-      return true;
-    }
 
     /// Configure the zero mask mask: each one bit in the given mask corresponds to a bit
     /// that must be zero in the physical address for the access to be valid.
@@ -111,13 +80,6 @@ namespace TT_STEE      // TensTorrent Static Trusted Execution Environment.
 
   private:
 
-    struct SteecfgBits
-    {
-      unsigned sw1dis_   : 1;
-      uint64_t res_      : 62;
-      unsigned locked_   : 1;
-    };
-
     uint64_t addr_ = 0x0;   // Address of memory mapped region of this stee.
     uint64_t size_ = 8;  // Size of memory mapped region of this stee.
     uint64_t zmask_ = uint64_t(7) << 52;  // Bits 52, 53, and 54.
@@ -127,12 +89,6 @@ namespace TT_STEE      // TensTorrent Static Trusted Execution Environment.
     uint64_t secHigh_ = 0;
 
     unsigned secWorld_ = 0;    // Non-zero for a secure world.
-
-    union
-    {
-      uint64_t value_ = 0;
-      SteecfgBits bits_;
-    } steecfg_;
   };
 
 }

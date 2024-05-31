@@ -1038,19 +1038,6 @@ applySteeConfig(Hart<URV>& hart, const nlohmann::json& config)
 	}
     }
 
-  tag = "address";
-  if (sconf.contains(tag))
-    {
-      uint64_t addr = 0;
-      if (not getJsonUnsigned(tag, sconf.at(tag), addr))
-	errors++;
-      else if (not hart.configSteeAddress(addr))
-	{
-	  std::cerr << "Bad STEE address: " << sconf.at(tag) << " -- Must be a multiple of 8.\n";
-	  errors++;
-	}
-    }
-
   if (not errors)
     hart.enableStee(true);
 
