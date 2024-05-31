@@ -570,6 +570,10 @@ namespace WdRiscv
       return true;
     }
 
+    /// Return true if given address has reserve-eventual attribute.
+    bool hasReserveAttribute(uint64_t addr) const
+    { return pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt).isRsrv(); }
+
   protected:
 
     /// Write byte to given address without write-access check. Return

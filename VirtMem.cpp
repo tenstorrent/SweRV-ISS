@@ -657,7 +657,6 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	    }
 
 	  {
-	    // TODO FIX : this has to be atomic
 	    // B2. Compare pte to memory.
 	    PTE pte2(0);
 	    memRead(pteAddr, bigEnd_, pte2.data_);
@@ -821,7 +820,6 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	    }
 
 	  {
-	    // TODO FIX : this has to be atomic
 	    // B2. Compare pte to memory.
 	    PTE pte2(0);
 	    memRead(pteAddr, bigEnd_, pte2.data_);
@@ -999,7 +997,6 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	    }
 
 	  {
-	    // TODO FIX : this has to be atomic
 	    // B2. Compare pte to memory.
 	    PTE pte2(0);
 	    memRead(pteAddr, bigEnd_, pte2.data_);

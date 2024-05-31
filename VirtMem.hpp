@@ -440,21 +440,27 @@ namespace WdRiscv
       return true;
     }
 
-    /// Write a memory word honoring the big-endian flag. Return true
-    /// on success and false on failure.
+    /// Write a memory word honoring the big-endian flag. Return true on success and false
+    /// on failure. This is used to update A/D bits. Memory must have reserve-eventual
+    /// attribute.
     bool memWrite(uint64_t addr, bool bigEnd, uint32_t data)
     {
       if (bigEnd)
 	data = util::byteswap(data);
+      if (not memory_.hasReserveAttribute(addr))
+	return false;
       return memory_.write(hartIx_, addr, data);
     }
 
-    /// Write a memory double-word honoring the big-endian flag. Return
-    /// true on success and false on failure.
+    /// Write a memory double-word honoring the big-endian flag. Return true on success
+    /// and false on failure. This is used to update A/D bits. Memory must have
+    /// reserve-eventual attribute.
     bool memWrite(uint64_t addr, bool bigEnd, uint64_t data)
     {
       if (bigEnd)
 	data = util::byteswap(data);
+      if (not memory_.hasReserveAttribute(addr))
+	return false;
       return memory_.write(hartIx_, addr, data);
     }
 
