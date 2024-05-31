@@ -65,23 +65,12 @@ namespace TT_STEE      // TensTorrent Static Trusted Execution Environment.
     void configSecureRegion(uint64_t low, uint64_t high)
     { secLow_ = low; secHigh_ = high; }
 
-    /// Configure the address of the memory-mapped register associated with this STEE.
-    bool configAddress(uint64_t addr)
-    {
-      if ((addr % 8) != 0)
-	return false;
-      addr_ = addr;
-      return true;
-    }
-
     /// Set the secure world index. An index of zero implies a non-zecure world.
     void setSecureWorld(unsigned world)
     { secWorld_ = world; }
 
   private:
 
-    uint64_t addr_ = 0x0;   // Address of memory mapped region of this stee.
-    uint64_t size_ = 8;  // Size of memory mapped region of this stee.
     uint64_t zmask_ = uint64_t(7) << 52;  // Bits 52, 53, and 54.
     uint64_t secMask_ = uint64_t(1) << 55;  // Bit 55.
 
