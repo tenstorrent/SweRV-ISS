@@ -2877,28 +2877,24 @@ Mcm<URV>::checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const
 
   auto earlyB = earliestOpTime(instrB);
 
-  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+  for (auto ix = instrB.tag_; ix > 0; --ix)
     {
-      const auto& op = *iter;
-      if (op.isCanceled()  or  op.hartIx_ != hartIx  or  op.instrTag_ >= instrB.tag_)
-	continue;
-  
-      if (op.time_ < earlyB)
-	break;
-  
-      const auto& instrA =  instrVec.at(op.instrTag_);
+      const auto& instrA = instrVec.at(ix-1);
+
       if (instrA.isCanceled()  or  not instrA.isRetired())
 	continue;
+  
+      if (earlyB > instrA.retireTime_)
+	break;
 
       auto instId = instrA.di_.instId();
       if (instId == InstId::cbo_flush or instId == InstId::cbo_clean)
-	if (earlyB <= instrA.retireTime_)
-	  {
-	    cerr << "Error: Read op of load instruction happens before retire time of "
-		 << "preceeding overlapping cbo.clean/flush: hart-id=" << hart.hartId()
-		 << " cbo-tag=" << instrA.tag_ << "load-tag=" << instrB.tag_ << '\n';
-	    return false;
-	  }
+	{
+	  cerr << "Error: Read op of load instruction happens before retire time of "
+	       << "preceeding overlapping cbo.clean/flush: hart-id=" << hart.hartId()
+	       << " cbo-tag=" << instrA.tag_ << "load-tag=" << instrB.tag_ << '\n';
+	  return false;
+	}
     }
 
   return true;
