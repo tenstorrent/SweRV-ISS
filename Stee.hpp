@@ -14,22 +14,21 @@ namespace TT_STEE      // TensTorrent Static Trusted Execution Environment.
     /// Constructor.
     Stee() = default;
 
-    /// Return true if given memory access is legal. If the secure world is disabled then
-    /// all access is insecure. Otherwise, access with bit 55 clear is insecure.
+    /// Return true if given memory access is legal. If the secure world is enabled then
+    /// all accesses are legal. Otherwise, access to secure region is invalid.
     bool isValidAccess(uint64_t physAddr, unsigned size) const
     {
-      if (not secWorld_)
-	return false;   // Not in secure world.
+      if (secWorld_)
+	return true;   // In secure world.
 
-      if ((physAddr & secMask_) != secMask_)
-	return false;   // Address must all bits of secMask_ set.
+      if ((physAddr & secMask_) != 0)
+	return false;   // Address must not any of the secMask_ bits set.
 
       if ((physAddr & zmask_) != 0)
 	return false;  // Zero-mask bits must be zero
       
-      uint64_t addr = physAddr;
-      addr &= ~secMask_;
-      return addr + size - 1 < secLow_ or addr > secHigh_;
+      // Address must not target secure area.
+      return physAddr + size - 1 < secLow_ or physAddr > secHigh_;
     }
 
     /// Clear the bits corresponding to the secure-mask in the given address.
