@@ -449,7 +449,7 @@ namespace WdRiscv
       PMACFG31 = 0x7ff,
       PMACFG32 = 0xbe0,
       PMACFG63 = 0xbff,
-      MATP     = 0x7c7,   // Machine address translation and protection
+      C_MATP   = 0x7c7,   // Machine address translation and protection
 
       MAX_CSR_ = 0xfff,
       MIN_CSR_ = 0      // csr with smallest number
@@ -988,6 +988,9 @@ namespace WdRiscv
     /// Enable triggers.
     void enableTriggers(bool flag);
 
+    /// Enable STEE (static trusted execution env)
+    void enableStee(bool flag);
+
     /// Enable/disable firing of triggers in machine mode when interrupts are enabled.
     void enableMmodeTriggersWithIe(bool flag)
     { triggers_.enableMmodeWithIe(flag); }
@@ -1250,6 +1253,9 @@ namespace WdRiscv
 
     /// Helper to constructor. Define PMA CSRs.
     void definePmaRegs();
+
+    /// Helper to construction. Define STEE (static trusted execution) CSRs
+    void defineSteeRegs();
 
     /// Set the store error address capture register. Return true on
     /// success and false if register is not implemented.

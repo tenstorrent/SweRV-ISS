@@ -1557,6 +1557,16 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
         }
     }
 
+  if (steeEnabled_)
+    {
+      if (not stee_.isValidAccess(addr1, ldSize))
+	return EC::LOAD_ACC_FAULT;
+      if (addr2 != addr1 and not stee_.isValidAccess(addr2, ldSize))
+	return EC::LOAD_ACC_FAULT;
+      addr1 = stee_.clearSecureBits(addr1);
+      addr2 = stee_.clearSecureBits(addr2);
+    }
+
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
@@ -1598,14 +1608,6 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	      return EC::LOAD_ACC_FAULT;
 	    }
 	}
-    }
-
-  if (steeEnabled_)
-    {
-      if (not stee_.isValidAccess(addr1, ldSize))
-	return EC::LOAD_ACC_FAULT;
-      if (addr2 != addr1 and not stee_.isValidAccess(addr2, ldSize))
-	return EC::LOAD_ACC_FAULT;
     }
 
   if (not misal)
@@ -3303,6 +3305,13 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
     {
       if (not processPmaChange(csr))
 	assert(0);
+      return;
+    }
+
+  if (steeEnabled_ and csr == CN::C_MATP)
+    {
+      unsigned world = val & 1;
+      stee_.setSecureWorld(world);
       return;
     }
 
@@ -11180,6 +11189,19 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
         }
     }
 
+  if (steeEnabled_)
+    {
+      if (not stee_.isValidAccess(addr1, stSize))
+	return EC::STORE_ACC_FAULT;
+      if (addr2 != addr1 and not stee_.isValidAccess(addr2, stSize))
+	{
+	  ldStFaultAddr_ = va2;
+	  return EC::STORE_ACC_FAULT;
+	}
+      addr1 = stee_.clearSecureBits(addr1);
+      addr2 = stee_.clearSecureBits(addr2);
+    }
+
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
@@ -11225,17 +11247,6 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	      ldStFaultAddr_ = va2;
 	      return EC::STORE_ACC_FAULT;
 	    }
-	}
-    }
-
-  if (steeEnabled_)
-    {
-      if (not stee_.isValidAccess(addr1, stSize))
-	return EC::STORE_ACC_FAULT;
-      if (addr2 != addr1 and not stee_.isValidAccess(addr2, stSize))
-	{
-	  ldStFaultAddr_ = va2;
-	  return EC::STORE_ACC_FAULT;
 	}
     }
 
