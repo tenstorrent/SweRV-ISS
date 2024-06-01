@@ -106,6 +106,7 @@ namespace WdRiscv
     std::optional<uint64_t> memorySize;
     std::optional<uint64_t> tlbSize;
     Uint64Vec snapshotPeriods;
+    Uint64Vec steesr;
     std::optional<uint64_t> alarmInterval;
     std::optional<uint64_t> clint;        // Advanced core-local-interrupt (CLINT) mem mapped address
     std::optional<uint64_t> interruptor;  // Interrupt generator mem mapped address

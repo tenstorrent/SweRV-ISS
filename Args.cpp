@@ -186,6 +186,32 @@ Args::collectCommandLineValues(const boost::program_options::variables_map& varM
         ok = false;
     }
 
+  if (varMap.count("steesr"))
+    {
+      auto rangeStr = varMap["steesr"].as<std::string>();
+      StringVec tokens;
+      boost::split(tokens, rangeStr, boost::is_any_of(":"));
+      if (tokens.size() != 2)
+	{
+	  std::cerr << "Error: Bad value for --steesr: \"" << rangeStr << "\". "
+		    << "Expecting a colon separated pair of numbers.\n";
+	  ok = false;
+	}
+      else
+	{
+	  uint64_t s0 = 0, s1 = 0;
+	  if (not parseCmdLineNumber("steesr", tokens.at(0), s0) or
+	      not parseCmdLineNumber("steesr", tokens.at(1), s1))
+	    ok = false;
+	  else
+	    {
+	      this->steesr.clear();
+	      this->steesr.push_back(s0);
+	      this->steesr.push_back(s1);
+	    }
+	}
+    }
+
   if (varMap.count("instcounter"))
     {
       auto numStr = varMap["instcounter"].as<std::string>();
@@ -420,6 +446,10 @@ Args::parseCmdLineArgs(std::span<char*> argv)
 	("mcmls", po::value<std::string>(),
 	 "Memory consistency checker merge buffer line size. If set to zero then "
 	 "write operations are not buffered and will happen as soon a received.")
+	("steesr", po::value<std::string>(),
+	 "Static trusted execution environment secure range: A colon separated pair of numbers"
+	 " defining the range of memory addresses considered secure. Secure access bit must"
+	 " be zero in each address of the pair.")
 	("perfapi", po::bool_switch(&this->perfApi),
 	 "Enable performance mode API.")
 #ifdef MEM_CALLBACKS

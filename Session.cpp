@@ -849,6 +849,9 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
 	errors++;
     }
 
+  if (args.steesr.size() == 2)
+    hart.configSteeSecureRegion(args.steesr.at(0), args.steesr.at(1));
+
   if (args.perfApi)
     {
       if (not system.enablePerfApi(traceFiles_))
