@@ -11446,7 +11446,10 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 #endif
       if (cause == ExceptionCause::NONE)
 	{
-	  memRead(pa1, pa2, elem);
+	  uint64_t data = 0;
+	  if (not readForLoad<ELEM_TYPE>(addr, pa1, pa2, data))
+	    assert(0);
+	  elem = data;
 	}
       else
         {
@@ -11768,7 +11771,10 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 #endif
       if (cause == ExceptionCause::NONE)
         {
-          memRead(pa1, pa2, elem);
+	  uint64_t data = 0;
+	  if (not readForLoad<ELEM_TYPE>(addr, pa1, pa2, data))
+	    assert(0);
+	  elem = data;
           vecRegs_.ldStPhysAddr_.back() = pa1;
         }
       else
@@ -12073,7 +12079,10 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 #endif
       if (cause == ExceptionCause::NONE)
 	{
-	  memRead(pa1, pa2, elem);
+	  uint64_t data = 0;
+	  if (not readForLoad<ELEM_TYPE>(vaddr, pa1, pa2, data))
+	    assert(0);
+	  elem = data;
 	  vecRegs_.write(vd, ix, destGroup, elem);
           vecRegs_.ldStPhysAddr_.back() = pa1;
 	}
@@ -12519,7 +12528,10 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 #endif
 	  if (cause == ExceptionCause::NONE)
             {
-              memRead(pa1, pa2, elem);
+	      uint64_t data = 0;
+	      if (not readForLoad<ELEM_TYPE>(faddr, pa1, pa2, data))
+		assert(0);
+	      elem = data;
               vecRegs_.ldStPhysAddr_.back() = pa1;
             }
 	  else
@@ -13030,7 +13042,10 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 #endif
 	  if (cause == ExceptionCause::NONE)
 	    {
-	      memRead(pa1, pa2, elem);
+	      uint64_t data = 0;
+	      if (not readForLoad<ELEM_TYPE>(faddr, pa1, pa2, data))
+		assert(0);
+	      elem = data;
 	      vecRegs_.write(dvg, ix, destGroup, elem);
               vecRegs_.ldStPhysAddr_.back() = pa1;
 	    }
