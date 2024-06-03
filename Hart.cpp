@@ -1774,7 +1774,6 @@ Hart<URV>::getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned siz
 
 template <typename URV>
 template <typename LOAD_TYPE>
-inline
 bool
 Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool hyper, uint64_t& data)
 {
@@ -1792,9 +1791,6 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
 	triggerTripped_ = true;
     }
 
-  // Unsigned version of LOAD_TYPE
-  using ULT = typename std::make_unsigned<LOAD_TYPE>::type;
-
   uint64_t addr1 = virtAddr;
   uint64_t addr2 = addr1;
   uint64_t gaddr1 = virtAddr;
@@ -1810,6 +1806,16 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
 
+  return readForLoad<LOAD_TYPE>(virtAddr, addr1, addr2, data);
+}
+
+
+
+template <typename URV>
+template <typename LOAD_TYPE>
+bool
+Hart<URV>::readForLoad(uint64_t virtAddr, uint64_t addr1, uint64_t addr2, uint64_t& data)
+{
   // Loading from console-io does a standard input read.
   if (conIoValid_ and addr1 == conIo_ and enableConIn_ and not triggerTripped_)
     {
@@ -1822,6 +1828,9 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
       data = 0;
       return true;
     }
+
+  // Unsigned version of LOAD_TYPE
+  using ULT = typename std::make_unsigned<LOAD_TYPE>::type;
 
   ULT uval = 0;   // Unsigned loaded value
   bool device = false;  // True if loading from a device.

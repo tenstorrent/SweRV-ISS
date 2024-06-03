@@ -2602,6 +2602,12 @@ namespace WdRiscv
                                           uint64_t& gaddr1, uint64_t& gaddr2,
 					  unsigned ldSize, bool hyper);
 
+    /// Helper to load method. Vaddr is the virtual address. Paddr1 is the physical
+    /// address.  Paddr2 is identical to paddr1 for non-page-crossing loads; otherwise, it
+    /// is the physical address on the other page.
+    template<typename LOAD_TYPE>
+    bool readForLoad(uint64_t vaddr, uint64_t paddr1, uint64_t paddr2, uint64_t& data);
+
     /// Helper to the cache block operation (cbo) instructions.
     ExceptionCause determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa,
 					 bool isZero);
