@@ -233,7 +233,7 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
     }
   else
     {
-      va = (exec or xForR_)? va : applyPointerMaskVa(va, priv, false);
+      va = (exec or xForR_ or execReadable_)? va : applyPointerMaskVa(va, priv, false);
       pa = va;
     }
 
@@ -440,7 +440,9 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
   // Exactly one of read/write/exec must be true.
   assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
-  va = (exec or xForR_)? va : applyPointerMask(va, priv, true);
+  bool mxr = execReadable_ or
+             (vsMode_ != Mode::Bare? s1ExecReadable_ : false);
+  va = (exec or xForR_ or mxr)? va : applyPointerMask(va, priv, true);
 
   if (vsMode_ == Mode::Bare)
     gpa = pa = va;
@@ -473,7 +475,8 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 	      gpa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
 	    }
 	}
-      else
+
+      if (not entry or not entry->valid_)
 	{
 	  TlbEntry tlbEntry;
 	  auto cause = stage1TranslateNoTlb(va, priv, read, write, exec, gpa, tlbEntry);
@@ -532,7 +535,6 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
     return stage1PageFaultType(read, write, exec);
 
   auto cause = (this->*walkFn)(va, priv, read, write, exec, pa, entry);
-  // From here on, all traps come from implicit memory accesses
   stage1ImplicitAccessTrap_ = cause != ExceptionCause::NONE;
   return cause;
 }
@@ -579,7 +581,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
       // already accounts for MPRV.
       if (pmpMgr_.isEnabled())
 	{
-	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	  const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
 	  if (not pmp.isRead(privMode))
 	    return accessFaultType(read, write, exec);
 	}
@@ -648,13 +650,12 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	  // already accounts for MPRV.
 	  if (pmpMgr_.isEnabled())
 	    {
-	      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	      const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
 	      if (not pmp.isWrite(privMode))
 		return accessFaultType(read, write, exec);
 	    }
 
 	  {
-	    // TODO FIX : this has to be atomic
 	    // B2. Compare pte to memory.
 	    PTE pte2(0);
 	    memRead(pteAddr, bigEnd_, pte2.data_);
@@ -745,7 +746,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       // already accounts for MPRV.
       if (pmpMgr_.isEnabled())
 	{
-	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	  const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
 	  if (not pmp.isRead(privMode))
 	    return accessFaultType(read, write, exec);
 	}
@@ -812,13 +813,12 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  // already accounts for MPRV.
 	  if (pmpMgr_.isEnabled())
 	    {
-	      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	      const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
 	      if (not pmp.isWrite(privMode))
 		return accessFaultType(read, write, exec);
 	    }
 
 	  {
-	    // TODO FIX : this has to be atomic
 	    // B2. Compare pte to memory.
 	    PTE pte2(0);
 	    memRead(pteAddr, bigEnd_, pte2.data_);
@@ -919,7 +919,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       // already accounts for MPRV.
       if (pmpMgr_.isEnabled())
 	{
-	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	  const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
 	  if (not pmp.isRead(privMode))
 	    return accessFaultType(read, write, exec);
 	}
@@ -990,13 +990,12 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  // already accounts for MPRV.
 	  if (pmpMgr_.isEnabled())
 	    {
-	      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	      const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
 	      if (not pmp.isWrite(privMode))
 		return accessFaultType(read, write, exec);
 	    }
 
 	  {
-	    // TODO FIX : this has to be atomic
 	    // B2. Compare pte to memory.
 	    PTE pte2(0);
 	    memRead(pteAddr, bigEnd_, pte2.data_);

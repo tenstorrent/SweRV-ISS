@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <string_view>
 #include <vector>
+#include <algorithm>
 #include <unordered_map>
 
 namespace WdRiscv
@@ -174,11 +175,13 @@ namespace WdRiscv
 
     PmaManager(uint64_t memorySize);
 
+    ~PmaManager() = default;
+
     /// Return the physical memory attribute associated with the
     /// word-aligned address covering the given address. Return
     /// an unmapped attribute if the given address is out of memory
     /// range.
-    Pma getPma(uint64_t addr) const
+    inline Pma getPma(uint64_t addr) const
     {
       addr = (addr >> 2) << 2; // Make word aligned.
 
@@ -211,16 +214,18 @@ namespace WdRiscv
       addr = (addr >> 2) << 2; // Make word aligned.
 
       // Search regions in order. Return first matching.
-      for (unsigned ix = 0; ix < regions_.size(); ++ix)
+      auto it = std::find_if(regions_.begin(), regions_.end(),
+          [addr] (const auto& region) {
+              return region.valid_ and addr >= region.firstAddr_ and
+                      addr <= region.lastAddr_;
+          });
+
+      if (it != regions_.end())
         {
-          const auto& region = regions_.at(ix);
-          if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
-            {
-              auto pma = region.pma_;
-              if (trace_)
-                pmaTrace_.push_back({ix, addr, region.firstAddr_, region.lastAddr_, reason});
-              return pma;
-            }
+          if (trace_)
+            pmaTrace_.push_back({unsigned(std::distance(regions_.begin(), it)),
+                                  addr, it->firstAddr_, it->lastAddr_, reason});
+          return (*it).pma_;
         }
 
       if (addr >= memSize_)

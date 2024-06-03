@@ -850,7 +850,7 @@ Hart<URV>::checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned 
 
 template <typename URV>
 bool
-Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal, bool isVtypeImm)
+Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal, bool vli /* vsetvli instruction*/)
 {
   bool ma = (vtypeVal >> 7) & 1;  // Mask agnostic
   bool ta = (vtypeVal >> 6) & 1;  // Tail agnostic
@@ -882,7 +882,18 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal, bool isVtypeImm)
           if (rd != 0 and rs1 == 0)
             elems = vlmax;
           else if (rd == 0 and rs1 == 0)
-            elems = peekCsr(CsrNumber::VL);  // Keep current value of VL.
+	    {
+	      // Section 6.2 of vec spec. Cannot change VLMAX. This should apply uniformly
+	      // to vsetvl & vsetvli. The instructions are implemented by different
+	      // tribes. One tribe takes an exception, the other legalizes (trims) VL.
+	      unsigned prevVlmax = vecRegs_.vlmax();
+	      if (vlmax != prevVlmax and not vill)
+		{
+		  auto trim = vli? vecRegs_.legalizeVsetvliAvl_ : vecRegs_.legalizeVsetvlAvl_;
+		  vill = not trim;
+		}
+	      elems = peekCsr(CsrNumber::VL);  // Current value of VL (maybe trimmed below).
+	    }
           else  // strip mining
             {
               URV avl = intRegs_.read(rs1);  // Application vector length.
@@ -900,7 +911,7 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal, bool isVtypeImm)
 
       if (elems > vlmax)
         {
-          legalizedAvl = isVtypeImm? vecRegs_.legalizeVsetvliAvl_ : vecRegs_.legalizeVsetvlAvl_;
+          legalizedAvl = vli? vecRegs_.legalizeVsetvliAvl_ : vecRegs_.legalizeVsetvlAvl_;
           if (legalizedAvl and vlmax != 0)
             elems = vlmax;
           else
@@ -11409,6 +11420,9 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
   unsigned vd = di->op0(), rs1 = di->op1();
 
+  if (not checkVecOpsVsEmul(di, vd, groupX8))
+    return false;
+
   unsigned elemBytes = VecRegs::elemWidthInBytes(eew);
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
   URV addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
@@ -11535,6 +11549,9 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
     }
 
   unsigned vd = di->op0(), rs1 = di->op1();
+
+  if (not checkVecOpsVsEmul(di, vd, groupX8))
+    return false;
 
   unsigned elemSize = 1;
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemSize / 8;

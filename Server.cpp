@@ -125,8 +125,14 @@ template <typename URV>
 Server<URV>::Server(System<URV>& system)
   : system_(system)
 {
+  // In server mode the test-bench will issue a cancel-lr explcitly for wrs instructions.
+  for (unsigned i = 0; i < system.hartCount(); ++i)
+    {
+      auto& hart = *(system_.ithHart(i));
+      hart.setWrsCancelsLr(false);
+    }
 }
-  
+
 
 template <typename URV>
 bool
@@ -281,12 +287,13 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
       break;
     case 'c':
       {
-	URV reset = 0, mask = 0, pokeMask = 0;
-	if (hart.peekCsr(CsrNumber(req.address), value, reset, mask, pokeMask))
+	URV reset = 0, mask = 0, pokeMask = 0, readMask = 0;
+	if (hart.peekCsr(CsrNumber(req.address), value, reset, mask, pokeMask, readMask))
 	  {
 	    reply.value = value;
 	    reply.address = mask;
 	    reply.time = pokeMask;
+            reply.instrTag = readMask;
 	    return true;
 	  }
       }

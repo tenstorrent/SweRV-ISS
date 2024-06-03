@@ -140,7 +140,7 @@ RVCORE_SRCS := IntRegs.cpp CsRegs.cpp FpRegs.cpp instforms.cpp \
 	    amo.cpp SparseMem.cpp InstProfile.cpp Isa.cpp Mcm.cpp \
 	    crypto.cpp Decoder.cpp Trace.cpp cbo.cpp Uart8250.cpp \
 	    Uartsf.cpp hypervisor.cpp vector-crypto.cpp WhisperMessage.cpp \
-	    Imsic.cpp Args.cpp Session.cpp PerfApi.cpp
+	    Imsic.cpp Args.cpp Session.cpp PerfApi.cpp dot-product.cpp
 
 # List of All CPP Sources for the project
 SRCS_CXX += $(RVCORE_SRCS) whisper.cpp

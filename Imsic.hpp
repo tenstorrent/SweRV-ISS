@@ -144,12 +144,13 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       topId_ = 0;
       if (not config_)
 	return;
-      for (size_t i = 1; i < pending_.size(); ++i)
-	if (pending_.at(i) and enabled_.at(i))
-	  {
-	    topId_ = i;
-	    return;
-	  }
+
+      auto it = std::mismatch(pending_.begin(), pending_.end(), enabled_.begin(), [] (bool a, bool b) {
+            return !(a and b);
+      });
+
+      if (it.first != pending_.end())
+        topId_ = std::distance(pending_.begin(), it.first);
     }
 
     /// Return the enable bits of id's i*32 to i*32 + 31 packed in a word.

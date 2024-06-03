@@ -308,12 +308,14 @@ template <typename URV>
 static bool
 pokeHartMemory(Hart<URV>& hart, uint64_t physAddr, uint64_t data, unsigned size)
 {
+#if 0
   // The test-bench can defer IMISC interrupts and undefer them when they get delivered to
   // the hart on the RTL side. But, the test-bench does not do that. To avoid triggering
   // an interrupt too soon, we skip writing to the IMSIC. Presumably, the test-bench will
   // poke the IMSIC when the RTL delivers the IMSIC interrupt to the hart.
   if (hart.isImsicAddr(physAddr))
     return true;   // IMSIC memory poked explicity by the test bench.
+#endif
 
   if (size == 1)
     return hart.pokeMemory(physAddr, uint8_t(data), true);
@@ -572,46 +574,49 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
   instrB.physAddr_ = paddr;
   instrB.physAddr2_ = paddr;
   instrB.data_ = 0;   // Determined at bypass time.
+
   if (instrB.di_.instId() == InstId::cbo_zero)
-    instrB.isStore_ = true;
-
-  // All preceeding (in program order) overlapping stores/amos must have drained.
-  unsigned hartIx = hart.sysHartIndex();
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
-  const auto& pendingWrites = hartPendingWrites_.at(hartIx);
-
-  McmInstrIx limit = instrB.tag_ >= windowSize_ ? instrB.tag_ - windowSize_ : 0;
-  bool ok = true;
-
-  // Check for preceding incomplete stores (not all bytes written). Check for
-  // stores still in the store buffer.
-  for (McmInstrIx tag = instrB.tag_; tag > limit; --tag)
     {
-      const auto& instrA =  instrVec.at(tag - 1);
-      if (instrA.isCanceled() or not instrA.isStore_ or not instrA.di_.isAmo())
-	continue;
+      instrB.isStore_ = true;  // To enable forwarding
 
-      if (not instrA.isRetired() or not instrA.di_.isValid())
+      auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
+      instrB.complete_ = checkStoreComplete(instrB);
+      if (instrB.complete_)
 	{
-	  cerr << "Mcm::retireCmo: Instruction A invalid/not-retired\n";
-	  assert(0 && "Mcm::retireCmo: Instruction A invalid/not-retired");
+	  undrained.erase(instrB.tag_);
+	  return ppoRule1(hart, instrB);
 	}
-
-      if (not instrA.complete_)
-	ok = false;
       else
-	{	  // Check for preceding stores still in store buffer.
-	  for (auto& op : pendingWrites)
-	    if (op.instrTag_ == instrA.tag_)
-	      ok = false;
-	}
+	undrained.insert(instrB.tag_);
 
-      if (not ok)
-	cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
-	     << instrA.tag_ << " tag2=" << instrB.tag_ << " (CMO)\n";
+      return true;
     }
 
-  return ok;
+  // For cbo.flush/clean, all preceeding (in program order) overlapping stores/amos must
+  // have drained.
+  unsigned hartIx = hart.sysHartIndex();
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& undrained = hartUndrainedStores_.at(hartIx);
+
+  for (auto storeTag : undrained)
+    {
+      const auto& instrA =  instrVec.at(storeTag);
+      if (instrA.tag_ >= instrB.tag_)
+	break;
+
+      if (instrA.isCanceled())
+	continue;
+
+      const DecodedInst& di = instrA.di_;
+      if ((di.isStore() or di.isAmo()) and instrA.overlaps(instrB))
+	{
+	  cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
+	       << instrA.tag_ << " tag2=" << instrB.tag_ << " (CMO)\n";
+	  return false;
+	}
+    }
+
+  return true;
 }
 
 
@@ -629,8 +634,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   McmInstr* instr = findOrAddInstr(hartIx, tag);
   if (instr->retired_)
     {
-      cerr << "Mcm::retire: Error: Time=" << time << " hart-id=" << hartIx << " tag="
-	   << tag << " Instruction retired multiple times\n";
+      cerr << "Mcm::retire: Error: Time=" << time << " hart-id=" << hart.hartId()
+	   << " tag=" << tag << " Instruction retired multiple times\n";
       return false;
     }
 
@@ -662,8 +667,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (di.isStore() or di.isAmo())
     ok = retireStore(hart, *instr);
 
-  // Check read operations of instruction comparing RTL values to
-  // memory model (whisper) values.
+  // Check read operations of instruction comparing RTL values to model (whisper) values.
   for (auto opIx : instr->memOps_)
     {
       if (opIx >= sysMemOps_.size())
@@ -671,42 +675,32 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       auto& op = sysMemOps_.at(opIx);
       if (not op.isRead_)
 	continue;
-
       if (not checkRtlRead(hart, *instr, op))
 	ok = false;
     }
 
-  // Amo sanity check.
-  if (di.isAmo())
+  // Amo sanity check: Must have bot read and write ops.
+  if (di.isAmo() and (not instrHasRead(*instr) or not instrHasWrite(*instr)))
     {
-      URV hartId = hart.hartId();
-
-      // Must have a read.  Must not have a write.
-      if (not instrHasRead(*instr))
-	{
-	  cerr << "Error: Hart-id=" << hartId << " tag=" << tag
-	       << " amo instruction retired before read op.\n";
-	  ok = false;
-	}
-
-      if (not instrHasWrite(*instr))
-	{
-	  cerr << "Warning: Hart-id=" << hartId << " tag=" << tag
-	       << " amo instruction retired without a write op.\n";
-	  return false;
-	}
-
-      instr->isStore_ = true;  // AMO is both load and store.
+      cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << tag
+	   << " amo instruction retired before read/write op.\n";
+      return false;
     }
+
+  if (di.isAmo())
+    instr->isStore_ = true;  // AMO is both load and store.
 
   setProducerTime(hartIx, *instr);
   updateDependencies(hart, *instr);
 
-  if ((instr->isStore_ or di.isAmo()) and instr->complete_)
+  if (instr->isStore_ and instr->complete_)
     {
       ok = checkStoreData(hartIx, *instr) and ok;
       ok = ppoRule1(hart, *instr) and ok;
     }
+
+  if (instr->isLoad_)
+    ok = checkLoadVsPriorCmo(hart, *instr);
 
   assert(di.isValid());
 
@@ -1044,8 +1038,8 @@ bool
 Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
 		       const MemoryOp& op) const
 {
-  // This is disabled until we resolve discrepancy over CLINT between
-  // whisper config file and RTL.
+  // This is disabled until we resolve discrepancy over CLINT between whisper config file
+  // and RTL.
   return true;
 
   if (op.size_ > instr.size_)
@@ -1219,6 +1213,17 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
   if (instr.isCanceled() or not instr.isStore_)
     return false;
 
+  if (instr.di_.instId() == InstId::cbo_zero)
+    {
+      unsigned count = 0;
+      for (auto opIx : instr.memOps_)
+	{
+	  const auto& op = sysMemOps_.at(opIx);
+	  count += op.size_;
+	}
+      return count == lineSize_;
+    }
+
   unsigned expectedMask = (1 << instr.size_) - 1;  // Mask of bytes covered by instruction.
   unsigned writeMask = 0;   // Mask of bytes covered by write operations.
   uint64_t addr = instr.physAddr_, addr2 = instr.physAddr2_, size = instr.size_;
@@ -1387,6 +1392,10 @@ trimOp(MemoryOp& op, uint64_t addr, unsigned size)
       if (op.physAddr_ + op.size_ > addr + size)
 	op.size_ = addr + size - op.physAddr_;  // Trim wide op.
     }
+
+  unsigned n = sizeof(op.data_) - op.size_;  // Unused most sig bytes.
+  op.data_ = ((op.data_) << n*8) >> n*8;
+  op.rtlData_ = ((op.rtlData_) << n*8) >> n*8;
 }
 
 
@@ -2850,6 +2859,44 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	}
     }
   
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // If B is a load and A is cbo.flush/clean instruction that overlaps B.
+
+  if (not instrB.isLoad_)
+    return true;  // NA: B is not a load.
+
+  auto hartIx = hart.sysHartIndex();
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+
+  auto earlyB = earliestOpTime(instrB);
+
+  for (auto ix = instrB.tag_; ix > 0; --ix)
+    {
+      const auto& instrA = instrVec.at(ix-1);
+
+      if (instrA.isCanceled()  or  not instrA.isRetired())
+	continue;
+  
+      if (earlyB > instrA.retireTime_)
+	break;
+
+      auto instId = instrA.di_.instId();
+      if (instId == InstId::cbo_flush or instId == InstId::cbo_clean)
+	{
+	  cerr << "Error: Read op of load instruction happens before retire time of "
+	       << "preceeding overlapping cbo.clean/flush: hart-id=" << hart.hartId()
+	       << " cbo-tag=" << instrA.tag_ << "load-tag=" << instrB.tag_ << '\n';
+	  return false;
+	}
+    }
+
   return true;
 }
 

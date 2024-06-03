@@ -60,20 +60,16 @@ Hart<URV>::execHfence_vvma(const DecodedInst* di)
   else if (di->op0() != 0 and di->op1() == 0)
     {
       URV addr = intRegs_.read(di->op0());
-      addr = virtMem_.applyPointerMask(addr, privMode_, virtMode_);
       uint64_t vpn = virtMem_.pageNumber(addr);
       tlb.invalidateVirtualPage(vpn);
     }
   else
     {
       URV addr = intRegs_.read(di->op0());
-      addr = virtMem_.applyPointerMask(addr, privMode_, virtMode_);
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV asid = intRegs_.read(di->op1());
       tlb.invalidateVirtualPageAsid(vpn, asid);
     }
-
-  invalidateDecodeCache();
 }
 
 
@@ -117,17 +113,14 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
     }
   else if (di->op0() != 0 and di->op1() == 0)
     {
-      URV addr = intRegs_.read(di->op0());
-      // address is shifted right by 2 bits
-      addr = virtMem_.applyPointerMask(addr << 2, privMode_, virtMode_);
+      URV addr = intRegs_.read(di->op0()) << 2;
       uint64_t vpn = virtMem_.pageNumber(addr);
       if (useGpa)
 	tlb.invalidateVirtualPage(vpn);
     }
   else
     {
-      URV addr = intRegs_.read(di->op0());
-      addr = virtMem_.applyPointerMask(addr << 2, privMode_, virtMode_);
+      URV addr = intRegs_.read(di->op0()) << 2;
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV vmid = intRegs_.read(di->op1());
       if (useGpa)
@@ -135,8 +128,6 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
       else
 	tlb.invalidateVmid(vmid);
     }
-
-  invalidateDecodeCache();
 }
 
 

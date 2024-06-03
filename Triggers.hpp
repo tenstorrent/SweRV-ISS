@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <vector>
 #include <string>
+#include <bit>
 #include "trapEnums.hpp"
 
 namespace WdRiscv
@@ -561,9 +562,8 @@ namespace WdRiscv
 
     /// Perform a match on the given item (maybe an address or a value) and the data2
     /// component of this trigger (assumed to be of type Address) according to the match
-    /// field. If clearBit0 is true (this is used for instruction address matching), then
-    /// clear bit0 in item and data2 before perfroming the match.
-    bool doMatch(URV item, bool clearBit0) const;
+    /// field.
+    bool doMatch(URV item) const;
 
     /// Set the hit bit of this trigger. For a chained trigger, this is to be called only
     /// if all the triggers in the chain have tripped.
@@ -647,16 +647,10 @@ namespace WdRiscv
     {
       // Pre-compute mask for a masked compare (match == 1 in mcontrol).
       data2CompareMask_ = ~URV(0);
-      unsigned leastSigZeroBit = 0; // Index of least sig zero bit
-      URV value = data2_;
-      while (value & 1)
-	{
-	  leastSigZeroBit++;
-	  value >>= 1;
-	}
-      if (leastSigZeroBit == 8*sizeof(URV) - 1)
+      unsigned leastSigZeroBit = std::countr_one(data2_); // Index of least sig zero bit
+      if (leastSigZeroBit >= 8*sizeof(URV) - 1)
         data2CompareMask_ = 0;
-      else if (leastSigZeroBit < 8*sizeof(URV))
+      else
         data2CompareMask_ = data2CompareMask_ << (leastSigZeroBit + 1);
     }
 

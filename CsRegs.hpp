@@ -373,6 +373,11 @@ namespace WdRiscv
       // Advanced interrupt architecture (AIA)
       MISELECT   = 0x350,
       MIREG      = 0x351,
+      MIREG2     = 0x352,
+      MIREG3     = 0x353,
+      MIREG4     = 0x355,
+      MIREG5     = 0x356,
+      MIREG6     = 0x357,
       MTOPEI     = 0x35c,
       MTOPI      = 0xFB0,
       MVIEN      = 0x308,
@@ -384,6 +389,11 @@ namespace WdRiscv
       MIPH       = 0x354,
       SISELECT   = 0x150,
       SIREG      = 0x151,
+      SIREG2     = 0x152,
+      SIREG3     = 0x153,
+      SIREG4     = 0x155,
+      SIREG5     = 0x156,
+      SIREG6     = 0x157,
       STOPEI     = 0x15c,
       STOPI      = 0xdb0,
       SIEH       = 0x114,
@@ -394,6 +404,11 @@ namespace WdRiscv
       HVIPRIO2   = 0x647,
       VSISELECT  = 0x250,
       VSIREG     = 0x251,
+      VSIREG2    = 0x252,
+      VSIREG3    = 0x253,
+      VSIREG4    = 0x255,
+      VSIREG5    = 0x256,
+      VSIREG6    = 0x257,
       VSTOPEI    = 0x25c,
       VSTOPI     = 0xeb0,
       HIDELEGH   = 0x613,
@@ -434,7 +449,7 @@ namespace WdRiscv
       PMACFG31 = 0x7ff,
       PMACFG32 = 0xbe0,
       PMACFG63 = 0xbff,
-      MATP     = 0x7c7,   // Machine address translation and protection
+      C_MATP   = 0x7c7,   // Machine address translation and protection
 
       MAX_CSR_ = 0xfff,
       MIN_CSR_ = 0      // csr with smallest number
@@ -973,6 +988,9 @@ namespace WdRiscv
     /// Enable triggers.
     void enableTriggers(bool flag);
 
+    /// Enable STEE (static trusted execution env)
+    void enableStee(bool flag);
+
     /// Enable/disable firing of triggers in machine mode when interrupts are enabled.
     void enableMmodeTriggersWithIe(bool flag)
     { triggers_.enableMmodeWithIe(flag); }
@@ -1235,6 +1253,9 @@ namespace WdRiscv
 
     /// Helper to constructor. Define PMA CSRs.
     void definePmaRegs();
+
+    /// Helper to construction. Define STEE (static trusted execution) CSRs
+    void defineSteeRegs();
 
     /// Set the store error address capture register. Return true on
     /// success and false if register is not implemented.

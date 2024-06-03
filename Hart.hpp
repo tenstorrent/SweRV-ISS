@@ -233,11 +233,11 @@ namespace WdRiscv
     URV peekCsr(CsrNumber csr) const;
 
     /// Set val, reset, writeMask, and pokeMask respectively to the
-    /// value, reset-value, write-mask and poke-mask of the control
-    /// and status register csr returning true on success. Return
-    /// false leaving parameters unmodified if csr is out of bounds.
+    /// value, reset-value, write-mask, poke-mask, and read-mask of
+    /// the control and status register csr returning true on success.
+    /// Return false leaving parameters unmodified if csr is out of bounds.
     bool peekCsr(CsrNumber csr, URV& val, URV& reset, URV& writeMask,
-		 URV& pokeMask) const;
+		 URV& pokeMask, URV& readMask) const;
 
     /// Set val/name to the value/name of the control and status
     /// register csr returning true on success. Return false leaving
@@ -596,7 +596,7 @@ namespace WdRiscv
     /// Define memory mapped locations for CLINT.
     void configAclint(uint64_t mswiOffset, bool hasMswi,
                       uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
-		      bool softwareInterruptOnReset,
+		      bool softwareInterruptOnReset, bool deliverInterrupts,
                       std::function<Hart<URV>*(unsigned ix)> indexToHart)
     {
       if (hasMswi)
@@ -613,6 +613,7 @@ namespace WdRiscv
           aclintMtimeEnd_ = mtimeOffset + 0x8;
         }
       aclintSiOnReset_ = softwareInterruptOnReset;
+      aclintDeliverInterrupts_ = deliverInterrupts;
       indexToHart_ = indexToHart;
     }
 
@@ -762,8 +763,8 @@ namespace WdRiscv
     /// address of the instruction is identical to the given address.
     void setToHostAddress(uint64_t address);
 
-    void setFromHostAddress(uint64_t addr)
-    { fromHost_ = addr; fromHostValid_ = true; }
+    void setFromHostAddress(uint64_t addr, bool enabled)
+    { fromHost_ = addr; fromHostValid_ = enabled; }
 
     /// Undefine address to which a write will stop the simulator
     void clearToHostAddress();
@@ -2016,7 +2017,7 @@ namespace WdRiscv
       auto fetchMem =  [this](uint64_t addr, uint32_t& value) -> bool {
 	if (pmpEnabled_)
 	  {
-	    Pmp pmp = pmpManager_.accessPmp(addr, PmpManager::AccessReason::Fetch);
+	    const Pmp& pmp = pmpManager_.accessPmp(addr, PmpManager::AccessReason::Fetch);
 	    if (not pmp.isExec(privMode_))
 	      return false;
 	  }
@@ -2061,17 +2062,28 @@ namespace WdRiscv
     bool readInstFromFetchCache(uint64_t addr, uint16_t& inst) const
     { return fetchCache_.read(addr, inst); }
 
+    /// Configure the mask defining which bits of a physical address must be zero for the
+    /// address to be considered valid when STEE (static truested execution environment)
+    /// is enabled. A bit set in the given mask must correspond to a zero bit in a physical
+    /// address; otherwise, the STEE will deem the physical address invalid.
     void configSteeZeroMask(uint64_t mask)
     { stee_.configZeroMask(mask); }
 
+    /// Configure the mask defining the bits of physical address that must be one for the
+    /// address to be considered secure when STEE is enabled. For example if bit 55 of
+    /// the given mask is 1, then an address with bit 55 set will be considered secure.
     void configSteeSecureMask(uint64_t mask)
     { stee_.configSecureMask(mask); }
 
+    /// Configure the region of memory that is considered secure and that requires secure
+    /// access when STEE is enabled. This is purely for testing as the secure region is a
+    /// property of the platform.
     void configSteeSecureRegion(uint64_t low, uint64_t high)
     { stee_.configSecureRegion(low, high); }
 
+    /// Enable STEE.
     void enableStee(bool flag)
-    { steeEnabled_ = flag; }
+    { steeEnabled_ = flag; csRegs_.enableStee(flag); }
 
     /// Return true if ACLINT is configured.
     bool hasAclint() const
@@ -2132,6 +2144,12 @@ namespace WdRiscv
     /// assigned a valid event).
     bool hasActivePerfCounter() const
     { return csRegs_.mPerfRegs_.hasActiveCounter(); }
+
+    /// Skip cancel-lr in wrs_sto/wrs_nto if flag is false. This is used in
+    /// server/interactive mode where the driver (test-bench) will do an explicit
+    /// cancel-lr at the right time.
+    void setWrsCancelsLr(bool flag)
+    { wrsCancelsLr_ = flag; }
 
   protected:
 
@@ -2807,7 +2825,7 @@ namespace WdRiscv
                       URV info2 = 0);
 
     /// Create trap instruction information for mtinst/htinst.
-    uint32_t createTrapInst(const DecodedInst* di, bool interrupt, unsigned cause, URV info) const;
+    uint32_t createTrapInst(const DecodedInst* di, bool interrupt, unsigned cause, URV info, URV info2) const;
 
     /// Illegal instruction. Initiate an illegal instruction trap.
     /// This is used for one of the following:
@@ -4838,6 +4856,15 @@ namespace WdRiscv
     void execSm4ed(const DecodedInst*);
     void execSm4ks(const DecodedInst*);
 
+    // Dot product (non standard) exntesion
+    void execVqdot_vv(const DecodedInst*);
+    void execVqdot_vx(const DecodedInst*);
+    void execVqdotu_vv(const DecodedInst*);
+    void execVqdotu_vx(const DecodedInst*);
+    void execVqdotsu_vv(const DecodedInst*);
+    void execVqdotsu_vx(const DecodedInst*);
+    void execVqdotus_vx(const DecodedInst*);
+
     void execSinval_vma(const DecodedInst*);
     void execSfence_w_inval(const DecodedInst*);
     void execSfence_inval_ir(const DecodedInst*);
@@ -5015,6 +5042,7 @@ namespace WdRiscv
 
     URV fromHost_ = 0;
     bool fromHostValid_ = false;
+    unsigned pendingHtifGetc_ = 0; // Count of pending HTIF get-character requests.
 
     URV conIo_ = 0;              // Writing a byte to this writes to console.
     bool conIoValid_ = false;    // True if conIo_ is valid.
@@ -5028,6 +5056,7 @@ namespace WdRiscv
     uint64_t aclintMtimeEnd_ = 0;
     uint64_t aclintAlarm_ = ~uint64_t(0); // Interrupt when timer >= this
     bool aclintSiOnReset_ = false;
+    bool aclintDeliverInterrupts_ = true;
     std::function<Hart<URV>*(unsigned ix)> indexToHart_ = nullptr;
 
     // True if we want to defer an interrupt for later. By default, take immediately.
@@ -5259,6 +5288,8 @@ namespace WdRiscv
     std::shared_ptr<Mcm<URV>> mcm_;    // Memory consistency model.
     std::shared_ptr<PerfApi> perfApi_; // Memory consistency model.
     bool ooo_ = false;                 // Out of order execution (mcm or perfApi).
+
+    bool wrsCancelsLr_ = true;         // wrs_sto/wrs_nto instructions do cancel-lr.
 
     FILE* initStateFile_ = nullptr;
     std::unordered_set<uint64_t> initInstrLines_;

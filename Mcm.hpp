@@ -256,6 +256,11 @@ namespace WdRiscv
     /// Helper to above ppoRule7.
     bool ppoRule7(const McmInstr& instrA, const McmInstr& instrB) const;
 
+    /// If B is a load and A is cbo.flush/clean instruction that overlaps B and preceeds
+    /// it in program order, then B cannot have a read operation prior to to A's retire
+    /// time.  Return true if this rule followed and false otherwise.
+    bool checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const;
+
     /// Check that previous SINVAL.VMA instructions are executed before subsequent
     /// implicit references to the memory-management data structures. Return true on
     /// success and false if there are translations between the the current

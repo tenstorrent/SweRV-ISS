@@ -35,9 +35,9 @@ namespace WdRiscv
 
     friend class PmpManager;
 
-    enum Type { Off = 0, Tor = 1, Na4 = 2, Napot = 3, _Count = 4 };
+    enum Type : uint8_t { Off = 0, Tor = 1, Na4 = 2, Napot = 3, _Count = 4 };
 
-    enum Mode
+    enum Mode : uint8_t
       {
        None = 0, Read = 1, Write = 2, Exec = 4, ReadWrite = Read | Write,
        Default = Read | Write | Exec
@@ -102,6 +102,7 @@ namespace WdRiscv
     bool locked_    : 1;
     unsigned pmpIx_ : 5;  // Index of corresponding pmp register.
   } __attribute__((packed));
+  static_assert(sizeof(Pmp) <= 3);
 
 
   /// Physical memory protection manager. One per hart.  rotection
@@ -164,25 +165,27 @@ namespace WdRiscv
 
     /// Similar to getPmp but it also updates the access count associated with
     /// each PMP entry.
-    inline Pmp accessPmp(uint64_t addr) const
+    inline const Pmp& accessPmp(uint64_t addr) const
     { return accessPmp(addr, AccessReason::None); }
 
     /// Similar to getPmp but it also updates the access count associated with
     /// each PMP entry.
-    inline Pmp accessPmp(uint64_t addr, AccessReason reason) const
+    inline const Pmp& accessPmp(uint64_t addr, AccessReason reason) const
     {
       addr = (addr >> 2) << 2;
       for (const auto& region : regions_)
-	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
-	  {
-	    auto pmp = region.pmp_;
-	    auto ix = pmp.pmpIndex();
-	    auto val = pmp.val();
-	    if (trace_)
-              pmpTrace_.push_back({ix, addr, val, reason});
-	    return pmp;
-	  }
-      return {};
+        {
+          if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
+            {
+              auto& pmp = region.pmp_;
+              auto ix = pmp.pmpIndex();
+              auto val = pmp.val();
+              if (trace_)
+                pmpTrace_.push_back({ix, addr, val, reason});
+              return region.pmp_;
+            }
+        }
+      return defaultPmp_;
     }
 
     /// Used for tracing to determine if an address matches multiple PMPs.
@@ -262,6 +265,7 @@ namespace WdRiscv
     std::vector<Region> regions_;
     bool enabled_ = false;
     bool trace_ = false;   // Collect stats if true.
+    Pmp defaultPmp_;
 
     // PMPs used in most recent instruction
     mutable std::vector<PmpTrace> pmpTrace_;

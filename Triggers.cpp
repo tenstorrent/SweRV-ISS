@@ -709,12 +709,11 @@ Trigger<URV>::matchLdStAddr(URV address, TriggerTiming timing, bool isLoad,
     return false;
 
   bool isStore = not isLoad;
-  bool clearBit0 = false;
 
-  if (getTiming() == timing and
-      Select(ctl.select_) == Select::MatchAddress and
+  if (getTiming() == timing and Select(ctl.select_) == Select::MatchAddress and
       ((isLoad and ctl.load_) or (isStore and ctl.store_)))
-    return doMatch(address, clearBit0);
+    return doMatch(address);
+
   return false;
 }
 
@@ -765,12 +764,10 @@ Trigger<URV>::matchLdStData(URV value, TriggerTiming timing, bool isLoad,
     return false;
 
   bool isStore = not isLoad;
-  bool clearBit0 = false;
 
-  if (getTiming() == timing and
-      Select(ctl.select_) == Select::MatchData and
+  if (getTiming() == timing and Select(ctl.select_) == Select::MatchData and
       ((isLoad and ctl.load_) or (isStore and ctl.store_)))
-    return doMatch(value, clearBit0);
+    return doMatch(value);
   return false;
 }
 
@@ -791,14 +788,9 @@ Trigger<URV>::matchLdStData(URV value, TriggerTiming timing, bool isLoad,
 
 template <typename URV>
 bool
-Trigger<URV>::doMatch(URV item, bool clearBit0) const
+Trigger<URV>::doMatch(URV item) const
 {
   URV data2 = data2_;
-  if (clearBit0)
-    {
-      data2 = (data2 >> 1) << 1;
-      item = (item >> 1) << 1;
-    }
 
   auto doMatch = [this] (URV item, URV compare, Match match) -> bool {
     switch (match)
@@ -818,7 +810,7 @@ Trigger<URV>::doMatch(URV item, bool clearBit0) const
       case Match::MaskHighEqualLow:
         {
           unsigned halfBitCount = 4*sizeof(URV);
-          // Mask low half of item with data2_ high half
+          // Mask low half of item with tdata2 high half
           item = item & (compare >> halfBitCount);
           // Compare low half
           return (item << halfBitCount) == (compare << halfBitCount);
@@ -827,10 +819,11 @@ Trigger<URV>::doMatch(URV item, bool clearBit0) const
       case Match::MaskLowEqualHigh:
         {
           unsigned halfBitCount = 4*sizeof(URV);
-          // Mask high half of item with data2_ low half
-          item = item & (compare << halfBitCount);
-          // Compare high half
-          return (item >> halfBitCount) == (compare >> halfBitCount);
+          // Mask high half of item with high half of tdata2
+          item = item & compare;
+          // Compare high half of item with low half of tdata2
+	  compare = (compare << halfBitCount) >> halfBitCount;  // Clear high half of tdata2
+          return (item >> halfBitCount) == compare;
         }
 
       default:
@@ -878,13 +871,9 @@ Trigger<URV>::matchInstAddr(URV address, TriggerTiming timing, PrivilegeMode mod
   else if (virtMode)
     return false;
 
-  bool clearBit0 = true;  // Clear bit0 of address before matching.
+  if (getTiming() == timing and Select(ctl.select_) == Select::MatchAddress and ctl.execute_)
+    return doMatch(address);
 
-  if (getTiming() == timing and
-
-      Select(ctl.select_) == Select::MatchAddress and
-      ctl.execute_)
-    return doMatch(address, clearBit0);
   return false;
 }
 
@@ -934,12 +923,8 @@ Trigger<URV>::matchInstOpcode(URV opcode, TriggerTiming timing,
   else if (virtMode)
     return false;
 
-  bool clearBit0 = false;
-
-  if (getTiming() == timing and
-      Select(ctl.select_) == Select::MatchData and
-      ctl.execute_)
-    return doMatch(opcode, clearBit0);
+  if (getTiming() == timing and Select(ctl.select_) == Select::MatchData and ctl.execute_)
+    return doMatch(opcode);
   return false;
 }
 

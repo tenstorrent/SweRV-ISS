@@ -43,6 +43,7 @@ CsRegs<URV>::CsRegs()
   defineStateEnableRegs();
   defineEntropyReg();
   definePmaRegs();
+  defineSteeRegs();
 }
 
 
@@ -1826,8 +1827,7 @@ void
 CsRegs<URV>::enableTriggers(bool flag)
 {
   using CN = CsrNumber;
-
-  triggersOn_ = true;
+  triggersOn_ = flag;
 
   auto enableCsr = [this] (CN csrn, bool flag) {
     auto csr = findCsr(csrn);
@@ -1841,6 +1841,16 @@ CsRegs<URV>::enableTriggers(bool flag)
 
   enableCsr(CN::SCONTEXT, flag and superEnabled_);
   enableCsr(CN::HCONTEXT, flag and superEnabled_ and hyperEnabled_);
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableStee(bool flag)
+{
+  auto csr = findCsr(CsrNumber::C_MATP);
+  if (csr)
+    csr->setImplemented(flag);
 }
 
 
@@ -3338,6 +3348,17 @@ CsRegs<URV>::definePmaRegs()
 	num = advance(CN::PMACFG32, i - 32);
       defineCsr(name, num, !mand, !imp, reset, mask, pokeMask);
     }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::defineSteeRegs()
+{
+  bool imp = false;
+  bool mand = false;
+  uint64_t reset = 0, mask = 0x1, pokeMask = 0x1;
+  defineCsr("c_matp", CsrNumber::C_MATP, !mand, !imp, reset, mask, pokeMask);
 }
 
 

@@ -547,13 +547,9 @@ template <typename URV>
 void
 Hart<URV>::updateAddressTranslation()
 {
-  bool invalidate = false; // Invalidate decode cache.
-
   URV value = 0;
   if (peekCsr(CsrNumber::SATP, value))
     {
-      uint32_t prevAsid = virtMode_ ? virtMem_.vsAsid() : virtMem_.asid();
-
       SatpFields<URV> satp(value);
       if constexpr (sizeof(URV) != 4)
 	if ((satp.bits_.MODE >= 1 and satp.bits_.MODE <= 7) or satp.bits_.MODE >= 12)
@@ -571,15 +567,10 @@ Hart<URV>::updateAddressTranslation()
 	  virtMem_.setAsid(satp.bits_.ASID);
 	  virtMem_.setRootPage(satp.bits_.PPN);
 	}
-
-      if (satp.bits_.ASID != prevAsid)
-	invalidate = true;
     }
 
   if (peekCsr(CsrNumber::VSATP, value))
     {
-      uint32_t prevAsid = virtMem_.vsAsid();
-
       SatpFields<URV> satp(value);
       if constexpr (sizeof(URV) != 4)
 	if ((satp.bits_.MODE >= 1 and satp.bits_.MODE <= 7) or satp.bits_.MODE >= 12)
@@ -588,26 +579,15 @@ Hart<URV>::updateAddressTranslation()
       virtMem_.setVsMode(VirtMem::Mode(satp.bits_.MODE));
       virtMem_.setVsAsid(satp.bits_.ASID);
       virtMem_.setVsRootPage(satp.bits_.PPN);
-
-      if (satp.bits_.ASID != prevAsid)
-	invalidate = true;
     }
 
   if (peekCsr(CsrNumber::HGATP, value))
     {
-      uint32_t prevVmid = virtMem_.vmid();
-
       HgatpFields<URV> hgatp(value);
       virtMem_.setStage2Mode(VirtMem::Mode(hgatp.bits_.MODE));
       virtMem_.setVmid(hgatp.bits_.VMID);
       virtMem_.setStage2RootPage(hgatp.bits_.PPN);
-
-      if (hgatp.bits_.VMID != prevVmid)
-	invalidate = true;
     }
-
-  if (invalidate)
-    invalidateDecodeCache();
 }
 
 
@@ -1568,13 +1548,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	}
       if (pm != PM::Machine)
         {
-          bool disablePointerMask = not hyper and mstatusMprv() and mstatus_.bits_.MXR;
-          VirtMem::Pmm prevPmm = virtMem_.pmMode(pm, virt);
-          if (disablePointerMask)
-            virtMem_.enablePointerMasking(VirtMem::Pmm::Off, pm, virt);
 	  auto cause = virtMem_.translateForLoad2(va1, ldSize, pm, virt, gaddr1, addr1, gaddr2, addr2);
-          if (disablePointerMask)
-            virtMem_.enablePointerMasking(prevPmm, pm, virt);
           if (cause != EC::NONE)
 	    {
 	      ldStFaultAddr_ = addr1;
@@ -1583,13 +1557,23 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
         }
     }
 
+  if (steeEnabled_)
+    {
+      if (not stee_.isValidAccess(addr1, ldSize))
+	return EC::LOAD_ACC_FAULT;
+      if (addr2 != addr1 and not stee_.isValidAccess(addr2, ldSize))
+	return EC::LOAD_ACC_FAULT;
+      addr1 = stee_.clearSecureBits(addr1);
+      addr2 = stee_.clearSecureBits(addr2);
+    }
+
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
       auto effPm = effectivePrivilege();
       if (hyper)
 	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-      Pmp pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
+      const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
       if (not pmp.isRead(effPm)  or  (virtMem_.isExecForRead() and not pmp.isExec(effPm)))
 	return EC::LOAD_ACC_FAULT;
     }
@@ -1617,21 +1601,13 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	  auto effPm = effectivePrivilege();
 	  if (hyper)
 	    effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-	  Pmp pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
+	  const Pmp& pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
 	  if (not pmp2.isRead(effPm) or (virtMem_.isExecForRead() and not pmp2.isExec(effPm)))
 	    {
 	      ldStFaultAddr_ = va2;
 	      return EC::LOAD_ACC_FAULT;
 	    }
 	}
-    }
-
-  if (steeEnabled_)
-    {
-      if (not stee_.isValidAccess(addr1, ldSize))
-	return EC::LOAD_ACC_FAULT;
-      if (addr2 != addr1 and not stee_.isValidAccess(addr2, ldSize))
-	return EC::LOAD_ACC_FAULT;
     }
 
   if (not misal)
@@ -2012,14 +1988,12 @@ Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
 	  int ch = readCharNonBlocking(syscall_.effectiveFd(STDIN_FILENO));
 	  if (ch > 0)
 	    memory_.poke(fromHost_, ((val >> 48) << 48) | uint64_t(ch), true);
+	  else
+	    ++pendingHtifGetc_;
 	}
     }
-  else if (dev == 0 and cmd == 0)
-    {
-      if (storeVal & 1)
-	throw CoreException(CoreException::Stop, "write to to-host",
-			    toHost_, val);
-    }
+  else if (dev == 0 and cmd == 0 and (storeVal & 1))
+    throw CoreException(CoreException::Stop, "write to to-host", toHost_, val);
 }
 
 
@@ -2098,7 +2072,8 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   ldStWrite_ = true;
   ldStData_ = storeVal;
 
-  invalidateDecodeCache(virtAddr, ldStSize_);
+  invalidateDecodeCache(pa1, ldStSize_); // this could be smaller
+  invalidateDecodeCache(pa2, ldStSize_);
 
   if (ooo_)
     {
@@ -2168,7 +2143,8 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
       if (hart and stSize == 4 and (addr & 3) == 0)
 	{
 	  storeVal = storeVal & 1;  // Only bit zero is implemented.
-          hart->setSwInterrupt((1 << 1) | storeVal);
+	  if (aclintDeliverInterrupts_)
+	    hart->setSwInterrupt((1 << 1) | storeVal);
 	  return;
 	}
     }
@@ -2206,7 +2182,7 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
       auto hart = indexToHart_(hartIx);
       if (hart and (stSize == 4 or stSize == 8))
 	{
-	  if (stSize == 4)
+	  if (stSize == 4 and aclintDeliverInterrupts_)
 	    {
 	      if ((addr & 7) == 0)  // Multiple of 8
 		{
@@ -2221,12 +2197,12 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 	    }
 	  else if (stSize == 8)
 	    {
-	      if ((addr & 7) == 0)
+	      if ((addr & 7) == 0 and aclintDeliverInterrupts_)
 		hart->aclintAlarm_ = storeVal + 10000;
 
-	      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
+	      // An htif_getc may be pending, send char back to target.
 	      auto inFd = syscall_.effectiveFd(STDIN_FILENO);
-	      if (fromHostValid_ and hasPendingInput(inFd))
+	      if (pendingHtifGetc_ and hasPendingInput(inFd))
 		{
 		  uint64_t v = 0;
 		  peekMemory(fromHost_, v, true);
@@ -2234,7 +2210,10 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 		    {
 		      int c = char(readCharNonBlocking(inFd));
 		      if (c > 0)
-			memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
+			{
+			  memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
+			  --pendingHtifGetc_;
+			}
 		    }
 		}
 	    }
@@ -2359,7 +2338,7 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& phy
 
   if (pmpEnabled_)
     {
-      Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
+      const Pmp& pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
       if (not pmp.isExec(privMode_))
 	return ExceptionCause::INST_ACC_FAULT;
     }
@@ -2408,7 +2387,7 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& phy
 
   if (pmpEnabled_)
     {
-      Pmp pmp2 = pmpManager_.accessPmp(physAddr2, PmpManager::AccessReason::Fetch);
+      const Pmp& pmp2 = pmpManager_.accessPmp(physAddr2, PmpManager::AccessReason::Fetch);
       if (not pmp2.isExec(privMode_))
 	{
 	  virtAddr += 2; // To report faulting portion of fetch.
@@ -2522,12 +2501,6 @@ Hart<URV>::initiateInterrupt(InterruptCause cause, URV pc)
   bool interrupt = true;
   URV info = 0;  // This goes into mtval.
   initiateTrap(nullptr, interrupt, URV(cause), pc, info);
-
-#if 0
-  // Operating system code does this by writing to CLINT.
-  if (cause == InterruptCause::M_SOFTWARE)
-    setSwInterrupt(0);
-#endif
 
   if (not enableCounters_ or not hasActivePerfCounter())
     return;
@@ -2658,7 +2631,7 @@ isGpaTrap(unsigned causeCode)
 
 template <typename URV>
 uint32_t
-Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeCode, URV info) const
+Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeCode, URV info, URV info2) const
 {
   using EC = ExceptionCause;
 
@@ -2683,14 +2656,12 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
       break;
     }
 
-  if (not di and cause != EC::INST_GUEST_PAGE_FAULT)
-    assert(0 and "No instruction where exception indicates it's needed.");
-
   // Implicit accesses for VS-stage address translation generate a pseudocode.
   if (isGpaTrap(causeCode))
     {
       bool implicitWrite;
-      if (virtMem_.stage1TrapInfo(implicitWrite))
+      // FIXME: info2 should be masked non-zero first
+      if (virtMem_.stage1TrapImplAcc(implicitWrite) and info2)
         {
           /// From Table 8.12 of privileged spec.
           if constexpr (sizeof(URV) == 4)
@@ -2698,10 +2669,11 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
           else
             return 0x3000 | (uint32_t(implicitWrite) << 5);
         }
-      // Not possible to create a transformed instruction for fetch fault
-      if (cause == EC::INST_GUEST_PAGE_FAULT)
-        return 0;
+      return 0;
     }
+
+  if (not di)
+    return 0;
 
   // Spec does not specify how vector ld/st should be handled.
   if (di->isVector())
@@ -2828,7 +2800,7 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
   if (isGpaTrap(cause))
     tval2 = info2 >> 2;
 
-  uint32_t tinst = isRvh()? createTrapInst(di, interrupt, cause, info) : 0;
+  uint32_t tinst = isRvh()? createTrapInst(di, interrupt, cause, info, info2) : 0;
 
   bool gva = ( isRvh() and not interrupt and
 	       (hyperLs_ or isGvaTrap(gvaVirtMode, cause)) );
@@ -3139,7 +3111,7 @@ Hart<URV>::peekCsr(CsrNumber csrn) const
 template <typename URV>
 bool
 Hart<URV>::peekCsr(CsrNumber csrn, URV& val, URV& reset, URV& writeMask,
-		   URV& pokeMask) const
+		   URV& pokeMask, URV& readMask) const
 { 
   const Csr<URV>* csr = csRegs_.getImplementedCsr(csrn);
   if (not csr)
@@ -3151,6 +3123,7 @@ Hart<URV>::peekCsr(CsrNumber csrn, URV& val, URV& reset, URV& writeMask,
   reset = csr->getResetValue();
   writeMask = csr->getWriteMask();
   pokeMask = csr->getPokeMask();
+  readMask = csr->getReadMask();
   return true;
 }
 
@@ -3334,6 +3307,13 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       return;
     }
 
+  if (steeEnabled_ and csr == CN::C_MATP)
+    {
+      unsigned world = val & 1;
+      stee_.setSecureWorld(world);
+      return;
+    }
+
   if (csr == CN::SATP or csr == CN::VSATP or csr == CN::HGATP)
     updateAddressTranslation();
   else if (csr == CN::FCSR or csr == CN::FRM or csr == CN::FFLAGS)
@@ -3371,9 +3351,9 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 
   if (csr == CN::STIMECMP)
     {
-      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
+      // An htif_getc may be pending, send char back to target.
       auto inFd = syscall_.effectiveFd(STDIN_FILENO);
-      if (fromHostValid_ and hasPendingInput(inFd))
+      if (pendingHtifGetc_ and hasPendingInput(inFd))
         {
           uint64_t v = 0;
           peekMemory(fromHost_, v, true);
@@ -3381,7 +3361,10 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
             {
               int c = char(readCharNonBlocking(inFd));
               if (c > 0)
-                memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
+		{
+		  memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
+		  --pendingHtifGetc_;
+		}
             }
         }
     }
@@ -5346,7 +5329,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       URV mipVal = csRegs_.peekMip();
       URV prev = mipVal;
 
-      if (hasAclint())
+      if (hasAclint() and aclintDeliverInterrupts_)
 	{
 	  // Deliver/clear machine timer interrupt from clint.
 	  if (time_ >= aclintAlarm_ + timeShift_)
@@ -5370,7 +5353,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	    }
 	}
 
-      if (swInterrupt_.bits_.alarm_)
+      if (swInterrupt_.bits_.alarm_ and aclintDeliverInterrupts_)
         {
 	  if (swInterrupt_.bits_.flag_)
 	    {
@@ -9050,6 +9033,34 @@ Hart<URV>::execute(const DecodedInst* di)
       execSm4ks(di);
       return;
 
+    case InstId::vqdot_vv:
+      execVqdot_vv(di);
+      return;
+
+    case InstId::vqdot_vx:
+      execVqdot_vx(di);
+      return;
+
+    case InstId::vqdotu_vv:
+      execVqdotu_vv(di);
+      return;
+
+    case InstId::vqdotu_vx:
+      execVqdotu_vx(di);
+      return;
+
+    case InstId::vqdotsu_vv:
+      execVqdotsu_vv(di);
+      return;
+
+    case InstId::vqdotsu_vx:
+      execVqdotsu_vx(di);
+      return;
+
+    case InstId::vqdotus_vx:
+      execVqdotus_vx(di);
+      return;
+
     case InstId::sinval_vma:
       execSinval_vma(di);
       return;
@@ -9926,14 +9937,12 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
   else if (di->op0() != 0 and di->op1() == 0)
     {
       URV addr = intRegs_.read(di->op0());
-      addr = virtMem_.applyPointerMask(addr, privMode_, virtMode_);
       uint64_t vpn = virtMem_.pageNumber(addr);
       tlb.invalidateVirtualPage(vpn);
     }
   else
     {
       URV addr = intRegs_.read(di->op0());
-      addr = virtMem_.applyPointerMask(addr, privMode_, virtMode_);
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV asid = intRegs_.read(di->op1());
       tlb.invalidateVirtualPageAsid(vpn, asid);
@@ -10423,7 +10432,7 @@ Hart<URV>::checkCsrAccess(const DecodedInst* di, CsrNumber csr, bool isWrite)
 
 
   // Section 2.3 of AIA, lower priority than stateen. Doesn't follow normal hs-qualified rules.
-  if (not imsicAccessible(di, csr, privMode_, virtMode_))
+  if (isRvaia() and not imsicAccessible(di, csr, privMode_, virtMode_))
     return false;
 
   if (csr == CN::SATP and privMode_ == PM::Supervisor)
@@ -11170,13 +11179,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	}
       if (pm != PM::Machine)
         {
-          bool disablePointerMask = not hyper and mstatusMprv() and mstatus_.bits_.MXR;
-          VirtMem::Pmm prevPmm = virtMem_.pmMode(pm, virt);
-          if (disablePointerMask)
-            virtMem_.enablePointerMasking(VirtMem::Pmm::Off, pm, virt);
 	  auto cause = virtMem_.translateForStore2(va1, stSize, pm, virt, gaddr1, addr1, gaddr2, addr2);
-          if (disablePointerMask)
-            virtMem_.enablePointerMasking(prevPmm, pm, virt);
           if (cause != EC::NONE)
 	    {
 	      ldStFaultAddr_ = addr1;
@@ -11185,13 +11188,26 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
         }
     }
 
+  if (steeEnabled_)
+    {
+      if (not stee_.isValidAccess(addr1, stSize))
+	return EC::STORE_ACC_FAULT;
+      if (addr2 != addr1 and not stee_.isValidAccess(addr2, stSize))
+	{
+	  ldStFaultAddr_ = va2;
+	  return EC::STORE_ACC_FAULT;
+	}
+      addr1 = stee_.clearSecureBits(addr1);
+      addr2 = stee_.clearSecureBits(addr2);
+    }
+
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
       auto effPm = effectivePrivilege();
       if (hyper)
 	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-      Pmp pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
+      const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
       if (not pmp.isWrite(effPm))
 	return EC::STORE_ACC_FAULT;
     }
@@ -11224,23 +11240,12 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	  auto effPm = effectivePrivilege();
 	  if (hyper)
 	    effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-	  Pmp pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
+	  const Pmp& pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
 	  if (not pmp2.isWrite(effPm))
 	    {
 	      ldStFaultAddr_ = va2;
 	      return EC::STORE_ACC_FAULT;
 	    }
-	}
-    }
-
-  if (steeEnabled_)
-    {
-      if (not stee_.isValidAccess(addr1, stSize))
-	return EC::STORE_ACC_FAULT;
-      if (addr2 != addr1 and not stee_.isValidAccess(addr2, stSize))
-	{
-	  ldStFaultAddr_ = va2;
-	  return EC::STORE_ACC_FAULT;
 	}
     }
 
@@ -11951,7 +11956,10 @@ Hart<URV>::execWrs_nto(const DecodedInst* di)
       return;
     }
 
-  cancelLr(CancelLrCause::WRS_NTO);  // Lose reservation.
+  // In server/interactive mode, we skip cancelLr. The driver (test-bench) will explicitly
+  // cancel-lr at the right time.
+  if (wrsCancelsLr_)
+    cancelLr(CancelLrCause::WRS_NTO);  // Lose reservation.
 }
 
 
@@ -11967,7 +11975,10 @@ Hart<URV>::execWrs_sto(const DecodedInst* di)
       return;
     }
 
-  cancelLr(CancelLrCause::WRS_STO);  // Lose reservation.
+  // In server/interactive mode, we skip cancelLr. The driver (test-bench) will explicitly
+  // cancel-lr at the right time.
+  if (wrsCancelsLr_)
+    cancelLr(CancelLrCause::WRS_STO);  // Lose reservation.
 }
 
 

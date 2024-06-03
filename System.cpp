@@ -203,7 +203,7 @@ System<URV>::loadElfFiles(const std::vector<std::string>& files, bool raw, bool 
       if (not toHostSym_.empty() and memory_->findElfSymbol(toHostSym_, sym))
 	hart->setToHostAddress(sym.addr_);
       if (not fromHostSym_.empty() and memory_->findElfSymbol(fromHostSym_, sym))
-	hart->setFromHostAddress(sym.addr_);
+	hart->setFromHostAddress(sym.addr_, true);
       if (not consoleIoSym_.empty() and memory_->findElfSymbol(consoleIoSym_, sym))
 	hart->setConsoleIo(URV(sym.addr_));
 

@@ -99,13 +99,16 @@ File::iregWrite(unsigned sel, URV val)
 
       auto& vec = *vecPtr;
       constexpr size_t bits = sizeof(URV)*8;
-      unsigned begin = offset*32;
-      unsigned end = std::min(begin + bits, vec.size());
-      // slow, use bitset?
-      for (unsigned i = begin; i < end; i++)
-        vec[i] = (val >> (i - begin)) & 1;
+      int begin = offset*32;
+      int end = std::min(begin + bits, vec.size());
+      for (int i = end-1; i >= begin; i--)
+        {
+          vec[i] = (val >> (i - begin)) & 1;
 
-      updateTopId();
+          bool active = pending_[i] and enabled_[i];
+          if ((topId_ == 0 or unsigned(i) < topId_) and active)
+            topId_ = i;
+        }
     }
 
   return true;
