@@ -96,6 +96,11 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     uint64_t isBranch() const
     { return di_.isBranch(); }
 
+    /// Return true if this branch instruction is taken. Will return false if
+    /// instruction has not executed or is not a branch.
+    bool isTakenBranch() const
+    { return taken_; }
+
     /// Record the branch prediction made by the performance model. Return false if
     /// instruction is not a branch or is not decoded.
     bool predictBranch(bool taken, uint64_t target)
@@ -223,6 +228,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     // Following applicable if instruction is a branch
     bool predicted_    : 1 = false;  // true if predicted to be a branch
     bool prTaken_      : 1 = false;  // true if predicted branch/jump is taken
+    bool taken_        : 1 = false;  // true if branch/jump is actually taken
     bool mispredicted_ : 1 = false;
     bool shouldFlush_  : 1 = false;
 
