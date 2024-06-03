@@ -1827,6 +1827,7 @@ void
 CsRegs<URV>::enableTriggers(bool flag)
 {
   using CN = CsrNumber;
+  triggersOn_ = flag;
 
   auto enableCsr = [this] (CN csrn, bool flag) {
     auto csr = findCsr(csrn);
