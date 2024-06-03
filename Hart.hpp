@@ -2825,7 +2825,7 @@ namespace WdRiscv
                       URV info2 = 0);
 
     /// Create trap instruction information for mtinst/htinst.
-    uint32_t createTrapInst(const DecodedInst* di, bool interrupt, unsigned cause, URV info) const;
+    uint32_t createTrapInst(const DecodedInst* di, bool interrupt, unsigned cause, URV info, URV info2) const;
 
     /// Illegal instruction. Initiate an illegal instruction trap.
     /// This is used for one of the following:

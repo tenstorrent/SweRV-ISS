@@ -2631,7 +2631,7 @@ isGpaTrap(unsigned causeCode)
 
 template <typename URV>
 uint32_t
-Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeCode, URV info) const
+Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeCode, URV info, URV info2) const
 {
   using EC = ExceptionCause;
 
@@ -2656,14 +2656,12 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
       break;
     }
 
-  if (not di and cause != EC::INST_GUEST_PAGE_FAULT)
-    assert(0 and "No instruction where exception indicates it's needed.");
-
   // Implicit accesses for VS-stage address translation generate a pseudocode.
   if (isGpaTrap(causeCode))
     {
       bool implicitWrite;
-      if (virtMem_.stage1TrapInfo(implicitWrite))
+      // FIXME: info2 should be masked non-zero first
+      if (virtMem_.stage1TrapImplAcc(implicitWrite) and info2)
         {
           /// From Table 8.12 of privileged spec.
           if constexpr (sizeof(URV) == 4)
@@ -2671,10 +2669,11 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
           else
             return 0x3000 | (uint32_t(implicitWrite) << 5);
         }
-      // Not possible to create a transformed instruction for fetch fault
-      if (cause == EC::INST_GUEST_PAGE_FAULT)
-        return 0;
+      return 0;
     }
+
+  if (not di)
+    return 0;
 
   // Spec does not specify how vector ld/st should be handled.
   if (di->isVector())
@@ -2801,7 +2800,7 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
   if (isGpaTrap(cause))
     tval2 = info2 >> 2;
 
-  uint32_t tinst = isRvh()? createTrapInst(di, interrupt, cause, info) : 0;
+  uint32_t tinst = isRvh()? createTrapInst(di, interrupt, cause, info, info2) : 0;
 
   bool gva = ( isRvh() and not interrupt and
 	       (hyperLs_ or isGvaTrap(gvaVirtMode, cause)) );

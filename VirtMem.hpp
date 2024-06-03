@@ -710,7 +710,7 @@ namespace WdRiscv
     /// Return true if last translation had a fault in VS-stage translation caused by
     /// implicit access and false otherwise. Sets flag if attempted to update A/D bits
     /// on last stage 1 translation. This is necessary to properly write mtinst/htinst.
-    bool stage1TrapInfo(bool& implicitWrite) const
+    bool stage1TrapImplAcc(bool& implicitWrite) const
     {
       implicitWrite = stage1AttemptedADUpdate_;
       return stage1ImplicitAccessTrap_;

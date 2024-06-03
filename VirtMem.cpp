@@ -535,7 +535,6 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
     return stage1PageFaultType(read, write, exec);
 
   auto cause = (this->*walkFn)(va, priv, read, write, exec, pa, entry);
-  // From here on, all traps come from implicit memory accesses
   stage1ImplicitAccessTrap_ = cause != ExceptionCause::NONE;
   return cause;
 }
