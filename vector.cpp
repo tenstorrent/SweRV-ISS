@@ -11078,7 +11078,10 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 #endif
       if (cause == ExceptionCause::NONE)
         {
-          memRead(pa1, pa2, elem);
+	  uint64_t data = 0;
+          if (not readForLoad<ELEM_TYPE>(addr, pa1, pa2, data))
+	    assert(0);
+	  elem = data;
           vecRegs_.ldStPhysAddr_.back() = pa1;
         }
       else
