@@ -11957,7 +11957,10 @@ Hart<URV>::execWrs_nto(const DecodedInst* di)
       return;
     }
 
-  cancelLr(CancelLrCause::WRS_NTO);  // Lose reservation.
+  // In server/interactive mode, we skip cancelLr. The driver (test-bench) will explicitly
+  // cancel-lr at the right time.
+  if (wrsCancelsLr_)
+    cancelLr(CancelLrCause::WRS_NTO);  // Lose reservation.
 }
 
 
@@ -11973,7 +11976,10 @@ Hart<URV>::execWrs_sto(const DecodedInst* di)
       return;
     }
 
-  cancelLr(CancelLrCause::WRS_STO);  // Lose reservation.
+  // In server/interactive mode, we skip cancelLr. The driver (test-bench) will explicitly
+  // cancel-lr at the right time.
+  if (wrsCancelsLr_)
+    cancelLr(CancelLrCause::WRS_STO);  // Lose reservation.
 }
 
 

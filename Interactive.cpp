@@ -162,6 +162,13 @@ template <typename URV>
 Interactive<URV>::Interactive(System<URV>& system)
   : system_(system)
 {
+  // In interactive mode the user will issue a cancel-lr explcitly for wrs instructions.
+  // This is done to be able to replay server mode command log.
+  for (unsigned i = 0; i < system.hartCount(); ++i)
+    {
+      auto& hart = *(system_.ithHart(i));
+      hart.setWrsCancelsLr(false);
+    }
 }
 
 

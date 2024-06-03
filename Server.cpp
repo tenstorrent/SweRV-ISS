@@ -125,8 +125,14 @@ template <typename URV>
 Server<URV>::Server(System<URV>& system)
   : system_(system)
 {
+  // In server mode the test-bench will issue a cancel-lr explcitly for wrs instructions.
+  for (unsigned i = 0; i < system.hartCount(); ++i)
+    {
+      auto& hart = *(system_.ithHart(i));
+      hart.setWrsCancelsLr(false);
+    }
 }
-  
+
 
 template <typename URV>
 bool

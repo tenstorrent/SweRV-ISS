@@ -2145,6 +2145,12 @@ namespace WdRiscv
     bool hasActivePerfCounter() const
     { return csRegs_.mPerfRegs_.hasActiveCounter(); }
 
+    /// Skip cancel-lr in wrs_sto/wrs_nto if flag is false. This is used in
+    /// server/interactive mode where the driver (test-bench) will do an explicit
+    /// cancel-lr at the right time.
+    void setWrsCancelsLr(bool flag)
+    { wrsCancelsLr_ = flag; }
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
@@ -5282,6 +5288,8 @@ namespace WdRiscv
     std::shared_ptr<Mcm<URV>> mcm_;    // Memory consistency model.
     std::shared_ptr<PerfApi> perfApi_; // Memory consistency model.
     bool ooo_ = false;                 // Out of order execution (mcm or perfApi).
+
+    bool wrsCancelsLr_ = true;         // wrs_sto/wrs_nto instructions do cancel-lr.
 
     FILE* initStateFile_ = nullptr;
     std::unordered_set<uint64_t> initInstrLines_;
