@@ -441,6 +441,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
     }
 
   packet.nextIva_ = hart.peekPc();
+  if (di.isBranch()) packet.taken_ = hart.lastBranchTaken();
 
   // Record the values of the dstination register.
   unsigned destIx = 0;
