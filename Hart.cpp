@@ -1758,13 +1758,13 @@ readCharNonBlocking(int fd)
 
 template <typename URV>
 bool
-Hart<URV>::getOooLoadValue(const DecodedInst& di, uint64_t va, uint64_t pa1, uint64_t pa2,
+Hart<URV>::getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2,
 			   unsigned size, uint64_t& value)
 {
   if (not ooo_)
     return false;
   if (mcm_)
-    return mcm_->getCurrentLoadValue(*this, di, va, pa1, pa2, size, value);
+    return mcm_->getCurrentLoadValue(*this, va, pa1, pa2, size, value);
   if (perfApi_)
     return perfApi_->getLoadData(hartIx_, instCounter_, va, size, value);
   assert(0);
@@ -1806,7 +1806,7 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
 
-  return readForLoad<LOAD_TYPE>(*di, virtAddr, addr1, addr2, data);
+  return readForLoad<LOAD_TYPE>(virtAddr, addr1, addr2, data);
 }
 
 
@@ -1814,8 +1814,7 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
 template <typename URV>
 template <typename LOAD_TYPE>
 bool
-Hart<URV>::readForLoad(const DecodedInst& di, uint64_t virtAddr, uint64_t addr1,
-		       uint64_t addr2, uint64_t& data)
+Hart<URV>::readForLoad(uint64_t virtAddr, uint64_t addr1, uint64_t addr2, uint64_t& data)
 {
   // Loading from console-io does a standard input read.
   if (conIoValid_ and addr1 == conIo_ and enableConIn_ and not triggerTripped_)
@@ -1864,7 +1863,7 @@ Hart<URV>::readForLoad(const DecodedInst& di, uint64_t virtAddr, uint64_t addr1,
       if (ooo_)
 	{
 	  uint64_t oooVal = 0;
-	  getOooLoadValue(di, virtAddr, addr1, addr2, sizeof(LOAD_TYPE), oooVal);
+	  getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), oooVal);
 	}
     }
   else
@@ -1873,7 +1872,7 @@ Hart<URV>::readForLoad(const DecodedInst& di, uint64_t virtAddr, uint64_t addr1,
       if (ooo_)   // Out of order execution (mcm or perfApi)
 	{
 	  uint64_t oooVal = 0;
-	  hasOooVal = getOooLoadValue(di, virtAddr, addr1, addr2, sizeof(LOAD_TYPE), oooVal);
+	  hasOooVal = getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), oooVal);
 	  if (hasOooVal)
 	    uval = oooVal;
 	}

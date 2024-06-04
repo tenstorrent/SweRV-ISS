@@ -137,12 +137,9 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   instr->addMemOp(sysMemOps_.size());
   sysMemOps_.push_back(op);
   instr->isLoad_ = true;
-
-  bool result = true;
-  if (checkLoadComplete(*instr))
-    instr->complete_ = true;
+  instr->complete_ = checkLoadComplete(*instr);
   
-  return result;
+  return true;
 }
 
 
@@ -1485,21 +1482,14 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 
 template <typename URV>
 bool
-Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, const DecodedInst& di, uint64_t vaddr,
-			      uint64_t paddr1, uint64_t paddr2, unsigned size,
-			      uint64_t& value)
+Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
+			      uint64_t paddr2, unsigned size, uint64_t& value)
 {
   value = 0;
   if (size == 0 or size > 8)
     {
       cerr << "Mcm::getCurrentLoadValue: Invalid size: " << size << '\n';
       assert(0 && "Mcm::getCurrentLoadValue: Invalid size");
-      return false;
-    }
-
-  if (di.isVector())
-    {
-      cerr << "Mcm::getCurrentLoadValue: Vector load is not yet supported.\n";
       return false;
     }
 
