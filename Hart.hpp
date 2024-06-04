@@ -2280,8 +2280,8 @@ namespace WdRiscv
     }
 
     /// Get the data value for an out of order read (mcm or perfApi).
-    bool getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
-			 uint64_t& value);
+    bool getOooLoadValue(const DecodedInst& di, uint64_t va, uint64_t pa1, uint64_t pa2,
+			 unsigned size, uint64_t& value);
 
     /// Set current privilege mode.
     void setPrivilegeMode(PrivilegeMode m)
@@ -2606,7 +2606,8 @@ namespace WdRiscv
     /// address.  Paddr2 is identical to paddr1 for non-page-crossing loads; otherwise, it
     /// is the physical address on the other page.
     template<typename LOAD_TYPE>
-    bool readForLoad(uint64_t vaddr, uint64_t paddr1, uint64_t paddr2, uint64_t& data);
+    bool readForLoad(const DecodedInst& di, uint64_t vaddr, uint64_t paddr1,
+		     uint64_t paddr2, uint64_t& data);
 
     /// Helper to the cache block operation (cbo) instructions.
     ExceptionCause determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa,

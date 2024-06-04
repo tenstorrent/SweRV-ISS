@@ -180,14 +180,14 @@ namespace WdRiscv
 
     bool setCurrentInstruction(Hart<URV>& hart, uint64_t instrTag);
 
-    /// Return the load value of the current target instruction which
-    /// must be a load instruction (set with setCurrentInstruction).
-    /// Paddr1 is the physical address of the loaded data. Paddr2 is
-    /// the same as paddr1 except for page corssing loads where paddr2
-    /// is the physical address of the second page. Vaddr is the virtual
-    /// address of the load data.
-    bool getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
-			     uint64_t paddr2, unsigned size, uint64_t& value);
+    /// Return the load value of the current target instruction which must be a load
+    /// instruction (set with setCurrentInstruction).  Paddr1 is the physical address of
+    /// the loaded data. Paddr2 is the same as paddr1 except for page corssing loads where
+    /// paddr2 is the physical address of the second page. Vaddr is the virtual address of
+    /// the load data.
+    bool getCurrentLoadValue(Hart<URV>& hart, const DecodedInst& di, uint64_t vaddr,
+			     uint64_t paddr1, uint64_t paddr2, unsigned size,
+			     uint64_t& value);
 
     /// Return the merge buffer line size in bytes.
     unsigned mergeBufferLineSize() const

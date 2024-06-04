@@ -170,8 +170,8 @@ Mcm<URV>::findOrAddInstr(unsigned hartIx, uint32_t tag)
     {
       if (tag > 100000000)
 	{
-	  std::cerr << "MCM: Instruction tag way too large: " << tag << '\n';
-	  std::cerr << "MCM: Code expects dense consecutive tags starting at 0\n";
+	  cerr << "MCM: Instruction tag way too large: " << tag << '\n';
+	  cerr << "MCM: Code expects dense consecutive tags starting at 0\n";
 	  assert(0);
 	}
       McmInstr instr;
@@ -428,8 +428,8 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   McmInstr* instr = findOrAddInstr(hartIx, instrTag);
   if (not instr)
     {
-      std::cerr << "Mcm::bypassOp: Error: hart-id=" << hart.hartId() << " time=" << time
-		<< " tag=" << instrTag << " unknown instr tag\n";
+      cerr << "Mcm::bypassOp: Error: hart-id=" << hart.hartId() << " time=" << time
+	   << " tag=" << instrTag << " unknown instr tag\n";
       return false;
     }
 
@@ -442,14 +442,14 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
     {
       if (instr->di_.instId() != InstId::cbo_zero or (size % 8) != 0)
 	{
-	  std::cerr << "Mcm::byppassOp: Error: hart-id=" << hart.hartId() << " time=" << time
-		    << " invalid size: " << size << '\n';
+	  cerr << "Mcm::byppassOp: Error: hart-id=" << hart.hartId() << " time=" << time
+	       << " invalid size: " << size << '\n';
 	  return false;
 	}
       if (rtlData != 0)
 	{
-	  std::cerr << "Mcm::byppassOp: Error: hart-id=" << hart.hartId() << " time=" << time
-		    << " invalid data (must be 0) for a cbo.zero instruction: " << rtlData << '\n';
+	  cerr << "Mcm::byppassOp: Error: hart-id=" << hart.hartId() << " time=" << time
+	       << " invalid data (must be 0) for a cbo.zero instruction: " << rtlData << '\n';
 	  return false;
 	}
       uint64_t lineStart = physAddr & ~(uint64_t(lineSize_) - 1);
@@ -1483,14 +1483,21 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 
 template <typename URV>
 bool
-Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
-			      uint64_t paddr2, unsigned size, uint64_t& value)
+Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, const DecodedInst& di, uint64_t vaddr,
+			      uint64_t paddr1, uint64_t paddr2, unsigned size,
+			      uint64_t& value)
 {
   value = 0;
   if (size == 0 or size > 8)
     {
       cerr << "Mcm::getCurrentLoadValue: Invalid size: " << size << '\n';
       assert(0 && "Mcm::getCurrentLoadValue: Invalid size");
+      return false;
+    }
+
+  if (di.isVector())
+    {
+      cerr << "Mcm::getCurrentLoadValue: Vector load is not yet supported.\n";
       return false;
     }
 

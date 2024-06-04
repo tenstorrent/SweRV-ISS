@@ -98,7 +98,7 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   uint32_t uval = 0;
   uint64_t mcmVal = 0;
-  bool hasMcm = mcm_ and mcm_->getCurrentLoadValue(*this, virtAddr, addr, addr, ldStSize_, mcmVal);
+  bool hasMcm = mcm_ and mcm_->getCurrentLoadValue(*this, *di, virtAddr, addr, addr, ldStSize_, mcmVal);
 
   if (hasMcm)
     uval = mcmVal;
@@ -155,7 +155,7 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 #endif
 
   uint64_t uval = 0;
-  bool hasMcm = mcm_ and mcm_->getCurrentLoadValue(*this, virtAddr, addr, addr, ldStSize_, uval);
+  bool hasMcm = mcm_ and mcm_->getCurrentLoadValue(*this, *di, virtAddr, addr, addr, ldStSize_, uval);
 
   if (not hasMcm)
     memRead(addr, addr, uval);
@@ -232,7 +232,7 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
   if (mcm_)
     {
       uint64_t mcmVal = 0;
-      if (mcm_->getCurrentLoadValue(*this, virtAddr, addr1, addr1, ldStSize_, mcmVal))
+      if (mcm_->getCurrentLoadValue(*this, *di, virtAddr, addr1, addr1, ldStSize_, mcmVal))
 	{
 	  uval = mcmVal;
 	  hasMcmVal = true;
