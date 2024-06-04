@@ -50,7 +50,7 @@ namespace WdRiscv
     // memOps contains indices into an array of MemoryOp items.
     std::vector<MemoryOpIx> memOps_;
     uint64_t virtAddr_ = 0;   // Virtual data address for ld/st instructions.
-    uint64_t physAddr_ = 0;   // Phusical data address for ld/st instruction.
+    uint64_t physAddr_ = 0;   // Physical data address for ld/st instruction.
     uint64_t physAddr2_ = 0;  // Additional data address for page crossing stores.
     uint64_t data_ = 0;       // Data for load/sore instructions.
     uint64_t addrTime_ = 0;   // Time address register was produced (for ld/st/amo).

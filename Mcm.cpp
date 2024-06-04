@@ -1519,20 +1519,20 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
   // Cancel early read ops that are covered by later ones. Trim wide reads.
   cancelReplayedReads(instr);
 
-  uint64_t mergeMask = 0;
-  uint64_t merged = 0;
-  bool ok = true;
-  size_t nops = instr->memOps_.size();
-  for (size_t j = 0; j < nops; ++j)
+  uint64_t mergeMask = 0;  // Mask of bits obtained from read ops.
+  uint64_t merged = 0;     // Value obtained from read ops.
+
+  // Process instruction ops in reverse order.
+  for (auto iter = instr->memOps_.rbegin(); iter  != instr->memOps_.rend(); ++iter)
     {
-      auto opIx = instr->memOps_.at(nops - 1 - j);
-      auto& op = sysMemOps_.at(opIx);
+      auto& op = sysMemOps_.at(*iter);
       if (not op.isRead_)
 	continue;
 
       // Let forwarding override read-op data.
       forwardToRead(hart, op);
 
+      // Recover op data relevant to current load instruction.
       uint64_t opVal = op.data_;
       uint64_t mask = ~uint64_t(0);
       if (pageNum(op.physAddr_) == pageNum(paddr1))
@@ -1577,11 +1577,8 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
 
   uint64_t expectedMask = (~uint64_t(0) << unused) >> unused;
   if (mergeMask != expectedMask)
-    {
-      cerr << "Error: Read ops do not cover all the bytes of load instruction"
-	   << " tag=" << tag << '\n';
-      ok = false;
-    }
+    cerr << "Error: Read ops do not cover all the bytes of load instruction"
+	 << " tag=" << tag << '\n';
 
   unsigned forwardCount = 0, readCount = 0;
   for (auto opIx : instr->memOps_)
@@ -1599,7 +1596,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
 
   instr->complete_ = true;  // FIX : Only for non-io
 
-  return ok;
+  return mergeMask == expectedMask;
 }
   
 
