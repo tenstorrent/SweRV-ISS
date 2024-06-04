@@ -18911,14 +18911,15 @@ Hart<URV>::doVecFpRedSumStride(std::vector<ELEM_TYPE>& elems, unsigned numElems,
 
   using VSO = VecRegs::Step::Operation;
 
+  unsigned resIx = 0;
   unsigned stride = 3;
-  for (unsigned ix = 0; ix < numElems; ix+=stride)
+  for (unsigned ix = 0; ix < numElems; ix+=stride, ++resIx)
     {
       ELEM_TYPE e1 = elems.at(ix);
       ELEM_TYPE e2 = elems.at(ix + 2);
 
       ELEM_TYPE result = doFadd(e1, e2);
-      elems.at(ix >> 1) = result;
+      elems.at(resIx) = result;
       URV incFlags = activeSimulatorFpFlags();
       vecRegs_.fpFlags_.push_back(incFlags);
       vecRegs_.steps_.emplace_back(VSO::StrideRed, e1, e2, result);
