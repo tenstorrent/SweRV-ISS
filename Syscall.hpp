@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -33,21 +33,21 @@ namespace WdRiscv
   class Syscall
   {
   public:
-    
+
     /// Signed register type corresponding to URV. For example, if URV
     /// is uint32_t, then SRV will be int32_t.
     using SRV = typename std::make_signed_t<URV>;
 
-    Syscall(Hart<URV>& hart)
-      : hart_(hart)
+    Syscall(std::vector<std::shared_ptr<Hart<URV>>>& harts, size_t memSize)
+      : harts_(harts)
     {
-    	auto mem_size = hart.getMemorySize();
+    	auto mem_size = memSize;
     	mmap_blocks_.insert(std::make_pair(mem_size/2L, blk_t(mem_size/2L, true)));
     }
 
     /// Emulate a system call on the associated hart. Return an integer
     /// value corresponding to the result.
-    URV emulate();
+    URV emulate(unsigned ix);
 
     /// Redirect the given output file descriptor (typically that of
     /// stdout or stderr) to the given file. Return true on success
@@ -61,7 +61,7 @@ namespace WdRiscv
 
     void enableLinux(bool flag)
     { linux_ = flag; }
-      
+
     /// Save the currently open file descriptors to the given file.
     bool saveFileDescriptors(const std::string& path);
 
@@ -74,9 +74,9 @@ namespace WdRiscv
 
     uint64_t mmap_alloc(uint64_t size);
 
-    int mmap_dealloc(uint64_t addr, uint64_t size);
+    int mmap_dealloc(Hart<URV>& hart, uint64_t addr, uint64_t size);
 
-    uint64_t mmap_remap(uint64_t addr, uint64_t old_size, uint64_t new_size, bool maymove);
+    uint64_t mmap_remap(Hart<URV>& hart, uint64_t addr, uint64_t old_size, uint64_t new_size, bool maymove);
 
     using AddrLen = std::pair<uint64_t, uint64_t>;  // Address/length pair
 
@@ -123,9 +123,17 @@ namespace WdRiscv
       return fd;
     }
 
+    Hart<URV>* nextAvailHart()
+    {
+      for (auto hptr : harts_)
+        if (hptr->isSuspended())
+          return hptr.get();
+      return nullptr;
+    }
+
   private:
 
-    Hart<URV>& hart_;
+    std::vector<std::shared_ptr<Hart<URV>>>& harts_;
     bool linux_ = false;
     URV progBreak_ = 0;          // For brk Linux emulation.
 

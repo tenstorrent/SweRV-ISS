@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include "Memory.hpp"
 #include "Imsic.hpp"
+#include "Syscall.hpp"
 #include "pci/Pci.hpp"
 #include "pci/virtio/Blk.hpp"
 
@@ -412,6 +413,7 @@ namespace WdRiscv
     std::vector< std::shared_ptr<HartClass> > sysHarts_; // All harts in system.
     std::unordered_map<URV, unsigned> hartIdToIndex_;
     std::shared_ptr<Memory> memory_;
+    std::shared_ptr<Syscall<URV>> syscall_;
     std::unique_ptr<SparseMem> sparseMem_;
     std::shared_ptr<Mcm<URV>> mcm_;
     std::shared_ptr<TT_PERF::PerfApi> perfApi_;
