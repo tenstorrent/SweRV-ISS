@@ -2638,6 +2638,12 @@ namespace WdRiscv
                                            uint64_t& gaddr1, uint64_t& gaddr2,
 					   unsigned stSize, bool hyper);
 
+    /// Helper to store method. Vaddr is the virtual address. Paddr1 is the physical
+    /// address.  Paddr2 is identical to paddr1 for non-page-crossing sores; otherwise, it
+    /// is the physical address on the other page.
+    template<typename STORE_TYPE>
+    bool writeForStore(uint64_t vaddr, uint64_t paddr1, uint64_t paddr2, STORE_TYPE data);
+
     /// Helper to execLr. Load type must be int32_t, or int64_t.
     /// Return true if instruction is successful. Return false if an
     /// exception occurs or a trigger is tripped. If successful,

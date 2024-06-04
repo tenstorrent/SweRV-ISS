@@ -2053,6 +2053,16 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
       return false;
     }
 
+  return writeForStore<STORE_TYPE>(virtAddr, pa1, pa2, storeVal);
+#endif
+}
+
+
+template <typename URV>
+template <typename STORE_TYPE>
+bool
+Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TYPE storeVal)
+{
   // If addr is special location, then write to console.
   if (conIoValid_ and pa1 == conIo_)
     {
@@ -2136,8 +2146,6 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   memPeek(pa1, pa2, temp, false /*usePma*/);
   ldStData_ = temp;
   return true;
-
-#endif
 }
 
 
