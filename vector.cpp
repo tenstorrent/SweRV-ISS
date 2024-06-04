@@ -11237,7 +11237,8 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
                                            false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	{
-	  memWrite(pa1, pa2, elem);
+	  if (not writeForStore(addr, pa1, pa2, elem))
+	    assert(0);
           vecRegs_.ldStPhysAddr_.back() = pa1;
 	  vecRegs_.stData_.push_back(elem);
 	}
@@ -11576,7 +11577,8 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
                                            false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	{
-	  memWrite(pa1, pa2, elem);
+	  if (not writeForStore(addr, pa1, pa2, elem))
+	    assert(0);
 	  vecRegs_.ldStAddr_.push_back(addr);
           vecRegs_.ldStPhysAddr_.push_back(pa1);
 	  vecRegs_.maskedAddr_.push_back(false);
@@ -11923,7 +11925,8 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
                                            false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	{
-	  memWrite(pa1, pa2, elem);
+	  if (not writeForStore(addr, pa1, pa2, elem))
+	    assert(0);
 	  vecRegs_.stData_.push_back(elem);
           vecRegs_.ldStPhysAddr_.back() = pa1;
 	}
@@ -12279,7 +12282,8 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                           false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
-	    memWrite(pa1, pa2, x);
+	    if (not writeForStore(vaddr, pa1, pa2, x))
+	      assert(0);
 	  data = x;
 	}
       else if (elemSize == 2)
@@ -12289,7 +12293,8 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                           false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
-	    memWrite(pa1, pa2, x);
+	    if (not writeForStore(vaddr, pa1, pa2, x))
+	      assert(0);
 	  data = x;
 	}
       else if (elemSize == 4)
@@ -12299,7 +12304,8 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                           false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
-	    memWrite(pa1, pa2, x);
+	    if (not writeForStore(vaddr, pa1, pa2, x))
+	      assert(0);
 	  data = x;
 	}
       else if (elemSize == 8)
@@ -12309,7 +12315,8 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                           false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
-	    memWrite(pa1, pa2, x);
+	    if (not writeForStore(vaddr, pa1, pa2, x))
+	      assert(0);
 	  data = x;
 	}
       else
@@ -12702,7 +12709,8 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
                                                false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
 	    {
-	      memWrite(pa1, pa2, elem);
+	      if (not writeForStore(faddr, pa1, pa2, elem))
+		assert(0);
 	      vecRegs_.stData_.push_back(elem);
               vecRegs_.ldStPhysAddr_.back() = pa1;
 	    }
@@ -13203,7 +13211,8 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	      cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                               false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
-		memWrite(pa1, pa2, x);
+		if (not writeForStore(faddr, pa1, pa2, x))
+		  assert(0);
 	      data = x;
 	    }
 	  else if (elemSize == 2)
@@ -13213,7 +13222,8 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	      cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                               false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
-		memWrite(pa1, pa2, x);
+		if (not writeForStore(faddr, pa1, pa2, x))
+		  assert(0);
 	      data = x;
 	    }
 	  else if (elemSize == 4)
@@ -13223,7 +13233,8 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	      cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                               false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
-		memWrite(pa1, pa2, x);
+		if (not writeForStore(faddr, pa1, pa2, x))
+		  assert(0);
 	      data = x;
 	    }
 	  else if (elemSize == 8)
@@ -13233,7 +13244,8 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	      cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                               false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
-		memWrite(pa1, pa2, x);
+		if (not writeForStore(faddr, pa1, pa2, x))
+		  assert(0);
 	      data = x;
 	    }
 	  else

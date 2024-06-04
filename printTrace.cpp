@@ -372,7 +372,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     }
 
   // Process memory diff.
-  if (ldStWrite_)
+  if (ldStWrite_ and not di.isVector())
     {
       if (pending)
         fprintf(out, "  +\n");
@@ -699,16 +699,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   // Memory
   buffer.printChar(',');
   uint64_t virtDataAddr = 0, physDataAddr = 0;
-  if (lastLdStAddress(virtDataAddr, physDataAddr))
-    {
-      bool store = ldStWrite_;
-      buffer.print(virtDataAddr);
-      if (physDataAddr != virtDataAddr)
-        buffer.printChar(':').print(physDataAddr);
-      if (store)
-        buffer.printChar('=').print(ldStData_);
-    }
-  else if (not vecRegs_.ldStAddr_.empty())
+  if (not vecRegs_.ldStAddr_.empty())
     {
       for (uint64_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
         {
@@ -722,6 +713,15 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
           if (i < vecRegs_.stData_.size())
             buffer.printChar('=').print(vecRegs_.stData_.at(i));
         }
+    }
+  else if (lastLdStAddress(virtDataAddr, physDataAddr))
+    {
+      bool store = ldStWrite_;
+      buffer.print(virtDataAddr);
+      if (physDataAddr != virtDataAddr)
+        buffer.printChar(':').print(physDataAddr);
+      if (store)
+        buffer.printChar('=').print(ldStData_);
     }
 
   // Instruction information.
