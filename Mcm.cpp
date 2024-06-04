@@ -1455,7 +1455,9 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 	{
 	  unsigned mask = determineOpMask(*instr, op);
 	  mask &= expectedMask;
-	  if ((mask & readMask) == mask)
+          if (not mask)
+            cancel = false;
+          else if ((mask & readMask) == mask)
 	    cancel = true;  // Read op already covered by other read ops
 	  else
 	    readMask |= mask;
@@ -1547,16 +1549,16 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, const DecodedInst& di, uint64_t v
 	  if (op.physAddr_ <= paddr1)
 	    {
 	      uint64_t offset = paddr1 - op.physAddr_;
-	      if (offset > 8)
-		offset = 8;
+              if (offset >= size)
+                continue;
 	      opVal >>= offset*8;
 	      mask >>= offset*8;
 	    }
 	  else
 	    {
 	      uint64_t offset = op.physAddr_ - paddr1;
-	      if (offset > 8)
-		offset = 8;
+              if (offset >= size)
+                continue;
 	      opVal <<= offset*8;
 	      mask <<= offset*8;
 	    }
@@ -1566,8 +1568,8 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, const DecodedInst& di, uint64_t v
 	  if (op.physAddr_ == paddr2)
 	    {
 	      uint64_t offset = offsetToNextPage(paddr1);
-	      if (offset > 8)
-		offset = 8;
+              if (offset >= size)
+                continue;
 	      opVal <<= offset*8;
 	      mask <<= offset*8;
 	    }

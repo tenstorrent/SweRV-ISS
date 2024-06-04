@@ -1864,7 +1864,7 @@ Hart<URV>::readForLoad(const DecodedInst& di, uint64_t virtAddr, uint64_t addr1,
       if (ooo_)
 	{
 	  uint64_t oooVal = 0;
-	  getOooLoadValue(di, virtAddr, addr1, addr2, ldStSize_, oooVal);
+	  getOooLoadValue(di, virtAddr, addr1, addr2, sizeof(LOAD_TYPE), oooVal);
 	}
     }
   else
@@ -1873,7 +1873,7 @@ Hart<URV>::readForLoad(const DecodedInst& di, uint64_t virtAddr, uint64_t addr1,
       if (ooo_)   // Out of order execution (mcm or perfApi)
 	{
 	  uint64_t oooVal = 0;
-	  hasOooVal = getOooLoadValue(di, virtAddr, addr1, addr2, ldStSize_, oooVal);
+	  hasOooVal = getOooLoadValue(di, virtAddr, addr1, addr2, sizeof(LOAD_TYPE), oooVal);
 	  if (hasOooVal)
 	    uval = oooVal;
 	}
