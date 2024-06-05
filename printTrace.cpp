@@ -338,6 +338,14 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   URV value = 0;
   if (reg > 0)
     {
+      if (di.instId() == InstId::amocas_q)  // amocas_q modifies 2 registers.
+	{
+	  assert((reg & 1) == 1);
+	  value = intRegs_.read(reg - 1);
+	  formatInstTrace<URV>(out, tag, *this, instSV, 'r', reg - 1, value, tmp);
+	  fprintf(out, " +\n");
+	  pending = true;
+	}
       value = intRegs_.read(reg);
       formatInstTrace<URV>(out, tag, *this, instSV, 'r', reg, value, tmp);
       pending = true;
