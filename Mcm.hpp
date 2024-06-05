@@ -22,8 +22,8 @@ namespace WdRiscv
   {
     uint64_t   time_           = 0;
     uint64_t   physAddr_       = 0;
-    uint64_t   data_           = 0;
-    uint64_t   rtlData_        = 0;
+    uint64_t   data_           = 0;  // Model (Whisper) data for ld/st instructions.
+    uint64_t   rtlData_        = 0;  // RTL data.
     McmInstrIx instrTag_       = 0;
     uint64_t   forwardTime_    = 0;  // Time of store instruction forwarding to this op.
     uint8_t    hartIx_    : 8  = 0;
@@ -52,15 +52,15 @@ namespace WdRiscv
     uint64_t virtAddr_ = 0;   // Virtual data address for ld/st instructions.
     uint64_t physAddr_ = 0;   // Physical data address for ld/st instruction.
     uint64_t physAddr2_ = 0;  // Additional data address for page crossing stores.
-    uint64_t data_ = 0;       // Data for load/sore instructions.
+    uint64_t storeData_ = 0;  // Model (whisper) Data for sore instructions.
     uint64_t addrTime_ = 0;   // Time address register was produced (for ld/st/amo).
     uint64_t dataTime_ = 0;   // Time data register was produced (for st/amo).
-    uint64_t retireTime_ = 0; // Time instructin was retired.
+    uint64_t retireTime_ = 0; // Time instruction was retired.
     McmInstrIx addrProducer_ = 0;
     McmInstrIx dataProducer_ = 0;
     DecodedInst di_;
     McmInstrIx tag_ = 0;
-    uint8_t size_   : 8 = 0;        // Data size for load/store insructions.
+    uint8_t size_   : 8 = 0;        // Data size for load/store instructions.
     bool retired_   : 1 = false;
     bool canceled_  : 1 = false;
     bool isLoad_    : 1 = false;
@@ -68,7 +68,7 @@ namespace WdRiscv
     bool complete_  : 1 = false;
     bool forwarded_ : 1 = false; // True if all bytes of load were forwarded.
 
-    /// Return true if this a load/store isntruction.
+    /// Return true if this a load/store instruction.
     bool isMemory() const { return isLoad_ or isStore_; }
 
     /// Return true if this instruction is retired.
@@ -135,7 +135,7 @@ namespace WdRiscv
     /// Initiate an out of order read for a load instruction. If a
     /// preceding overlapping store has not yet left the merge/store
     /// buffer then forward data from that store to the read operation;
-    /// otherwise, get the data from glbal memory. Return true on
+    /// otherwise, get the data from global memory. Return true on
     /// success and false if global memory is not readable (in the
     /// case where we do not forward).
     bool readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
@@ -166,7 +166,7 @@ namespace WdRiscv
 			   uint64_t physAddr, unsigned size,
 			   uint64_t rtlData);
 
-    /// Cancel all the memory operations associted with the given tag. This is
+    /// Cancel all the memory operations associated with the given tag. This is
     /// done when a speculative instruction is canceled or when an instruction
     /// is trapped.
     void cancelInstruction(Hart<URV>& hart, uint64_t instrTag);
@@ -182,7 +182,7 @@ namespace WdRiscv
 
     /// Return the load value of the current target instruction which must be a load
     /// instruction (set with setCurrentInstruction).  Pa1 is the physical address of the
-    /// loaded data. Pa2 is the same as paddr1 except for page corssing loads where pa2 is
+    /// loaded data. Pa2 is the same as paddr1 except for page crossing loads where pa2 is
     /// the physical address of the second page. Va is the virtual address of the load
     /// data.
     bool getCurrentLoadValue(Hart<URV>& hart, uint64_t va, uint64_t pa1, uint64_t pa2,
@@ -255,7 +255,7 @@ namespace WdRiscv
     /// Helper to above ppoRule7.
     bool ppoRule7(const McmInstr& instrA, const McmInstr& instrB) const;
 
-    /// If B is a load and A is cbo.flush/clean instruction that overlaps B and preceeds
+    /// If B is a load and A is cbo.flush/clean instruction that overlaps B and precedes
     /// it in program order, then B cannot have a read operation prior to to A's retire
     /// time.  Return true if this rule followed and false otherwise.
     bool checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const;
@@ -303,7 +303,7 @@ namespace WdRiscv
       return mt;
     }
 
-    /// Return the smallest time of the memor operations of the given instruction. Adjust
+    /// Return the smallest time of the memory operations of the given instruction. Adjust
     /// read-operation times to account for forwarding.
     uint64_t effectiveReadTime(const McmInstr& instr) const;
 
@@ -366,9 +366,9 @@ namespace WdRiscv
     /// boundary of the instruction.
     void trimMemoryOp(const McmInstr& instr, MemoryOp& op);
 
-    /// Helper to retire method: Capture paramters of store instruction and
+    /// Helper to retire method: Capture parameters of store instruction and
     /// commit its data to memory. Return true on success and false on failure.
-    /// Return true if instuction is not a a store.
+    /// Return true if instruction is not a a store.
     bool retireStore(Hart<URV>& hart, McmInstr& instr);
 
     /// Helper to retire method: Retire a CMO instruction. Return false on
@@ -396,13 +396,13 @@ namespace WdRiscv
     bool forwardToRead(Hart<URV>& hart, MemoryOp& op);
 
     /// Forward from a write to a read op. Return true on success.  Mask is the mask of
-    /// bits of op to be updated by the forward operartion and is updated (bits cleared)
+    /// bits of op to be updated by the forward operation and is updated (bits cleared)
     /// if some parts of op are successfully updated. This a helper to forwardToRead.
     bool writeToReadForward(const MemoryOp& writOp, MemoryOp& readOp, uint64_t& mask);
 
-    /// Forward from a store instrution to a read-operation. Mask is the mast of bits of
+    /// Forward from a store instruction to a read-operation. Mask is the mast of bits of
     /// op to be updated by the forward operation and is updated (bits cleared) if some
-    /// parts of op are successfully ipdated. This is a helper to to forwardToRead.
+    /// parts of op are successfully updated. This is a helper to to forwardToRead.
     /// Addr/data/size are the physical-address/data-value/data-size of the store
     /// instruction.
     bool storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask,
@@ -432,7 +432,7 @@ namespace WdRiscv
       return rangesOverlap(instr.physAddr2_, size2, op.physAddr_, op.size_);
     }
 
-    /// Return true if the data memory referenced by given instruction overlpas
+    /// Return true if the data memory referenced by given instruction overlaps
     /// the given address.
     bool overlapsAddr(const McmInstr& instr, uint64_t addr) const
     {
