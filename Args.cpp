@@ -405,6 +405,9 @@ Args::parseCmdLineArgs(std::span<char*> argv)
 	("raw", po::bool_switch(&this->raw),
 	 "Bare metal mode: Disable emulation of Linux/newlib system call emulation "
          "even if Linux/newlib symbols detected in the target ELF file.")
+        ("envvar", po::value(&this->envVars)->multitoken(),
+         "Pass environment variable to newlib/Linux target program "
+         "(e.g. ENV_VAR_NAME=4)")
 	("elfisa", po::bool_switch(&this->elfisa),
 	 "Configure reset value of MISA according to the RISCV architecture tag(s) "
          "encoded into the loaded ELF file(s) if any.")

@@ -1159,11 +1159,12 @@ namespace WdRiscv
     /// RISCV page address larger than or equal to the given address.
     void setTargetProgramBreak(URV addr);
 
-    /// For Linux emulation: Put the program arguments on the stack
-    /// suitable for calling the target program main from _start.
-    /// Return true on success and false on failure (not all stack
-    /// area required is writable).
-    bool setTargetProgramArgs(const std::vector<std::string>& args);
+    /// For Linux emulation: Put the program arguments and user-specified
+    /// environment variables on the stack suitable for calling the
+    /// target program main from _start. Return true on success and
+    /// false on failure (not all stack area required is writable).
+    bool setTargetProgramArgs(const std::vector<std::string>& args,
+                              const std::vector<std::string>& envVars);
 
     /// Return physical memory attribute region of a given address.
     Pma getPma(uint64_t addr) const

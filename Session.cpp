@@ -808,7 +808,7 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
       if (clib)
 	{
 	  if (args.loadFrom.empty())
-	    if (not hart.setTargetProgramArgs(args.expandedTargets.front()))
+	    if (not hart.setTargetProgramArgs(args.expandedTargets.front(), args.envVars))
 	      {
 		size_t memSize = hart.memorySize();
 		size_t suggestedStack = memSize - 4;
