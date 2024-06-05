@@ -4316,7 +4316,8 @@ pokeString(Hart<URV>& hart, uint64_t addr, std::string_view str)
 template <typename URV>
 inline
 bool
-Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
+Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args,
+                                const std::vector<std::string>& envVars)
 {
   URV sp = 0;
 
@@ -4338,10 +4339,18 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
     }
   argvAddrs.push_back(0);  // Null pointer at end of argv.
 
-  // Setup envp on the stack (LANG is needed for clang compiled code).
+  // Setup default envp on the stack (LANG is needed for clang compiled code).
   static constexpr auto envs = std::to_array<std::string_view>({ "LANG=C", "LC_ALL=C" });
   std::vector<URV> envpAddrs;  // Addresses of the envp strings.
   for (const auto& env : envs)
+    {
+      sp -= env.size() + 1;  // Make room for env entry and null char.
+      envpAddrs.push_back(sp);
+      if (not pokeString(*this, sp, env))
+	return false;
+    }
+  // Setup user envp on the stack.
+  for (const auto& env : envVars)
     {
       sp -= env.size() + 1;  // Make room for env entry and null char.
       envpAddrs.push_back(sp);
