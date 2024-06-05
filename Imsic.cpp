@@ -101,14 +101,10 @@ File::iregWrite(unsigned sel, URV val)
       constexpr size_t bits = sizeof(URV)*8;
       int begin = offset*32;
       int end = std::min(begin + bits, vec.size());
-      for (int i = end-1; i >= begin; i--)
-        {
-          vec[i] = (val >> (i - begin)) & 1;
+      for (int i = begin; i < end; i++)
+        vec[i] = (val >> (i - begin)) & 1;
 
-          bool active = pending_[i] and enabled_[i];
-          if ((topId_ == 0 or unsigned(i) < topId_) and active)
-            topId_ = i;
-        }
+      updateTopId();
     }
 
   return true;
