@@ -1806,7 +1806,8 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
 
-  return readForLoad<LOAD_TYPE>(virtAddr, addr1, addr2, data);
+  return readForLoad<LOAD_TYPE>(di, virtAddr, addr1, addr2, data);
+#endif
 }
 
 
@@ -1814,8 +1815,14 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
 template <typename URV>
 template <typename LOAD_TYPE>
 bool
-Hart<URV>::readForLoad(uint64_t virtAddr, uint64_t addr1, uint64_t addr2, uint64_t& data)
+Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
+		       [[maybe_unused]] uint64_t addr1, [[maybe_unused]] uint64_t addr2,
+		       uint64_t& data)
 {
+#ifdef FAST_SLOPPY
+  return fastLoad<LOAD_TYPE>(di, virtAddr, data);
+#else
+
   // Loading from console-io does a standard input read.
   if (conIoValid_ and addr1 == conIo_ and enableConIn_ and not triggerTripped_)
     {
@@ -2324,7 +2331,7 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
 template <typename URV>
 inline
 ExceptionCause
-Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& physAddr2,
+Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, [[maybe_unused]] uint64_t& physAddr2,
 			   uint64_t& gPhysAddr, uint32_t& inst)
 {
 #ifdef FAST_SLOPPY
@@ -12172,6 +12179,96 @@ WdRiscv::Hart<uint64_t>::store<uint32_t>(const DecodedInst*, uint64_t, bool, uin
 template
 bool
 WdRiscv::Hart<uint64_t>::store<uint64_t>(const DecodedInst*, uint64_t, bool, uint64_t, bool);
+
+
+template
+bool
+WdRiscv::Hart<uint32_t>::readForLoad<uint8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::readForLoad<int8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::readForLoad<uint16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::readForLoad<int16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::readForLoad<uint32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::readForLoad<int32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::readForLoad<uint64_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::readForLoad<uint8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::readForLoad<int8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::readForLoad<uint16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::readForLoad<int16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::readForLoad<uint32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::readForLoad<int32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::readForLoad<uint64_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+
+template
+bool
+WdRiscv::Hart<uint32_t>::writeForStore<uint8_t>(uint64_t, uint64_t, uint64_t, uint8_t);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::writeForStore<uint16_t>(uint64_t, uint64_t, uint64_t, uint16_t);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::writeForStore<uint32_t>(uint64_t, uint64_t, uint64_t, uint32_t);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::writeForStore<uint64_t>(uint64_t, uint64_t, uint64_t, uint64_t);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::writeForStore<uint8_t>(uint64_t, uint64_t, uint64_t, uint8_t);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::writeForStore<uint16_t>(uint64_t, uint64_t, uint64_t, uint16_t);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::writeForStore<uint32_t>(uint64_t, uint64_t, uint64_t, uint32_t);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::writeForStore<uint64_t>(uint64_t, uint64_t, uint64_t, uint64_t);
 
 
 template class WdRiscv::Hart<uint32_t>;
