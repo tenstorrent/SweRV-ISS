@@ -31,7 +31,7 @@ template <typename URV>
 void
 Hart<URV>::execVandn_vv(const DecodedInst* di)
 {
-  if (not isRvzvbb())
+  if (not isRvzvbb() and not isRvzvkb())
     {
       illegalInst(di);
       return;
@@ -78,7 +78,7 @@ template <typename URV>
 void
 Hart<URV>::execVandn_vx(const DecodedInst* di)
 {
-  if (not isRvzvbb())
+  if (not isRvzvbb() and not isRvzvkb())
     {
       illegalInst(di);
       return;
@@ -222,7 +222,7 @@ template <typename URV>
 void
 Hart<URV>::execVbrev8_v(const DecodedInst* di)
 {
-  if (not isRvzvbb())
+  if (not isRvzvbb() and not isRvzvkb())
     {
       illegalInst(di);
       return;
@@ -293,7 +293,7 @@ template <typename URV>
 void
 Hart<URV>::execVrev8_v(const DecodedInst* di)
 {
-  if (not isRvzvbb())
+  if (not isRvzvbb() and not isRvzvkb())
     {
       illegalInst(di);
       return;
@@ -580,7 +580,7 @@ template <typename URV>
 void
 Hart<URV>::execVrol_vv(const DecodedInst* di)
 {
-  if (not isRvzvbb())
+  if (not isRvzvbb() and not isRvzvkb())
     {
       illegalInst(di);
       return;
@@ -654,7 +654,7 @@ template <typename URV>
 void
 Hart<URV>::execVrol_vx(const DecodedInst* di)
 {
-  if (not isRvzvbb())
+  if (not isRvzvbb() and not isRvzvkb())
     {
       illegalInst(di);
       return;
@@ -730,7 +730,7 @@ template <typename URV>
 void
 Hart<URV>::execVror_vv(const DecodedInst* di)
 {
-  if (not isRvzvbb())
+  if (not isRvzvbb() and not isRvzvkb())
     {
       illegalInst(di);
       return;
@@ -804,7 +804,7 @@ template <typename URV>
 void
 Hart<URV>::execVror_vx(const DecodedInst* di)
 {
-  if (not isRvzvbb())
+  if (not isRvzvbb() and not isRvzvkb())
     {
       illegalInst(di);
       return;
@@ -852,7 +852,7 @@ template <typename URV>
 void
 Hart<URV>::execVror_vi(const DecodedInst* di)
 {
-  if (not isRvzvbb())
+  if (not isRvzvbb() and not isRvzvkb())
     {
       illegalInst(di);
       return;

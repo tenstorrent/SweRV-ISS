@@ -1400,6 +1400,10 @@ namespace WdRiscv
     bool isRvzvksh() const
     { return extensionIsEnabled(RvExtension::Zvksh); }
 
+    /// Return true if the vector Zvkb extension is enabled.
+    bool isRvzvkb() const
+    { return extensionIsEnabled(RvExtension::Zvkb); }
+
     /// Return true if the zicond extension is enabled.
     bool isRvzicond() const
     { return extensionIsEnabled(RvExtension::Zicond); }
