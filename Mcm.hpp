@@ -524,9 +524,9 @@ namespace WdRiscv
 
     void setProducerTime(unsigned hartIx, McmInstr& instr);
 
-    /// Map register number of operand opIx to a unique integer by adding
-    /// an offset: integer register have 0 offset, fp regs have 32, and
-    /// csr regs have 64.
+    /// Map register number of operand opIx to a unique integer by adding an offset:
+    /// integer register have 0 offset, fp regs have 32, vector regs have 64, and csr regs
+    /// have 96.
     unsigned effectiveRegIx(const DecodedInst& di, unsigned opIx) const;
 
     /// Return the difference between the next page boundary and the
@@ -538,7 +538,8 @@ namespace WdRiscv
 
     const unsigned intRegOffset_ = 0;
     const unsigned fpRegOffset_ = 32;
-    const unsigned csRegOffset_ = 64;
+    const unsigned vecRegOffset_ = 64;
+    const unsigned csRegOffset_ = 96;
     const unsigned totalRegCount_ = csRegOffset_ + 4096; // 4096: max csr count.
 
     using McmInstrVec = std::vector<McmInstr>;

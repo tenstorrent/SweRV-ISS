@@ -1739,13 +1739,15 @@ Mcm<URV>::effectiveRegIx(const DecodedInst& di, unsigned opIx) const
     case OperandType::FpReg:
       return di.ithOperand(opIx) + fpRegOffset_;
 
+    case OperandType::VecReg:
+      return di.ithOperand(opIx) + vecRegOffset_;
+
     case OperandType::CsReg:
       {
 	CsrNumber csr{di.ithOperand(opIx)};
 	return unsigned(csr) + csRegOffset_;
       }
 
-    case OperandType::VecReg:   // FIX: Not yet supported.
     case OperandType::Imm:
     case OperandType::None:
       assert(0);
