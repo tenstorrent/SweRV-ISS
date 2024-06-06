@@ -142,7 +142,7 @@ namespace WdRiscv
     /// within a system of cores -- see sysHartIndex method) and
     /// associate it with the given memory. The MHARTID is configured as
     /// a read-only CSR with a reset value of hartId.
-    Hart(unsigned hartIx, URV hartId, Memory& memory, uint64_t& time);
+    Hart(unsigned hartIx, URV hartId, Memory& memory, Syscall<URV>& syscall, uint64_t& time);
 
     /// Destructor.
     ~Hart();
@@ -2151,6 +2151,13 @@ namespace WdRiscv
     /// cancel-lr at the right time.
     void setWrsCancelsLr(bool flag)
     { wrsCancelsLr_ = flag; }
+
+    /// Set hart suspend state. If true, run will have no effect.
+    void setSuspendState(bool flag)
+    { suspended_ = flag; }
+
+    bool isSuspended()
+    { return suspended_; }
 
   protected:
 
@@ -5035,7 +5042,7 @@ namespace WdRiscv
     FpRegs fpRegs_;              // Floating point registers.
     VecRegs vecRegs_;            // Vector register file.
 
-    Syscall<URV> syscall_;
+    Syscall<URV>& syscall_;
     URV syscallSlam_ = 0;        // Area in which to slam syscall mem changes.
 
     bool forceRounding_ = false;
@@ -5334,6 +5341,8 @@ namespace WdRiscv
       uint8_t value_ = 0;
     };
     InterruptAlarm swInterrupt_;
+
+    bool suspended_ = false; // If true, don't execute instructions.
   };
 }
 

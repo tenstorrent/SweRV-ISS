@@ -80,6 +80,9 @@ namespace WdRiscv
     /// Check if running an app linked with newlib/linuux CLIB.
     void checkForNewlibOrLinux(const Args& args, bool& newlib, bool& linux);
 
+    /// Check if running an app that uses openMp.
+    bool checkForOpenMp(const Args& args);
+
     bool determineIsa(const HartConfig& config, const Args& args, bool clib,
 		      std::string& isa);
 

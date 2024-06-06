@@ -82,9 +82,10 @@ parseNumber(std::string_view numberStr, TYPE& number)
 
 
 template <typename URV>
-Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory, uint64_t& time)
+Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory, Syscall<URV>& syscall, uint64_t& time)
   : hartIx_(hartIx), memory_(memory), intRegs_(32),
-    fpRegs_(32), syscall_(*this),
+    fpRegs_(32),
+    syscall_(syscall),
     time_(time),
     pmpManager_(memory.size(), UINT64_C(1024)*1024),
     virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16)
@@ -4624,6 +4625,10 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
     {
       if (userStop)
         break;
+
+      if (suspended_)
+        continue;
+
       resetExecInfo(); clearTraceData();
 
       if (enableGdb_ and ++gdbCount >= gdbLimit)
@@ -4796,6 +4801,9 @@ template <typename URV>
 bool
 Hart<URV>::runSteps(uint64_t steps, FILE* traceFile)
 {
+  if (suspended_)
+    return false;
+
   // Setup signal handlers. Restore on destruction.
   SignalHandlers handlers;
 
@@ -4953,6 +4961,9 @@ Hart<URV>::simpleRunWithLimit()
 
   while (noUserStop and instCounter_ < limit) 
     {
+      if (suspended_)
+        continue;
+
       resetExecInfo();
 
       currPc_ = pc_;
@@ -5010,6 +5021,9 @@ Hart<URV>::simpleRunNoLimit()
 {
   while (noUserStop)
     {
+      if (suspended_)
+        continue;
+
       currPc_ = pc_;
       ++instCounter_;
 
@@ -9861,7 +9875,7 @@ Hart<URV>::execEcall(const DecodedInst*)
 
   if (newlib_ or linux_ or syscallSlam_)
     {
-      URV a0 = syscall_.emulate();
+      URV a0 = syscall_.emulate(hartIx_);
       intRegs_.write(RegA0, a0);
       if (not syscallSlam_)
         return;

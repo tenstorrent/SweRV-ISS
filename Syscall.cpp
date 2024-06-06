@@ -31,6 +31,7 @@
 #include <sys/ioctl.h>
 #include <sys/uio.h>
 #include <sys/utsname.h>
+#include <linux/futex.h>
 
 #include "Hart.hpp"
 #include "Syscall.hpp"
@@ -404,7 +405,7 @@ Syscall<URV>::registerLinuxFd(int linuxFd, const std::string& path, bool isRead)
 
 template <typename URV>
 URV
-Syscall<URV>::emulate()
+Syscall<URV>::emulate(unsigned ix)
 {
   static std::unordered_map<int, std::string> names =
     {
@@ -679,6 +680,7 @@ Syscall<URV>::emulate()
      {285,  "copy_file_range"},
      {286,  "preadv2"},
      {287,  "pwritev2"},
+     {435,  "clone3"},
      {1024, "open"},
      {1025, "link"},
      {1026, "unlink"},
@@ -742,19 +744,20 @@ Syscall<URV>::emulate()
 
   // On success syscall returns a non-negtive integer.
   // On failure it returns the negative of the error number.
-  URV a0 = hart_.peekIntReg(RegA0);
-  URV a1 = hart_.peekIntReg(RegA1);
-  URV a2 = hart_.peekIntReg(RegA2);
+  auto& hart = *harts_.at(ix);
+  URV a0 = hart.peekIntReg(RegA0);
+  URV a1 = hart.peekIntReg(RegA1);
+  URV a2 = hart.peekIntReg(RegA2);
 
   memChanges_.clear();
 
-  URV a3 = hart_.peekIntReg(RegA3);
+  URV a3 = hart.peekIntReg(RegA3);
 
   URV num = 0;
-  if (hart_.isRve())
-    num = hart_.peekIntReg(RegT0);
+  if (hart.isRve())
+    num = hart.peekIntReg(RegT0);
   else
-    num = hart_.peekIntReg(RegA7);
+    num = hart.peekIntReg(RegA7);
 
   switch (num)
     {
@@ -774,7 +777,7 @@ Syscall<URV>::emulate()
           return SRV(-EINVAL);
 
         for (size_t i = 0; i < len; ++i)
-          if (not hart_.pokeMemory(rvBuff+i, uint8_t(buffer[i]), true))
+          if (not hart.pokeMemory(rvBuff+i, uint8_t(buffer[i]), true))
             return SRV(-EINVAL);
 
 	// Linux getcwd system call returns count of bytes placed in buffer
@@ -799,14 +802,14 @@ Syscall<URV>::emulate()
               // Copy riscv flock struct into fl.
               struct flock fl;
 
-              if (readHartMemory(hart_, a2, fl) != sizeof(fl))
+              if (readHartMemory(hart, a2, fl) != sizeof(fl))
                 return SRV(-EINVAL);
 
               rc = fcntl(fd, cmd, &fl);
               if (rc < 0)
                 return rc;
 
-              uint64_t written = writeHartMemory(hart_, fl, a2);
+              uint64_t written = writeHartMemory(hart, fl, a2);
               if (written)
                 memChanges_.emplace_back(a2, written);
               return written == sizeof(fl)? rc : SRV(-EINVAL);
@@ -832,7 +835,7 @@ Syscall<URV>::emulate()
           {
             size_t size = _IOC_SIZE(req);
             tmp.resize(size);
-            if (readHartMemory(hart_, rvArg, tmp, size) != size)
+            if (readHartMemory(hart, rvArg, tmp, size) != size)
               return SRV(-EINVAL);
             arg = tmp.data();
           }
@@ -849,7 +852,7 @@ Syscall<URV>::emulate()
 	uint64_t rvPath = a1;
 	mode_t mode = a2;
 	std::array<char, 1024> path;
-        if (not copyRvString(hart_, rvPath, path))
+        if (not copyRvString(hart, rvPath, path))
           return SRV(-EINVAL);
 
 	errno = 0;
@@ -863,7 +866,7 @@ Syscall<URV>::emulate()
 
         uint64_t rvPath = a1;
         std::array<char, 1024> path;
-        if (not copyRvString(hart_, rvPath, path))
+        if (not copyRvString(hart, rvPath, path))
           return SRV(-EINVAL);
 
 	int flags = SRV(a2);
@@ -886,7 +889,7 @@ Syscall<URV>::emulate()
 
         uint64_t rvPath = a1;
         std::array<char, 1024> path;
-        if (not copyRvString(hart_, rvPath, path))
+        if (not copyRvString(hart, rvPath, path))
           return SRV(-EINVAL);
 
         int mode = a2;
@@ -899,7 +902,7 @@ Syscall<URV>::emulate()
       {
         uint64_t rvPath = a0;
         std::array<char, 1024> path;
-        if (not copyRvString(hart_, rvPath, path))
+        if (not copyRvString(hart, rvPath, path))
           return SRV(-EINVAL);
 
 	errno = 0;
@@ -913,7 +916,7 @@ Syscall<URV>::emulate()
 
         uint64_t rvPath = a1;
         std::array<char, 1024> path;
-        if (not copyRvString(hart_, rvPath, path))
+        if (not copyRvString(hart, rvPath, path))
           return SRV(-EINVAL);
 
         mode_t mode = a2;
@@ -928,7 +931,7 @@ Syscall<URV>::emulate()
 
 	uint64_t rvPath = a1;
         std::array<char, 1024> path;
-        if (not copyRvString(hart_, rvPath, path))
+        if (not copyRvString(hart, rvPath, path))
           return SRV(-EINVAL);
 
 	int flags = a2;
@@ -975,7 +978,7 @@ Syscall<URV>::emulate()
 	ssize_t rc = getdirentries64(fd, buff.data(), count, &base);
         if (rc >= 0)
           {
-            ssize_t written = writeHartMemory(hart_, buff, rvBuff, rc);
+            ssize_t written = writeHartMemory(hart, buff, rvBuff, rc);
             if (written)
               memChanges_.emplace_back(rvBuff, written);
             return written == rc? rc : SRV(-EINVAL);
@@ -1007,17 +1010,17 @@ Syscall<URV>::emulate()
         for (SRV i = 0; i < count; ++i)
           {
             URV base = 0, len = 0;
-            if (not hart_.peekMemory(rvIov, base, true))
+            if (not hart.peekMemory(rvIov, base, true))
               return SRV(-EINVAL);
             rvIov += sizeof(base);
 
-            if (not hart_.peekMemory(rvIov, len, true))
+            if (not hart.peekMemory(rvIov, len, true))
               return SRV(-EINVAL);
             rvIov += sizeof(len);
 
             auto& buffer = buffers.at(i);
             buffer.resize(len);
-            if (readHartMemory(hart_, base, buffer, len) != len)
+            if (readHartMemory(hart, base, buffer, len) != len)
               return SRV(-EINVAL);
 
             iov.at(i).iov_base = buffer.data();
@@ -1043,7 +1046,7 @@ Syscall<URV>::emulate()
         if (rc < 0)
           return SRV(-errno);
 
-        ssize_t written = writeHartMemory(hart_, temp, buffAddr, rc);
+        ssize_t written = writeHartMemory(hart, temp, buffAddr, rc);
         if (written)
           memChanges_.emplace_back(buffAddr, written);
 	return written == rc? written : SRV(-EINVAL);
@@ -1058,7 +1061,7 @@ Syscall<URV>::emulate()
 	off_t offset = a3;
 
         std::vector<uint8_t> temp(count);
-        if (readHartMemory(hart_, buffAddr, temp, count) != count)
+        if (readHartMemory(hart, buffAddr, temp, count) != count)
           return SRV(-EINVAL);
 
 	errno = 0;
@@ -1072,7 +1075,7 @@ Syscall<URV>::emulate()
 	URV rvPath = a1, rvBuff = a2, buffSize = a3;
 
         std::array<char, 1024> path;
-        if (not copyRvString(hart_, rvPath, path))
+        if (not copyRvString(hart, rvPath, path))
           return SRV(-EINVAL);
 
         std::vector<char> buff(buffSize);
@@ -1082,7 +1085,7 @@ Syscall<URV>::emulate()
         if (rc < 0)
           return SRV(-errno);
 
-        ssize_t written = writeHartMemory(hart_, buff, rvBuff, rc);
+        ssize_t written = writeHartMemory(hart, buff, rvBuff, rc);
         if (written)
           memChanges_.emplace_back(rvBuff, written);
 	return  written == rc ? written : SRV(-EINVAL);
@@ -1095,7 +1098,7 @@ Syscall<URV>::emulate()
         // Copy rv path into path.
         uint64_t rvPath = a1;
         std::array<char, 1024> path;
-        if (not copyRvString(hart_, rvPath, path))
+        if (not copyRvString(hart, rvPath, path))
           return SRV(-EINVAL);
 
 	uint64_t rvBuff = a2;
@@ -1119,7 +1122,7 @@ Syscall<URV>::emulate()
           }
 
         bool copyOk = true;
-        size_t len = copyStatBufferToRiscv(hart_, buff, rvBuff, copyOk);
+        size_t len = copyStatBufferToRiscv(hart, buff, rvBuff, copyOk);
         memChanges_.emplace_back(rvBuff, len);
 	return copyOk? rc : SRV(-1);
       }
@@ -1136,14 +1139,16 @@ Syscall<URV>::emulate()
 	  return SRV(-errno);
 
         bool copyOk  = true;
-        size_t len = copyStatBufferToRiscv(hart_, buff, rvBuff, copyOk);
+        size_t len = copyStatBufferToRiscv(hart, buff, rvBuff, copyOk);
 
         memChanges_.emplace_back(rvBuff, len);
 	return copyOk? rc : SRV(-1);
       }
 
     case 98:  // futex
-      return 0;
+      if (a1 != FUTEX_WAKE_PRIVATE)
+        std::cerr << "Warning: unimplemented futex operation " << a1 << std::endl;
+      return 1;
 
     case 214: // brk
        {
@@ -1154,7 +1159,7 @@ Syscall<URV>::emulate()
           else
             {
               for (URV addr = progBreak_; addr < newBrk; addr++)
-                hart_.pokeMemory(addr, uint8_t(0), true /*usePma*/);
+                hart.pokeMemory(addr, uint8_t(0), true /*usePma*/);
               rc = progBreak_ = newBrk;
             }
      	  return rc;
@@ -1193,7 +1198,7 @@ Syscall<URV>::emulate()
         if (rc < 0)
           return SRV(-errno);
 
-        ssize_t written = writeHartMemory(hart_, temp, buffAddr, rc);
+        ssize_t written = writeHartMemory(hart, temp, buffAddr, rc);
         if (written)
           memChanges_.emplace_back(buffAddr, written);
 	return written == rc? written : SRV(-EINVAL);
@@ -1207,7 +1212,7 @@ Syscall<URV>::emulate()
 	size_t count = a2;
 
         std::vector<uint8_t> temp(count);
-        if (readHartMemory(hart_, buffAddr, temp, count) != count)
+        if (readHartMemory(hart, buffAddr, temp, count) != count)
           return SRV(-EINVAL);
 
 	errno = 0;
@@ -1221,12 +1226,12 @@ Syscall<URV>::emulate()
 
 	uint64_t rvPath = a1;
         std::array<char, 1024> path;
-        if (not copyRvString(hart_, rvPath, path))
+        if (not copyRvString(hart, rvPath, path))
 	  return SRV(-EINVAL);
 
         uint64_t rvTimeAddr = a2;
         std::array<timespec, 2> spec;
-        if (readHartMemory(hart_, rvTimeAddr, spec) != sizeof(spec))
+        if (readHartMemory(hart, rvTimeAddr, spec) != sizeof(spec))
           return SRV(-EINVAL);
 
         int flags = a3;
@@ -1253,14 +1258,14 @@ Syscall<URV>::emulate()
 	    clk_id == CLOCK_MONOTONIC_RAW)
 	  {
 	    // For repeatabilty. Pretend hart is running at 1 GHZ. Use instruction count.
-	    tp.tv_sec = hart_.getInstructionCount() / 1000000000;
-	    tp.tv_nsec = hart_.getInstructionCount() % 1000000000;
+	    tp.tv_sec = hart.getInstructionCount() / 1000000000;
+	    tp.tv_nsec = hart.getInstructionCount() % 1000000000;
 	  }
 	else if (clock_gettime(clk_id, &tp) != 0)
 	  return SRV(-errno);
-	if (not hart_.pokeMemory(rvBuff, uint64_t(tp.tv_sec), true))
+	if (not hart.pokeMemory(rvBuff, uint64_t(tp.tv_sec), true))
 	  return SRV(-1);
-	if (not hart_.pokeMemory(rvBuff + 8, uint64_t(tp.tv_nsec), true))
+	if (not hart.pokeMemory(rvBuff + 8, uint64_t(tp.tv_nsec), true))
 	  return SRV(-1);
 	return 0;
       }
@@ -1275,7 +1280,7 @@ Syscall<URV>::emulate()
 	if (ticks < 0)
 	  return SRV(-errno);
 
-        size_t len = copyTmsToRiscv(hart_, tms0, rvBuff);
+        size_t len = copyTmsToRiscv(hart, tms0, rvBuff);
         size_t expected = 4*sizeof(URV);
 
         if (len)
@@ -1296,7 +1301,7 @@ Syscall<URV>::emulate()
         if (rc >= 0)
           {
             strcpy(uts.release, "5.16.0");
-            size_t len = writeHartMemory(hart_, uts, rvBuff);
+            size_t len = writeHartMemory(hart, uts, rvBuff);
             if (len)
               memChanges_.emplace_back(rvBuff, len);
             return len == sizeof(uts)? rc : SRV(-EINVAL);
@@ -1327,10 +1332,10 @@ Syscall<URV>::emulate()
             size_t len = 0;
             size_t expected = 12; // uint64_t & uint32_t
 	    if (sizeof(URV) == 4)
-	      len = copyTimevalToRiscv32(hart_, tv0, tvAddr);
+	      len = copyTimevalToRiscv32(hart, tv0, tvAddr);
 	    else
               {
-                len = copyTimevalToRiscv64(hart_, tv0, tvAddr);
+                len = copyTimevalToRiscv64(hart, tv0, tvAddr);
                 expected = 16; // uint64_t & unit64_t
               }
             if (len)
@@ -1341,7 +1346,7 @@ Syscall<URV>::emulate()
 
 	if (tzAddr)
           {
-            size_t len = copyTimezoneToRiscv(hart_, tz0, tzAddr);
+            size_t len = copyTimezoneToRiscv(hart, tz0, tzAddr);
             if (len)
               memChanges_.emplace_back(a1, len);
             if (len != 2*sizeof(URV))
@@ -1379,7 +1384,7 @@ Syscall<URV>::emulate()
       {
     	URV addr = a0;
     	URV size = a1;
-    	return mmap_dealloc(addr, size);
+    	return mmap_dealloc(hart, addr, size);
       }
 
     case 216: // mremap
@@ -1388,7 +1393,7 @@ Syscall<URV>::emulate()
     	URV old_size = a1;
     	URV new_size = ((a2+(1<<12)-1)>>12)<<12;
     	bool maymove = a3 & MREMAP_MAYMOVE;
-    	return  mmap_remap(addr,old_size,new_size, maymove);
+    	return mmap_remap(hart, addr,old_size,new_size, maymove);
       }
 
     case 222: // mmap2
@@ -1415,17 +1420,45 @@ Syscall<URV>::emulate()
       {
         size_t pathAddr = a1;
         std::array<char, 1024> oldName;
-        if (not copyRvString(hart_, pathAddr, oldName))
+        if (not copyRvString(hart, pathAddr, oldName))
           return SRV(-EINVAL);
 
         size_t newPathAddr = a3;
         std::array<char, 1024> newName;
-        if (not copyRvString(hart_, newPathAddr, newName))
+        if (not copyRvString(hart, newPathAddr, newName))
           return SRV(-EINVAL);
 
         errno = 0;
         int result = rename(oldName.data(), newName.data());
         return (result == -1) ? -errno : result;
+      }
+
+    case 435:  // clone3
+      {
+        auto nextAvail = nextAvailHart();
+        if (not nextAvail)
+          return SRV(-EAGAIN);
+
+        std::array<uint64_t, 11> clone_args;
+        if (not readHartMemory(hart, a0, clone_args))
+          return SRV(-EINVAL);
+
+        nextAvail->pokePc(hart.peekPc());
+        for (int i = 0; i < 32; i++)
+          {
+            URV val;
+            hart.peekIntReg(i, val);
+            nextAvail->pokeIntReg(i, val);
+          }
+        nextAvail->pokeIntReg(RegSp, clone_args[5]);
+        nextAvail->pokeIntReg(RegTp, clone_args[7]);
+        nextAvail->pokeIntReg(RegA0, 0);
+        nextAvail->setSuspendState(false);
+
+        assert(clone_args[2] == clone_args[3]);
+        hart.pokeMemory(clone_args[2], nextAvail->sysHartIndex(), true);
+
+        return nextAvail->sysHartIndex();
       }
 
     case 1024: // open
@@ -1445,7 +1478,7 @@ Syscall<URV>::emulate()
 	int mode = a2;
 
         std::array<char, 1024> path;
-        if (not copyRvString(hart_, rvPath, path))
+        if (not copyRvString(hart, rvPath, path))
           return SRV(-EINVAL);
 
 	errno = 0;
@@ -1465,7 +1498,7 @@ Syscall<URV>::emulate()
         uint64_t rvPath = a0;
 
         std::array<char, 1024> path;
-        if (not copyRvString(hart_, rvPath, path))
+        if (not copyRvString(hart, rvPath, path))
           return SRV(-EINVAL);
 
 	errno = 0;
@@ -1479,7 +1512,7 @@ Syscall<URV>::emulate()
 
         // Copy rv path into path.
         std::array<char, 1024> path;
-        if (not copyRvString(hart_, rvPath, path))
+        if (not copyRvString(hart, rvPath, path))
           return SRV(-EINVAL);
 
 	struct stat buff;
@@ -1491,7 +1524,7 @@ Syscall<URV>::emulate()
 	uint64_t rvBuff = a1;
 
         bool copyOk  = true;
-        size_t len = copyStatBufferToRiscv(hart_, buff, rvBuff, copyOk);
+        size_t len = copyStatBufferToRiscv(hart, buff, rvBuff, copyOk);
 
         memChanges_.emplace_back(rvBuff, len);
 	return copyOk? rc : SRV(-1);
@@ -1507,7 +1540,7 @@ Syscall<URV>::emulate()
   if (num < reportedCalls.size() and reportedCalls.at(num))
     return -1;
 
-  std::cerr << "Unimplemented syscall " << names[int(num)] << " number " << num << "\n";
+  std::cerr << "Warning: Unimplemented syscall " << names[int(num)] << " number " << num << "\n";
 
    if (num < reportedCalls.size())
      reportedCalls.at(num) = true;
@@ -1657,7 +1690,7 @@ Syscall<URV>::mmap_alloc(uint64_t size)
 
 template <typename URV>
 int
-Syscall<URV>::mmap_dealloc(uint64_t addr, uint64_t size)
+Syscall<URV>::mmap_dealloc(Hart<URV>& hart, uint64_t addr, uint64_t size)
 {
   if (mmap_blocks_.empty())
     return -1;
@@ -1696,7 +1729,7 @@ Syscall<URV>::mmap_dealloc(uint64_t addr, uint64_t size)
   auto mem_addr = curr->first;
   auto mem_end_addr = mem_addr + size;
   for (; mem_addr<mem_end_addr; mem_addr+=uint64_t(sizeof(uint64_t)))
-    hart_.pokeMemory(mem_addr,uint64_t(0), true /*usePma*/);
+    hart.pokeMemory(mem_addr,uint64_t(0), true /*usePma*/);
 
   if (size < curr_size)
     {
@@ -1733,7 +1766,7 @@ Syscall<URV>::mmap_dealloc(uint64_t addr, uint64_t size)
 
 template <typename URV>
 uint64_t
-Syscall<URV>::mmap_remap(uint64_t addr, uint64_t old_size, uint64_t new_size,
+Syscall<URV>::mmap_remap(Hart<URV>& hart, uint64_t addr, uint64_t old_size, uint64_t new_size,
                          bool maymove)
 {
   if (old_size == new_size) return addr;
@@ -1744,7 +1777,7 @@ Syscall<URV>::mmap_remap(uint64_t addr, uint64_t old_size, uint64_t new_size,
       assert(curr != mmap_blocks_.end() and curr->second.length == old_size and not curr->second.free);
       curr->second.length = new_size;
       mmap_blocks_.insert(std::make_pair(addr+new_size, blk_t(old_size-new_size, false)));
-      mmap_dealloc(addr+new_size,old_size-new_size);
+      mmap_dealloc(hart,addr+new_size,old_size-new_size);
       //print_mmap("remap1");
       return addr;
     }
@@ -1766,10 +1799,10 @@ Syscall<URV>::mmap_remap(uint64_t addr, uint64_t old_size, uint64_t new_size,
         {
           uint64_t data;
           bool usePma = true;
-          hart_.peekMemory(addr+index, data, usePma);
-          hart_.pokeMemory(new_addr+index, data, usePma);
+          hart.peekMemory(addr+index, data, usePma);
+          hart.pokeMemory(new_addr+index, data, usePma);
         }
-      mmap_dealloc(addr, old_size);
+      mmap_dealloc(hart, addr, old_size);
       //print_mmap("remap3");
       return new_addr;
     }
@@ -1785,7 +1818,7 @@ Syscall<URV>::getUsedMemBlocks(uint64_t sp, std::vector<AddrLen>& usedBlocks)
   usedBlocks.clear();
 
   // Up to 16 GB, snapshot the whole memory.
-  uint64_t memSize = hart_.getMemorySize();
+  uint64_t memSize = harts_.at(0)->getMemorySize();
   if (memSize <= 0x400000000L)
     {
       usedBlocks.emplace_back(0, memSize);
