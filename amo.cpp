@@ -69,7 +69,7 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/))
+      if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
 	triggerTripped_ = true;
     }
 
@@ -127,7 +127,7 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/))
+      if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
 	triggerTripped_ = true;
     }
 
@@ -181,7 +181,7 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
   if (hasActiveTrigger())
     {
       bool isLd = true;
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, isLd))
+      if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, isLd))
 	triggerTripped_ = true;
       if (triggerTripped_)
 	return false;
@@ -299,7 +299,7 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
-  if (hasTrig and (ldStAddrTriggerHit(virtAddr, timing, isLd) or
+  if (hasTrig and (ldStAddrTriggerHit(virtAddr, ldStSize_, timing, isLd) or
                    ldStDataTriggerHit(storeVal, timing, isLd)))
     triggerTripped_ = true;
 

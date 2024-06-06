@@ -1032,10 +1032,10 @@ namespace WdRiscv
     /// remaining triggers in its chain have tripped. Set the local-hit bit of any
     /// load/store trigger that matches. If a matching load/store trigger causes its chain
     /// to trip, then set the hit bit of all the triggers in that chain.
-    bool ldStAddrTriggerHit(URV addr, TriggerTiming t, bool isLoad,
+    bool ldStAddrTriggerHit(URV addr, unsigned size, TriggerTiming t, bool isLoad,
                             PrivilegeMode mode, bool virtMode, bool ie)
     {
-      bool chainHit = triggers_.ldStAddrTriggerHit(addr, t, isLoad, mode, virtMode, ie);
+      bool chainHit = triggers_.ldStAddrTriggerHit(addr, size, t, isLoad, mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))
@@ -1056,10 +1056,10 @@ namespace WdRiscv
     }
 
     /// Similar to ldStAddrTriggerHit but for instruction address.
-    bool instAddrTriggerHit(URV addr, TriggerTiming t, PrivilegeMode mode,
+    bool instAddrTriggerHit(URV addr, unsigned size, TriggerTiming t, PrivilegeMode mode,
                             bool virtMode, bool ie)
     {
-      bool chainHit = triggers_.instAddrTriggerHit(addr, t, mode, virtMode, ie);
+      bool chainHit = triggers_.instAddrTriggerHit(addr, size, t, mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))

@@ -1789,7 +1789,7 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/))
+      if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
 	triggerTripped_ = true;
     }
 
@@ -2039,7 +2039,7 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
-  if (hasTrig and (ldStAddrTriggerHit(virtAddr, timing, isLd) or
+  if (hasTrig and (ldStAddrTriggerHit(virtAddr, ldStSize_, timing, isLd) or
                    ldStDataTriggerHit(storeVal, timing, isLd)))
       triggerTripped_ = true;
 
@@ -4561,12 +4561,11 @@ private:
 template <typename URV>
 inline
 bool
-Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
-				FILE* file)
+Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst, FILE* file)
 {
   // Process pre-execute address trigger and fetch instruction.
   bool hasTrig = hasActiveInstTrigger();
-  triggerTripped_ = hasTrig and instAddrTriggerHit(addr, TriggerTiming::Before);
+  triggerTripped_ = hasTrig and instAddrTriggerHit(addr, 4 /*size*/, TriggerTiming::Before);
   // Fetch instruction.
   bool fetchOk = true;
   if (triggerTripped_)
