@@ -236,7 +236,7 @@ VecRegs::getLastMemory(std::vector<uint64_t>& addresses,
   if (ldStSize_ == 0)
     return false;
 
-  addresses = ldStAddr_;
+  addresses = ldStVa_;
   data = stData_;
   return true;
 }

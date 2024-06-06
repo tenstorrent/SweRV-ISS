@@ -11057,8 +11057,9 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
       if (ix < vecRegs_.elemCount())
         {
           vecRegs_.maskedAddr_.push_back(skip);
-          vecRegs_.ldStAddr_.push_back(addr);
-          vecRegs_.ldStPhysAddr_.push_back(addr);
+          vecRegs_.ldStVa_.push_back(addr);
+          vecRegs_.ldStPa_.push_back(addr);
+	  vecRegs_.ldStPa2_.push_back(addr);
         }
       if (skip)
 	{
@@ -11082,7 +11083,8 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
           if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data))
 	    assert(0);
 	  elem = data;
-          vecRegs_.ldStPhysAddr_.back() = pa1;
+          vecRegs_.ldStPa_.back() = pa1;
+	  vecRegs_.ldStPa2_.back() = pa2;
         }
       else
         {
@@ -11218,8 +11220,9 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   for (unsigned ix = start; ix < elemCount; ++ix, addr += sizeof(ELEM_TYPE))
     {
       bool skip = masked and not vecRegs_.isActive(0, ix);
-      vecRegs_.ldStAddr_.push_back(addr);
-      vecRegs_.ldStPhysAddr_.push_back(addr);
+      vecRegs_.ldStVa_.push_back(addr);
+      vecRegs_.ldStPa_.push_back(addr);
+      vecRegs_.ldStPa2_.push_back(addr);
       vecRegs_.maskedAddr_.push_back(skip);
       if (skip)
 	{
@@ -11239,7 +11242,8 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 	{
 	  if (not writeForStore(addr, pa1, pa2, elem))
 	    assert(0);
-          vecRegs_.ldStPhysAddr_.back() = pa1;
+          vecRegs_.ldStPa_.back() = pa1;
+	  vecRegs_.ldStPa2_.back() = pa2;
 	  vecRegs_.stData_.push_back(elem);
 	}
       else
@@ -11461,8 +11465,9 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
       vecRegs_.write(vd, ix, groupX8, elem);
 
-      vecRegs_.ldStAddr_.push_back(addr);
-      vecRegs_.ldStPhysAddr_.push_back(pa1);
+      vecRegs_.ldStVa_.push_back(addr);
+      vecRegs_.ldStPa_.push_back(pa1);
+      vecRegs_.ldStPa2_.push_back(pa1);
       vecRegs_.maskedAddr_.push_back(false);
     }
 
@@ -11579,8 +11584,9 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
 	{
 	  if (not writeForStore(addr, pa1, pa2, elem))
 	    assert(0);
-	  vecRegs_.ldStAddr_.push_back(addr);
-          vecRegs_.ldStPhysAddr_.push_back(pa1);
+	  vecRegs_.ldStVa_.push_back(addr);
+          vecRegs_.ldStPa_.push_back(pa1);
+	  vecRegs_.ldStPa2_.push_back(pa2);
 	  vecRegs_.maskedAddr_.push_back(false);
 	  vecRegs_.stData_.push_back(elem);
 	}
@@ -11753,8 +11759,9 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
       bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
       if (ix < vecRegs_.elemCount())
         {
-          vecRegs_.ldStAddr_.push_back(addr);
-          vecRegs_.ldStPhysAddr_.push_back(addr);
+          vecRegs_.ldStVa_.push_back(addr);
+          vecRegs_.ldStPa_.push_back(addr);
+	  vecRegs_.ldStPa2_.push_back(addr);
           vecRegs_.maskedAddr_.push_back(skip);
         }
       if (skip)
@@ -11777,7 +11784,8 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 	  if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data))
 	    assert(0);
 	  elem = data;
-          vecRegs_.ldStPhysAddr_.back() = pa1;
+          vecRegs_.ldStPa_.back() = pa1;
+	  vecRegs_.ldStPa2_.back() = pa2;
         }
       else
         {
@@ -11906,8 +11914,9 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
     {
       bool skip = masked and not vecRegs_.isActive(0, ix);
-      vecRegs_.ldStAddr_.push_back(addr);
-      vecRegs_.ldStPhysAddr_.push_back(addr);
+      vecRegs_.ldStVa_.push_back(addr);
+      vecRegs_.ldStPa_.push_back(addr);
+      vecRegs_.ldStPa2_.push_back(addr);
       vecRegs_.maskedAddr_.push_back(skip);
       if (skip)
 	{
@@ -11928,7 +11937,8 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 	  if (not writeForStore(addr, pa1, pa2, elem))
 	    assert(0);
 	  vecRegs_.stData_.push_back(elem);
-          vecRegs_.ldStPhysAddr_.back() = pa1;
+          vecRegs_.ldStPa_.back() = pa1;
+	  vecRegs_.ldStPa2_.back() = pa2;
 	}
       else
         {
@@ -12061,8 +12071,9 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
           uint64_t offset = 0;
           vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset);
           vaddr = addr + offset;
-          vecRegs_.ldStAddr_.push_back(vaddr);
-          vecRegs_.ldStPhysAddr_.push_back(vaddr);
+          vecRegs_.ldStVa_.push_back(vaddr);
+          vecRegs_.ldStPa_.push_back(vaddr);
+          vecRegs_.ldStPa2_.push_back(vaddr);
           vecRegs_.maskedAddr_.push_back(skip);
         }
       if (skip)
@@ -12087,7 +12098,8 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    assert(0);
 	  elem = data;
 	  vecRegs_.write(vd, ix, destGroup, elem);
-          vecRegs_.ldStPhysAddr_.back() = pa1;
+          vecRegs_.ldStPa_.back() = pa1;
+          vecRegs_.ldStPa2_.back() = pa2;
 	}
       else
         {
@@ -12262,8 +12274,9 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
       uint64_t vaddr = addr + offset, data = 0;
       bool skip = masked and not vecRegs_.isActive(0, ix);
-      vecRegs_.ldStAddr_.push_back(vaddr);
-      vecRegs_.ldStPhysAddr_.push_back(vaddr);
+      vecRegs_.ldStVa_.push_back(vaddr);
+      vecRegs_.ldStPa_.push_back(vaddr);
+      vecRegs_.ldStPa2_.push_back(vaddr);
       vecRegs_.maskedAddr_.push_back(skip);
       if (skip)
 	{
@@ -12330,7 +12343,8 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
         }
 
       vecRegs_.stData_.push_back(data);
-      vecRegs_.ldStPhysAddr_.back() = pa1;
+      vecRegs_.ldStPa_.back() = pa1;
+      vecRegs_.ldStPa2_.back() = pa2;
     }
 
   return true;
@@ -12514,8 +12528,9 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	  bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
           if (ix < vecRegs_.elemCount())
             {
-              vecRegs_.ldStAddr_.push_back(faddr);
-              vecRegs_.ldStPhysAddr_.push_back(faddr);
+              vecRegs_.ldStVa_.push_back(faddr);
+              vecRegs_.ldStPa_.push_back(faddr);
+	      vecRegs_.ldStPa2_.push_back(faddr);
               vecRegs_.maskedAddr_.push_back(skip);
             }
 	  if (skip)
@@ -12539,7 +12554,8 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	      if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data))
 		assert(0);
 	      elem = data;
-              vecRegs_.ldStPhysAddr_.back() = pa1;
+              vecRegs_.ldStPa_.back() = pa1;
+              vecRegs_.ldStPa2_.back() = pa2;
             }
 	  else
 	    {
@@ -12693,8 +12709,9 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	  unsigned dvg = vd + field*eg;   // Source vector gorup.
 
 	  bool skip = masked and not vecRegs_.isActive(0, ix);
-	  vecRegs_.ldStAddr_.push_back(faddr);
-          vecRegs_.ldStPhysAddr_.push_back(faddr);
+	  vecRegs_.ldStVa_.push_back(faddr);
+          vecRegs_.ldStPa_.push_back(faddr);
+          vecRegs_.ldStPa2_.push_back(faddr);
 	  vecRegs_.maskedAddr_.push_back(skip);
 	  if (skip)
 	    {
@@ -12712,7 +12729,8 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	      if (not writeForStore(faddr, pa1, pa2, elem))
 		assert(0);
 	      vecRegs_.stData_.push_back(elem);
-              vecRegs_.ldStPhysAddr_.back() = pa1;
+              vecRegs_.ldStPa_.back() = pa1;
+              vecRegs_.ldStPa2_.back() = pa2;
 	    }
 	  else
 	    {
@@ -13029,8 +13047,9 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
                 assert(0);
 
               faddr = addr + offset + field*elemSize;
-              vecRegs_.ldStAddr_.push_back(faddr);
-              vecRegs_.ldStPhysAddr_.push_back(faddr);
+              vecRegs_.ldStVa_.push_back(faddr);
+              vecRegs_.ldStPa_.push_back(faddr);
+              vecRegs_.ldStPa2_.push_back(faddr);
               vecRegs_.maskedAddr_.push_back(skip);
             }
 	  if (skip)
@@ -13055,7 +13074,8 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 		assert(0);
 	      elem = data;
 	      vecRegs_.write(dvg, ix, destGroup, elem);
-              vecRegs_.ldStPhysAddr_.back() = pa1;
+              vecRegs_.ldStPa_.back() = pa1;
+              vecRegs_.ldStPa2_.back() = pa2;
 	    }
 	  else
 	    {
@@ -13191,8 +13211,9 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	{
 	  unsigned dvg = vd + field*eg;  // Source vector grop.
 	  bool skip = masked and not vecRegs_.isActive(0, ix);
-	  vecRegs_.ldStAddr_.push_back(faddr);
-          vecRegs_.ldStPhysAddr_.push_back(faddr);
+	  vecRegs_.ldStVa_.push_back(faddr);
+          vecRegs_.ldStPa_.push_back(faddr);
+          vecRegs_.ldStPa2_.push_back(faddr);
 	  vecRegs_.maskedAddr_.push_back(skip);
 	  if (skip)
 	    {
@@ -13259,7 +13280,8 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	    }
 
 	  vecRegs_.stData_.push_back(data);
-          vecRegs_.ldStPhysAddr_.back() = pa1;
+          vecRegs_.ldStPa_.back() = pa1;
+          vecRegs_.ldStPa2_.back() = pa2;
 	}
     }
 

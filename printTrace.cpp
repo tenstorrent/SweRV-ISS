@@ -305,16 +305,16 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 	oss << ":0x" << ldStPhysAddr1_;
       tmp += " [" + oss.str() + "]";
     }
-  else if (not vecRegs_.ldStAddr_.empty())
+  else if (not vecRegs_.ldStVa_.empty())
     {
       std::ostringstream oss;
-      for (uint64_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
+      for (uint64_t i = 0; i < vecRegs_.ldStVa_.size(); ++i)
         {
           if (i > 0)
             oss << ";";
-          oss << "0x" << std::hex << vecRegs_.ldStAddr_.at(i);
-          if (vecRegs_.ldStPhysAddr_.at(i) != vecRegs_.ldStAddr_.at(i))
-            oss << ":0x" << vecRegs_.ldStPhysAddr_.at(i);
+          oss << "0x" << std::hex << vecRegs_.ldStVa_.at(i);
+          if (vecRegs_.ldStPa_.at(i) != vecRegs_.ldStVa_.at(i))
+            oss << ":0x" << vecRegs_.ldStPa_.at(i);
           if (i < vecRegs_.stData_.size())
             oss << '=' << "0x" << vecRegs_.stData_.at(i);
         }
@@ -707,15 +707,15 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   // Memory
   buffer.printChar(',');
   uint64_t virtDataAddr = 0, physDataAddr = 0;
-  if (not vecRegs_.ldStAddr_.empty())
+  if (not vecRegs_.ldStVa_.empty())
     {
-      for (uint64_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
+      for (uint64_t i = 0; i < vecRegs_.ldStVa_.size(); ++i)
         {
           if (i > 0)
             buffer.printChar(';');
-          buffer.print(vecRegs_.ldStAddr_.at(i));
-          if (vecRegs_.ldStPhysAddr_.at(i) != vecRegs_.ldStAddr_.at(i))
-            buffer.printChar(':').print(vecRegs_.ldStPhysAddr_.at(i));
+          buffer.print(vecRegs_.ldStVa_.at(i));
+          if (vecRegs_.ldStPa_.at(i) != vecRegs_.ldStVa_.at(i))
+            buffer.printChar(':').print(vecRegs_.ldStPa_.at(i));
           if (i < vecRegs_.maskedAddr_.size() and vecRegs_.maskedAddr_.at(i))
             buffer.printChar('m');
           if (i < vecRegs_.stData_.size())

@@ -530,7 +530,7 @@ namespace WdRiscv
     }
 
     const std::vector<uint64_t>& ldStAddrs() const
-    { return ldStAddr_; }
+    { return ldStVa_; }
 
     const std::vector<bool>& maskedAddrs() const
     { return maskedAddr_; }
@@ -580,8 +580,9 @@ namespace WdRiscv
     void clearTraceData()
     {
       ldStSize_ = 0;
-      ldStAddr_.clear();
-      ldStPhysAddr_.clear();
+      ldStVa_.clear();
+      ldStPa_.clear();
+      ldStPa2_.clear();
       maskedAddr_.clear();
       stData_.clear();
       fpFlags_.clear();
@@ -870,14 +871,15 @@ namespace WdRiscv
 
     // Following used for logging/tracing. Cleared before each instruction.
     // Collected by a vector load/store instruction.
-    unsigned ldStSize_ = 0;               // Vector load/store element size.
-    std::vector<uint64_t> ldStAddr_;      // Addresses of vector load/store instruction.
-    std::vector<uint64_t> ldStPhysAddr_;  // Phys addresses of vector load/store instruction (FIXME: page crosses).
-    std::vector<bool> maskedAddr_;        // True if address is masked off (element skipped).
-    std::vector<Step> steps_;             // Incremental steps taken by previous instruction (useful for vector instruction debug).
-    std::vector<uint8_t> fpFlags_;        // Incremental fp flags (useful for vector instruction debug).
-    std::vector<uint8_t> vxsat_;          // VXSAT per-element operation (useful for vector instruction debug).
-    std::vector<uint64_t> stData_;        // Data of vector store instruction.
-    std::vector<unsigned> opsEmul_;       // Effective grouping of vector operands.
+    unsigned ldStSize_ = 0;           // Vector load/store element size.
+    std::vector<uint64_t> ldStVa_;    // Virtual addresses of vector load/store instruction.
+    std::vector<uint64_t> ldStPa_;    // Phys addresses of vector load/store instruction.
+    std::vector<uint64_t> ldStPa2_;   // For page crossers: addr on 2nd page, otherwise same as ldStPa_.
+    std::vector<bool> maskedAddr_;    // True if address is masked off (element skipped).
+    std::vector<Step> steps_;         // Incremental steps taken by previous instruction (useful for vector instruction debug).
+    std::vector<uint8_t> fpFlags_;    // Incremental fp flags (useful for vector instruction debug).
+    std::vector<uint8_t> vxsat_;      // VXSAT per-element operation (useful for vector instruction debug).
+    std::vector<uint64_t> stData_;    // Data of vector store instruction.
+    std::vector<unsigned> opsEmul_;   // Effective grouping of vector operands.
   };
 }
