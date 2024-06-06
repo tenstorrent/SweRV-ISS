@@ -543,16 +543,16 @@ namespace WdRiscv
 
     using McmInstrVec = std::vector<McmInstr>;
 
-    using RegTimeVec = std::vector<uint64_t>; // Map reg index to time.
-    using RegProducer = std::vector<uint64_t>; // Map reg index to instr tag.
+    using RegTimeVec = std::vector<uint64_t>;    // Map reg index to time.
+    using RegProducer = std::vector<uint64_t>;   // Map reg index to instr tag.
 
-    MemoryOpVec sysMemOps_;  // Memory ops of all cores.
-    std::vector<McmInstrVec> hartInstrVecs_; // One vector per hart.
+    MemoryOpVec sysMemOps_;                      // Memory ops of all cores.
+    std::vector<McmInstrVec> hartInstrVecs_;     // One vector per hart.
     std::vector<MemoryOpVec> hartPendingWrites_; // One vector per hart.
+    std::vector<uint64_t> sinvalVmaTime_;        // One entry per hart.
+    std::vector<uint64_t> sinvalVmaTag_;         // One entry per hart.
 
     uint64_t time_ = 0;
-    uint64_t sinvalVmaTime_ = 0;
-    uint64_t sinvalVmaTag_ = 0;
     unsigned pageSize_ = 4096;
     unsigned lineSize_ = 64; // Merge buffer line size.
     unsigned windowSize_ = 1000;

@@ -34,7 +34,10 @@ Mcm<URV>::Mcm(unsigned hartCount, unsigned pageSize, unsigned mergeBufferSize)
   hartPendingFences_.resize(hartCount);
   hartUndrainedStores_.resize(hartCount);
 
- // If no merge buffer, then memory is updated on insert messages.
+  sinvalVmaTime_.resize(hartCount);
+  sinvalVmaTag_.resize(hartCount);
+
+  // If no merge buffer, then memory is updated on insert messages.
   writeOnInsert_ = (lineSize_ == 0);
 }
 
@@ -648,8 +651,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   instr->di_ = di;
   if (instr->di_.instId() == InstId::sfence_vma)
     {
-      sinvalVmaTime_ = time;
-      sinvalVmaTag_ = tag;
+      sinvalVmaTime_.at(hartIx) = time;
+      sinvalVmaTag_.at(hartIx) = tag;
     }
 
   if (instr->di_.instId() == InstId::sfence_inval_ir)
@@ -2907,10 +2910,13 @@ Mcm<URV>::checkSfenceInvalIr(Hart<URV>& hart, const McmInstr& instr) const
   // using translation times. Required times are currently not available. We do not
   // consider instruction address translation.
 
-  if (sinvalVmaTag_ == 0)
+  unsigned hartIx = hart.sysHartIndex();
+
+  auto invalTag = sinvalVmaTag_.at(hartIx);
+  if (invalTag == 0)
     return true;   // No sinval.vma was retired
 
-  unsigned hartIx = hart.sysHartIndex();
+  auto invalTime = sinvalVmaTime_.at(hartIx);
 
   for (size_t ix = sysMemOps_.size(); ix > 0; --ix)
     {
@@ -2919,11 +2925,11 @@ Mcm<URV>::checkSfenceInvalIr(Hart<URV>& hart, const McmInstr& instr) const
 	continue;
       if (op.instrTag_ < instr.tag_)
 	break;
-      if (op.time_ < sinvalVmaTime_)
+      if (op.time_ < invalTime)
 	{
-	  cerr << "Error: Hart-id=" << hart.hartId() << "implicit memory access for "
+	  cerr << "Error: Hart-id=" << hart.hartId() << " implicit memory access for "
 	       << "translation of instruction at tag=" << op.instrTag_ << " is out of order "
-	       << "with respect to sinval.vma instruction with tag=" << sinvalVmaTag_
+	       << "with respect to sinval.vma instruction with tag=" << invalTag
 	       << " and sfence.inval.ir with tag=" << instr.tag_ << '\n';
 	  return false;
 	}
