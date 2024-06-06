@@ -1051,7 +1051,7 @@ Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
 	       hart.isImsicAddr(addr) or hart.isPciAddr(addr));
 
   // Major hack (temporary until RTL removes CLINT device).
-  skip = skip or (addr >= 0x2000000 and addr < 0xc000);
+  skip = skip or (addr >= 0x2000000 and addr < 0x200c000);
 
   if (skip)
     return true;
