@@ -594,11 +594,14 @@ namespace WdRiscv
     { ownTrace_ = flag; }
 
     /// Define memory mapped locations for CLINT.
-    void configAclint(uint64_t mswiOffset, bool hasMswi,
+    void configAclint(uint64_t base, uint64_t size, uint64_t mswiOffset, bool hasMswi,
                       uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
 		      bool softwareInterruptOnReset, bool deliverInterrupts,
                       std::function<Hart<URV>*(unsigned ix)> indexToHart)
     {
+      aclintBase_ = base;
+      aclintSize_ = size;
+
       if (hasMswi)
         {
           aclintSwStart_ = mswiOffset;
@@ -2088,7 +2091,7 @@ namespace WdRiscv
 
     /// Return true if ACLINT is configured.
     bool hasAclint() const
-    { return (aclintSwStart_ < aclintSwEnd_) or (aclintMtimerStart_ < aclintMtimerEnd_); }
+    { return aclintSize_ > 0; }
 
     /// Set the ACLINT alarm to the given value.
     bool hasAclintTimer(uint64_t& addr) const
@@ -2118,10 +2121,7 @@ namespace WdRiscv
 				   uint64_t& gPhysAddr, uint32_t& instr);
 
     bool isAclintAddr(uint64_t addr) const
-    {
-      return hasAclint() and ((addr >= aclintSwStart_ and addr < aclintSwEnd_) or
-                              (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_));
-    }
+    { return hasAclint() and addr >= aclintBase_ and addr < aclintBase_ + aclintSize_; }
 
     bool isAclintMtimeAddr(uint64_t addr) const
     { return addr >= aclintMtimeStart_ and addr < aclintMtimeEnd_; }
@@ -5062,6 +5062,8 @@ namespace WdRiscv
     bool conIoValid_ = false;    // True if conIo_ is valid.
     bool enableConIn_ = true;
 
+    uint64_t aclintBase_ = 0;
+    uint64_t aclintSize_ = 0;
     uint64_t aclintSwStart_ = 0;
     uint64_t aclintSwEnd_ = 0;
     uint64_t aclintMtimerStart_ = 0;

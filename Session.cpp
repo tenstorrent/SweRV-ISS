@@ -699,8 +699,8 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
 
   if (args.clint)
     {
-      uint64_t swAddr = *args.clint;
-      config.configAclint(system, hart, swAddr, 0 /* swOffset */, true /* hasMswi */,
+      uint64_t swAddr = *args.clint, size = 0xc000;
+      config.configAclint(system, hart, swAddr, size, swAddr, 0 /* swOffset */, true /* hasMswi */,
                           0x4000 /* timerOffset */, 0xbff8 /* timeOffset */, true /* hasMtimer */);
     }
 

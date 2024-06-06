@@ -76,7 +76,7 @@ namespace WdRiscv
     /// is true then a software interrupt for hart0 is injected
     /// in the clint at reset.
     template<typename URV>
-    bool configAclint(System<URV>&, Hart<URV>&, uint64_t clintStart,
+    bool configAclint(System<URV>&, Hart<URV>&, uint64_t aclintStart, uint64_t aclintSize,
                       uint64_t mswiOffset, bool hasMswi,
                       uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
 		      bool siOnReset = false, bool deliverInterrupts = true) const;
