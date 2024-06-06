@@ -495,7 +495,7 @@ namespace WdRiscv
     /// Return true if this trigger is enabled for loads (or stores if
     /// isLoad is false), for addresses, for the given timing and if
     /// it matches the given data address.  Return false otherwise.
-    bool matchLdStAddr(URV address, TriggerTiming timing, bool isLoad,
+    bool matchLdStAddr(URV address, unsigned size, TriggerTiming timing, bool isLoad,
                        PrivilegeMode mode, bool virtMode) const;
 
     /// Return true if this trigger is enabled for loads (or stores if
@@ -507,7 +507,7 @@ namespace WdRiscv
     /// Return true if this trigger is enabled for instruction
     /// addresses (execution), for the given timing and if it matches
     /// the given address. Return false otherwise.
-    bool matchInstAddr(URV address, TriggerTiming timing,
+    bool matchInstAddr(URV address, unsigned size, TriggerTiming timing,
                        PrivilegeMode mode, bool virtMode) const;
 
     /// Return true if this trigger is enabled for instruction opcodes
@@ -698,7 +698,7 @@ namespace WdRiscv
     }
 
     template <typename M>
-    bool matchLdStAddr(URV address, TriggerTiming timing, bool isLoad,
+    bool matchLdStAddr(URV address, unsigned size, TriggerTiming timing, bool isLoad,
                        PrivilegeMode mode, bool virtMode) const;
 
     template <typename M>
@@ -706,7 +706,7 @@ namespace WdRiscv
                        PrivilegeMode mode, bool virtMode) const;
 
     template <typename M>
-    bool matchInstAddr(URV address, TriggerTiming timing,
+    bool matchInstAddr(URV address, unsigned size, TriggerTiming timing,
                        PrivilegeMode mode, bool virtMode) const;
 
     template <typename M>
@@ -846,7 +846,7 @@ namespace WdRiscv
     /// load/store trigger that matches. If the trigger action is contingent on interrupts
     /// being enabled (ie == true), then the trigger will not trip even if its condition
     /// is satisfied.
-    bool ldStAddrTriggerHit(URV address, TriggerTiming, bool isLoad,
+    bool ldStAddrTriggerHit(URV address, unsigned size, TriggerTiming, bool isLoad,
                             PrivilegeMode mode, bool virtMode, bool ie);
 
     /// Similar to ldStAddrTriggerHit but for data match.
@@ -854,7 +854,7 @@ namespace WdRiscv
                             PrivilegeMode mode, bool virtMode, bool ie);
 
     /// Similar to ldStAddrTriggerHit but for instruction address.
-    bool instAddrTriggerHit(URV address, TriggerTiming timing,
+    bool instAddrTriggerHit(URV address, unsigned size, TriggerTiming timing,
                             PrivilegeMode mode, bool virtMode, bool ie);
 
     /// Similar to instAddrTriggerHit but for instruction opcode.

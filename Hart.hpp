@@ -2707,9 +2707,9 @@ namespace WdRiscv
     /// Return true if one or more load-address/store-address trigger has a hit on the
     /// given address and given timing (before/after). Set the hit bit of all the triggers
     /// that trip.
-    bool ldStAddrTriggerHit(URV addr, TriggerTiming t, bool isLoad)
+    bool ldStAddrTriggerHit(URV addr, unsigned size, TriggerTiming t, bool isLoad)
     {
-      return csRegs_.ldStAddrTriggerHit(addr, t, isLoad, privilegeMode(), virtMode(),
+      return csRegs_.ldStAddrTriggerHit(addr, size, t, isLoad, privilegeMode(), virtMode(),
 					isInterruptEnabled());
     }
 
@@ -2724,9 +2724,9 @@ namespace WdRiscv
 
     /// Return true if one or more execution trigger has a hit on the given address and
     /// given timing (before/after). Set the hit bit of all the triggers that trip.
-    bool instAddrTriggerHit(URV addr, TriggerTiming t)
+    bool instAddrTriggerHit(URV addr, unsigned size, TriggerTiming t)
     {
-      return csRegs_.instAddrTriggerHit(addr, t, privilegeMode(), virtMode(),
+      return csRegs_.instAddrTriggerHit(addr, size, t, privilegeMode(), virtMode(),
 					isInterruptEnabled());
     }
 
