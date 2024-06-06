@@ -1039,10 +1039,6 @@ bool
 Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
 		       const MemoryOp& op) const
 {
-  // This is disabled until we resolve discrepancy over CLINT between whisper config file
-  // and RTL.
-  return true;
-
   if (op.size_ > instr.size_)
     {
       cerr << "Warning: Read operation size (" << unsigned(op.size_) << ") larger than "
@@ -1053,6 +1049,10 @@ Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
   uint64_t addr = op.physAddr_;
   bool skip = (hart.isAclintAddr(addr) or hart.isInterruptorAddr(addr, op.size_) or
 	       hart.isImsicAddr(addr) or hart.isPciAddr(addr));
+
+  // Major hack (temporary until RTL removes CLINT device).
+  skip = skip or (addr >= 0x2000000 and addr < 0xc000);
+
   if (skip)
     return true;
 
