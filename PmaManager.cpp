@@ -94,9 +94,6 @@ PmaManager::setMemMappedMask(uint64_t addr, uint64_t mask, unsigned size)
   if ((addr & (size - 1)) != 0)
     return false;   // Not aligned.
 
-  if (not isMemMappedReg(addr))
-    return false;
-
   memMappedRegs_[addr].mask_ = mask;
   memMappedRegs_[addr].size_ = size;
   return true;
