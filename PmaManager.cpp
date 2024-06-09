@@ -179,15 +179,12 @@ PmaManager::writeRegister(uint64_t addr, uint64_t value)
   return true;
 }
 
-
 bool
-PmaManager::checkRegisterWrite(uint64_t addr, unsigned size) const
+PmaManager::checkRegisterWrite(uint64_t addr, [[maybe_unused]] unsigned size) const
 {
-  auto iter = memMappedRegs_.find(addr);
-  if (iter == memMappedRegs_.end())
-    return false;
 
-  return iter->second.size_ == size;
+  auto iter = memMappedRegs_.find(addr);
+  return iter != memMappedRegs_.end();
 }
 
 

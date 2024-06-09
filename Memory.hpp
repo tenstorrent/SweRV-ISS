@@ -171,10 +171,8 @@ namespace WdRiscv
       // Memory mapped region accessible only with word-size read.
       if (pma1.hasMemMappedReg() and pmaMgr_.isMemMappedReg(address))
         {
-          if (readSize != 4 and readSize != 8)
-            return false;
           if ((address & (readSize-1)) != 0)
-            return false;
+            return false;  // Must be aligned.
         }
 
       return true;
