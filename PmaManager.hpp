@@ -36,7 +36,7 @@ namespace WdRiscv
        None = 0, Read = 1, Write = 2, Exec = 4, Idempotent = 8,
        AmoOther = 0x10,  // for amo add/min/max
        AmoSwap = 0x20, AmoLogical = 0x40,
-       Iccm = 0x80, Dccm = 0x100, MemMapped = 0x200, Rsrv = 0x400,
+       MemMapped = 0x200, Rsrv = 0x400,
        Io = 0x800, Cacheable = 0x1000,
        MisalOk = 0x2000, // True if misaligned access supported.
        MisalAccFault = 0x4000, // Set if misaligned generates access fault.
@@ -46,8 +46,7 @@ namespace WdRiscv
        Default = Read | Write | Exec | Idempotent | Amo | Rsrv | MisalOk
       };
 
-    /// Default constructor: No access allowed. No-dccm, no-iccm,
-    /// no-mmr, no-atomic.
+    /// Default constructor: No access allowed, no-mmr, no-atomic.
     Pma(Attrib a = None)
       : attrib_(a)
     { }
@@ -55,19 +54,10 @@ namespace WdRiscv
     /// Return true if associated address region is mapped (accessible
     /// for read, write, or execute).
     bool isMapped() const
-    { return attrib_ & (Mapped | MemMapped); }
+    { return attrib_ & Mapped; }
 
-    /// Return true if ICCM region (instruction closely coupled
-    /// memory).
-    bool isIccm() const
-    { return attrib_ & Iccm; }
-
-    /// Return true if DCCM region (data closely coupled memory).
-    bool isDccm() const
-    { return attrib_ & Dccm; }
-
-    /// Return true if memory-mapped-register region.
-    bool isMemMappedReg() const
+    /// Return true if region has memory mapped register(s).
+    bool hasMemMappedReg() const
     { return attrib_ & MemMapped; }
 
     /// Return true if idempotent region (non-IO region).
@@ -80,11 +70,11 @@ namespace WdRiscv
 
     /// Return true if readable (load instructions allowed) region.
     bool isRead() const
-    { return attrib_ & (Read | MemMapped); }
+    { return attrib_ & Read; }
 
     /// Return true if writeable (store instructions allowed) region.
     bool isWrite() const
-    { return attrib_ & (Write | MemMapped); }
+    { return attrib_ & Write; }
 
     /// Return true if executable (fetch allowed) region.
     bool isExec() const
@@ -147,10 +137,9 @@ namespace WdRiscv
     uint32_t attributesToInt()
     { return attrib_; }
 
-    /// Convert given string to a Pma object. Return true on success
-    /// return false if string does not contain a valid attribute names.
-    /// Valid names: none, read, write, execute, idempotent, amo, iccm,
-    /// dccm, mem_mapped, rsrv, io.
+    /// Convert given string to a Pma object. Return true on success return false if
+    /// string does not contain a valid attribute names.  Valid names: none, read, write,
+    /// execute, idempotent, amo, mem_mapped, rsrv, io.
     static bool stringToAttrib(std::string_view str, Attrib& attrib);
 
     static std::string attributesToString(uint32_t attrib);
@@ -287,14 +276,15 @@ namespace WdRiscv
     /// with given address.
     uint64_t getMemMappedMask(uint64_t addr) const;
 
-    /// Return true if the word-algined word containing given address
-    /// is in data closed coupled memory.
-    bool isAddrInDccm(size_t addr) const
-    { Pma pma = getPma(addr); return pma.isDccm(); }
-
-    /// Return true if given address is in memory-mapped register region.
-    bool isAddrMemMapped(size_t addr) const
-    { Pma pma = getPma(addr); return pma.isMemMappedReg(); }
+    /// Return true if given address is whitin a memory mapped register.
+    bool isMemMappedReg(size_t addr) const
+    {
+      addr = (addr >> 2) << 2;   // Make a multiple of 4.
+      if (memMappedRegs_.find(addr) != memMappedRegs_.end())
+	return true;
+      addr = (addr >> 3) << 3;   // Make a multiple of 8.
+      return memMappedRegs_.find(addr) != memMappedRegs_.end();
+    }
 
     /// Enable misaligned data access in default PMA.
     void enableMisalignedData(bool flag)

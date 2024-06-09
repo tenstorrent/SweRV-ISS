@@ -1210,7 +1210,7 @@ applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config)
 	    {
 	      if (not hart.definePmaRegion(ix, low, high, pma))
 		itemErrors++;
-	      else if (pma.isMemMappedReg())
+	      else if (pma.hasMemMappedReg())
 		{
 		  unsigned size = 4;
 		  tag = "register_size";

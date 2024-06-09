@@ -1514,8 +1514,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
   addr1 = gaddr1 = va1;
   addr2 = gaddr2 = va2;  // Phys addr of 2nd page when crossing page boundary.
 
-  // Misaligned load from io section triggers an exception. Crossing
-  // dccm to non-dccm causes an exception.
+  // Misaligned load from io section triggers an exception.
   uint64_t alignMask = ldSize - 1;
   bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;

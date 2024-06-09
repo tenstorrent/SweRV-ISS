@@ -107,7 +107,7 @@ namespace WdRiscv
         }
 
       // Memory mapped region accessible only with word-size read.
-      if (pma1.isMemMappedReg())
+      if (pma1.hasMemMappedReg() and pmaMgr_.isMemMappedReg(address))
 	return readRegister(address, value);
 
 #endif
@@ -126,7 +126,7 @@ namespace WdRiscv
 
     /// Read an unsigned integer ot type T from memory for instruction
     /// fetch. Return true on success and false if address is not
-    /// executable or if an iccm boundary is corssed.
+    /// executable.
     template <typename T>
     bool readInst(uint64_t address, T& value) const
     {
@@ -138,8 +138,8 @@ namespace WdRiscv
 	{
 	  // Misaligned address: Check next address.
 	  Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1, PmaManager::AccessReason::Fetch);
-	  if (not pma2.isExec() or pma.isIccm() != pma2.isIccm())
-	    return false;  // No exec or crossing ICCM boundary.
+	  if (not pma2.isExec())
+	    return false;  // No exec.
 	}
 
 #ifdef MEM_CALLBACKS
@@ -169,7 +169,7 @@ namespace WdRiscv
 	}
 
       // Memory mapped region accessible only with word-size read.
-      if (pma1.isMemMappedReg())
+      if (pma1.hasMemMappedReg() and pmaMgr_.isMemMappedReg(address))
         {
           if (readSize != 4 and readSize != 8)
             return false;
@@ -196,7 +196,7 @@ namespace WdRiscv
 	}
 
       // Memory mapped region accessible only with word-size write.
-      if (pma1.isMemMappedReg())
+      if (pma1.hasMemMappedReg() and pmaMgr_.isMemMappedReg(address))
 	return pmaMgr_.checkRegisterWrite(address, writeSize);
 
       return true;
@@ -240,7 +240,7 @@ namespace WdRiscv
 	}
 
       // Memory mapped region accessible only with word-size write.
-      if (pma1.isMemMappedReg())
+      if (pma1.hasMemMappedReg() and pmaMgr_.isMemMappedReg(address))
 	return writeRegister(sysHartIx, address, value);
 
   #ifdef MEM_CALLBACKS
@@ -318,7 +318,7 @@ namespace WdRiscv
 
       // Memory mapped region accessible only with word-size read.
       Pma pma1 = pmaMgr_.getPma(address);
-      if (pma1.isMemMappedReg())
+      if (pma1.hasMemMappedReg() and pmaMgr_.isMemMappedReg(address))
 	return readRegister(address, value);
 
       if (usePma)
@@ -535,7 +535,7 @@ namespace WdRiscv
         return false;
 
       Pma pma1 = pmaMgr_.getPma(address);
-      if (pma1.isMemMappedReg())
+      if (pma1.hasMemMappedReg() and pmaMgr_.isMemMappedReg(address))
         {
           if (sizeof(T) == 4)
 	    return pmaMgr_.pokeRegister(address, value);
@@ -590,11 +590,6 @@ namespace WdRiscv
       lwd.size_ = 0;
     }
 
-    /// Return true if CCM (iccm or dccm) configuration defined by
-    /// addr/size is valid. Return false otherwise. Tag parameter
-    /// ("iccm"/"dccm"/"pic") is used with error messages.
-    bool checkCcmConfig(const std::string& tag, uint64_t addr, uint64_t size) const;
-
     /// Reset (to zero) all memory mapped registers.
     void resetMemoryMappedRegisters();
 
@@ -633,13 +628,6 @@ namespace WdRiscv
       lwd.addr_ = addr;
       lwd.value_ = value;
       return true;
-    }
-
-    /// Return true if given data address is external to the core.
-    bool isDataAddressExternal(uint64_t addr) const
-    {
-      Pma pma = pmaMgr_.getPma(addr);
-      return not (pma.isDccm() or pma.isMemMappedReg());
     }
 
     /// Track LR instructin resrvations.

@@ -1445,11 +1445,6 @@ namespace WdRiscv
     void setTargetProgramFinished(bool flag)
     { targetProgFinished_ = flag; }
 
-    /// Make atomic memory operations illegal/legal outside of the DCCM
-    /// region based on the value of flag (true/false).
-    void setAmoInDccmOnly(bool flag)
-    { amoInDccmOnly_ = flag; }
-
     /// Make atomic memory operations illegal/legal for non cacheable
     /// memory based on the value of flag (true/false).
     void setAmoInCacheableOnly(bool flag)
@@ -2868,12 +2863,10 @@ namespace WdRiscv
     /// illegal instruction.
     void unimplemented(const DecodedInst*);
 
-    /// Check address associated with an atomic memory operation (AMO)
-    /// instruction. Return true if AMO access is allowed. Return
-    /// false triggering an exception if address is misaligned or if
-    /// it is out of DCCM range in DCCM-only mode. If successful, the
-    /// given virtual addr is replaced by the translated physical
-    /// address.
+    /// Check address associated with an atomic memory operation (AMO) instruction. Return
+    /// true if AMO access is allowed. Return false triggering an exception if address is
+    /// misaligned.  If successful, the given virtual addr is replaced by the translated
+    /// physical address.
     ExceptionCause validateAmoAddr(uint64_t& addr, uint64_t& gaddr, unsigned accessSize);
 
     /// Do the load value part of a word-sized AMO instruction. Return
@@ -5150,7 +5143,6 @@ namespace WdRiscv
     int gdbTcpPort_ = -1;           // Enable gdb mode.
     bool newlib_ = false;           // Enable newlib system calls.
     bool linux_ = false;            // Enable linux system calls.
-    bool amoInDccmOnly_ = false;
     bool amoInCacheableOnly_ = false;
 
     uint32_t perfControl_ = ~0;     // Performance counter control

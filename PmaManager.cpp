@@ -34,8 +34,6 @@ Pma::stringToAttrib(std::string_view str, Pma::Attrib& attrib)
     { "amoother", Pma::AmoOther },
     { "amoarithmetic", Pma::AmoArith },
     { "amo", Pma::AmoArith },
-    { "iccm", Pma::Iccm },
-    { "dccm", Pma::Dccm },
     { "mem_mapped", Pma::MemMapped },
     { "rsrv", Pma::Rsrv },
     { "io", Pma::Io },
@@ -69,8 +67,6 @@ Pma::attributesToString(uint32_t attrib)
   result += (attrib & Pma::AmoOther)? "amoother," : "";
   result += (attrib & Pma::AmoSwap)? "amoswap," : "";
   result += (attrib & Pma::AmoLogical)? "amological," : "";
-  result += (attrib & Pma::Iccm)? "iccm," : "";
-  result += (attrib & Pma::Dccm)? "dccm," : "";
   result += (attrib & Pma::MemMapped)? "memmapped," : "";
   result += (attrib & Pma::Rsrv)? "rsrv," : "";
   result += (attrib & Pma::Io)? "io," : "";
@@ -98,7 +94,7 @@ PmaManager::setMemMappedMask(uint64_t addr, uint64_t mask, unsigned size)
   if ((addr & (size - 1)) != 0)
     return false;   // Not aligned.
 
-  if (not isAddrMemMapped(addr))
+  if (not isMemMappedReg(addr))
     return false;
 
   memMappedRegs_[addr].mask_ = mask;

@@ -204,8 +204,7 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr1_ = addr2;
 
-  // Address outside DCCM causes an exception (this is swerv specific).
-  bool fail = amoInDccmOnly_ and not memory_.pmaMgr_.isAddrInDccm(addr1);
+  bool fail = false;
 
   // Access must be naturally aligned.
   if ((addr1 & (ldStSize_ - 1)) != 0)
@@ -325,7 +324,6 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   if (cause == EC::NONE)
     {
       bool fail = not memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt).isRsrv();
-      fail = fail or (amoInDccmOnly_ and not memory_.pmaMgr_.isAddrInDccm(addr1));
       fail = (fail or virtMem_.lastPbmt() == VirtMem::Pbmt::Nc or
 	      virtMem_.lastPbmt() == VirtMem::Pbmt::Io); // Non-cacheable pbmt.
       if (fail)

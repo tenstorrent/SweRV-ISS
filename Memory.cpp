@@ -1115,7 +1115,7 @@ Memory::initializeByte(uint64_t addr, uint8_t value)
   if (addr >= size_)
     return false;
 
-  if (pmaMgr_.isAddrMemMapped(addr))
+  if (pmaMgr_.isMemMappedReg(addr))
     {
       if (not pmaMgr_.pokeRegisterByte(addr, value))
         return false;
@@ -1130,42 +1130,6 @@ Memory::initializeByte(uint64_t addr, uint8_t value)
   return true;
 }
 
-
-bool
-Memory::checkCcmConfig(const std::string& tag, uint64_t addr, uint64_t size) const
-{
-  if (size < pageSize_)
-    {
-      std::cerr << "Invalid " << tag << " size (" << size << "). Expecting a\n"
-		<< "  multiple of page size (" << pageSize_ << ")\n";
-      return false;
-    }
-
-  // CCM area must be page aligned.
-  if ((addr % pageSize_) != 0)
-    {
-      std::cerr << "Invalid " << tag << " start address (0x" << std::hex << addr
-		<< "): not page (0x" << pageSize_ << ") aligned\n" << std::dec;
-      return false;
-    }
-
-  // CCM area must be aligned to the nearest power of 2 larger than or
-  // equal to its size.
-  size_t log2Size = static_cast<size_t>(std::bit_width(size) - 1);
-  size_t powerOf2 = size_t(1) << log2Size;
-  if (powerOf2 != size)
-    powerOf2 *= 2;
-
-  if ((addr % powerOf2) != 0)
-    {
-      std::cerr << "Invalid " << tag << " start address (" << addr
-		<< "): not aligned to size (" << powerOf2 << ")\n";
-      return false;
-    }
-
-  return true;
-}
-    
 
 void
 Memory::resetMemoryMappedRegisters()
