@@ -1811,6 +1811,10 @@ namespace WdRiscv
     bool definePmaRegion(unsigned ix, uint64_t low, uint64_t high, Pma pma)
     { return memory_.pmaMgr_.defineRegion(ix, low, high, pma); }
 
+    /// Return true if given address is within a memory mapped register.
+    bool isMemMappedReg(size_t addr) const
+    { return memory_.pmaMgr_.isMemMappedReg(addr); }
+
     /// Mark as invalid entry with the given index.
     void invalidatePmaEntry(unsigned ix)
     { memory_.pmaMgr_.invalidateEntry(ix); }
@@ -5207,9 +5211,6 @@ namespace WdRiscv
 
     // Indexed by exception cause.
     std::vector<uint64_t> exceptionStat_;
-
-    // Ith entry is true if ith region has pic
-    std::vector<bool> regionHasMemMappedRegs_;
 
     // Decoded instruction cache.
     std::vector<DecodedInst> decodeCache_;
