@@ -236,25 +236,13 @@ namespace WdRiscv
       return false;
     }
 
-    /// Define a physical memory attribute region at given index ix
-    /// (indices are 0 to n-1 where n is the region count). Regions
-    /// are checked in order order (if an address is covered by
-    /// multiple regions, then the first defined region applies). The
-    /// defined region consists of the word-aligned words with
-    /// addresses between fistAddr and lastAddr inclusive. For
-    /// example, if firstAddr is 5 and lastAddr is 13, then the
-    /// defined region consists of the words at 8 and 12 (bytes 8 to
-    /// 15).
-    bool defineRegion(unsigned ix, uint64_t firstAddr, uint64_t lastAddr, Pma pma)
-    {
-      Region region{firstAddr, lastAddr, pma, true};
-      if (ix >= 128)
-	return false;  // Arbitrary limit.
-      if (ix >= regions_.size())
-	regions_.resize(ix + 1);
-      regions_.at(ix) = region;
-      return true;
-    }
+    /// Define a physical memory attribute region at given index ix (indices are 0 to n-1
+    /// where n is the region count). Regions are checked in order order (if an address is
+    /// covered by multiple regions, then the first defined region applies). The defined
+    /// region consists of the word-aligned words with addresses between fistAddr and
+    /// lastAddr inclusive. For example, if firstAddr is 5 and lastAddr is 13, then the
+    /// defined region consists of the words at 8 and 12 (bytes 8 to 15).
+    bool defineRegion(unsigned ix, uint64_t firstAddr, uint64_t lastAddr, Pma pma);
 
     /// Mark entry at given index as invalid.
     void invalidateEntry(unsigned ix)
@@ -320,6 +308,9 @@ namespace WdRiscv
     /// Print current pma map.
     void printPmas(std::ostream& os) const;
 
+    // Mark region as having memory mapped registers if it overlapps such registers.
+    void updateMemMappedAttrib(unsigned ix);
+
   protected:
 
     /// Reset (to zero) all memory mapped registers.
@@ -367,6 +358,9 @@ namespace WdRiscv
 
     struct Region
     {
+      bool overlaps(uint64_t low, uint64_t high) const
+      { return not (high < firstAddr_ or low > lastAddr_); }
+
       uint64_t firstAddr_ = 0;
       uint64_t lastAddr_ = 0;
       Pma pma_;
@@ -400,6 +394,8 @@ namespace WdRiscv
 
     std::vector<Region> regions_;
     std::unordered_map<uint64_t, MemMappedReg> memMappedRegs_;
+    std::vector<std::pair<uint64_t, uint64_t>> memMappedRanges_;
+
     bool trace_ = false;  // Collect stats if true.
     mutable std::vector<PmaTrace> pmaTrace_;
 

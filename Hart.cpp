@@ -3278,9 +3278,15 @@ Hart<URV>::processPmaChange(CsrNumber csr)
   bool valid = false;
   unpackPmacfg(val, valid, low, high, pma);
   if (valid)
-    definePmaRegion(ix, low, high, pma);
-  else
-    invalidatePmaEntry(ix);
+    {
+      if (not definePmaRegion(ix, low, high, pma))
+	return false;
+      // Mark region as having memory mapped registers if it overlapps such registers.
+      memory_.pmaMgr_.updateMemMappedAttrib(ix);
+      return true;
+    }
+
+  invalidatePmaEntry(ix);
   return true;
 }
 

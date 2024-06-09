@@ -100,6 +100,28 @@ PmaManager::setMemMappedMask(uint64_t addr, uint64_t mask, unsigned size)
 }
 
 
+bool
+PmaManager::defineRegion(unsigned ix, uint64_t firstAddr, uint64_t lastAddr, Pma pma)
+{
+  Region region{firstAddr, lastAddr, pma, true};
+  if (ix >= 128)
+    return false;  // Arbitrary limit.
+
+  if (ix >= regions_.size())
+    regions_.resize(ix + 1);
+  regions_.at(ix) = region;
+
+  // If definition comes from config file, remember memory mapped address range.
+  if (pma.hasMemMappedReg())
+    {
+      if (ix >= memMappedRanges_.size())
+	memMappedRanges_.resize(ix + 1);
+      memMappedRanges_.at(ix) = std::make_pair(firstAddr, lastAddr);
+    }
+  return true;
+}
+
+
 uint64_t
 PmaManager::getMemMappedMask(uint64_t addr) const
 {
@@ -251,4 +273,15 @@ PmaManager::printPmas(std::ostream& os) const
       printRegion(os, region);
       os << '\n';
     }
+}
+
+
+void
+PmaManager::updateMemMappedAttrib(unsigned ix)
+{
+  auto& region = regions_.at(ix);
+
+  for (auto& range : memMappedRanges_)
+    if (region.overlaps(range.first, range.second))
+      region.pma_.enable(Pma::Attrib::MemMapped);
 }
