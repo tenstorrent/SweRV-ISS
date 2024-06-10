@@ -772,11 +772,19 @@ namespace WdRiscv
     /// Undefine address to which a write will stop the simulator
     void clearToHostAddress();
 
-    /// Set address to the special address writing to which stops the
-    /// simulation. Return true on success and false on failure (no
-    /// such address defined).
+    /// Set address to the special address writing to which stops the simulation. Return
+    /// true on success and false on failure (no such address defined).
     bool getToHostAddress(uint64_t& address) const
     { if (toHostValid_) address = toHost_; return toHostValid_; }
+
+    /// Set address to the special address writing to which stops the simulation. Return
+    /// true on success and false on failure (no such address defined).
+    bool getFromHostAddress(uint64_t& address) const
+    { if (fromHostValid_) address = toHost_; return fromHostValid_; }
+
+    /// Return true if given address is an HTIF address.
+    bool isHtifAddr(uint64_t a) const
+    { return (toHostValid_ and a == toHost_) or (fromHostValid_ and a == fromHost_); }
 
     /// Program counter.
     URV pc() const
