@@ -133,6 +133,8 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
     }
 
   uint64_t virtAddr = intRegs_.read(di->op0());
+  uint64_t mask = uint64_t(cacheLineSize_) - 1;
+  virtAddr = virtAddr & ~mask;  // Make address cache line aligned.
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
@@ -191,6 +193,8 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
     }
 
   uint64_t virtAddr = intRegs_.read(di->op0());
+  uint64_t mask = uint64_t(cacheLineSize_) - 1;
+  virtAddr = virtAddr & ~mask;  // Make address cache line aligned.
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
@@ -270,6 +274,8 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
   bool isZero = false;
 
   uint64_t virtAddr = intRegs_.read(di->op0());
+  uint64_t mask = uint64_t(cacheLineSize_) - 1;
+  virtAddr = virtAddr & ~mask;  // Make address cache line aligned.
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
@@ -332,6 +338,8 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   uint64_t virtAddr = intRegs_.read(di->op0());
   uint64_t mask = uint64_t(cacheLineSize_) - 1;
   virtAddr = virtAddr & ~mask;  // Make address cache line aligned.
+  uint64_t gPhysAddr = virtAddr;
+  uint64_t physAddr = virtAddr;
 
 #ifndef FAST_SLOPPY
   if (hasActiveTrigger())
@@ -343,8 +351,6 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
     }
 #endif
 
-  uint64_t gPhysAddr = virtAddr;
-  uint64_t physAddr = virtAddr;
   ldStAddr_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
