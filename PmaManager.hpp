@@ -329,10 +329,28 @@ namespace WdRiscv
     /// register.  This interface is for double-word sized registers.
     bool readRegister(uint64_t addr, uint64_t& value) const;
 
-    /// Interface for reading a register of an invalid (not word and
-    /// not double-word) size.
-    bool readRegister(uint64_t, auto&) const
-    { return false; }
+    /// Interface for reading a memory-mapped register where the size is neither 4 nor 8.
+    /// Fail if address is not word/double-word aligned. Fail if no such register.
+    bool readRegister(uint64_t addr, auto& value) const
+    {
+      // Try reading a double-word register.
+      uint64_t u64 = 0;
+      if (readRegister(addr, u64))
+	{
+	  value = u64;
+	  return true;
+	}
+
+      // Try a word register.
+      uint32_t u32 = 0;
+      if (readRegister(addr, u32))
+	{
+	  value = u32;
+	  return true;
+	}
+
+      return false;
+    }
 
     /// Set the value of the memory mapped regiser at addr to the
     /// given value returning true if addr is valid. Return false if

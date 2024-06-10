@@ -139,13 +139,9 @@ PmaManager::readRegister(uint64_t addr, uint32_t& value) const
     return false;  // Not word aligned.
 
   auto iter = memMappedRegs_.find(addr);
-  if (iter == memMappedRegs_.end())
-    return false;
+  if (iter != memMappedRegs_.end())
+    value = iter->second.value_;
 
-  if (iter->second.size_ != 4)
-    return false;
-
-  value = iter->second.value_;
   return true;
 }
 
