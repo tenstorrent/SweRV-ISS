@@ -505,6 +505,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 	}
     }
 
+  hart.setTargetProgramFinished(false);
   hart.pokePc(prevPc);
   hart.setInstructionCount(prevInstrCount);
 
