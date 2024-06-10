@@ -124,7 +124,7 @@ namespace WdRiscv
       return true;
     }
 
-    /// Read an unsigned integer ot type T from memory for instruction
+    /// Read an unsigned integer of type T from memory for instruction
     /// fetch. Return true on success and false if address is not
     /// executable.
     template <typename T>

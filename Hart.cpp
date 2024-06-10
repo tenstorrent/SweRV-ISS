@@ -885,8 +885,10 @@ template <typename URV>
 bool
 Hart<URV>::peekMemory(uint64_t address, uint64_t& val, bool usePma) const
 {
-  uint32_t high = 0, low = 0;
+  if (memory_.peek(address, val, usePma))
+    return true;
 
+  uint32_t high = 0, low = 0;
   if (memory_.peek(address, low, usePma) and memory_.peek(address + 4, high, usePma))
     {
       val = (uint64_t(high) << 32) | low;
