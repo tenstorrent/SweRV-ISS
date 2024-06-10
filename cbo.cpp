@@ -135,6 +135,17 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
   uint64_t virtAddr = intRegs_.read(di->op0());
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
+
+#ifndef FAST_SLOPPY
+  if (hasActiveTrigger())
+    {
+      if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
+        triggerTripped_ = true;
+      if (triggerTripped_)
+        return;
+    }
+#endif
+
   bool isZero = false;
   ldStAddr_ = virtAddr;
   ldStSize_ = cacheLineSize_;
@@ -182,6 +193,17 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
   uint64_t virtAddr = intRegs_.read(di->op0());
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
+
+#ifndef FAST_SLOPPY
+  if (hasActiveTrigger())
+    {
+      if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
+        triggerTripped_ = true;
+      if (triggerTripped_)
+        return;
+    }
+#endif
+
   bool isZero = false;
   ldStAddr_ = virtAddr;
   ldStSize_ = cacheLineSize_;
@@ -250,6 +272,17 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
   uint64_t virtAddr = intRegs_.read(di->op0());
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
+
+#ifndef FAST_SLOPPY
+  if (hasActiveTrigger())
+    {
+      if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
+        triggerTripped_ = true;
+      if (triggerTripped_)
+        return;
+    }
+#endif
+
   ldStAddr_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
@@ -299,6 +332,16 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   uint64_t virtAddr = intRegs_.read(di->op0());
   uint64_t mask = uint64_t(cacheLineSize_) - 1;
   virtAddr = virtAddr & ~mask;  // Make address cache line aligned.
+
+#ifndef FAST_SLOPPY
+  if (hasActiveTrigger())
+    {
+      if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
+        triggerTripped_ = true;
+      if (triggerTripped_)
+        return;
+    }
+#endif
 
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
