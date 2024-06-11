@@ -1054,6 +1054,9 @@ Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
   // Major hack (temporary until RTL removes CLINT device).
   skip = skip or (addr >= 0x2000000 and addr < 0x200c000);
 
+  // Major hack (temporary until RTL HTIF addresses are rationalized).
+  skip = skip or (addr >= 0x70000000 and addr < 0x70000008);
+
   if (skip)
     return true;
 
