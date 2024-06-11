@@ -2306,7 +2306,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 		if (f6 == 0b101100) return instTable_.getEntry(InstId::vqdot_vx);
 		if (f6 == 0b101000) return instTable_.getEntry(InstId::vqdotu_vx);
 		if (f6 == 0b101010) return instTable_.getEntry(InstId::vqdotsu_vx);
-		if (f6 == 0b101110) return instTable_.getEntry(InstId::vqdotsu_vx);
+		if (f6 == 0b101110) return instTable_.getEntry(InstId::vqdotus_vx);
 	      }
 
 	    return illegal;
