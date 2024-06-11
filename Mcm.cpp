@@ -1634,8 +1634,8 @@ Mcm<URV>::storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& 
       if ((byteMask & mask) == 0)
 	continue;  // Byte forwarded by another instruction.
 
-      // Check if read-op byte overlaps departed write-op of instruction
-      bool departed = false;
+      // Check if read-op byte overlaps drained write-op of instruction
+      bool drained = false;
       for (const auto wopIx : store.memOps_)
 	{
 	  if (wopIx >= sysMemOps_.size())
@@ -1646,17 +1646,19 @@ Mcm<URV>::storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& 
 	  if (byteAddr < wop.physAddr_ or byteAddr >= wop.physAddr_ + wop.size_)
 	    continue;  // Write op does overlap read.
 	  if (wop.time_ < readOp.time_)
-	    departed = true; // Write op cannot forward.
+	    drained = true; // Write op cannot forward.
 	}
-      if (departed)
-	continue;
       
       uint8_t byteVal = data >> (byteAddr - il)*8;
       uint64_t aligned = uint64_t(byteVal) << 8*rix;
 	
-      readOp.data_ = (readOp.data_ & ~byteMask) | aligned;
+      if (not drained)
+	{
+	  readOp.data_ = (readOp.data_ & ~byteMask) | aligned;
+	  count++;
+	}
+
       mask = mask & ~byteMask;
-      count++;
       if (mask == 0)
 	break;
     }
@@ -1717,8 +1719,12 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, MemoryOp& readOp)
 	  unsigned size2 = store.size_ - size1;
 	  assert(size2 > 0 and size2 < 8);
 	  uint64_t data2 = store.storeData_ >> size1 * 8;
-	  storeToReadForward(store, readOp, mask, store.physAddr2_, data2, size2);
+	  if (not storeToReadForward(store, readOp, mask, store.physAddr2_, data2, size2))
+	    continue;
 	}
+
+      if (store.complete_)
+	continue;
 
       if (readOp.forwardTime_ == 0)
 	readOp.forwardTime_ = earliestOpTime(store);
