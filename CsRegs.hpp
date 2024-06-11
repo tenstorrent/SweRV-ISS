@@ -446,9 +446,7 @@ namespace WdRiscv
 
       // Tenstorrent Ascalon CSRs
       PMACFG0  = 0x7e0,   // Physical memory protection
-      PMACFG31 = 0x7ff,
-      PMACFG32 = 0xbe0,
-      PMACFG63 = 0xbff,
+      PMACFG15 = 0x7ef,
       C_MATP   = 0x7c7,   // Machine address translation and protection
 
       MAX_CSR_ = 0xfff,

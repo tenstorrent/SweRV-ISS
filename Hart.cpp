@@ -673,13 +673,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   // If any PMACFG CSR is defined, change the default PMA to no access.
   bool hasPmacfg = false;
   using CN = CsrNumber;
-  for (unsigned ix = unsigned(CN::PMACFG0); ix <= unsigned(CN::PMACFG31); ++ix)
-    if (csRegs_.getImplementedCsr(CN(ix)))
-      {
-	hasPmacfg = true;
-	processPmaChange(CN(ix));
-      }
-  for (unsigned ix = unsigned(CN::PMACFG32); ix <= unsigned(CN::PMACFG63); ++ix)
+  for (unsigned ix = unsigned(CN::PMACFG0); ix <= unsigned(CN::PMACFG15); ++ix)
     if (csRegs_.getImplementedCsr(CN(ix)))
       {
 	hasPmacfg = true;
@@ -3264,10 +3258,8 @@ Hart<URV>::processPmaChange(CsrNumber csr)
   using CN = CsrNumber;
 
   unsigned ix = unsigned(csr);
-  if (ix >= unsigned(CN::PMACFG0) and ix <= unsigned(CN::PMACFG31))
+  if (ix >= unsigned(CN::PMACFG0) and ix <= unsigned(CN::PMACFG15))
     ix -= unsigned(CN::PMACFG0);
-  else  if (ix >= unsigned(CN::PMACFG32) and ix <= unsigned(CN::PMACFG63))
-    ix = 32 + ix - unsigned(CN::PMACFG32);
   else
     return false;
 
@@ -3332,8 +3324,7 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       return;
     }
 
-  if ((csr >= CN::PMACFG0 and csr <= CN::PMACFG31) or
-      (csr >= CN::PMACFG32 and csr <= CN::PMACFG63))
+  if (csr >= CN::PMACFG0 and csr <= CN::PMACFG15)
     {
       if (not processPmaChange(csr))
 	assert(0);

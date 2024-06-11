@@ -1942,8 +1942,7 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
       peek(num, prev);
       value = legalizePmpcfgValue(prev, value);
     }
-  else if ((num >= CN::PMACFG0 and num <= CN::PMACFG31) or
-	   (num >= CN::PMACFG32 and num <= CN::PMACFG63))
+  else if (num >= CN::PMACFG0 and num <= CN::PMACFG15)
     {
       URV prev = 0;
       peek(num, prev);
@@ -3340,12 +3339,10 @@ CsRegs<URV>::definePmaRegs()
   uint64_t reset = 0x7, mask = 0xfc0ffffffffff1ff;
   uint64_t pokeMask = ~(uint64_t(0x3f) << 52);   // Bits 52 to 57 are read only zero
 
-  for (unsigned i = 0; i < 64; ++i)
+  for (unsigned i = 0; i < 16; ++i)
     {
       std::string name = std::string("pmacfg") + std::to_string(i);
       CN num = advance(CN::PMACFG0, i);
-      if (i >= 32)
-	num = advance(CN::PMACFG32, i - 32);
       defineCsr(name, num, !mand, !imp, reset, mask, pokeMask);
     }
 }
@@ -3495,8 +3492,7 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
       peek(num, prev);
       value = legalizePmpcfgValue(prev, value);
     }
-  else if ((num >= CN::PMACFG0 and num <= CN::PMACFG31) or
-	   (num >= CN::PMACFG32 and num <= CN::PMACFG63))
+  else if (num >= CN::PMACFG0 and num <= CN::PMACFG15)
     {
       URV prev = 0;
       peek(num, prev);
@@ -4301,13 +4297,10 @@ CsRegs<URV>::addMachineFields()
         setCsrFields(csrNum, {{"addr", 54}, {"zero", 10}});
     }
 
-  for (unsigned i = 0; i < 64; ++i)
+  for (unsigned i = 0; i < 16; ++i)
     {
       CsrNumber csrNum;
-      if (i < 32)
-        csrNum = advance(CsrNumber::PMACFG0, i);
-      else
-        csrNum = advance(CsrNumber::PMACFG32, i-32);
+      csrNum = advance(CsrNumber::PMACFG0, i);
       setCsrFields(csrNum,
       {{"permission",         3},     {"memtype",   2}, {"amotype", 2},
        {"cache_or_combining", 1},     {"coherency", 1}, {"res1",    3},
