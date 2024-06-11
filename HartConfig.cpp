@@ -985,6 +985,16 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         hart.configVectorLegalizeVsetvliAvl(flag);
     }
 
+  tag = "legalize_for_egs";
+  if (vconf.contains(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, vconf.at(tag), flag))
+        errors++;
+      else
+        hart.configVectorLegalizeForEgs(flag);
+    }
+
   return errors == 0;
 }
 

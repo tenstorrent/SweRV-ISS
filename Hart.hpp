@@ -2071,6 +2071,12 @@ namespace WdRiscv
     void configVectorLegalizeVsetvliAvl(bool flag)
     { vecRegs_.configVectorLegalizeVsetvliAvl(flag); }
 
+    /// If flag is true, make VL/VSTART value a multiple of EGS in vector-crypto
+    /// instructions that have EGS. Otherwise, trigger an exceptio if VL/VSTART is not a
+    /// mulitple of EGS for such instrucions.
+    void configVectorLegalizeForEgs(bool flag)
+    { vecRegs_.configLegalizeForEgs(flag); }
+
     /// Support memory consistency model (MCM) instruction cache. Read 2 bytes from the
     /// given address (must be even) into inst. Return true on success.  Return false if
     /// the line of the given address is not in the cache.
