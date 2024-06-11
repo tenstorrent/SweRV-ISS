@@ -165,8 +165,9 @@ Hart<URV>::hyperLoad(const DecodedInst* di)
   virtMem_.setVsSum(vsstatus_.bits_.SUM);
 
   if constexpr (isRv64())
-    virtMem_.enablePointerMasking(VirtMem::Pmm(hstatus_.bits_.HUPMM),
-                                      PrivilegeMode::User, true);
+    if (privMode_ == PrivilegeMode::User and not virtMode_)
+      virtMem_.enablePointerMasking(VirtMem::Pmm(hstatus_.bits_.HUPMM),
+                                        PrivilegeMode::User, true);
   hyperLs_ = true;
 
   URV virtAddr = intRegs_.read(di->op1());
@@ -180,7 +181,8 @@ Hart<URV>::hyperLoad(const DecodedInst* di)
   virtMem_.setVsSum(prevVsSum);
 
   if constexpr (isRv64())
-    virtMem_.enablePointerMasking(prevPmm, PrivilegeMode::User, true);
+    if (privMode_ == PrivilegeMode::User and not virtMode_)
+      virtMem_.enablePointerMasking(prevPmm, PrivilegeMode::User, true);
 }
 
 
@@ -293,7 +295,8 @@ Hart<URV>::hyperStore(const DecodedInst* di)
   virtMem_.setVsSum(vsstatus_.bits_.SUM);
 
   if constexpr (isRv64())
-    virtMem_.enablePointerMasking(VirtMem::Pmm(hstatus_.bits_.HUPMM),
+    if (privMode_ == PrivilegeMode::User and not virtMode_)
+      virtMem_.enablePointerMasking(VirtMem::Pmm(hstatus_.bits_.HUPMM),
                                   PrivilegeMode::User, true);
   hyperLs_ = true;
 
@@ -308,7 +311,8 @@ Hart<URV>::hyperStore(const DecodedInst* di)
   virtMem_.setVsSum(prevVsSum);
 
   if constexpr (isRv64())
-    virtMem_.enablePointerMasking(prevPmm, PrivilegeMode::User, true);
+    if (privMode_ == PrivilegeMode::User and not virtMode_)
+      virtMem_.enablePointerMasking(prevPmm, PrivilegeMode::User, true);
 }
 
 
