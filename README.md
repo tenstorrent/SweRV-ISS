@@ -53,7 +53,7 @@ simulator. In particular you would need:
 
 2. The RISCV tool-chain which contains a cross-compiler to compile
    C/C++ code to RISCV binary. This can be installed on most Linux
-   distributions using your distros pacakge manager (apt, dnf, pacman
+   distributions using your distros package manager (apt, dnf, pacman
    etc.). Otherwise it can be built from the upstream source code.
 
    Ubuntu
@@ -227,7 +227,7 @@ The following is a brief description of the command line options:
        a (atomic), c (compressed instructions), d (double precision fp),
        f (single precision fp), i (base integer), m (multiply divide),
        s (supervisor mode), u (user mode), and v). By default, only i, m and
-       c are enabled. Canonical ISA strings with versioned ectension are supported.
+       c are enabled. Canonical ISA strings with versioned extension are supported.
        Examples: --isa imacf, --isa rv32i2p0_m2p0_f2p0_v1p0_zfh0p1
 
     --target program
@@ -382,7 +382,7 @@ Here's the output of the "help" command:
     peek <res> <addr>
       Print value of resource res (one of r, f, c, v, m) and address addr.
       For memory (m) up to 2 addresses may be provided to define a range
-      of memory locations to be printed; also, an optional filename after
+      of memory locations to be printed; also, an optional file name after
       the two addresses writes the command output to that file.
       examples: peek r x1   peek c mtval   peek m 0x4096
                 peek m 0x10 0x40 out
@@ -526,10 +526,10 @@ or
   "cores" : "4"
 ```
 If expressed as a string, a numeric value may be prefixed with 0x to
-specify headecimal notation (JSON does not support hexadecimal notation
+specify hexadecimal notation (JSON does not support hexadecimal notation
 for integers).
 
-The value of a boolean parameters may be specified as an integer with 0
+The value of a Boolean parameters may be specified as an integer with 0
 indicating false and non-zero indicating true. Alternatively it may
 be specified using the strings "false", "False", "true", or "True".
 
@@ -583,7 +583,7 @@ Example:
 ```
 
 ### memmap
-Object defining memory organization. Fields of memap:
+Object defining memory organization. Fields of memmap:
 * size: Field defining physical memory size
 * page_size: Field defining page size
 * pma: Array of entries defining physical memory attributes.
@@ -615,8 +615,8 @@ mhpmevent CSRs.
 ###  enable_performance_counters
 Whisper will count events associated with performance counters when
 this is set to true. Note that pipeline specific events (such as
-mispredicted branches) are not supported. Synchronous events (such as
-count retired load insructions) are supported.
+mis-predicted branches) are not supported. Synchronous events (such as
+count retired load instructions) are supported.
 
 ###  abi_names
 If set to true then registers are identified by their ABI names in the
@@ -629,11 +629,11 @@ If set to true then page table walk information is emitted to the log file.
 Defines the size of a lr.w/lr.d reservation (default is 4 for RV32 and 8 for RV64).
 
 ###  enable_misaligned_data
-If set to false then a misaligend data access by a load/store
+If set to false then a misaligned data access by a load/store
 instructions will trigger an exception.
 
 ###  misaligned_has_priority
-When true, makes misalgined data exceptions have priority over page and access
+When true, makes misaligned data exceptions have priority over page and access
 fault exceptions. Default is true.
 
 ###  page_fault_on_first_access
@@ -641,7 +641,7 @@ When true, makes first access to a page table entry trigger a page fault.
 Default is true.
 
 ###  tlb_entries
-Defines the number of translation lookaside buffer entries. Default is 32.
+Defines the number of translation look-aside buffer entries. Default is 32.
 
 ### clear_mprv_on_ret
 When true (default), makes the mret/sret instruction clear the mprv bit in
@@ -661,7 +661,7 @@ this address is not an all ones bit pattern. Default: all ones bit pattern.
 
 ### debug_trap_address
 Defines the address of the debug mode exception handler.  Whisper will
-jump to this address upon ecountering an exception in debug mode if
+jump to this address upon encountering an exception in debug mode if
 this address is not an all ones bit pattern. Default: all ones bit
 pattern.
 
@@ -676,11 +676,11 @@ Default is zero.
 
 
 ###  csr
-The CSR configuration is a map wher each key is a CSR name and the
+The CSR configuration is a map where each key is a CSR name and the
 corresponding value is an object with the following fields: "number",
 "reset", "mask", "poke_mask", "exists", and "shared". Set "exists" to
 "false" to mark a non implemented CSR (read/write instructions to such a
-CSR will trigger illegal instruciton exception). Set "mask" to the
+CSR will trigger illegal instruction exception). Set "mask" to the
 write mask of the CSR (zero bits correspond to bits that will be
 preserved by write instructions). Set "reset" to reset value of the
 CSR. Set "shared" to "true" for CSRs that are shared between harts. The
@@ -689,7 +689,7 @@ non-standard CSR. The poke_mask should be used for the rare cases
 where poke operation may modify some bits that are not modifiable by
 CSR write instructions.
 
-For CSRs with sahred base name and different integer suffixes
+For CSRs with shared base name and different integer suffixes
 (e.g. pmpaddr0, pmpaddr1, ...), the configurations may be defined
 for each CSR or a common configuration may be defined
 with a range attribute. Example:
@@ -703,14 +703,14 @@ with a range attribute. Example:
 ###  vector
 The vector configuration is an object with the following fields:
 * bytes_per_vec: vector size in bytes.
-* min_bytes_per_elem: narrowest suppoted element size in bytes (default 1).
+* min_bytes_per_elem: narrowest supported element size in bytes (default 1).
 * max_bytes_per_elem: widest supported element size in bytes (no default).
 * min_bytes_per_lmul: map of lmul to min-element-width-in bytes (default: no min).
 * min_bytes_per_lmul: map of lmul to max-element-width-in bytes (default: no max).
 * mask_agnostic_policy: "ones" or "undisturb" to set behavior of mask-anostic instructions, default is "ones".
 * tail_agnostic_policy: "ones" or "undisturb" to set behavior of tail-anostic instructions, default is "ones".
 * trap_non_zero_vstart: causes vector instruction to trap on non-zero vstart, default is true.
-* update_whole_mask: when true, compute all the elements of the desitnation mask register for mask-logical and mask-manipulation instructions regardless of VL.
+* update_whole_mask: when true, compute all the elements of the destination mask register for mask-logical and mask-manipulation instructions regardless of VL.
 * trap_invalid_vtype: when true, trap on invalid/unsupported vtype configurations, when false set vtype.vill instead.
 * legalize_vsetvl_avl: when true, legalize VL to VLMAX if it would be greater than VLMAX after a vsetvl instruction.
 * legalize_vsetvli_avl: when true, legalize VL to VLMAX if it would be greater than VLMAX after a vsetvli instruction.
@@ -729,7 +729,7 @@ Example:
 ```
 
 ###  aclint
-The advanced core local interruptor (aclint) configuration is an object with the following fields:
+The advanced core local interrup controller (aclint) configuration is an object with the following fields:
 * base: base address of the memory area associated with the ACLINT.
 * sw_offset: offset to software interrupt region within the ACLINT area).
 * timer_offset: offset to timer within the ACLINT area.
@@ -793,8 +793,8 @@ as load/store by the performance counters.
 When run in server or interactive modes, Whisper will check the RISCV
 weak memory ordering rules also known as preserved program order (PPO)
 rules. This feature is enabled by setting the
-"enable_memory_consitency" to "true" in the configuration file or by
-using "--mcm" on the command line. Detailed inforation about the PPO
+"enable_memory_consistency" to "true" in the configuration file or by
+using "--mcm" on the command line. Detailed information about the PPO
 rules can be found in chapter 17 of the the [RISCV unprivileged specs.](https://github.com/riscv/riscv-isa-manual/releases/download/draft-20221206-b7080e0/riscv-spec.pdf)
 
 By default, we check the ordering rules of the weak memory ordering
@@ -844,9 +844,9 @@ order (ppo) rules of RISCV.
 C++ code coverage for Whisper can be configured and collected on Linux with minimal effort using [gcov](https://gcc.gnu.org/onlinedocs/gcc/Gcov-Intro.html) and [lcov](https://github.com/linux-test-project/lcov).
 
 To enable and collect C++ code coverage:
-1. Pass the `--coverage` flag to the compiler and linker.  Note: coverage should be enabled with optimizations disabled to get the most accurate line information.
+1. Pass the `--coverage` flag to the compiler and linker.  Note: coverage should be enabled with optimization disabled to get the most accurate line information.
     - When compiling using the Makefile, invoke `make` with `OFLAGS="-g -O0 --coverage"`.  If done successfully, a .gcno file should exist in the build folder beside the .d and .o file for each source file included in the build.
-    - When compile using bazel, invoke `bazel build` with `--compilation_mode dbg --collect_code_coverage --instrumentation_filter=rvcore,whisper`.  If done successfully, a .gcno file should exist in the bazel-bin/_objs folder (or subfolder for the target) beside the .d and .o file for each source file included in the build.
+    - When compile using bazel, invoke `bazel build` with `--compilation_mode dbg --collect_code_coverage --instrumentation_filter=rvcore,whisper`.  If done successfully, a .gcno file should exist in the bazel-bin/_objs folder (or sub-folder for the target) beside the .d and .o file for each source file included in the build.
 2. Run a test or set of tests that invokes the whisper executable created in step 1.  Coverage information will be aggregated across invocations into a .gcda file for each source file in the build.  These .gcda files should be created beside the .gcno file but may be put in a different place depending on the working directory.  Running tests from the repository root should prevent this issue, but some testing tools (e.g. riscof) run tests in their own working directory.  The output directory of these .gcda files can be controlled using the `GCOV_PREFIX` and `GCOV_PREFIX_STRIP` environment variables, so set these values if necessary so that the .gcda file is created next to the .gcno file (for example, running riscof with a local bazel build likely requires `GCOV_PREFIX=[Whisper repo root absolute path]` and `GCOV_PREFIX_STRIP=3`).
 3. Use `lcov` to aggregate the coverage information from the .gcda files into a single coverage report.  Invoke `lcov` with `--output-file [report name; for example, _coverage_report.dat] --directory [path to directory containing .gcno and .gcda files] --base-directory [Whisper repo root absolute path] --capture --no-external`.  If done correctly, a file with the name passed to `lcov` in the `--output-file` parameter will be created and should not be empty.
 4. (optional) Generate an html report using `genhtml`.  `genhtml` should be invoked using `-o [collateral output directory] [coverage report file from step 3]`.  The index.html page in the output directory can then be opened using a web browser.
@@ -907,9 +907,9 @@ Whisper includes the functionality necessary to run these tests and a plugin use
 5. (Optional) set the `jobs` field in the `whisper` and \<Ref> sections to a number larger than 1 to allow running tests in parallel.
 6. Update sail_cSim/riscof_sail_cSim.py and/or spike/riscof_spike.py as necessary based on desired usage.  Some modifications may include:
    - Replace the dynamic switching of 32 vs 64 based on ISA when running gcc and objdump to just 64 if your toolchain is compiled for multilib.
-   - Disable logging to file and creating disassembly files.  Some tests (particularly some floating point tests) are very large, so generating disassembly and log files for these tests is very time consuming and can consume large amounts of space.  These files are unused for scoring, so they can safely be disabled if just scoring tests.
+   - Disable logging to file and creating dis-assembly files.  Some tests (particularly some floating point tests) are very large, so generating dis-assembly and log files for these tests is very time consuming and can consume large amounts of space.  These files are unused for scoring, so they can safely be disabled if just scoring tests.
    - Ensure extensions for all desired tests are included in the architecture string passed to the compile command and/or executable invocations.
 7. Build Whisper and the reference model simulator.  See the Sail or Spike documentation on how to do so.
 8. Ensure the paths to the RISC-V toolchain (i.e. gcc and objdump), the reference model executable, and whisper executable are in the `PATH` environment variable.  All need to be able to be invoked without a path.
-9. Run the desired test suite using `riscof run`.  The `--suite` parameter should be provided with the riscv-arch-test/riscv-test-suite directory (or a subdirectory) from the clone from step 2 above, and the `--env` folder should be provided with the riscv-arch-test/riscv-test-suite/env folder.
+9. Run the desired test suite using `riscof run`.  The `--suite` parameter should be provided with the riscv-arch-test/riscv-test-suite directory (or a sub-directory) from the clone from step 2 above, and the `--env` folder should be provided with the riscv-arch-test/riscv-test-suite/env folder.
    - By default, the run command will produce an HTML report containing information about which tests passed and failed and will attempt to open this report in the browser once all tests have completed.  If this behavior is undesirable (e.g. running on a headless node or as part of CI), provide the `--no-browser` argument.
