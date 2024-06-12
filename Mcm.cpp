@@ -1926,7 +1926,7 @@ Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
       for (unsigned i = 0; i < instrB.size_ and ok; ++i)
 	{
 	  uint64_t byteAddr = instrB.physAddr_ + i;
-	  if (instrOverlapsPhysAddr(instrA, byteAddr))
+	  if (overlapsPhysAddr(instrA, byteAddr))
 	    {
 	      uint64_t ta = latestByteTime(instrA, byteAddr);
 	      uint64_t tb = earliestByteTime(instrB, byteAddr);
@@ -1941,7 +1941,7 @@ Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
       for (unsigned i = 0; i < size1 and ok; ++i)
 	{
 	  uint64_t byteAddr = instrB.physAddr_ + i;
-	  if (instrOverlapsPhysAddr(instrA, byteAddr))
+	  if (overlapsPhysAddr(instrA, byteAddr))
 	    {
 	      uint64_t ta = latestByteTime(instrA, byteAddr);
 	      uint64_t tb = earliestByteTime(instrB, byteAddr);
@@ -1951,7 +1951,7 @@ Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
       for (unsigned i = 0; i < size2 and ok; ++i)
 	{
 	  uint64_t byteAddr = instrB.physAddr2_ + i;
-	  if (instrOverlapsPhysAddr(instrA, byteAddr))
+	  if (overlapsPhysAddr(instrA, byteAddr))
 	    {
 	      uint64_t ta = latestByteTime(instrA, byteAddr);
 	      uint64_t tb = earliestByteTime(instrB, byteAddr);
@@ -2082,7 +2082,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	    {
 	      uint64_t addr = remoteOp.physAddr_ + byteIx;
 
-	      if (not overlapsAddr(instrA, addr) or not overlapsAddr(instrB, addr))
+	      if (not overlapsPhysAddr(instrA, addr) or not overlapsPhysAddr(instrB, addr))
 		continue;
 
 	      unsigned byteMask = 1 << (addr - instrB.physAddr_);  // Non page crossing
