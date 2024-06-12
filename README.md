@@ -782,6 +782,18 @@ with 2 trigger registers (the mask and reset values are made up):
      ],
 ```
 
+### load_data_trigger
+Enable support for load-data debug triggers.
+
+### exec_opcode_trigger
+Enable support for instruction opcode debug triggers.
+
+### all_ld_st_addr_trigger
+Enable matching on all possible addresses in a load/store access [address, address+size-1].
+
+### all_inst_addr_trigger
+Enable matching on all possible addresses in a instruction fetch access [address, address+size-1].
+
 ### perf_count_fp_load_store
 When true, the floating point load/store instructions will be counted
 as load/store by the performance counters.

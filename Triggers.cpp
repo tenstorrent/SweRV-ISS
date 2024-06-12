@@ -718,10 +718,7 @@ Trigger<URV>::matchLdStAddr(URV address, unsigned size, TriggerTiming timing, bo
 	  switch (data1_.mcontrol6_.size_)
 	    {
 	    case 0:   // Match any access size
-	      for (unsigned i = 0; i < size; ++i)
-		if (doMatch(address + i))
-		  return true;
-	      return false;
+              break;
 
 	    case 1:  // Byte access
 	      if (size != 1)
@@ -753,7 +750,15 @@ Trigger<URV>::matchLdStAddr(URV address, unsigned size, TriggerTiming timing, bo
 	    }
 	}
 
-      return doMatch(address);
+      if (not matchAllLdStAddr_)
+        return doMatch(address);
+      else
+        {
+          for (unsigned i = 0; i < size; ++i)
+            if (doMatch(address + i))
+              return true;
+          return false;
+        }
     }
 
   return false;
@@ -921,10 +926,7 @@ Trigger<URV>::matchInstAddr(URV address, unsigned size, TriggerTiming timing, Pr
 	  switch (data1_.mcontrol6_.size_)
 	    {
 	    case 0:   // Match any access size
-	      for (unsigned i = 0; i < size; ++i)
-		if (doMatch(address + i))
-		  return true;
-	      return false;
+              break;
 
 	    case 1:  // Byte access
 	      if (size != 1)
@@ -956,7 +958,15 @@ Trigger<URV>::matchInstAddr(URV address, unsigned size, TriggerTiming timing, Pr
 	    }
 	}
 
-      return doMatch(address);
+      if (not matchAllInstAddr_)
+        return doMatch(address);
+      else
+        {
+          for (unsigned i = 0; i < size; ++i)
+            if (doMatch(address + i))
+              return true;
+          return false;
+        }
     }
 
   return false;

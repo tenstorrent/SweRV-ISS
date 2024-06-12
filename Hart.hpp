@@ -332,6 +332,16 @@ namespace WdRiscv
     void configExecOpcodeTrigger(bool flag)
     { csRegs_.configExecOpcodeTrigger(flag); }
 
+    /// Enable/disable matching all addresses in a load/store access
+    /// for debug triggering.
+    void configAllLdStAddrTrigger(bool flag)
+    { csRegs_.configAllLdStAddrTrigger(flag); }
+
+    /// Enable/disable matching all addresses in a instruction fetch
+    /// access for debug triggering.
+    void configAllInstAddrTrigger(bool flag)
+    { csRegs_.configAllInstAddrTrigger(flag); }
+
     /// Configure machine mode performance counters returning true on
     /// success and false on failure. N consecutive counters starting
     /// at MHPMCOUNTER3/MHPMCOUNTER3H are made read/write. The

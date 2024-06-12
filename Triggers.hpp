@@ -641,6 +641,14 @@ namespace WdRiscv
     void enableExecOpcode(bool flag)
     { enableExecOpcode_ = flag; }
 
+    /// Enable all ld/st address matching [address, address+size-1].
+    void enableAllLdStAddrMatch(bool flag)
+    { matchAllLdStAddr_ = flag; }
+
+    /// Enable all inst address matching [address, address+size-1].
+    void enableAllInstAddrMatch(bool flag)
+    { matchAllInstAddr_ = flag; }
+
   protected:
 
     void updateCompareMask()
@@ -750,6 +758,10 @@ namespace WdRiscv
     size_t chainBegin_ = 0, chainEnd_ = 0;
     bool enableLoadData_ = false;
     bool enableExecOpcode_ = false;
+
+    bool matchAllLdStAddr_ = true; // If enabled, attempt to match address against
+                                        // any [address, address+size-1].
+    bool matchAllInstAddr_ = true; // Same as above but for instruction fetch.
   };
 
 
@@ -969,6 +981,14 @@ namespace WdRiscv
     /// Enable exec-opcode triggering (disabled by default).
     void enableExecOpcode(bool flag)
     { for ( auto& trig : triggers_) trig.enableExecOpcode(flag); }
+
+    /// Enable all ld/st address matching [address, address+size-1].
+    void enableAllLdStAddrMatch(bool flag)
+    { for ( auto& trig : triggers_) trig.enableAllLdStAddrMatch(flag); }
+
+    /// Enable all inst address matching [address, address+size-1].
+    void enableAllInstAddrMatch(bool flag)
+    { for ( auto& trig : triggers_) trig.enableAllInstAddrMatch(flag); }
 
     /// Reset all triggers.
     void reset();

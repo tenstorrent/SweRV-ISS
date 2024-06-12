@@ -983,6 +983,16 @@ namespace WdRiscv
     void configExecOpcodeTrigger(bool flag)
     { triggers_.enableExecOpcode(flag); }
 
+    /// Enable/disable matching all addresses in a load/store access
+    /// for debug triggering.
+    void configAllLdStAddrTrigger(bool flag)
+    { triggers_.enableAllLdStAddrMatch(flag); }
+
+    /// Enable/disable matching all addresses in a instruction fetch
+    /// access for debug triggering.
+    void configAllInstAddrTrigger(bool flag)
+    { triggers_.enableAllInstAddrMatch(flag); }
+
     /// Enable triggers.
     void enableTriggers(bool flag);
 
