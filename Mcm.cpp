@@ -548,6 +548,9 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 
   undrained.erase(instr.tag_);
 
+#if 1
+  return true;
+#else
   if (paddr == paddr2)
     return pokeHartMemory(hart, paddr, value, stSize);
 
@@ -559,6 +562,7 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
   ok = pokeHartMemory(hart, paddr2, value2, size2) and ok;
 
   return ok;
+#endif
 }
 
 
