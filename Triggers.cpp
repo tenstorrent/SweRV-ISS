@@ -72,7 +72,7 @@ Triggers<URV>::readInfo(URV trigger, URV& value) const
 {
   if (trigger >= triggers_.size())
     {
-      value = 1;  // Per spec.
+      value = 0x1000001;  // Per spec.
       return true;
     }
 
