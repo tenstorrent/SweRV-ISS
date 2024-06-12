@@ -1554,16 +1554,6 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
         }
     }
 
-  if (steeEnabled_)
-    {
-      if (not stee_.isValidAccess(addr1, ldSize))
-	return EC::LOAD_ACC_FAULT;
-      if (addr2 != addr1 and not stee_.isValidAccess(addr2, ldSize))
-	return EC::LOAD_ACC_FAULT;
-      addr1 = stee_.clearSecureBits(addr1);
-      addr2 = stee_.clearSecureBits(addr2);
-    }
-
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
@@ -1573,6 +1563,16 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
       if (not pmp.isRead(effPm)  or  (virtMem_.isExecForRead() and not pmp.isExec(effPm)))
 	return EC::LOAD_ACC_FAULT;
+    }
+
+  if (steeEnabled_)
+    {
+      if (not stee_.isValidAccess(addr1, ldSize))
+	return EC::LOAD_ACC_FAULT;
+      if (addr2 != addr1 and not stee_.isValidAccess(addr2, ldSize))
+	return EC::LOAD_ACC_FAULT;
+      addr1 = stee_.clearSecureBits(addr1);
+      addr2 = stee_.clearSecureBits(addr2);
     }
 
   Pma pma = getPma(addr1);
@@ -11233,6 +11233,17 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
         }
     }
 
+  // Physical memory protection. Assuming grain size is >= 8.
+  if (pmpEnabled_)
+    {
+      auto effPm = effectivePrivilege();
+      if (hyper)
+	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
+      const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
+      if (not pmp.isWrite(effPm))
+	return EC::STORE_ACC_FAULT;
+    }
+
   if (steeEnabled_)
     {
       if (not stee_.isValidAccess(addr1, stSize))
@@ -11244,17 +11255,6 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	}
       addr1 = stee_.clearSecureBits(addr1);
       addr2 = stee_.clearSecureBits(addr2);
-    }
-
-  // Physical memory protection. Assuming grain size is >= 8.
-  if (pmpEnabled_)
-    {
-      auto effPm = effectivePrivilege();
-      if (hyper)
-	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-      const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
-      if (not pmp.isWrite(effPm))
-	return EC::STORE_ACC_FAULT;
     }
 
   if (misal)
