@@ -1154,9 +1154,22 @@ Syscall<URV>::emulate(unsigned ix)
           {
             uint32_t value;
             hart.peekMemory(a0, value, true);
+
+            // assume CLOCK_MONOTONIC
+            uint64_t timeout = 0;
+            if (a3 != 0)
+              {
+                uint64_t sec, nsec;
+                hart.peekMemory(a3, sec, true);
+                hart.peekMemory(a3 + 8, nsec, true);
+
+                timeout += sec*1000000000;
+                timeout += nsec%1000000000;
+              }
+
             if (a2 == value)
               {
-                hart.setSuspendState(true, 100000);
+                hart.setSuspendState(true, timeout);
                 futexMap_[a0].insert(hart.sysHartIndex());
               }
             else
@@ -1293,8 +1306,8 @@ Syscall<URV>::emulate(unsigned ix)
 	    clk_id == CLOCK_MONOTONIC_RAW)
 	  {
 	    // For repeatabilty. Pretend hart is running at 1 GHZ. Use instruction count.
-	    tp.tv_sec = hart.getInstructionCount() / 1000000000;
-	    tp.tv_nsec = hart.getInstructionCount() % 1000000000;
+	    tp.tv_sec = hart.getTime() / 1000000000;
+	    tp.tv_nsec = hart.getTime() % 1000000000;
 	  }
 	else if (clock_gettime(clk_id, &tp) != 0)
 	  return SRV(-errno);
@@ -1492,7 +1505,7 @@ Syscall<URV>::emulate(unsigned ix)
         nextAvail->setSuspendState(false, 0);
 
         assert(clone_args[2] == clone_args[3]);
-        if (clone_args[1] & CLONE_CHILD_SETTID)
+        if (clone_args[0] & CLONE_CHILD_SETTID)
           hart.pokeMemory(clone_args[2], nextAvail->sysHartIndex(), true);
 
         return nextAvail->sysHartIndex();

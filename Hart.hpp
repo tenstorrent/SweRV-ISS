@@ -976,6 +976,10 @@ namespace WdRiscv
     uint64_t getInstructionCount() const
     { return instCounter_; }
 
+    /// Get the time CSR value.
+    uint64_t getTime() const
+    { return time_; }
+
     /// Return count of traps (exceptions or interrupts) seen by this
     /// hart.
     uint64_t getTrapCount() const
@@ -2174,10 +2178,7 @@ namespace WdRiscv
     void setSuspendState(bool flag, uint64_t timeout = 0)
     {
       suspended_ = flag;
-      if (not flag)
-        resumeTime_ = 0;
-      else
-        resumeTime_ = time_ + timeout;
+      resumeTime_ = flag? time_ + timeout : 0;
     }
 
     bool isSuspended()
