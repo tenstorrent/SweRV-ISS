@@ -1562,6 +1562,20 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.configExecOpcodeTrigger(flag);
     }
 
+  tag = "all_ld_st_addr_trigger";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.configAllLdStAddrTrigger(flag);
+    }
+
+  tag = "all_inst_addr_trigger";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.configAllInstAddrTrigger(flag);
+    }
+
   tag = "memmap";
   if (config_ -> contains(tag))
     {
