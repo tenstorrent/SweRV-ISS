@@ -32,6 +32,7 @@
 #include <sys/uio.h>
 #include <sys/utsname.h>
 #include <linux/futex.h>
+#include <sched.h>
 
 #include "Hart.hpp"
 #include "Syscall.hpp"
@@ -744,6 +745,8 @@ Syscall<URV>::emulate(unsigned ix)
 
   // On success syscall returns a non-negtive integer.
   // On failure it returns the negative of the error number.
+  std::lock_guard<std::mutex> lock(emulateMutex_);
+
   auto& hart = *harts_.at(ix);
   URV a0 = hart.peekIntReg(RegA0);
   URV a1 = hart.peekIntReg(RegA1);
@@ -1146,9 +1149,41 @@ Syscall<URV>::emulate(unsigned ix)
       }
 
     case 98:  // futex
-      if (a1 != FUTEX_WAKE_PRIVATE)
+      {
+        if (a1 == FUTEX_WAIT_PRIVATE)
+          {
+            uint32_t value;
+            hart.peekMemory(a0, value, true);
+            if (a2 == value)
+              {
+                hart.setSuspendState(true, 100000);
+                futexMap_[a0].insert(hart.sysHartIndex());
+              }
+            else
+              {
+                hart.setSuspendState(false, 0);
+                if (futexMap_[a0].contains(hart.sysHartIndex()))
+                  futexMap_[a0].erase(hart.sysHartIndex());
+              }
+            return 0;
+          }
+
+        if (a1 == FUTEX_WAKE_PRIVATE)
+          {
+            unsigned count = std::min(size_t(a2), futexMap_[a0].size());
+            for (unsigned i = 0; i < count; ++i)
+              {
+                auto it = futexMap_[a0].begin();
+                futexMap_[a0].erase(it);
+                auto resumeHart = harts_.at(*it);
+                resumeHart->setSuspendState(false, 0);
+              }
+            return count;
+          }
+
         std::cerr << "Warning: unimplemented futex operation " << a1 << std::endl;
-      return 1;
+        return 0;
+      }
 
     case 214: // brk
        {
@@ -1450,13 +1485,15 @@ Syscall<URV>::emulate(unsigned ix)
             hart.peekIntReg(i, val);
             nextAvail->pokeIntReg(i, val);
           }
-        nextAvail->pokeIntReg(RegSp, clone_args[5]);
-        nextAvail->pokeIntReg(RegTp, clone_args[7]);
+        nextAvail->pokeIntReg(RegSp, clone_args[5] + clone_args[6]);
+        if (clone_args[0] & CLONE_SETTLS)
+          nextAvail->pokeIntReg(RegTp, clone_args[7]);
         nextAvail->pokeIntReg(RegA0, 0);
-        nextAvail->setSuspendState(false);
+        nextAvail->setSuspendState(false, 0);
 
         assert(clone_args[2] == clone_args[3]);
-        hart.pokeMemory(clone_args[2], nextAvail->sysHartIndex(), true);
+        if (clone_args[1] & CLONE_CHILD_SETTID)
+          hart.pokeMemory(clone_args[2], nextAvail->sysHartIndex(), true);
 
         return nextAvail->sysHartIndex();
       }

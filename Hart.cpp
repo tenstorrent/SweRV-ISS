@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -466,7 +466,7 @@ Hart<URV>::unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
 
   if (entryIx >= 64)
     return false;
-  
+
   CsrNumber csrn = CsrNumber(unsigned(CsrNumber::PMPADDR0) + entryIx);
 
   unsigned config = csRegs_.getPmpConfigByteFromPmpAddr(csrn);
@@ -495,7 +495,7 @@ Hart<URV>::unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
           low = (low >> pmpG) << pmpG;  // Clear least sig G bits.
           low = low << 2;
         }
-              
+
       high = pmpVal;
       high = (high >> pmpG) << pmpG;
       high = high << 2;
@@ -857,7 +857,7 @@ Hart<URV>::peekMemory(uint64_t address, uint8_t& val, bool usePma) const
 {
   return memory_.peek(address, val, usePma);
 }
-  
+
 
 template <typename URV>
 bool
@@ -1209,9 +1209,9 @@ printSignedHisto(const char* tag, const std::vector<uintmax_t>& histo,
     fprintf(file, "    %s (2,     16] %jd\n", tag, histo.at(9));
   if (histo.at(10))
     fprintf(file, "    %s (16,    1k] %jd\n", tag, histo.at(10));
-  if (histo.at(11))	              
+  if (histo.at(11))
     fprintf(file, "    %s (1k,   64k] %jd\n", tag, histo.at(11));
-  if (histo.at(12))	              
+  if (histo.at(12))
     fprintf(file, "    %s > 64k       %jd\n", tag, histo.at(12));
 }
 
@@ -1477,7 +1477,7 @@ void
 Hart<URV>::reportLrScStat(FILE* file) const
 {
   fprintf(file, "Load-reserve dispatched: %jd\n", uintmax_t(lrCount_));
-  fprintf(file, "Load-reserve successful: %jd\n", uintmax_t(lrSuccess_)); 
+  fprintf(file, "Load-reserve successful: %jd\n", uintmax_t(lrSuccess_));
   fprintf(file, "Store-conditional dispatched: %jd\n", uintmax_t(scCount_));
   fprintf(file, "Store-conditional successful: %jd\n", uintmax_t(scSuccess_));
 }
@@ -1738,8 +1738,8 @@ readCharNonBlocking(int fd)
 	  if (prev == 1 and c == 'x')
 	    throw CoreException(CoreException::Stop, "Keyboard stop", 0, 3);
 	  prev = c;
-	}	  
-	
+	}
+
       return c;
     }
 
@@ -2915,7 +2915,7 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
   if (hasActiveTrigger())
     {
       if (interrupt)
-	{	
+	{
 	  if (csRegs_.intTriggerHit(cause, privMode_, virtMode_, isInterruptEnabled()))
 	    initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
 	}
@@ -3000,7 +3000,7 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
   mstatus_.bits_.MPIE = mstatus_.bits_.MIE;
   mstatus_.bits_.MIE = 0;
   writeMstatus();
-  
+
   // Clear pending nmi bit in dcsr
   URV dcsrVal = 0;
   if (peekCsr(CsrNumber::DCSR, dcsrVal))
@@ -3018,7 +3018,7 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
 template <typename URV>
 bool
 Hart<URV>::peekIntReg(unsigned ix, URV& val) const
-{ 
+{
   if (ix < intRegs_.size())
     {
       val = intRegs_.read(ix);
@@ -3031,7 +3031,7 @@ Hart<URV>::peekIntReg(unsigned ix, URV& val) const
 template <typename URV>
 URV
 Hart<URV>::peekIntReg(unsigned ix) const
-{ 
+{
   assert(ix < intRegs_.size());
   return intRegs_.read(ix);
 }
@@ -3040,7 +3040,7 @@ Hart<URV>::peekIntReg(unsigned ix) const
 template <typename URV>
 bool
 Hart<URV>::peekIntReg(unsigned ix, URV& val, std::string_view& name) const
-{ 
+{
   if (ix < intRegs_.size())
     {
       val = intRegs_.read(ix);
@@ -3054,7 +3054,7 @@ Hart<URV>::peekIntReg(unsigned ix, URV& val, std::string_view& name) const
 template <typename URV>
 bool
 Hart<URV>::peekFpReg(unsigned ix, uint64_t& val) const
-{ 
+{
   if (not isRvf() and not isRvd())
     return false;
 
@@ -3071,7 +3071,7 @@ Hart<URV>::peekFpReg(unsigned ix, uint64_t& val) const
 template <typename URV>
 bool
 Hart<URV>::peekUnboxedFpReg(unsigned ix, uint64_t& val) const
-{ 
+{
   if (not isRvf() and not isRvd())
     return false;
 
@@ -3088,7 +3088,7 @@ Hart<URV>::peekUnboxedFpReg(unsigned ix, uint64_t& val) const
 template <typename URV>
 bool
 Hart<URV>::pokeFpReg(unsigned ix, uint64_t val)
-{ 
+{
   if (not isRvf() and not isRvd())
     return false;
 
@@ -3105,7 +3105,7 @@ Hart<URV>::pokeFpReg(unsigned ix, uint64_t val)
 template <typename URV>
 bool
 Hart<URV>::pokeIntReg(unsigned ix, URV val)
-{ 
+{
   if (ix < intRegs_.size())
     {
       intRegs_.poke(ix, val);
@@ -3133,7 +3133,7 @@ template <typename URV>
 bool
 Hart<URV>::peekCsr(CsrNumber csrn, URV& val, URV& reset, URV& writeMask,
 		   URV& pokeMask, URV& readMask) const
-{ 
+{
   const Csr<URV>* csr = csRegs_.getImplementedCsr(csrn);
   if (not csr)
     return false;
@@ -3626,7 +3626,7 @@ Hart<URV>::configIsa(std::string_view isa, bool updateMisa)
 	misaReset |= URV(0x1000);
       if (isa_.isEnabled(RvExtension::V))
 	misaReset |= URV(0x200000);
-  
+
       URV mask = 0, pokeMask = 0;
       bool implemented = true, shared = true;
 
@@ -3944,7 +3944,7 @@ Hart<URV>::updatePerformanceCounters(const DecodedInst& di)
       else
 	pregs.updateCounters(EventNumber::Atomic, prevPerfControl_, lastPriv_, lastVirt_);
       break;
-      
+
     case RvExtension::F:
       pregs.updateCounters(EventNumber::FpSingle, prevPerfControl_, lastPriv_, lastVirt_);
       break;
@@ -3956,7 +3956,7 @@ Hart<URV>::updatePerformanceCounters(const DecodedInst& di)
     case RvExtension::Zfh:
       pregs.updateCounters(EventNumber::FpHalf, prevPerfControl_, lastPriv_, lastVirt_);
       break;
-      
+
     case RvExtension::V:
       pregs.updateCounters(EventNumber::Vector, prevPerfControl_, lastPriv_, lastVirt_);
       break;
@@ -4095,7 +4095,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 	  prof.destRegFreq_.at(di.op0())++; opIx++;
 	  rd = static_cast<int>(di.op0());
 	  // unsigned groupX8 = 8;
-	  // rd = vecRegs_.getLastWrittenReg(groupX8); 
+	  // rd = vecRegs_.getLastWrittenReg(groupX8);
 	  // assert(rd == di.op0());    // Does not work for load seg.
 	}
       else if (rdType == OperandType::CsReg)
@@ -4549,7 +4549,7 @@ public:
   {
     sigaction(SIGINT, &prevKbdAction_, nullptr);
   }
-  
+
 private:
 
   struct sigaction prevKbdAction_;
@@ -4625,7 +4625,11 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
         break;
 
       if (suspended_)
-        continue;
+        {
+          if (resumeTime_ and time_ > resumeTime_)
+            setSuspendState(false);
+          continue;
+        }
 
       resetExecInfo(); clearTraceData();
 
@@ -4662,16 +4666,23 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	  static std::mutex execMutex;
 	  auto lock = (ownTrace_)? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(execMutex);
 
-          uint32_t inst = 0;
-	  currPc_ = pc_;
-
-	  ++instCounter_;
-
           if (not hartIx_)
             {
               ++timeSample_;
               time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
             }
+
+          if (suspended_)
+            {
+              if (resumeTime_ and time_ > resumeTime_)
+                setSuspendState(false);
+              continue;
+            }
+
+          uint32_t inst = 0;
+	  currPc_ = pc_;
+
+	  ++instCounter_;
 
 	  if (mcycleEnabled())
 	    ++cycleCount_;
@@ -4772,7 +4783,7 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
   SignalHandlers handlers;
 
   bool success = untilAddress(address, traceFile);
-      
+
   if (instCounter_ >= limit)
     std::cerr << "Stopped -- Reached instruction limit hart=" << hartIx_ << "\n";
   else if (pc_ == address)
@@ -4799,9 +4810,6 @@ template <typename URV>
 bool
 Hart<URV>::runSteps(uint64_t steps, FILE* traceFile)
 {
-  if (suspended_)
-    return false;
-
   // Setup signal handlers. Restore on destruction.
   SignalHandlers handlers;
 
@@ -4957,21 +4965,25 @@ Hart<URV>::simpleRunWithLimit()
   bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
   bool prevIsBranch = true;  // For basic block tracing.
 
-  while (noUserStop and instCounter_ < limit) 
+  while (noUserStop and instCounter_ < limit)
     {
-      if (suspended_)
-        continue;
-
-      resetExecInfo();
-
-      currPc_ = pc_;
-      ++instCounter_;
-
       if (not hartIx_)
         {
           ++timeSample_;
           time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
         }
+
+      if (suspended_)
+        {
+          if (resumeTime_ and time_ > resumeTime_)
+            setSuspendState(false);
+          continue;
+        }
+
+      resetExecInfo();
+
+      currPc_ = pc_;
+      ++instCounter_;
 
       if (mcycleEnabled())
 	++cycleCount_;
@@ -5019,8 +5031,18 @@ Hart<URV>::simpleRunNoLimit()
 {
   while (noUserStop)
     {
+      if (not hartIx_)
+        {
+          ++timeSample_;
+          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+        }
+
       if (suspended_)
-        continue;
+        {
+          if (resumeTime_ and time_ > resumeTime_)
+            setSuspendState(false);
+          continue;
+        }
 
       currPc_ = pc_;
       ++instCounter_;
@@ -5055,7 +5077,7 @@ Hart<URV>::saveBranchTrace(const std::string& path)
       std::cerr << "Failed to open branch-trace output file '" << path << "' for writing\n";
       return false;
     }
-  
+
   for (auto iter = branchBuffer_.begin(); iter != branchBuffer_.end(); ++iter)
     {
       auto& rec = *iter;
@@ -5180,7 +5202,7 @@ Hart<URV>::run(FILE* file)
                   or enableCounters_ or alarmInterval_ or file
 		  or __tracerExtension or hasInterruptor_ or initStateFile_);
   if (complex)
-    return runUntilAddress(stopAddr, file); 
+    return runUntilAddress(stopAddr, file);
 
   uint64_t counter0 = instCounter_;
 
@@ -5528,18 +5550,25 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 
   try
     {
+      if (not hartIx_)
+        {
+          ++timeSample_;
+          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+        }
+
+      if (suspended_)
+        {
+          if (resumeTime_ and time_ > resumeTime_)
+            setSuspendState(false);
+          return;
+        }
+
       uint32_t inst = 0;
       currPc_ = pc_;
 
       resetExecInfo(); clearTraceData();
 
       ++instCounter_;
-
-      if (not hartIx_)
-        {
-          ++timeSample_;
-          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
-        }
 
       if (processExternalInterrupt(traceFile, instStr))
 	return;  // Next instruction in interrupt handler.
@@ -9476,7 +9505,7 @@ Hart<URV>::exitDebugMode()
   cancelLr(CancelLrCause::EXIT_DEBUG);  // Exiting debug modes loses LR reservation.
 
   pc_ = peekCsr(CsrNumber::DPC);  // Restore PC
-  
+
   debugMode_ = false;
   csRegs_.enterDebug(false);
 
@@ -9950,7 +9979,7 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User)
     {
       if (virtMode_)
@@ -10177,7 +10206,7 @@ namespace WdRiscv
     if (not csRegs_.read(CsrNumber::MEPC, privMode_, epc))
       illegalInst(di);
     setPc(epc);
-      
+
     // 3. Update virtual mode.
     if (savedMode != PrivilegeMode::Machine)
       setVirtualMode(savedVirt);
@@ -10382,7 +10411,7 @@ Hart<URV>::execDret(const DecodedInst* di)
   cancelLr(CancelLrCause::EXIT_DEBUG);  // Exiting debug modes loses LR reservation.
 
   pc_ = peekCsr(CsrNumber::DPC);  // Restore PC
-  
+
   debugMode_ = false;
   csRegs_.enterDebug(false);
 
@@ -10558,10 +10587,10 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
     hsq = hsq and isCsrWriteable(csr, PM::Supervisor, false /*virtMode*/);
 
   if (virtMode_ and hsq )
-    virtualInst(di);  // HS qualified 
+    virtualInst(di);  // HS qualified
   else
     illegalInst(di);
-  
+
   return false;
 }
 
@@ -12077,7 +12106,7 @@ template <typename URV>
 void
 Hart<URV>::execMop_r(const DecodedInst* di)
 {
-    if (not isRvzimop()) 
+    if (not isRvzimop())
       {
         illegalInst(di);
         return;
@@ -12090,7 +12119,7 @@ template <typename URV>
 void
 Hart<URV>::execMop_rr(const DecodedInst* di)
 {
-    if (not isRvzimop()) 
+    if (not isRvzimop())
       {
         illegalInst(di);
         return;
@@ -12103,7 +12132,7 @@ template <typename URV>
 void
 Hart<URV>::execCmop(const DecodedInst* di)
 {
-    if (not isRvzcmop() || not isRvc()) 
+    if (not isRvzcmop() || not isRvc())
       {
         illegalInst(di);
         return;

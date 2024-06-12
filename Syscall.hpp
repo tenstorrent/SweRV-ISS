@@ -152,5 +152,9 @@ namespace WdRiscv
     std::unordered_set<std::string, util::string_hash, std::equal_to<>> writePaths_;
 
     std::vector<AddrLen> memChanges_;  // Memory locations changed by syscall.
+
+    std::unordered_map<uint64_t, std::unordered_set<unsigned>> futexMap_;
+
+    std::mutex emulateMutex_;
   };
 }
