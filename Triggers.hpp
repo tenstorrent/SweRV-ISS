@@ -404,7 +404,7 @@ namespace WdRiscv
       if (isDebugModeOnly() and not debugMode)
 	return false;
 
-      info_ = (value & infoWriteMask_) | (data2_ & ~infoWriteMask_);
+      info_.value_ = (value & infoWriteMask_) | (info_.value_ & ~infoWriteMask_);
       modifiedInfo_ = true;
 
       return true;
@@ -437,7 +437,7 @@ namespace WdRiscv
     /// Poke tinfo. This allows writing of modifiable bits that are read-only to the CSR
     /// instructions.
     void pokeInfo(URV x)
-    { info_ = (x & infoPokeMask_) | (data3_ & ~infoPokeMask_); }
+    { info_.value_ = (x & infoPokeMask_) | (info_.value_ & ~infoPokeMask_); }
 
     void configData1(URV reset, URV mask, URV pokeMask)
     { data1Reset_ = reset; data1_.value_ = reset; data1WriteMask_ = mask; data1PokeMask_ = pokeMask;}
