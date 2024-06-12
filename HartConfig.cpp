@@ -1287,7 +1287,7 @@ hasDefinedPmacfgCsr(const nlohmann::json& config)
     }
 
   // We could have a specific pmacfg csr (example pmacfg0).
-  for (unsigned i = 0; i < 64; ++i)
+  for (unsigned i = 0; i < 16; ++i)
     {
       std::string name = "pmacfg";
       name += std::to_string(i);
