@@ -581,6 +581,10 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
       hart->cancelLr(WdRiscv::CancelLrCause::SC);
     }
 
+  // Clear dependency on other packets to expedite release of packet memory.
+  for (auto& producer : packet.opProducers_)
+    producer = nullptr;
+
   // Stores erased at drain time.
   if (not packet.isStore())
     {
@@ -664,6 +668,10 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
     assert(0);
 
   packet.drained_ = true;
+
+  // Clear dependency on other packets to expedite release of packet memory.
+  for (auto& producer : packet.opProducers_)
+    producer = nullptr;
 
   auto& packetMap = hartPacketMaps_.at(hartIx);
   packetMap.erase(packet.tag());
