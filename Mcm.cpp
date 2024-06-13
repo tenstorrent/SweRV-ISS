@@ -352,6 +352,33 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   if (not updateTime("Mcm::mergeBufferInsert", time))
     return false;
 
+  if (size <= 8)
+    return mergeBufferInsertScalar(hart, time, instrTag, physAddr, size, rtlData);
+
+  assert(size == lineSize_ or size == lineSize_ / 2);
+  assert((physAddr % lineSize_) == 0 or (physAddr % (lineSize_/2) == 0));
+
+  // FIX: This currently supports cbo.zero. For vector write, we would need to make
+  // rtlData a vector of double words.
+  uint64_t addr = physAddr;
+  for (unsigned i = 0; i < size; i += 8, addr += 8)
+    {
+      if (not mergeBufferInsertScalar(hart, time, instrTag, addr, 8, rtlData))
+	return false;
+    }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::mergeBufferInsertScalar(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
+				  uint64_t physAddr, unsigned size,
+				  uint64_t rtlData)
+{
+  assert(size <= 8);
+
   unsigned hartIx = hart.sysHartIndex();
 
   MemoryOp op = {};
@@ -369,8 +396,8 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   McmInstr* instr = findOrAddInstr(hartIx, instrTag);
   if (not instr)
     {
-      cerr << "Mcm::MergeBufferInsert: Error: Unknown instr tag\n";
-      assert(0 && "Mcm::MergeBufferInsert: Unknown instr tag");
+      cerr << "Mcm::MergeBufferInsertScalar: Error: Unknown instr tag\n";
+      assert(0 && "Mcm::MergeBufferInsertScalar: Unknown instr tag");
       return false;
     }
 
@@ -390,7 +417,7 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 
       if (not instr->retired_)
 	{
-	  cerr << "Mcm::MergeBufferInsert: Error: Merge buffer write for a non-retired store\n";
+	  cerr << "Mcm::MergeBufferInsertScalar: Error: Merge buffer write for a non-retired store\n";
 	  return false;
 	}
 
@@ -548,21 +575,7 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 
   undrained.erase(instr.tag_);
 
-#if 1
   return true;
-#else
-  if (paddr == paddr2)
-    return pokeHartMemory(hart, paddr, value, stSize);
-
-  unsigned size1 = offsetToNextPage(paddr);
-  bool ok = pokeHartMemory(hart, paddr, value, size1);
-
-  unsigned size2 = stSize - size1;
-  uint64_t value2 = value >> (size1 * 8);
-  ok = pokeHartMemory(hart, paddr2, value2, size2) and ok;
-
-  return ok;
-#endif
 }
 
 
@@ -1916,7 +1929,8 @@ Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
   if (not instrA.isMemory() or not instrA.overlaps(instrB))
     return true;
 
-  if (instrA.isAligned() and instrB.isAligned())
+  // Non-scalar (e.g. cbo.zero) are not drained aomically even if aligned.
+  if (instrA.isAligned() and instrB.isAligned() and instrA.size_ <= 8 and instrB.size_ <= 8)
     return isBeforeInMemoryTime(instrA, instrB);
 
   // Check overlapped bytes.
