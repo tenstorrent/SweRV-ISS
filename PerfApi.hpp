@@ -101,6 +101,10 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     bool isTakenBranch() const
     { return taken_; }
 
+    /// Return branch target as determined by decode, even if the branch is not taken.
+    /// Return 0 if the instruction is not decoded, not a branch, or is an indirect branch.
+    uint64_t branchTargetFromDecode() const;
+
     /// Record the branch prediction made by the performance model. Return false if
     /// instruction is not a branch or is not decoded.
     bool predictBranch(bool taken, uint64_t target)
