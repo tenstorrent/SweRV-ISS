@@ -941,3 +941,32 @@ InstrPac::getDestOperands(std::array<Operand, 2>& ops)
 
   return count;
 }
+
+
+uint64_t
+InstrPac::branchTargetFromDecode() const
+{
+  if (!isBranch()) return 0;
+
+  using WdRiscv::InstId;
+  switch (di_.instEntry()->instId())
+    {
+    case InstId::jal:
+    case InstId::c_jal:
+    case InstId::c_j:
+      return instrVa() + di_.op1As<int64_t>();
+
+    case InstId::beq:
+    case InstId::bne:
+    case InstId::blt:
+    case InstId::bge:
+    case InstId::bltu:
+    case InstId::bgeu:
+    case InstId::c_beqz:
+    case InstId::c_bnez:
+      return instrVa() + di_.op2As<int64_t>();
+
+    default:
+      return 0;
+    }
+}
