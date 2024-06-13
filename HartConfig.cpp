@@ -18,6 +18,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <unordered_set>
+#include <bit>
 #include "HartConfig.hpp"
 #include "System.hpp"
 #include "Core.hpp"
@@ -2189,13 +2190,19 @@ HartConfig::applyImsicConfig(System<URV>& system) const
     if (not getJsonUnsigned("imsic.ids", imsic.at(tag), ids))
       return false;
 
+  uint64_t thresholdMask = std::bit_ceil(ids) - 1;
+  tag = "eithreshold_mask";
+  if (imsic.contains(tag))
+    if (not getJsonUnsigned("imsic.eithreshold_mask", imsic.at(tag), thresholdMask))
+      return false;
+
   bool trace = false;
   tag = "trace";
   if (imsic.contains(tag))
     if (not getJsonBoolean("imsic.trace", imsic.at(tag), trace))
       return false;
 
-  return system.configImsic(mbase, mstride, sbase, sstride, guests, ids, trace);
+  return system.configImsic(mbase, mstride, sbase, sstride, guests, ids, thresholdMask, trace);
 }
 
 

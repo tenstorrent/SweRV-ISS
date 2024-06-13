@@ -273,6 +273,7 @@ namespace WdRiscv
     bool configImsic(uint64_t mbase, uint64_t mstride,
 		     uint64_t sbase, uint64_t sstride,
 		     unsigned guests, unsigned ids,
+                     unsigned thresholdMask,
                      bool trace);
 
     /// Enable memory consistency model. This is relevant in server/interactive where RTL

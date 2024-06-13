@@ -126,7 +126,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// to the threshold do not participate in the computation of top
     /// id even if pending and enabled.
     void setThreshold(unsigned t)
-    { threshold_ = t; }
+    { threshold_ = t & thresholdMask_; }
 
     /// Return the top interrupt id threshold.  See setThrshold.
     unsigned threshold() const
@@ -185,13 +185,17 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// count: interrupts ids are 1 to idCount - 1 inclusive.  All
     /// previous enable/pending state is lost. Given address must be
     /// page aligned and idCount must be a multiple of 64.
-    void configure(uint64_t addr, unsigned idCount, unsigned pageSize)
+    void configure(uint64_t addr, unsigned idCount, unsigned pageSize,
+                   unsigned thresholdMask)
     {
       pageSize_ = pageSize;
       assert((addr % pageSize_) == 0);
       assert((idCount % 64) == 0);
       topId_ = 0;
       addr_ = addr;
+      delivery_ = 0;
+      threshold_ = 0;
+      thresholdMask_ = thresholdMask;
       pending_.clear();
       enabled_.clear();
       pending_.resize(idCount);
@@ -245,6 +249,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     unsigned topId_ = 0;
     unsigned delivery_ = 0;
     unsigned threshold_ = 0;
+    unsigned thresholdMask_ = 0;
     bool config_ = false;
     unsigned pageSize_ = 4096;
 
@@ -272,22 +277,25 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// with the given count of interrupt ids (idCount is the highest
     /// interrupt id plus 1 and must be a multiple of 64). All
     /// previous state enabled/pending state is lost.
-    void configureMachine(uint64_t addr, unsigned idCount, unsigned pageSize)
-    { mfile_.configure(addr, idCount, pageSize); }
+    void configureMachine(uint64_t addr, unsigned idCount, unsigned pageSize,
+                          unsigned thresholdMask)
+    { mfile_.configure(addr, idCount, pageSize, thresholdMask); }
 
     /// Configure the supervisor privilege file at the given address
     /// and with the given count of interrupt ids (idCount is the
     /// highest interrupt id plus 1 and must be a multiple of 64).
     /// All previous state enabled/pending state is lost.
-    void configureSupervisor(uint64_t addr, unsigned idCount, unsigned pageSize)
-    { sfile_.configure(addr, idCount, pageSize); }
+    void configureSupervisor(uint64_t addr, unsigned idCount, unsigned pageSize,
+                             unsigned thresholdMask)
+    { sfile_.configure(addr, idCount, pageSize, thresholdMask); }
 
     /// Configure g guest files of n-1 interrupt ids each. The guest
     /// addresses will be s+p, s+2p, s+3p, ... where s is the
     /// supervisor file address and p is the page size. A supervisor
     /// file must be configured before the guests files are
     /// configured. The parameter g must not exceed 64.
-    void configureGuests(unsigned g, unsigned n, unsigned pageSize)
+    void configureGuests(unsigned g, unsigned n, unsigned pageSize,
+                         unsigned thresholdMask)
     {
       assert(g <= 64);
       assert(sfile_.isConfigured());
@@ -297,7 +305,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       uint64_t addr = sfile_.address() + pageSize;
       for (size_t i = 1; i < gfiles_.size(); ++i)
 	{
-	  gfiles_.at(i).configure(addr, n, pageSize);
+	  gfiles_.at(i).configure(addr, n, pageSize, thresholdMask);
 	  addr += pageSize;
 	}
     }
@@ -648,13 +656,15 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// interrupt id supported by each file and must be a multiple of
     /// 64. Return true on success and false on failure: We fail if
     /// addr/stride are nog page aligned or if ids is larger than 64.
-    bool configureMachine(uint64_t addr, uint64_t stride, unsigned ids);
+    bool configureMachine(uint64_t addr, uint64_t stride, unsigned ids,
+                          unsigned thresholdMask);
 
     /// Configure supervisor privilege IMISC files (one per hart) and
     /// guest privilege file (guestCount per hart). Supervisor files
     /// will be at addresses addr, addr + stride, addr + 2*stride.
     /// See configMachine.
-    bool configureSupervisor(uint64_t addr, uint64_t stride, unsigned ids);
+    bool configureSupervisor(uint64_t addr, uint64_t stride, unsigned ids,
+                             unsigned thresholdMask);
 
     /// Configure n guests per hart. Guest files at each hart will be
     /// at s + ps, s + 2*ps, s + 3*ps, ... where s is the address of
@@ -662,7 +672,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// Return true on success and false on failure. Fail if
     /// supervisor files are not configured or if n is larger than 64
     /// or if ids is not a multiple of 64.
-    bool configureGuests(unsigned n, unsigned ids);
+    bool configureGuests(unsigned n, unsigned ids, unsigned thresholdMask);
 
     /// Return true if given address is covered by any of the configured
     /// IMSIC files.

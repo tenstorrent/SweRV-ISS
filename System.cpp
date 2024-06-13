@@ -561,6 +561,7 @@ bool
 System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
 			 uint64_t sbase, uint64_t sstride,
 			 unsigned guests, unsigned ids,
+                         unsigned thresholdMask,
                          bool trace)
 {
   using std::cerr;
@@ -635,9 +636,16 @@ System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
       return false;
     }
 
-  bool ok = imsicMgr_.configureMachine(mbase, mstride, ids);
-  ok = imsicMgr_.configureSupervisor(sbase, sstride, ids) and ok;
-  ok = imsicMgr_.configureGuests(guests, ids) and ok;
+  if (thresholdMask < (ids - 1))
+    {
+      cerr << thresholdMask << " " << ids << "\n";
+      cerr << "Error: Threshold mask cannot be less than the max interrupt id.\n";
+      return false;
+    }
+
+  bool ok = imsicMgr_.configureMachine(mbase, mstride, ids, thresholdMask);
+  ok = imsicMgr_.configureSupervisor(sbase, sstride, ids, thresholdMask) and ok;
+  ok = imsicMgr_.configureGuests(guests, ids, thresholdMask) and ok;
   if (not ok)
     {
       cerr << "Error: Failed to configure IMSIC.\n";
