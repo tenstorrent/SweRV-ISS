@@ -69,7 +69,7 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/))
+      if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
 	triggerTripped_ = true;
     }
 
@@ -127,7 +127,7 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/))
+      if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
 	triggerTripped_ = true;
     }
 
@@ -181,7 +181,7 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
   if (hasActiveTrigger())
     {
       bool isLd = true;
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, isLd))
+      if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, isLd))
 	triggerTripped_ = true;
       if (triggerTripped_)
 	return false;
@@ -204,8 +204,7 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr1_ = addr2;
 
-  // Address outside DCCM causes an exception (this is swerv specific).
-  bool fail = amoInDccmOnly_ and not memory_.pmaMgr_.isAddrInDccm(addr1);
+  bool fail = false;
 
   // Access must be naturally aligned.
   if ((addr1 & (ldStSize_ - 1)) != 0)
@@ -299,7 +298,7 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
-  if (hasTrig and (ldStAddrTriggerHit(virtAddr, timing, isLd) or
+  if (hasTrig and (ldStAddrTriggerHit(virtAddr, ldStSize_, timing, isLd) or
                    ldStDataTriggerHit(storeVal, timing, isLd)))
     triggerTripped_ = true;
 
@@ -325,7 +324,6 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   if (cause == EC::NONE)
     {
       bool fail = not memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt).isRsrv();
-      fail = fail or (amoInDccmOnly_ and not memory_.pmaMgr_.isAddrInDccm(addr1));
       fail = (fail or virtMem_.lastPbmt() == VirtMem::Pbmt::Nc or
 	      virtMem_.lastPbmt() == VirtMem::Pbmt::Io); // Non-cacheable pbmt.
       if (fail)

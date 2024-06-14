@@ -985,6 +985,16 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         hart.configVectorLegalizeVsetvliAvl(flag);
     }
 
+  tag = "legalize_for_egs";
+  if (vconf.contains(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, vconf.at(tag), flag))
+        errors++;
+      else
+        hart.configVectorLegalizeForEgs(flag);
+    }
+
   return errors == 0;
 }
 
@@ -1210,7 +1220,7 @@ applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config)
 	    {
 	      if (not hart.definePmaRegion(ix, low, high, pma))
 		itemErrors++;
-	      else if (pma.isMemMappedReg())
+	      else if (pma.hasMemMappedReg())
 		{
 		  unsigned size = 4;
 		  tag = "register_size";
@@ -1277,7 +1287,7 @@ hasDefinedPmacfgCsr(const nlohmann::json& config)
     }
 
   // We could have a specific pmacfg csr (example pmacfg0).
-  for (unsigned i = 0; i < 64; ++i)
+  for (unsigned i = 0; i < 16; ++i)
     {
       std::string name = "pmacfg";
       name += std::to_string(i);
@@ -1329,7 +1339,7 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
 template<typename URV>
 bool
 HartConfig::configAclint(System<URV>& system, Hart<URV>& hart, uint64_t clintStart,
-                         uint64_t mswiOffset, bool hasMswi,
+                         uint64_t clintSize, uint64_t mswiOffset, bool hasMswi,
                          uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
 		         bool siOnReset, bool deliverInterrupts) const
 {
@@ -1339,9 +1349,9 @@ HartConfig::configAclint(System<URV>& system, Hart<URV>& hart, uint64_t clintSta
     return system.ithHart(ix).get();
   };
 
-  hart.configAclint(clintStart + mswiOffset, hasMswi, clintStart + mtimerOffset,
-		    clintStart + mtimeOffset, hasMtimer, siOnReset, deliverInterrupts,
-		    indexToHart);
+  hart.configAclint(clintStart, clintSize, clintStart + mswiOffset, hasMswi,
+		    clintStart + mtimerOffset, clintStart + mtimeOffset, hasMtimer,
+		    siOnReset, deliverInterrupts, indexToHart);
   return true;
 }
 
@@ -1550,6 +1560,20 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
       hart.configExecOpcodeTrigger(flag);
+    }
+
+  tag = "all_ld_st_addr_trigger";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.configAllLdStAddrTrigger(flag);
+    }
+
+  tag = "all_inst_addr_trigger";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.configAllInstAddrTrigger(flag);
     }
 
   tag = "memmap";
@@ -1983,7 +2007,8 @@ HartConfig::applyClintConfig(System<URV>& system, Hart<URV>& hart) const
       return false;
     }
 
-  return configAclint(system, hart, addr, 0 /* swOffset */, true /* hasMswi */,
+  uint64_t size = 0xc000;
+  return configAclint(system, hart, addr, size, 0 /* swOffset */, true /* hasMswi */,
                       0x4000 /* timerOffset */, 0xbff8 /* timeOffset */, true /* hasMtimer */,
 		      false /*siOnReset*/, true /*deliverInterrupts*/);
 }
@@ -1999,12 +2024,31 @@ HartConfig::applyAclintConfig(System<URV>& system, Hart<URV>& hart) const
 
   auto& aclint = config_ -> at("aclint");
 
-  uint64_t base = 0, swOffset = 0, timerOffset = 0, timeOffset = 0;
+  uint64_t base = 0, size = 0, swOffset = 0, timerOffset = 0, timeOffset = 0;
 
   tag = "base";
   if (aclint.contains(tag))
-    if (not getJsonUnsigned("aclint.base", aclint.at(tag), base))
+    {
+      if (not getJsonUnsigned("aclint.base", aclint.at(tag), base))
+	return false;
+    }
+  else
+    {
+      std::cerr << "Error: Missing base field in aclint section of configuration file.\n";
       return false;
+    }
+
+  tag = "size";
+  if (aclint.contains(tag))
+    {
+      if (not getJsonUnsigned("aclint.size", aclint.at(tag), size))
+	return false;
+    }
+  else
+    {
+      std::cerr << "Error: Missing size field in aclint section of configuration file.\n";
+      return false;
+    }
 
   bool hasMswi = false;
   tag = "sw_offset";
@@ -2090,7 +2134,7 @@ HartConfig::applyAclintConfig(System<URV>& system, Hart<URV>& hart) const
     if (not getJsonBoolean("aclint.deliver_interrupts", aclint.at(tag), deliverInterrupts))
       return false;
 
-  return configAclint(system, hart, base, swOffset, hasMswi, timerOffset, timeOffset,
+  return configAclint(system, hart, base, size, swOffset, hasMswi, timerOffset, timeOffset,
 		      hasMtimer, siOnReset, deliverInterrupts);
 }
 
@@ -2589,12 +2633,12 @@ HartConfig::finalizeCsrConfig<uint64_t>(System<uint64_t>&) const;
 
 template bool
 HartConfig::configAclint<uint32_t>(System<uint32_t>&, Hart<uint32_t>&, uint64_t clintStart,
-                                   uint64_t mswiOffset, bool hasMswi,
+                                   uint64_t size, uint64_t mswiOffset, bool hasMswi,
                                    uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
 		                   bool siOnReset = false, bool deliverInterrupts = true) const;
 template bool
 HartConfig::configAclint<uint64_t>(System<uint64_t>&, Hart<uint64_t>&, uint64_t clintStart,
-                                   uint64_t mswiOffset, bool hasMswi,
+                                   uint64_t size, uint64_t mswiOffset, bool hasMswi,
                                    uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
 		                   bool siOnReset = false, bool deliverInterrupts = true) const;
 

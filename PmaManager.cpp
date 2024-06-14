@@ -34,8 +34,6 @@ Pma::stringToAttrib(std::string_view str, Pma::Attrib& attrib)
     { "amoother", Pma::AmoOther },
     { "amoarithmetic", Pma::AmoArith },
     { "amo", Pma::AmoArith },
-    { "iccm", Pma::Iccm },
-    { "dccm", Pma::Dccm },
     { "mem_mapped", Pma::MemMapped },
     { "rsrv", Pma::Rsrv },
     { "io", Pma::Io },
@@ -69,8 +67,6 @@ Pma::attributesToString(uint32_t attrib)
   result += (attrib & Pma::AmoOther)? "amoother," : "";
   result += (attrib & Pma::AmoSwap)? "amoswap," : "";
   result += (attrib & Pma::AmoLogical)? "amological," : "";
-  result += (attrib & Pma::Iccm)? "iccm," : "";
-  result += (attrib & Pma::Dccm)? "dccm," : "";
   result += (attrib & Pma::MemMapped)? "memmapped," : "";
   result += (attrib & Pma::Rsrv)? "rsrv," : "";
   result += (attrib & Pma::Io)? "io," : "";
@@ -98,11 +94,30 @@ PmaManager::setMemMappedMask(uint64_t addr, uint64_t mask, unsigned size)
   if ((addr & (size - 1)) != 0)
     return false;   // Not aligned.
 
-  if (not isAddrMemMapped(addr))
-    return false;
-
   memMappedRegs_[addr].mask_ = mask;
   memMappedRegs_[addr].size_ = size;
+  return true;
+}
+
+
+bool
+PmaManager::defineRegion(unsigned ix, uint64_t firstAddr, uint64_t lastAddr, Pma pma)
+{
+  Region region{firstAddr, lastAddr, pma, true};
+  if (ix >= 128)
+    return false;  // Arbitrary limit.
+
+  if (ix >= regions_.size())
+    regions_.resize(ix + 1);
+  regions_.at(ix) = region;
+
+  // If definition comes from config file, remember memory mapped address range.
+  if (pma.hasMemMappedReg())
+    {
+      if (ix >= memMappedRanges_.size())
+	memMappedRanges_.resize(ix + 1);
+      memMappedRanges_.at(ix) = std::make_pair(firstAddr, lastAddr);
+    }
   return true;
 }
 
@@ -124,13 +139,9 @@ PmaManager::readRegister(uint64_t addr, uint32_t& value) const
     return false;  // Not word aligned.
 
   auto iter = memMappedRegs_.find(addr);
-  if (iter == memMappedRegs_.end())
-    return false;
+  if (iter != memMappedRegs_.end())
+    value = iter->second.value_;
 
-  if (iter->second.size_ != 4)
-    return false;
-
-  value = iter->second.value_;
   return true;
 }
 
@@ -164,15 +175,12 @@ PmaManager::writeRegister(uint64_t addr, uint64_t value)
   return true;
 }
 
-
 bool
-PmaManager::checkRegisterWrite(uint64_t addr, unsigned size) const
+PmaManager::checkRegisterWrite(uint64_t addr, [[maybe_unused]] unsigned size) const
 {
-  auto iter = memMappedRegs_.find(addr);
-  if (iter == memMappedRegs_.end())
-    return false;
 
-  return iter->second.size_ == size;
+  auto iter = memMappedRegs_.find(addr);
+  return iter != memMappedRegs_.end();
 }
 
 
@@ -258,4 +266,15 @@ PmaManager::printPmas(std::ostream& os) const
       printRegion(os, region);
       os << '\n';
     }
+}
+
+
+void
+PmaManager::updateMemMappedAttrib(unsigned ix)
+{
+  auto& region = regions_.at(ix);
+
+  for (auto& range : memMappedRanges_)
+    if (region.overlaps(range.first, range.second))
+      region.pma_.enable(Pma::Attrib::MemMapped);
 }

@@ -36,7 +36,7 @@ namespace WdRiscv
        None = 0, Read = 1, Write = 2, Exec = 4, Idempotent = 8,
        AmoOther = 0x10,  // for amo add/min/max
        AmoSwap = 0x20, AmoLogical = 0x40,
-       Iccm = 0x80, Dccm = 0x100, MemMapped = 0x200, Rsrv = 0x400,
+       MemMapped = 0x200, Rsrv = 0x400,
        Io = 0x800, Cacheable = 0x1000,
        MisalOk = 0x2000, // True if misaligned access supported.
        MisalAccFault = 0x4000, // Set if misaligned generates access fault.
@@ -46,8 +46,7 @@ namespace WdRiscv
        Default = Read | Write | Exec | Idempotent | Amo | Rsrv | MisalOk
       };
 
-    /// Default constructor: No access allowed. No-dccm, no-iccm,
-    /// no-mmr, no-atomic.
+    /// Default constructor: No access allowed, no-mmr, no-atomic.
     Pma(Attrib a = None)
       : attrib_(a)
     { }
@@ -55,19 +54,10 @@ namespace WdRiscv
     /// Return true if associated address region is mapped (accessible
     /// for read, write, or execute).
     bool isMapped() const
-    { return attrib_ & (Mapped | MemMapped); }
+    { return attrib_ & Mapped; }
 
-    /// Return true if ICCM region (instruction closely coupled
-    /// memory).
-    bool isIccm() const
-    { return attrib_ & Iccm; }
-
-    /// Return true if DCCM region (data closely coupled memory).
-    bool isDccm() const
-    { return attrib_ & Dccm; }
-
-    /// Return true if memory-mapped-register region.
-    bool isMemMappedReg() const
+    /// Return true if region has memory mapped register(s).
+    bool hasMemMappedReg() const
     { return attrib_ & MemMapped; }
 
     /// Return true if idempotent region (non-IO region).
@@ -80,11 +70,11 @@ namespace WdRiscv
 
     /// Return true if readable (load instructions allowed) region.
     bool isRead() const
-    { return attrib_ & (Read | MemMapped); }
+    { return attrib_ & Read; }
 
     /// Return true if writeable (store instructions allowed) region.
     bool isWrite() const
-    { return attrib_ & (Write | MemMapped); }
+    { return attrib_ & Write; }
 
     /// Return true if executable (fetch allowed) region.
     bool isExec() const
@@ -147,10 +137,9 @@ namespace WdRiscv
     uint32_t attributesToInt()
     { return attrib_; }
 
-    /// Convert given string to a Pma object. Return true on success
-    /// return false if string does not contain a valid attribute names.
-    /// Valid names: none, read, write, execute, idempotent, amo, iccm,
-    /// dccm, mem_mapped, rsrv, io.
+    /// Convert given string to a Pma object. Return true on success return false if
+    /// string does not contain a valid attribute names.  Valid names: none, read, write,
+    /// execute, idempotent, amo, mem_mapped, rsrv, io.
     static bool stringToAttrib(std::string_view str, Attrib& attrib);
 
     static std::string attributesToString(uint32_t attrib);
@@ -247,25 +236,13 @@ namespace WdRiscv
       return false;
     }
 
-    /// Define a physical memory attribute region at given index ix
-    /// (indices are 0 to n-1 where n is the region count). Regions
-    /// are checked in order order (if an address is covered by
-    /// multiple regions, then the first defined region applies). The
-    /// defined region consists of the word-aligned words with
-    /// addresses between fistAddr and lastAddr inclusive. For
-    /// example, if firstAddr is 5 and lastAddr is 13, then the
-    /// defined region consists of the words at 8 and 12 (bytes 8 to
-    /// 15).
-    bool defineRegion(unsigned ix, uint64_t firstAddr, uint64_t lastAddr, Pma pma)
-    {
-      Region region{firstAddr, lastAddr, pma, true};
-      if (ix >= 128)
-	return false;  // Arbitrary limit.
-      if (ix >= regions_.size())
-	regions_.resize(ix + 1);
-      regions_.at(ix) = region;
-      return true;
-    }
+    /// Define a physical memory attribute region at given index ix (indices are 0 to n-1
+    /// where n is the region count). Regions are checked in order order (if an address is
+    /// covered by multiple regions, then the first defined region applies). The defined
+    /// region consists of the word-aligned words with addresses between fistAddr and
+    /// lastAddr inclusive. For example, if firstAddr is 5 and lastAddr is 13, then the
+    /// defined region consists of the words at 8 and 12 (bytes 8 to 15).
+    bool defineRegion(unsigned ix, uint64_t firstAddr, uint64_t lastAddr, Pma pma);
 
     /// Mark entry at given index as invalid.
     void invalidateEntry(unsigned ix)
@@ -287,14 +264,15 @@ namespace WdRiscv
     /// with given address.
     uint64_t getMemMappedMask(uint64_t addr) const;
 
-    /// Return true if the word-algined word containing given address
-    /// is in data closed coupled memory.
-    bool isAddrInDccm(size_t addr) const
-    { Pma pma = getPma(addr); return pma.isDccm(); }
-
-    /// Return true if given address is in memory-mapped register region.
-    bool isAddrMemMapped(size_t addr) const
-    { Pma pma = getPma(addr); return pma.isMemMappedReg(); }
+    /// Return true if given address is whitin a memory mapped register.
+    bool isMemMappedReg(size_t addr) const
+    {
+      addr = (addr >> 2) << 2;   // Make a multiple of 4.
+      if (memMappedRegs_.find(addr) != memMappedRegs_.end())
+	return true;
+      addr = (addr >> 3) << 3;   // Make a multiple of 8.
+      return memMappedRegs_.find(addr) != memMappedRegs_.end();
+    }
 
     /// Enable misaligned data access in default PMA.
     void enableMisalignedData(bool flag)
@@ -330,6 +308,9 @@ namespace WdRiscv
     /// Print current pma map.
     void printPmas(std::ostream& os) const;
 
+    // Mark region as having memory mapped registers if it overlapps such registers.
+    void updateMemMappedAttrib(unsigned ix);
+
   protected:
 
     /// Reset (to zero) all memory mapped registers.
@@ -348,10 +329,28 @@ namespace WdRiscv
     /// register.  This interface is for double-word sized registers.
     bool readRegister(uint64_t addr, uint64_t& value) const;
 
-    /// Interface for reading a register of an invalid (not word and
-    /// not double-word) size.
-    bool readRegister(uint64_t, auto&) const
-    { return false; }
+    /// Interface for reading a memory-mapped register where the size is neither 4 nor 8.
+    /// Fail if address is not word/double-word aligned. Fail if no such register.
+    bool readRegister(uint64_t addr, auto& value) const
+    {
+      // Try reading a double-word register.
+      uint64_t u64 = 0;
+      if (readRegister(addr, u64))
+	{
+	  value = u64;
+	  return true;
+	}
+
+      // Try a word register.
+      uint32_t u32 = 0;
+      if (readRegister(addr, u32))
+	{
+	  value = u32;
+	  return true;
+	}
+
+      return false;
+    }
 
     /// Set the value of the memory mapped regiser at addr to the
     /// given value returning true if addr is valid. Return false if
@@ -377,6 +376,9 @@ namespace WdRiscv
 
     struct Region
     {
+      bool overlaps(uint64_t low, uint64_t high) const
+      { return not (high < firstAddr_ or low > lastAddr_); }
+
       uint64_t firstAddr_ = 0;
       uint64_t lastAddr_ = 0;
       Pma pma_;
@@ -410,6 +412,8 @@ namespace WdRiscv
 
     std::vector<Region> regions_;
     std::unordered_map<uint64_t, MemMappedReg> memMappedRegs_;
+    std::vector<std::pair<uint64_t, uint64_t>> memMappedRanges_;
+
     bool trace_ = false;  // Collect stats if true.
     mutable std::vector<PmaTrace> pmaTrace_;
 

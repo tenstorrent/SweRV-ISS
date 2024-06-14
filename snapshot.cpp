@@ -57,16 +57,7 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
   if (csr)
     ofs << "c 0x" << unsigned(CN::MISA) << " 0x" << csr->read() << "\n";
 
-  // Write PMACFG in reverse order.
-  for (unsigned i = unsigned(CN::PMACFG63); i >= unsigned(CN::PMACFG32); i--)
-    {
-      auto csr = csRegs_.findCsr(CN(i));
-      if (not csr or not csr->isImplemented())
-	continue;
-      if (csr->read() != csr->getResetValue())
-	ofs << "c 0x" << i << " 0x" << csr->read() << "\n";
-    }
-  for (unsigned i = unsigned(CN::PMACFG31); i >= unsigned(CN::PMACFG0); i--)
+  for (unsigned i = unsigned(CN::PMACFG15); i >= unsigned(CN::PMACFG0); i--)
     {
       auto csr = csRegs_.findCsr(CN(i));
       if (not csr or not csr->isImplemented())
@@ -78,8 +69,7 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
   for (unsigned i = unsigned(CN::MIN_CSR_); i <= unsigned(CN::MAX_CSR_); i++)
     {
       if ( (i == unsigned(CN::MISA)) or
-	   (i >= unsigned(CN::PMACFG0) and i <= unsigned(CN::PMACFG31)) or
-	   (i >= unsigned(CN::PMACFG32) and i <= unsigned(CN::PMACFG63)) )
+	   (i >= unsigned(CN::PMACFG0) and i <= unsigned(CN::PMACFG15)))
 	continue;
       auto csr = csRegs_.findCsr(CN(i));
       if (not csr or not csr->isImplemented())

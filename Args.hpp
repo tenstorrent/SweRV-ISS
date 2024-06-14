@@ -37,7 +37,7 @@ namespace WdRiscv
       for (auto& arg : args)
 	argv.push_back(arg.data());
       return parseCmdLineArgs(std::span(argv.data(), argv.size()));
-    }			      
+    }
 
     /// Helper to parseCmdLineArgs.
     bool collectCommandLineValues(const boost::program_options::variables_map& varMap);
@@ -90,6 +90,7 @@ namespace WdRiscv
     StringVec   isaVec;                    // Extensions from isa string rv32/rv64 removed.
     std::string targetSep = " ";           // Target program argument separator.
     StringVec   pciDevs;                   // PCI device list.
+    StringVec   envVars;                   // Environment variables.
 
     std::optional<std::string> toHostSym;
     std::optional<std::string> consoleIoSym;

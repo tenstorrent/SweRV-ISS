@@ -305,16 +305,16 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 	oss << ":0x" << ldStPhysAddr1_;
       tmp += " [" + oss.str() + "]";
     }
-  else if (not vecRegs_.ldStAddr_.empty())
+  else if (not vecRegs_.ldStVa_.empty())
     {
       std::ostringstream oss;
-      for (uint64_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
+      for (uint64_t i = 0; i < vecRegs_.ldStVa_.size(); ++i)
         {
           if (i > 0)
             oss << ";";
-          oss << "0x" << std::hex << vecRegs_.ldStAddr_.at(i);
-          if (vecRegs_.ldStPhysAddr_.at(i) != vecRegs_.ldStAddr_.at(i))
-            oss << ":0x" << vecRegs_.ldStPhysAddr_.at(i);
+          oss << "0x" << std::hex << vecRegs_.ldStVa_.at(i);
+          if (vecRegs_.ldStPa_.at(i) != vecRegs_.ldStVa_.at(i))
+            oss << ":0x" << vecRegs_.ldStPa_.at(i);
           if (i < vecRegs_.stData_.size())
             oss << '=' << "0x" << vecRegs_.stData_.at(i);
         }
@@ -338,6 +338,14 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   URV value = 0;
   if (reg > 0)
     {
+      if (di.instId() == InstId::amocas_q)  // amocas_q modifies 2 registers.
+	{
+	  assert((reg & 1) == 1);
+	  value = intRegs_.read(reg - 1);
+	  formatInstTrace<URV>(out, tag, *this, instSV, 'r', reg - 1, value, tmp);
+	  fprintf(out, " +\n");
+	  pending = true;
+	}
       value = intRegs_.read(reg);
       formatInstTrace<URV>(out, tag, *this, instSV, 'r', reg, value, tmp);
       pending = true;
@@ -372,7 +380,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     }
 
   // Process memory diff.
-  if (ldStWrite_)
+  if (ldStWrite_ and not di.isVector())
     {
       if (pending)
         fprintf(out, "  +\n");
@@ -699,7 +707,22 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   // Memory
   buffer.printChar(',');
   uint64_t virtDataAddr = 0, physDataAddr = 0;
-  if (lastLdStAddress(virtDataAddr, physDataAddr))
+  if (not vecRegs_.ldStVa_.empty())
+    {
+      for (uint64_t i = 0; i < vecRegs_.ldStVa_.size(); ++i)
+        {
+          if (i > 0)
+            buffer.printChar(';');
+          buffer.print(vecRegs_.ldStVa_.at(i));
+          if (vecRegs_.ldStPa_.at(i) != vecRegs_.ldStVa_.at(i))
+            buffer.printChar(':').print(vecRegs_.ldStPa_.at(i));
+          if (i < vecRegs_.maskedAddr_.size() and vecRegs_.maskedAddr_.at(i))
+            buffer.printChar('m');
+          if (i < vecRegs_.stData_.size())
+            buffer.printChar('=').print(vecRegs_.stData_.at(i));
+        }
+    }
+  else if (lastLdStAddress(virtDataAddr, physDataAddr))
     {
       bool store = ldStWrite_;
       buffer.print(virtDataAddr);
@@ -707,21 +730,6 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
         buffer.printChar(':').print(physDataAddr);
       if (store)
         buffer.printChar('=').print(ldStData_);
-    }
-  else if (not vecRegs_.ldStAddr_.empty())
-    {
-      for (uint64_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
-        {
-          if (i > 0)
-            buffer.printChar(';');
-          buffer.print(vecRegs_.ldStAddr_.at(i));
-          if (vecRegs_.ldStPhysAddr_.at(i) != vecRegs_.ldStAddr_.at(i))
-            buffer.printChar(':').print(vecRegs_.ldStPhysAddr_.at(i));
-          if (i < vecRegs_.maskedAddr_.size() and vecRegs_.maskedAddr_.at(i))
-            buffer.printChar('m');
-          if (i < vecRegs_.stData_.size())
-            buffer.printChar('=').print(vecRegs_.stData_.at(i));
-        }
     }
 
   // Instruction information.

@@ -142,7 +142,7 @@ namespace WdRiscv
     /// within a system of cores -- see sysHartIndex method) and
     /// associate it with the given memory. The MHARTID is configured as
     /// a read-only CSR with a reset value of hartId.
-    Hart(unsigned hartIx, URV hartId, Memory& memory, uint64_t& time);
+    Hart(unsigned hartIx, URV hartId, Memory& memory, Syscall<URV>& syscall, uint64_t& time);
 
     /// Destructor.
     ~Hart();
@@ -331,6 +331,16 @@ namespace WdRiscv
     /// Enable/disable exec-opcode triggering (disabled by default).
     void configExecOpcodeTrigger(bool flag)
     { csRegs_.configExecOpcodeTrigger(flag); }
+
+    /// Enable/disable matching all addresses in a load/store access
+    /// for debug triggering.
+    void configAllLdStAddrTrigger(bool flag)
+    { csRegs_.configAllLdStAddrTrigger(flag); }
+
+    /// Enable/disable matching all addresses in a instruction fetch
+    /// access for debug triggering.
+    void configAllInstAddrTrigger(bool flag)
+    { csRegs_.configAllInstAddrTrigger(flag); }
 
     /// Configure machine mode performance counters returning true on
     /// success and false on failure. N consecutive counters starting
@@ -594,11 +604,14 @@ namespace WdRiscv
     { ownTrace_ = flag; }
 
     /// Define memory mapped locations for CLINT.
-    void configAclint(uint64_t mswiOffset, bool hasMswi,
+    void configAclint(uint64_t base, uint64_t size, uint64_t mswiOffset, bool hasMswi,
                       uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
 		      bool softwareInterruptOnReset, bool deliverInterrupts,
                       std::function<Hart<URV>*(unsigned ix)> indexToHart)
     {
+      aclintBase_ = base;
+      aclintSize_ = size;
+
       if (hasMswi)
         {
           aclintSwStart_ = mswiOffset;
@@ -769,11 +782,19 @@ namespace WdRiscv
     /// Undefine address to which a write will stop the simulator
     void clearToHostAddress();
 
-    /// Set address to the special address writing to which stops the
-    /// simulation. Return true on success and false on failure (no
-    /// such address defined).
+    /// Set address to the special address writing to which stops the simulation. Return
+    /// true on success and false on failure (no such address defined).
     bool getToHostAddress(uint64_t& address) const
     { if (toHostValid_) address = toHost_; return toHostValid_; }
+
+    /// Set address to the special address writing to which stops the simulation. Return
+    /// true on success and false on failure (no such address defined).
+    bool getFromHostAddress(uint64_t& address) const
+    { if (fromHostValid_) address = toHost_; return fromHostValid_; }
+
+    /// Return true if given address is an HTIF address.
+    bool isHtifAddr(uint64_t a) const
+    { return (toHostValid_ and a == toHost_) or (fromHostValid_ and a == fromHost_); }
 
     /// Program counter.
     URV pc() const
@@ -964,6 +985,10 @@ namespace WdRiscv
     /// Get executed instruction count.
     uint64_t getInstructionCount() const
     { return instCounter_; }
+
+    /// Get the time CSR value.
+    uint64_t getTime() const
+    { return time_; }
 
     /// Return count of traps (exceptions or interrupts) seen by this
     /// hart.
@@ -1159,11 +1184,12 @@ namespace WdRiscv
     /// RISCV page address larger than or equal to the given address.
     void setTargetProgramBreak(URV addr);
 
-    /// For Linux emulation: Put the program arguments on the stack
-    /// suitable for calling the target program main from _start.
-    /// Return true on success and false on failure (not all stack
-    /// area required is writable).
-    bool setTargetProgramArgs(const std::vector<std::string>& args);
+    /// For Linux emulation: Put the program arguments and user-specified
+    /// environment variables on the stack suitable for calling the
+    /// target program main from _start. Return true on success and
+    /// false on failure (not all stack area required is writable).
+    bool setTargetProgramArgs(const std::vector<std::string>& args,
+                              const std::vector<std::string>& envVars);
 
     /// Return physical memory attribute region of a given address.
     Pma getPma(uint64_t addr) const
@@ -1396,6 +1422,10 @@ namespace WdRiscv
     bool isRvzvksh() const
     { return extensionIsEnabled(RvExtension::Zvksh); }
 
+    /// Return true if the vector Zvkb extension is enabled.
+    bool isRvzvkb() const
+    { return extensionIsEnabled(RvExtension::Zvkb); }
+
     /// Return true if the zicond extension is enabled.
     bool isRvzicond() const
     { return extensionIsEnabled(RvExtension::Zicond); }
@@ -1436,11 +1466,6 @@ namespace WdRiscv
     /// Mark target program as finished/non-finished based on flag.
     void setTargetProgramFinished(bool flag)
     { targetProgFinished_ = flag; }
-
-    /// Make atomic memory operations illegal/legal outside of the DCCM
-    /// region based on the value of flag (true/false).
-    void setAmoInDccmOnly(bool flag)
-    { amoInDccmOnly_ = flag; }
 
     /// Make atomic memory operations illegal/legal for non cacheable
     /// memory based on the value of flag (true/false).
@@ -1808,6 +1833,10 @@ namespace WdRiscv
     bool definePmaRegion(unsigned ix, uint64_t low, uint64_t high, Pma pma)
     { return memory_.pmaMgr_.defineRegion(ix, low, high, pma); }
 
+    /// Return true if given address is within a memory mapped register.
+    bool isMemMappedReg(size_t addr) const
+    { return memory_.pmaMgr_.isMemMappedReg(addr); }
+
     /// Mark as invalid entry with the given index.
     void invalidatePmaEntry(unsigned ix)
     { memory_.pmaMgr_.invalidateEntry(ix); }
@@ -2056,6 +2085,12 @@ namespace WdRiscv
     void configVectorLegalizeVsetvliAvl(bool flag)
     { vecRegs_.configVectorLegalizeVsetvliAvl(flag); }
 
+    /// If flag is true, make VL/VSTART value a multiple of EGS in vector-crypto
+    /// instructions that have EGS. Otherwise, trigger an exceptio if VL/VSTART is not a
+    /// mulitple of EGS for such instrucions.
+    void configVectorLegalizeForEgs(bool flag)
+    { vecRegs_.configLegalizeForEgs(flag); }
+
     /// Support memory consistency model (MCM) instruction cache. Read 2 bytes from the
     /// given address (must be even) into inst. Return true on success.  Return false if
     /// the line of the given address is not in the cache.
@@ -2087,7 +2122,7 @@ namespace WdRiscv
 
     /// Return true if ACLINT is configured.
     bool hasAclint() const
-    { return (aclintSwStart_ < aclintSwEnd_) or (aclintMtimerStart_ < aclintMtimerEnd_); }
+    { return aclintSize_ > 0; }
 
     /// Set the ACLINT alarm to the given value.
     bool hasAclintTimer(uint64_t& addr) const
@@ -2117,10 +2152,7 @@ namespace WdRiscv
 				   uint64_t& gPhysAddr, uint32_t& instr);
 
     bool isAclintAddr(uint64_t addr) const
-    {
-      return hasAclint() and ((addr >= aclintSwStart_ and addr < aclintSwEnd_) or
-                              (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_));
-    }
+    { return hasAclint() and addr >= aclintBase_ and addr < aclintBase_ + aclintSize_; }
 
     bool isAclintMtimeAddr(uint64_t addr) const
     { return addr >= aclintMtimeStart_ and addr < aclintMtimeEnd_; }
@@ -2150,6 +2182,17 @@ namespace WdRiscv
     /// cancel-lr at the right time.
     void setWrsCancelsLr(bool flag)
     { wrsCancelsLr_ = flag; }
+
+    /// Set hart suspend state. If true, run will have no effect. If suspended,
+    /// reset the resume time.
+    void setSuspendState(bool flag, uint64_t timeout = 0)
+    {
+      suspended_ = flag;
+      resumeTime_ = flag? time_ + timeout : 0;
+    }
+
+    bool isSuspended()
+    { return suspended_; }
 
   protected:
 
@@ -2602,6 +2645,13 @@ namespace WdRiscv
                                           uint64_t& gaddr1, uint64_t& gaddr2,
 					  unsigned ldSize, bool hyper);
 
+    /// Helper to load method. Vaddr is the virtual address. Paddr1 is the physical
+    /// address.  Paddr2 is identical to paddr1 for non-page-crossing loads; otherwise, it
+    /// is the physical address on the other page.
+    template<typename LOAD_TYPE>
+    bool readForLoad(const DecodedInst* di, uint64_t vaddr, uint64_t paddr1,
+		     uint64_t paddr2, uint64_t& data);
+
     /// Helper to the cache block operation (cbo) instructions.
     ExceptionCause determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa,
 					 bool isZero);
@@ -2630,6 +2680,12 @@ namespace WdRiscv
     ExceptionCause determineStoreException(uint64_t& addr1, uint64_t& addr2,
                                            uint64_t& gaddr1, uint64_t& gaddr2,
 					   unsigned stSize, bool hyper);
+
+    /// Helper to store method. Vaddr is the virtual address. Paddr1 is the physical
+    /// address.  Paddr2 is identical to paddr1 for non-page-crossing sores; otherwise, it
+    /// is the physical address on the other page.
+    template<typename STORE_TYPE>
+    bool writeForStore(uint64_t vaddr, uint64_t paddr1, uint64_t paddr2, STORE_TYPE data);
 
     /// Helper to execLr. Load type must be int32_t, or int64_t.
     /// Return true if instruction is successful. Return false if an
@@ -2682,9 +2738,9 @@ namespace WdRiscv
     /// Return true if one or more load-address/store-address trigger has a hit on the
     /// given address and given timing (before/after). Set the hit bit of all the triggers
     /// that trip.
-    bool ldStAddrTriggerHit(URV addr, TriggerTiming t, bool isLoad)
+    bool ldStAddrTriggerHit(URV addr, unsigned size, TriggerTiming t, bool isLoad)
     {
-      return csRegs_.ldStAddrTriggerHit(addr, t, isLoad, privilegeMode(), virtMode(),
+      return csRegs_.ldStAddrTriggerHit(addr, size, t, isLoad, privilegeMode(), virtMode(),
 					isInterruptEnabled());
     }
 
@@ -2699,9 +2755,9 @@ namespace WdRiscv
 
     /// Return true if one or more execution trigger has a hit on the given address and
     /// given timing (before/after). Set the hit bit of all the triggers that trip.
-    bool instAddrTriggerHit(URV addr, TriggerTiming t)
+    bool instAddrTriggerHit(URV addr, unsigned size, TriggerTiming t)
     {
-      return csRegs_.instAddrTriggerHit(addr, t, privilegeMode(), virtMode(),
+      return csRegs_.instAddrTriggerHit(addr, size, t, privilegeMode(), virtMode(),
 					isInterruptEnabled());
     }
 
@@ -2843,12 +2899,10 @@ namespace WdRiscv
     /// illegal instruction.
     void unimplemented(const DecodedInst*);
 
-    /// Check address associated with an atomic memory operation (AMO)
-    /// instruction. Return true if AMO access is allowed. Return
-    /// false triggering an exception if address is misaligned or if
-    /// it is out of DCCM range in DCCM-only mode. If successful, the
-    /// given virtual addr is replaced by the translated physical
-    /// address.
+    /// Check address associated with an atomic memory operation (AMO) instruction. Return
+    /// true if AMO access is allowed. Return false triggering an exception if address is
+    /// misaligned.  If successful, the given virtual addr is replaced by the translated
+    /// physical address.
     ExceptionCause validateAmoAddr(uint64_t& addr, uint64_t& gaddr, unsigned accessSize);
 
     /// Do the load value part of a word-sized AMO instruction. Return
@@ -5021,7 +5075,7 @@ namespace WdRiscv
     FpRegs fpRegs_;              // Floating point registers.
     VecRegs vecRegs_;            // Vector register file.
 
-    Syscall<URV> syscall_;
+    Syscall<URV>& syscall_;
     URV syscallSlam_ = 0;        // Area in which to slam syscall mem changes.
 
     bool forceRounding_ = false;
@@ -5048,6 +5102,8 @@ namespace WdRiscv
     bool conIoValid_ = false;    // True if conIo_ is valid.
     bool enableConIn_ = true;
 
+    uint64_t aclintBase_ = 0;
+    uint64_t aclintSize_ = 0;
     uint64_t aclintSwStart_ = 0;
     uint64_t aclintSwEnd_ = 0;
     uint64_t aclintMtimerStart_ = 0;
@@ -5123,7 +5179,6 @@ namespace WdRiscv
     int gdbTcpPort_ = -1;           // Enable gdb mode.
     bool newlib_ = false;           // Enable newlib system calls.
     bool linux_ = false;            // Enable linux system calls.
-    bool amoInDccmOnly_ = false;
     bool amoInCacheableOnly_ = false;
 
     uint32_t perfControl_ = ~0;     // Performance counter control
@@ -5188,9 +5243,6 @@ namespace WdRiscv
 
     // Indexed by exception cause.
     std::vector<uint64_t> exceptionStat_;
-
-    // Ith entry is true if ith region has pic
-    std::vector<bool> regionHasMemMappedRegs_;
 
     // Decoded instruction cache.
     std::vector<DecodedInst> decodeCache_;
@@ -5318,6 +5370,9 @@ namespace WdRiscv
       uint8_t value_ = 0;
     };
     InterruptAlarm swInterrupt_;
+
+    bool suspended_ = false;      // If true, don't execute instructions.
+    uint64_t resumeTime_ = 0;     // If non-zero, resume from suspension after time is greater than this value.
   };
 }
 

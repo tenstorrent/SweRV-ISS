@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -82,9 +82,10 @@ parseNumber(std::string_view numberStr, TYPE& number)
 
 
 template <typename URV>
-Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory, uint64_t& time)
+Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory, Syscall<URV>& syscall, uint64_t& time)
   : hartIx_(hartIx), memory_(memory), intRegs_(32),
-    fpRegs_(32), syscall_(*this),
+    fpRegs_(32),
+    syscall_(syscall),
     time_(time),
     pmpManager_(memory.size(), UINT64_C(1024)*1024),
     virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16)
@@ -361,6 +362,7 @@ Hart<URV>::processExtensions(bool verbose)
   enableExtension(RvExtension::Zvknhb,   isa_.isEnabled(RvExtension::Zvknhb));
   enableExtension(RvExtension::Zvksed,   isa_.isEnabled(RvExtension::Zvksed));
   enableExtension(RvExtension::Zvksh,    isa_.isEnabled(RvExtension::Zvksh));
+  enableExtension(RvExtension::Zvkb,     isa_.isEnabled(RvExtension::Zvkb));
   enableExtension(RvExtension::Zicond,   isa_.isEnabled(RvExtension::Zicond));
   enableExtension(RvExtension::Zcb,      isa_.isEnabled(RvExtension::Zcb));
   enableExtension(RvExtension::Zfa,      isa_.isEnabled(RvExtension::Zfa));
@@ -464,7 +466,7 @@ Hart<URV>::unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
 
   if (entryIx >= 64)
     return false;
-  
+
   CsrNumber csrn = CsrNumber(unsigned(CsrNumber::PMPADDR0) + entryIx);
 
   unsigned config = csRegs_.getPmpConfigByteFromPmpAddr(csrn);
@@ -493,7 +495,7 @@ Hart<URV>::unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
           low = (low >> pmpG) << pmpG;  // Clear least sig G bits.
           low = low << 2;
         }
-              
+
       high = pmpVal;
       high = (high >> pmpG) << pmpG;
       high = high << 2;
@@ -671,13 +673,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   // If any PMACFG CSR is defined, change the default PMA to no access.
   bool hasPmacfg = false;
   using CN = CsrNumber;
-  for (unsigned ix = unsigned(CN::PMACFG0); ix <= unsigned(CN::PMACFG31); ++ix)
-    if (csRegs_.getImplementedCsr(CN(ix)))
-      {
-	hasPmacfg = true;
-	processPmaChange(CN(ix));
-      }
-  for (unsigned ix = unsigned(CN::PMACFG32); ix <= unsigned(CN::PMACFG63); ++ix)
+  for (unsigned ix = unsigned(CN::PMACFG0); ix <= unsigned(CN::PMACFG15); ++ix)
     if (csRegs_.getImplementedCsr(CN(ix)))
       {
 	hasPmacfg = true;
@@ -861,7 +857,7 @@ Hart<URV>::peekMemory(uint64_t address, uint8_t& val, bool usePma) const
 {
   return memory_.peek(address, val, usePma);
 }
-  
+
 
 template <typename URV>
 bool
@@ -883,8 +879,10 @@ template <typename URV>
 bool
 Hart<URV>::peekMemory(uint64_t address, uint64_t& val, bool usePma) const
 {
-  uint32_t high = 0, low = 0;
+  if (memory_.peek(address, val, usePma))
+    return true;
 
+  uint32_t high = 0, low = 0;
   if (memory_.peek(address, low, usePma) and memory_.peek(address + 4, high, usePma))
     {
       val = (uint64_t(high) << 32) | low;
@@ -1211,9 +1209,9 @@ printSignedHisto(const char* tag, const std::vector<uintmax_t>& histo,
     fprintf(file, "    %s (2,     16] %jd\n", tag, histo.at(9));
   if (histo.at(10))
     fprintf(file, "    %s (16,    1k] %jd\n", tag, histo.at(10));
-  if (histo.at(11))	              
+  if (histo.at(11))
     fprintf(file, "    %s (1k,   64k] %jd\n", tag, histo.at(11));
-  if (histo.at(12))	              
+  if (histo.at(12))
     fprintf(file, "    %s > 64k       %jd\n", tag, histo.at(12));
 }
 
@@ -1479,7 +1477,7 @@ void
 Hart<URV>::reportLrScStat(FILE* file) const
 {
   fprintf(file, "Load-reserve dispatched: %jd\n", uintmax_t(lrCount_));
-  fprintf(file, "Load-reserve successful: %jd\n", uintmax_t(lrSuccess_)); 
+  fprintf(file, "Load-reserve successful: %jd\n", uintmax_t(lrSuccess_));
   fprintf(file, "Store-conditional dispatched: %jd\n", uintmax_t(scCount_));
   fprintf(file, "Store-conditional successful: %jd\n", uintmax_t(scSuccess_));
 }
@@ -1512,8 +1510,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
   addr1 = gaddr1 = va1;
   addr2 = gaddr2 = va2;  // Phys addr of 2nd page when crossing page boundary.
 
-  // Misaligned load from io section triggers an exception. Crossing
-  // dccm to non-dccm causes an exception.
+  // Misaligned load from io section triggers an exception.
   uint64_t alignMask = ldSize - 1;
   bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;
@@ -1557,16 +1554,6 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
         }
     }
 
-  if (steeEnabled_)
-    {
-      if (not stee_.isValidAccess(addr1, ldSize))
-	return EC::LOAD_ACC_FAULT;
-      if (addr2 != addr1 and not stee_.isValidAccess(addr2, ldSize))
-	return EC::LOAD_ACC_FAULT;
-      addr1 = stee_.clearSecureBits(addr1);
-      addr2 = stee_.clearSecureBits(addr2);
-    }
-
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
@@ -1576,6 +1563,16 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
       if (not pmp.isRead(effPm)  or  (virtMem_.isExecForRead() and not pmp.isExec(effPm)))
 	return EC::LOAD_ACC_FAULT;
+    }
+
+  if (steeEnabled_)
+    {
+      if (not stee_.isValidAccess(addr1, ldSize))
+	return EC::LOAD_ACC_FAULT;
+      if (addr2 != addr1 and not stee_.isValidAccess(addr2, ldSize))
+	return EC::LOAD_ACC_FAULT;
+      addr1 = stee_.clearSecureBits(addr1);
+      addr2 = stee_.clearSecureBits(addr2);
     }
 
   Pma pma = getPma(addr1);
@@ -1741,8 +1738,8 @@ readCharNonBlocking(int fd)
 	  if (prev == 1 and c == 'x')
 	    throw CoreException(CoreException::Stop, "Keyboard stop", 0, 3);
 	  prev = c;
-	}	  
-	
+	}
+
       return c;
     }
 
@@ -1758,8 +1755,8 @@ readCharNonBlocking(int fd)
 
 template <typename URV>
 bool
-Hart<URV>::getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
-			   uint64_t& value)
+Hart<URV>::getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2,
+			   unsigned size, uint64_t& value)
 {
   if (not ooo_)
     return false;
@@ -1774,7 +1771,6 @@ Hart<URV>::getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned siz
 
 template <typename URV>
 template <typename LOAD_TYPE>
-inline
 bool
 Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool hyper, uint64_t& data)
 {
@@ -1788,12 +1784,9 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/))
+      if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
 	triggerTripped_ = true;
     }
-
-  // Unsigned version of LOAD_TYPE
-  using ULT = typename std::make_unsigned<LOAD_TYPE>::type;
 
   uint64_t addr1 = virtAddr;
   uint64_t addr2 = addr1;
@@ -1810,6 +1803,23 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
 
+  return readForLoad<LOAD_TYPE>(di, virtAddr, addr1, addr2, data);
+#endif
+}
+
+
+
+template <typename URV>
+template <typename LOAD_TYPE>
+bool
+Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
+		       [[maybe_unused]] uint64_t addr1, [[maybe_unused]] uint64_t addr2,
+		       uint64_t& data)
+{
+#ifdef FAST_SLOPPY
+  return fastLoad<LOAD_TYPE>(di, virtAddr, data);
+#else
+
   // Loading from console-io does a standard input read.
   if (conIoValid_ and addr1 == conIo_ and enableConIn_ and not triggerTripped_)
     {
@@ -1822,6 +1832,9 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
       data = 0;
       return true;
     }
+
+  // Unsigned version of LOAD_TYPE
+  using ULT = typename std::make_unsigned<LOAD_TYPE>::type;
 
   ULT uval = 0;   // Unsigned loaded value
   bool device = false;  // True if loading from a device.
@@ -1854,7 +1867,7 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
       if (ooo_)
 	{
 	  uint64_t oooVal = 0;
-	  getOooLoadValue(virtAddr, addr1, addr2, ldStSize_, oooVal);
+	  getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), oooVal);
 	}
     }
   else
@@ -1863,7 +1876,7 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
       if (ooo_)   // Out of order execution (mcm or perfApi)
 	{
 	  uint64_t oooVal = 0;
-	  hasOooVal = getOooLoadValue(virtAddr, addr1, addr2, ldStSize_, oooVal);
+	  hasOooVal = getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), oooVal);
 	  if (hasOooVal)
 	    uval = oooVal;
 	}
@@ -2021,7 +2034,7 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
-  if (hasTrig and (ldStAddrTriggerHit(virtAddr, timing, isLd) or
+  if (hasTrig and (ldStAddrTriggerHit(virtAddr, ldStSize_, timing, isLd) or
                    ldStDataTriggerHit(storeVal, timing, isLd)))
       triggerTripped_ = true;
 
@@ -2043,6 +2056,16 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
       return false;
     }
 
+  return writeForStore<STORE_TYPE>(virtAddr, pa1, pa2, storeVal);
+#endif
+}
+
+
+template <typename URV>
+template <typename STORE_TYPE>
+bool
+Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TYPE storeVal)
+{
   // If addr is special location, then write to console.
   if (conIoValid_ and pa1 == conIo_)
     {
@@ -2126,8 +2149,6 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   memPeek(pa1, pa2, temp, false /*usePma*/);
   ldStData_ = temp;
   return true;
-
-#endif
 }
 
 
@@ -2307,7 +2328,7 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
 template <typename URV>
 inline
 ExceptionCause
-Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, uint64_t& physAddr2,
+Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, [[maybe_unused]] uint64_t& physAddr2,
 			   uint64_t& gPhysAddr, uint32_t& inst)
 {
 #ifdef FAST_SLOPPY
@@ -2894,7 +2915,7 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
   if (hasActiveTrigger())
     {
       if (interrupt)
-	{	
+	{
 	  if (csRegs_.intTriggerHit(cause, privMode_, virtMode_, isInterruptEnabled()))
 	    initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
 	}
@@ -2979,7 +3000,7 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
   mstatus_.bits_.MPIE = mstatus_.bits_.MIE;
   mstatus_.bits_.MIE = 0;
   writeMstatus();
-  
+
   // Clear pending nmi bit in dcsr
   URV dcsrVal = 0;
   if (peekCsr(CsrNumber::DCSR, dcsrVal))
@@ -2997,7 +3018,7 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
 template <typename URV>
 bool
 Hart<URV>::peekIntReg(unsigned ix, URV& val) const
-{ 
+{
   if (ix < intRegs_.size())
     {
       val = intRegs_.read(ix);
@@ -3010,7 +3031,7 @@ Hart<URV>::peekIntReg(unsigned ix, URV& val) const
 template <typename URV>
 URV
 Hart<URV>::peekIntReg(unsigned ix) const
-{ 
+{
   assert(ix < intRegs_.size());
   return intRegs_.read(ix);
 }
@@ -3019,7 +3040,7 @@ Hart<URV>::peekIntReg(unsigned ix) const
 template <typename URV>
 bool
 Hart<URV>::peekIntReg(unsigned ix, URV& val, std::string_view& name) const
-{ 
+{
   if (ix < intRegs_.size())
     {
       val = intRegs_.read(ix);
@@ -3033,7 +3054,7 @@ Hart<URV>::peekIntReg(unsigned ix, URV& val, std::string_view& name) const
 template <typename URV>
 bool
 Hart<URV>::peekFpReg(unsigned ix, uint64_t& val) const
-{ 
+{
   if (not isRvf() and not isRvd())
     return false;
 
@@ -3050,7 +3071,7 @@ Hart<URV>::peekFpReg(unsigned ix, uint64_t& val) const
 template <typename URV>
 bool
 Hart<URV>::peekUnboxedFpReg(unsigned ix, uint64_t& val) const
-{ 
+{
   if (not isRvf() and not isRvd())
     return false;
 
@@ -3067,7 +3088,7 @@ Hart<URV>::peekUnboxedFpReg(unsigned ix, uint64_t& val) const
 template <typename URV>
 bool
 Hart<URV>::pokeFpReg(unsigned ix, uint64_t val)
-{ 
+{
   if (not isRvf() and not isRvd())
     return false;
 
@@ -3084,7 +3105,7 @@ Hart<URV>::pokeFpReg(unsigned ix, uint64_t val)
 template <typename URV>
 bool
 Hart<URV>::pokeIntReg(unsigned ix, URV val)
-{ 
+{
   if (ix < intRegs_.size())
     {
       intRegs_.poke(ix, val);
@@ -3112,7 +3133,7 @@ template <typename URV>
 bool
 Hart<URV>::peekCsr(CsrNumber csrn, URV& val, URV& reset, URV& writeMask,
 		   URV& pokeMask, URV& readMask) const
-{ 
+{
   const Csr<URV>* csr = csRegs_.getImplementedCsr(csrn);
   if (not csr)
     return false;
@@ -3237,10 +3258,8 @@ Hart<URV>::processPmaChange(CsrNumber csr)
   using CN = CsrNumber;
 
   unsigned ix = unsigned(csr);
-  if (ix >= unsigned(CN::PMACFG0) and ix <= unsigned(CN::PMACFG31))
+  if (ix >= unsigned(CN::PMACFG0) and ix <= unsigned(CN::PMACFG15))
     ix -= unsigned(CN::PMACFG0);
-  else  if (ix >= unsigned(CN::PMACFG32) and ix <= unsigned(CN::PMACFG63))
-    ix = 32 + ix - unsigned(CN::PMACFG32);
   else
     return false;
 
@@ -3253,9 +3272,15 @@ Hart<URV>::processPmaChange(CsrNumber csr)
   bool valid = false;
   unpackPmacfg(val, valid, low, high, pma);
   if (valid)
-    definePmaRegion(ix, low, high, pma);
-  else
-    invalidatePmaEntry(ix);
+    {
+      if (not definePmaRegion(ix, low, high, pma))
+	return false;
+      // Mark region as having memory mapped registers if it overlapps such registers.
+      memory_.pmaMgr_.updateMemMappedAttrib(ix);
+      return true;
+    }
+
+  invalidatePmaEntry(ix);
   return true;
 }
 
@@ -3299,8 +3324,7 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       return;
     }
 
-  if ((csr >= CN::PMACFG0 and csr <= CN::PMACFG31) or
-      (csr >= CN::PMACFG32 and csr <= CN::PMACFG63))
+  if (csr >= CN::PMACFG0 and csr <= CN::PMACFG15)
     {
       if (not processPmaChange(csr))
 	assert(0);
@@ -3602,7 +3626,7 @@ Hart<URV>::configIsa(std::string_view isa, bool updateMisa)
 	misaReset |= URV(0x1000);
       if (isa_.isEnabled(RvExtension::V))
 	misaReset |= URV(0x200000);
-  
+
       URV mask = 0, pokeMask = 0;
       bool implemented = true, shared = true;
 
@@ -3920,7 +3944,7 @@ Hart<URV>::updatePerformanceCounters(const DecodedInst& di)
       else
 	pregs.updateCounters(EventNumber::Atomic, prevPerfControl_, lastPriv_, lastVirt_);
       break;
-      
+
     case RvExtension::F:
       pregs.updateCounters(EventNumber::FpSingle, prevPerfControl_, lastPriv_, lastVirt_);
       break;
@@ -3932,7 +3956,7 @@ Hart<URV>::updatePerformanceCounters(const DecodedInst& di)
     case RvExtension::Zfh:
       pregs.updateCounters(EventNumber::FpHalf, prevPerfControl_, lastPriv_, lastVirt_);
       break;
-      
+
     case RvExtension::V:
       pregs.updateCounters(EventNumber::Vector, prevPerfControl_, lastPriv_, lastVirt_);
       break;
@@ -4071,7 +4095,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 	  prof.destRegFreq_.at(di.op0())++; opIx++;
 	  rd = static_cast<int>(di.op0());
 	  // unsigned groupX8 = 8;
-	  // rd = vecRegs_.getLastWrittenReg(groupX8); 
+	  // rd = vecRegs_.getLastWrittenReg(groupX8);
 	  // assert(rd == di.op0());    // Does not work for load seg.
 	}
       else if (rdType == OperandType::CsReg)
@@ -4299,7 +4323,8 @@ pokeString(Hart<URV>& hart, uint64_t addr, std::string_view str)
 template <typename URV>
 inline
 bool
-Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
+Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args,
+                                const std::vector<std::string>& envVars)
 {
   URV sp = 0;
 
@@ -4321,10 +4346,18 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
     }
   argvAddrs.push_back(0);  // Null pointer at end of argv.
 
-  // Setup envp on the stack (LANG is needed for clang compiled code).
+  // Setup default envp on the stack (LANG is needed for clang compiled code).
   static constexpr auto envs = std::to_array<std::string_view>({ "LANG=C", "LC_ALL=C" });
   std::vector<URV> envpAddrs;  // Addresses of the envp strings.
   for (const auto& env : envs)
+    {
+      sp -= env.size() + 1;  // Make room for env entry and null char.
+      envpAddrs.push_back(sp);
+      if (not pokeString(*this, sp, env))
+	return false;
+    }
+  // Setup user envp on the stack.
+  for (const auto& env : envVars)
     {
       sp -= env.size() + 1;  // Make room for env entry and null char.
       envpAddrs.push_back(sp);
@@ -4516,7 +4549,7 @@ public:
   {
     sigaction(SIGINT, &prevKbdAction_, nullptr);
   }
-  
+
 private:
 
   struct sigaction prevKbdAction_;
@@ -4526,12 +4559,11 @@ private:
 template <typename URV>
 inline
 bool
-Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
-				FILE* file)
+Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst, FILE* file)
 {
   // Process pre-execute address trigger and fetch instruction.
   bool hasTrig = hasActiveInstTrigger();
-  triggerTripped_ = hasTrig and instAddrTriggerHit(addr, TriggerTiming::Before);
+  triggerTripped_ = hasTrig and instAddrTriggerHit(addr, 4 /*size*/, TriggerTiming::Before);
   // Fetch instruction.
   bool fetchOk = true;
   if (triggerTripped_)
@@ -4591,6 +4623,14 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
     {
       if (userStop)
         break;
+
+      if (suspended_)
+        {
+          if (resumeTime_ and time_ > resumeTime_)
+            setSuspendState(false);
+          continue;
+        }
+
       resetExecInfo(); clearTraceData();
 
       if (enableGdb_ and ++gdbCount >= gdbLimit)
@@ -4626,16 +4666,23 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	  static std::mutex execMutex;
 	  auto lock = (ownTrace_)? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(execMutex);
 
-          uint32_t inst = 0;
-	  currPc_ = pc_;
-
-	  ++instCounter_;
-
           if (not hartIx_)
             {
               ++timeSample_;
               time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
             }
+
+          if (suspended_)
+            {
+              if (resumeTime_ and time_ > resumeTime_)
+                setSuspendState(false);
+              continue;
+            }
+
+          uint32_t inst = 0;
+	  currPc_ = pc_;
+
+	  ++instCounter_;
 
 	  if (mcycleEnabled())
 	    ++cycleCount_;
@@ -4736,7 +4783,7 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
   SignalHandlers handlers;
 
   bool success = untilAddress(address, traceFile);
-      
+
   if (instCounter_ >= limit)
     std::cerr << "Stopped -- Reached instruction limit hart=" << hartIx_ << "\n";
   else if (pc_ == address)
@@ -4918,18 +4965,25 @@ Hart<URV>::simpleRunWithLimit()
   bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
   bool prevIsBranch = true;  // For basic block tracing.
 
-  while (noUserStop and instCounter_ < limit) 
+  while (noUserStop and instCounter_ < limit)
     {
-      resetExecInfo();
-
-      currPc_ = pc_;
-      ++instCounter_;
-
       if (not hartIx_)
         {
           ++timeSample_;
           time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
         }
+
+      if (suspended_)
+        {
+          if (resumeTime_ and time_ > resumeTime_)
+            setSuspendState(false);
+          continue;
+        }
+
+      resetExecInfo();
+
+      currPc_ = pc_;
+      ++instCounter_;
 
       if (mcycleEnabled())
 	++cycleCount_;
@@ -4977,6 +5031,19 @@ Hart<URV>::simpleRunNoLimit()
 {
   while (noUserStop)
     {
+      if (not hartIx_)
+        {
+          ++timeSample_;
+          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+        }
+
+      if (suspended_)
+        {
+          if (resumeTime_ and time_ > resumeTime_)
+            setSuspendState(false);
+          continue;
+        }
+
       currPc_ = pc_;
       ++instCounter_;
 
@@ -5010,7 +5077,7 @@ Hart<URV>::saveBranchTrace(const std::string& path)
       std::cerr << "Failed to open branch-trace output file '" << path << "' for writing\n";
       return false;
     }
-  
+
   for (auto iter = branchBuffer_.begin(); iter != branchBuffer_.end(); ++iter)
     {
       auto& rec = *iter;
@@ -5135,7 +5202,7 @@ Hart<URV>::run(FILE* file)
                   or enableCounters_ or alarmInterval_ or file
 		  or __tracerExtension or hasInterruptor_ or initStateFile_);
   if (complex)
-    return runUntilAddress(stopAddr, file); 
+    return runUntilAddress(stopAddr, file);
 
   uint64_t counter0 = instCounter_;
 
@@ -5483,18 +5550,25 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 
   try
     {
+      if (not hartIx_)
+        {
+          ++timeSample_;
+          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+        }
+
+      if (suspended_)
+        {
+          if (resumeTime_ and time_ > resumeTime_)
+            setSuspendState(false);
+          return;
+        }
+
       uint32_t inst = 0;
       currPc_ = pc_;
 
       resetExecInfo(); clearTraceData();
 
       ++instCounter_;
-
-      if (not hartIx_)
-        {
-          ++timeSample_;
-          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
-        }
 
       if (processExternalInterrupt(traceFile, instStr))
 	return;  // Next instruction in interrupt handler.
@@ -9431,7 +9505,7 @@ Hart<URV>::exitDebugMode()
   cancelLr(CancelLrCause::EXIT_DEBUG);  // Exiting debug modes loses LR reservation.
 
   pc_ = peekCsr(CsrNumber::DPC);  // Restore PC
-  
+
   debugMode_ = false;
   csRegs_.enterDebug(false);
 
@@ -9828,7 +9902,7 @@ Hart<URV>::execEcall(const DecodedInst*)
 
   if (newlib_ or linux_ or syscallSlam_)
     {
-      URV a0 = syscall_.emulate();
+      URV a0 = syscall_.emulate(hartIx_);
       intRegs_.write(RegA0, a0);
       if (not syscallSlam_)
         return;
@@ -9905,7 +9979,7 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User)
     {
       if (virtMode_)
@@ -10132,7 +10206,7 @@ namespace WdRiscv
     if (not csRegs_.read(CsrNumber::MEPC, privMode_, epc))
       illegalInst(di);
     setPc(epc);
-      
+
     // 3. Update virtual mode.
     if (savedMode != PrivilegeMode::Machine)
       setVirtualMode(savedVirt);
@@ -10337,7 +10411,7 @@ Hart<URV>::execDret(const DecodedInst* di)
   cancelLr(CancelLrCause::EXIT_DEBUG);  // Exiting debug modes loses LR reservation.
 
   pc_ = peekCsr(CsrNumber::DPC);  // Restore PC
-  
+
   debugMode_ = false;
   csRegs_.enterDebug(false);
 
@@ -10513,10 +10587,10 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
     hsq = hsq and isCsrWriteable(csr, PM::Supervisor, false /*virtMode*/);
 
   if (virtMode_ and hsq )
-    virtualInst(di);  // HS qualified 
+    virtualInst(di);  // HS qualified
   else
     illegalInst(di);
-  
+
   return false;
 }
 
@@ -11188,6 +11262,17 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
         }
     }
 
+  // Physical memory protection. Assuming grain size is >= 8.
+  if (pmpEnabled_)
+    {
+      auto effPm = effectivePrivilege();
+      if (hyper)
+	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
+      const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
+      if (not pmp.isWrite(effPm))
+	return EC::STORE_ACC_FAULT;
+    }
+
   if (steeEnabled_)
     {
       if (not stee_.isValidAccess(addr1, stSize))
@@ -11199,17 +11284,6 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	}
       addr1 = stee_.clearSecureBits(addr1);
       addr2 = stee_.clearSecureBits(addr2);
-    }
-
-  // Physical memory protection. Assuming grain size is >= 8.
-  if (pmpEnabled_)
-    {
-      auto effPm = effectivePrivilege();
-      if (hyper)
-	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-      const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
-      if (not pmp.isWrite(effPm))
-	return EC::STORE_ACC_FAULT;
     }
 
   if (misal)
@@ -12032,7 +12106,7 @@ template <typename URV>
 void
 Hart<URV>::execMop_r(const DecodedInst* di)
 {
-    if (not isRvzimop()) 
+    if (not isRvzimop())
       {
         illegalInst(di);
         return;
@@ -12045,7 +12119,7 @@ template <typename URV>
 void
 Hart<URV>::execMop_rr(const DecodedInst* di)
 {
-    if (not isRvzimop()) 
+    if (not isRvzimop())
       {
         illegalInst(di);
         return;
@@ -12058,7 +12132,7 @@ template <typename URV>
 void
 Hart<URV>::execCmop(const DecodedInst* di)
 {
-    if (not isRvzcmop() || not isRvc()) 
+    if (not isRvzcmop() || not isRvc())
       {
         illegalInst(di);
         return;
@@ -12155,6 +12229,96 @@ WdRiscv::Hart<uint64_t>::store<uint32_t>(const DecodedInst*, uint64_t, bool, uin
 template
 bool
 WdRiscv::Hart<uint64_t>::store<uint64_t>(const DecodedInst*, uint64_t, bool, uint64_t, bool);
+
+
+template
+bool
+WdRiscv::Hart<uint32_t>::readForLoad<uint8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::readForLoad<int8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::readForLoad<uint16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::readForLoad<int16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::readForLoad<uint32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::readForLoad<int32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::readForLoad<uint64_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::readForLoad<uint8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::readForLoad<int8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::readForLoad<uint16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::readForLoad<int16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::readForLoad<uint32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::readForLoad<int32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::readForLoad<uint64_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+
+
+template
+bool
+WdRiscv::Hart<uint32_t>::writeForStore<uint8_t>(uint64_t, uint64_t, uint64_t, uint8_t);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::writeForStore<uint16_t>(uint64_t, uint64_t, uint64_t, uint16_t);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::writeForStore<uint32_t>(uint64_t, uint64_t, uint64_t, uint32_t);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::writeForStore<uint64_t>(uint64_t, uint64_t, uint64_t, uint64_t);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::writeForStore<uint8_t>(uint64_t, uint64_t, uint64_t, uint8_t);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::writeForStore<uint16_t>(uint64_t, uint64_t, uint64_t, uint16_t);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::writeForStore<uint32_t>(uint64_t, uint64_t, uint64_t, uint32_t);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::writeForStore<uint64_t>(uint64_t, uint64_t, uint64_t, uint64_t);
 
 
 template class WdRiscv::Hart<uint32_t>;

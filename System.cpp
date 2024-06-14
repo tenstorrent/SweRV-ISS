@@ -49,6 +49,7 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
   cores_.resize(coreCount);
 
   memory_ = std::make_unique<Memory>(memSize, pageSize);
+  syscall_ = std::make_unique<Syscall<URV>>(sysHarts_, memSize);
   sparseMem_ = nullptr;
 
   Memory& mem = *memory_;
@@ -57,7 +58,7 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
   for (unsigned ix = 0; ix < coreCount; ++ix)
     {
       URV coreHartId = ix * hartIdOffset;
-      cores_.at(ix) = std::make_shared<CoreClass>(coreHartId, ix, hartsPerCore, mem, time_);
+      cores_.at(ix) = std::make_shared<CoreClass>(coreHartId, ix, hartsPerCore, mem, *syscall_, time_);
 
       // Maintain a vector of all the harts in the system.  Map hart-id to index
       // of hart in system.

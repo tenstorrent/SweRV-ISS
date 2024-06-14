@@ -175,6 +175,19 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
     if (not system.loadSnapshot(args.loadFrom))
       return false;
 
+
+  if (linux and checkForOpenMp(args))
+    {
+      if (args.verbose)
+        std::cerr << "Found OpenMP in executable. To emulate clone, we suspend "
+                     "all harts other than hart 0.\n";
+      for (unsigned i = 1; i < system.hartCount(); ++i)
+        {
+          auto& hart = *system.ithHart(i);
+          hart.setSuspendState(true);
+        }
+    }
+
   // Set instruction count limit.
   if (args.instCountLim)
     for (unsigned i = 0; i < system.hartCount(); ++i)
@@ -475,6 +488,22 @@ Session<URV>::checkForNewlibOrLinux(const Args& args, bool& newlib, bool& linux)
 
 template<typename URV>
 bool
+Session<URV>::checkForOpenMp(const Args& args)
+{
+  bool foundOpenMp = false;
+  for (auto target : args.expandedTargets)
+    {
+      auto elfPath = target.at(0);
+      foundOpenMp = Memory::isSymbolInElfFile(elfPath, "gomp_init_num_threads");
+      if (foundOpenMp)
+        break;
+    }
+  return foundOpenMp;
+}
+
+
+template<typename URV>
+bool
 Session<URV>::determineIsa(const HartConfig& config, const Args& args, bool clib,
 			   std::string& isa)
 {
@@ -699,8 +728,8 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
 
   if (args.clint)
     {
-      uint64_t swAddr = *args.clint;
-      config.configAclint(system, hart, swAddr, 0 /* swOffset */, true /* hasMswi */,
+      uint64_t swAddr = *args.clint, size = 0xc000;
+      config.configAclint(system, hart, swAddr, size, swAddr, 0 /* swOffset */, true /* hasMswi */,
                           0x4000 /* timerOffset */, 0xbff8 /* timeOffset */, true /* hasMtimer */);
     }
 
@@ -808,7 +837,7 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
       if (clib)
 	{
 	  if (args.loadFrom.empty())
-	    if (not hart.setTargetProgramArgs(args.expandedTargets.front()))
+	    if (not hart.setTargetProgramArgs(args.expandedTargets.front(), args.envVars))
 	      {
 		size_t memSize = hart.memorySize();
 		size_t suggestedStack = memSize - 4;
@@ -822,9 +851,9 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
 		errors++;
 	      }
 	}
-      else if (args.expandedTargets.front().size() > 1)
+      else if (args.expandedTargets.front().size() > 1 or not args.envVars.empty())
 	{
-	  std::cerr << "Warning: Target program options present which requires\n"
+	  std::cerr << "Warning: Target program options or env vars present which requires\n"
 		    << "         the use of --newlib/--linux. Options ignored.\n";
 	}
     }

@@ -261,6 +261,32 @@ namespace WdRiscv
       return (inst() & 0x7f) == 0x27 and (f3 == 0 or f3 >= 5);
     }
 
+    /// Return the element size in bytes of a vector load instruction. Return zero for a
+    /// non-vector-load instruction.
+    unsigned vecLoadElemSize() const
+    {
+      if (not isVectorLoad()) return 0;
+      unsigned f3 = (inst() >> 12) & 7;
+      if (f3 == 0) return 1;
+      if (f3 == 5) return 2;
+      if (f3 == 6) return 4;
+      if (f3 == 7) return 8;
+      return 0;
+    }
+
+    /// Return the element size in bytes of a vector store instruction. Return zero for a
+    /// non-vector-store instruction.
+    unsigned vecStoreElemSize() const
+    {
+      if (not isVectorStore()) return 0;
+      unsigned f3 = (inst() >> 12) & 7;
+      if (f3 == 0) return 1;
+      if (f3 == 5) return 2;
+      if (f3 == 6) return 4;
+      if (f3 == 7) return 8;
+      return 0;
+    }
+
     /// Return true if this a CSR instruction.
     bool isCsr() const
     { return entry_ and entry_->isCsr(); }

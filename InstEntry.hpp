@@ -256,7 +256,7 @@ namespace WdRiscv
 
     /// Return true if this is an atomic instruction.
     bool isAtomic() const
-    { return ext_ == RvExtension::A; }
+    { return ext_ == RvExtension::A or ext_ == RvExtension::Zacas; }
 
     /// Return true if this is a hypervisor instruction.
     bool isHypervisor() const

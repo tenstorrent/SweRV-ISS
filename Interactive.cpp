@@ -2230,11 +2230,6 @@ Interactive<URV>::mbinsertCommand(Hart<URV>& hart, const std::string& line,
   uint64_t size = 0;
   if (not parseCmdLineNumber("size", tokens.at(3), size))
     return false;
-  if (size > 8)
-    {
-      std::cerr << "Invalid mbinsert size: " << size << " -- Expecting 0 to 8\n";
-      return false;
-    }
 
   uint64_t data = 0;
   if (not parseCmdLineNumber("data", tokens.at(4), data))

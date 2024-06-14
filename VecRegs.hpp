@@ -469,6 +469,30 @@ namespace WdRiscv
     void configVectorLegalizeVsetvliAvl(bool flag)
     { legalizeVsetvliAvl_ = flag; }
 
+    /// If flag is true, make VL/VSTART value a multiple of EGS in vector-crypto
+    /// instructions that have EGS. Otherwise, trigger an exceptio if VL/VSTART is not a
+    /// mulitple of EGS for such instrucions.
+    void configLegalizeForEgs(bool flag)
+    { legalizeForEgs_ = flag; }
+
+    /// Return true if elems/vstart is a multiple of EGS or if it is legalized to be a
+    /// multiple of egs. Return false if legalization is not enabled and elems/vstart is
+    /// not a multiple of EGS. This is for some vector-crypto instructions.
+    bool validateForEgs(unsigned egs, unsigned& vl, unsigned& vstart) const
+    {
+      if (legalizeForEgs_)
+	{
+	  if ((vl % egs) != 0)
+	    vl = vl - (vl % egs);
+
+	  if ((vstart % egs) != 0)
+	    vstart = vstart - (vstart % egs);
+	  return true;
+	}
+
+      return (vl % egs) == 0  and  (vstart % egs) == 0;
+    }
+
     /// Return a string representation of the given group multiplier.
     static constexpr std::string_view to_string(GroupMultiplier group)
     {
@@ -530,7 +554,7 @@ namespace WdRiscv
     }
 
     const std::vector<uint64_t>& ldStAddrs() const
-    { return ldStAddr_; }
+    { return ldStVa_; }
 
     const std::vector<bool>& maskedAddrs() const
     { return maskedAddr_; }
@@ -580,8 +604,9 @@ namespace WdRiscv
     void clearTraceData()
     {
       ldStSize_ = 0;
-      ldStAddr_.clear();
-      ldStPhysAddr_.clear();
+      ldStVa_.clear();
+      ldStPa_.clear();
+      ldStPa2_.clear();
       maskedAddr_.clear();
       stData_.clear();
       fpFlags_.clear();
@@ -858,6 +883,7 @@ namespace WdRiscv
     bool fpUnorderedSumTreeRed_ = false; // True if unordered fp reduction should use a reduction tree computation
     bool legalizeVsetvlAvl_ = false; // If true legalize VL to VLMAX if vtype is legal (if applicable).
     bool legalizeVsetvliAvl_ = false; // If true legalize VL to VLMAX if vtype is legal (if applicable).
+    bool legalizeForEgs_ = false;
 
     uint32_t groupX8_ = 8;    // Group multiplier as a number scaled by 8.
     uint32_t sewInBits_ = 8;  // SEW expressed in bits (Byte corresponds to 8).
@@ -870,14 +896,15 @@ namespace WdRiscv
 
     // Following used for logging/tracing. Cleared before each instruction.
     // Collected by a vector load/store instruction.
-    unsigned ldStSize_ = 0;               // Vector load/store element size.
-    std::vector<uint64_t> ldStAddr_;      // Addresses of vector load/store instruction.
-    std::vector<uint64_t> ldStPhysAddr_;  // Phys addresses of vector load/store instruction (FIXME: page crosses).
-    std::vector<bool> maskedAddr_;        // True if address is masked off (element skipped).
-    std::vector<Step> steps_;             // Incremental steps taken by previous instruction (useful for vector instruction debug).
-    std::vector<uint8_t> fpFlags_;        // Incremental fp flags (useful for vector instruction debug).
-    std::vector<uint8_t> vxsat_;          // VXSAT per-element operation (useful for vector instruction debug).
-    std::vector<uint64_t> stData_;        // Data of vector store instruction.
-    std::vector<unsigned> opsEmul_;       // Effective grouping of vector operands.
+    unsigned ldStSize_ = 0;           // Vector load/store element size.
+    std::vector<uint64_t> ldStVa_;    // Virtual addresses of vector load/store instruction.
+    std::vector<uint64_t> ldStPa_;    // Phys addresses of vector load/store instruction.
+    std::vector<uint64_t> ldStPa2_;   // For page crossers: addr on 2nd page, otherwise same as ldStPa_.
+    std::vector<bool> maskedAddr_;    // True if address is masked off (element skipped).
+    std::vector<Step> steps_;         // Incremental steps taken by previous instruction (useful for vector instruction debug).
+    std::vector<uint8_t> fpFlags_;    // Incremental fp flags (useful for vector instruction debug).
+    std::vector<uint8_t> vxsat_;      // VXSAT per-element operation (useful for vector instruction debug).
+    std::vector<uint64_t> stData_;    // Data of vector store instruction.
+    std::vector<unsigned> opsEmul_;   // Effective grouping of vector operands.
   };
 }

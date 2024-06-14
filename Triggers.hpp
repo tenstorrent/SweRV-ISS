@@ -404,7 +404,7 @@ namespace WdRiscv
       if (isDebugModeOnly() and not debugMode)
 	return false;
 
-      info_ = (value & infoWriteMask_) | (data2_ & ~infoWriteMask_);
+      info_.value_ = (value & infoWriteMask_) | (info_.value_ & ~infoWriteMask_);
       modifiedInfo_ = true;
 
       return true;
@@ -437,7 +437,7 @@ namespace WdRiscv
     /// Poke tinfo. This allows writing of modifiable bits that are read-only to the CSR
     /// instructions.
     void pokeInfo(URV x)
-    { info_ = (x & infoPokeMask_) | (data3_ & ~infoPokeMask_); }
+    { info_.value_ = (x & infoPokeMask_) | (info_.value_ & ~infoPokeMask_); }
 
     void configData1(URV reset, URV mask, URV pokeMask)
     { data1Reset_ = reset; data1_.value_ = reset; data1WriteMask_ = mask; data1PokeMask_ = pokeMask;}
@@ -495,7 +495,7 @@ namespace WdRiscv
     /// Return true if this trigger is enabled for loads (or stores if
     /// isLoad is false), for addresses, for the given timing and if
     /// it matches the given data address.  Return false otherwise.
-    bool matchLdStAddr(URV address, TriggerTiming timing, bool isLoad,
+    bool matchLdStAddr(URV address, unsigned size, TriggerTiming timing, bool isLoad,
                        PrivilegeMode mode, bool virtMode) const;
 
     /// Return true if this trigger is enabled for loads (or stores if
@@ -507,7 +507,7 @@ namespace WdRiscv
     /// Return true if this trigger is enabled for instruction
     /// addresses (execution), for the given timing and if it matches
     /// the given address. Return false otherwise.
-    bool matchInstAddr(URV address, TriggerTiming timing,
+    bool matchInstAddr(URV address, unsigned size, TriggerTiming timing,
                        PrivilegeMode mode, bool virtMode) const;
 
     /// Return true if this trigger is enabled for instruction opcodes
@@ -641,6 +641,14 @@ namespace WdRiscv
     void enableExecOpcode(bool flag)
     { enableExecOpcode_ = flag; }
 
+    /// Enable all ld/st address matching [address, address+size-1].
+    void enableAllLdStAddrMatch(bool flag)
+    { matchAllLdStAddr_ = flag; }
+
+    /// Enable all inst address matching [address, address+size-1].
+    void enableAllInstAddrMatch(bool flag)
+    { matchAllInstAddr_ = flag; }
+
   protected:
 
     void updateCompareMask()
@@ -698,7 +706,7 @@ namespace WdRiscv
     }
 
     template <typename M>
-    bool matchLdStAddr(URV address, TriggerTiming timing, bool isLoad,
+    bool matchLdStAddr(URV address, unsigned size, TriggerTiming timing, bool isLoad,
                        PrivilegeMode mode, bool virtMode) const;
 
     template <typename M>
@@ -706,7 +714,7 @@ namespace WdRiscv
                        PrivilegeMode mode, bool virtMode) const;
 
     template <typename M>
-    bool matchInstAddr(URV address, TriggerTiming timing,
+    bool matchInstAddr(URV address, unsigned size, TriggerTiming timing,
                        PrivilegeMode mode, bool virtMode) const;
 
     template <typename M>
@@ -750,6 +758,10 @@ namespace WdRiscv
     size_t chainBegin_ = 0, chainEnd_ = 0;
     bool enableLoadData_ = false;
     bool enableExecOpcode_ = false;
+
+    bool matchAllLdStAddr_ = true; // If enabled, attempt to match address against
+                                        // any [address, address+size-1].
+    bool matchAllInstAddr_ = true; // Same as above but for instruction fetch.
   };
 
 
@@ -846,7 +858,7 @@ namespace WdRiscv
     /// load/store trigger that matches. If the trigger action is contingent on interrupts
     /// being enabled (ie == true), then the trigger will not trip even if its condition
     /// is satisfied.
-    bool ldStAddrTriggerHit(URV address, TriggerTiming, bool isLoad,
+    bool ldStAddrTriggerHit(URV address, unsigned size, TriggerTiming, bool isLoad,
                             PrivilegeMode mode, bool virtMode, bool ie);
 
     /// Similar to ldStAddrTriggerHit but for data match.
@@ -854,7 +866,7 @@ namespace WdRiscv
                             PrivilegeMode mode, bool virtMode, bool ie);
 
     /// Similar to ldStAddrTriggerHit but for instruction address.
-    bool instAddrTriggerHit(URV address, TriggerTiming timing,
+    bool instAddrTriggerHit(URV address, unsigned size, TriggerTiming timing,
                             PrivilegeMode mode, bool virtMode, bool ie);
 
     /// Similar to instAddrTriggerHit but for instruction opcode.
@@ -969,6 +981,14 @@ namespace WdRiscv
     /// Enable exec-opcode triggering (disabled by default).
     void enableExecOpcode(bool flag)
     { for ( auto& trig : triggers_) trig.enableExecOpcode(flag); }
+
+    /// Enable all ld/st address matching [address, address+size-1].
+    void enableAllLdStAddrMatch(bool flag)
+    { for ( auto& trig : triggers_) trig.enableAllLdStAddrMatch(flag); }
+
+    /// Enable all inst address matching [address, address+size-1].
+    void enableAllInstAddrMatch(bool flag)
+    { for ( auto& trig : triggers_) trig.enableAllInstAddrMatch(flag); }
 
     /// Reset all triggers.
     void reset();

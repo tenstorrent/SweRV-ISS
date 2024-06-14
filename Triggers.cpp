@@ -72,7 +72,7 @@ Triggers<URV>::readInfo(URV trigger, URV& value) const
 {
   if (trigger >= triggers_.size())
     {
-      value = 1;  // Per spec.
+      value = 0x1000001;  // Per spec.
       return true;
     }
 
@@ -193,7 +193,7 @@ Triggers<URV>::updateChainHitBit(Trigger<URV>& trigger)
 
 template <typename URV>
 bool
-Triggers<URV>::ldStAddrTriggerHit(URV address, TriggerTiming timing,
+Triggers<URV>::ldStAddrTriggerHit(URV address, unsigned size, TriggerTiming timing,
 				  bool isLoad, PrivilegeMode mode,
                                   bool virtMode,
                                   bool interruptEnabled)
@@ -213,7 +213,7 @@ Triggers<URV>::ldStAddrTriggerHit(URV address, TriggerTiming timing,
 	    continue;  // Cannot fire in machine mode.
 	}
 
-      if (not trigger.matchLdStAddr(address, timing, isLoad, mode, virtMode))
+      if (not trigger.matchLdStAddr(address, size, timing, isLoad, mode, virtMode))
 	continue;
 
       trigger.setLocalHit(true);
@@ -260,7 +260,7 @@ Triggers<URV>::ldStDataTriggerHit(URV value, TriggerTiming timing, bool isLoad,
 
 template <typename URV>
 bool
-Triggers<URV>::instAddrTriggerHit(URV address, TriggerTiming timing,
+Triggers<URV>::instAddrTriggerHit(URV address, unsigned size, TriggerTiming timing,
                                   PrivilegeMode mode, bool virtMode, bool interruptEnabled)
 {
   // Check if we should skip tripping because we are running in machine mode and
@@ -278,7 +278,7 @@ Triggers<URV>::instAddrTriggerHit(URV address, TriggerTiming timing,
 	    continue;  // Cannot fire in machine mode.
 	}
 
-      if (not trigger.matchInstAddr(address, timing, mode, virtMode))
+      if (not trigger.matchInstAddr(address, size, timing, mode, virtMode))
 	continue;
 
       trigger.setLocalHit(true);
@@ -680,7 +680,7 @@ Triggers<URV>::defineChainBounds()
 template <typename URV>
 template <typename M>
 bool
-Trigger<URV>::matchLdStAddr(URV address, TriggerTiming timing, bool isLoad,
+Trigger<URV>::matchLdStAddr(URV address, unsigned size, TriggerTiming timing, bool isLoad,
                             PrivilegeMode mode, bool virtMode) const
 {
   const M& ctl = data1_.template mcontrol<M>();
@@ -712,7 +712,54 @@ Trigger<URV>::matchLdStAddr(URV address, TriggerTiming timing, bool isLoad,
 
   if (getTiming() == timing and Select(ctl.select_) == Select::MatchAddress and
       ((isLoad and ctl.load_) or (isStore and ctl.store_)))
-    return doMatch(address);
+    {
+      if constexpr (std::is_same_v<M, decltype(data1_.mcontrol6_)>)
+	{
+	  switch (data1_.mcontrol6_.size_)
+	    {
+	    case 0:   // Match any access size
+              break;
+
+	    case 1:  // Byte access
+	      if (size != 1)
+		return false;
+	      break;
+
+	    case 2:  // half word access
+	      if (size != 2)
+		return false;
+	      break;
+
+	    case 3:  // word access
+	      if (size != 4)
+		return false;
+	      break;
+
+	    case 4:  // 6-byte access
+	      assert(0);  // Not supported
+	      break;
+
+	    case 5:  // double word access
+	      if (size != 8)
+		return false;
+	      break;
+
+	    default:
+	      assert(0);
+	      break;
+	    }
+	}
+
+      if (not matchAllLdStAddr_)
+        return doMatch(address);
+      else
+        {
+          for (unsigned i = 0; i < size; ++i)
+            if (doMatch(address + i))
+              return true;
+          return false;
+        }
+    }
 
   return false;
 }
@@ -720,15 +767,15 @@ Trigger<URV>::matchLdStAddr(URV address, TriggerTiming timing, bool isLoad,
 
 template <typename URV>
 bool
-Trigger<URV>::matchLdStAddr(URV address, TriggerTiming timing, bool isLoad,
+Trigger<URV>::matchLdStAddr(URV address, unsigned size, TriggerTiming timing, bool isLoad,
                             PrivilegeMode mode, bool virtMode) const
 {
   if (not data1_.isAddrData())
     return false;  // Not an address trigger.
   if (data1_.isMcontrol())
-    return matchLdStAddr<decltype(data1_.mcontrol_)>(address, timing, isLoad, mode, virtMode);
+    return matchLdStAddr<decltype(data1_.mcontrol_)>(address, size, timing, isLoad, mode, virtMode);
   else
-    return matchLdStAddr<decltype(data1_.mcontrol6_)>(address, timing, isLoad, mode, virtMode);
+    return matchLdStAddr<decltype(data1_.mcontrol6_)>(address, size, timing, isLoad, mode, virtMode);
 }
 
 
@@ -792,7 +839,7 @@ Trigger<URV>::doMatch(URV item) const
 {
   URV data2 = data2_;
 
-  auto doMatch = [this] (URV item, URV compare, Match match) -> bool {
+  auto helper = [this] (URV item, URV compare, Match match) -> bool {
     switch (match)
       {
       case Match::Equal:
@@ -835,16 +882,17 @@ Trigger<URV>::doMatch(URV item) const
 
   Match match = Match(data1_.mcontrol_.match_);
   if (match >= Match::Equal and match <= Match::MaskLowEqualHigh)
-    return doMatch(item, data2, match);
+    return helper(item, data2, match);
   else
-    return not doMatch(item, data2, Match(uint32_t(match) - 8));
+    return not helper(item, data2, Match(uint32_t(match) - 8));
 }
 
 
 template <typename URV>
 template <typename M>
 bool
-Trigger<URV>::matchInstAddr(URV address, TriggerTiming timing, PrivilegeMode mode, bool virtMode) const
+Trigger<URV>::matchInstAddr(URV address, unsigned size, TriggerTiming timing, PrivilegeMode mode,
+			    bool virtMode) const
 {
   const M& ctl = data1_.template mcontrol<M>();
 
@@ -872,7 +920,54 @@ Trigger<URV>::matchInstAddr(URV address, TriggerTiming timing, PrivilegeMode mod
     return false;
 
   if (getTiming() == timing and Select(ctl.select_) == Select::MatchAddress and ctl.execute_)
-    return doMatch(address);
+    {
+      if constexpr (std::is_same_v<M, decltype(data1_.mcontrol6_)>)
+	{
+	  switch (data1_.mcontrol6_.size_)
+	    {
+	    case 0:   // Match any access size
+              break;
+
+	    case 1:  // Byte access
+	      if (size != 1)
+		return false;
+	      break;
+
+	    case 2:  // half word access
+	      if (size != 2)
+		return false;
+	      break;
+
+	    case 3:  // word access
+	      if (size != 4)
+		return false;
+	      break;
+
+	    case 4:  // 6-byte access
+	      assert(0);  // Not supported
+	      break;
+
+	    case 5:  // double word access
+	      if (size != 8)
+		return false;
+	      break;
+
+	    default:
+	      assert(0);
+	      break;
+	    }
+	}
+
+      if (not matchAllInstAddr_)
+        return doMatch(address);
+      else
+        {
+          for (unsigned i = 0; i < size; ++i)
+            if (doMatch(address + i))
+              return true;
+          return false;
+        }
+    }
 
   return false;
 }
@@ -880,15 +975,15 @@ Trigger<URV>::matchInstAddr(URV address, TriggerTiming timing, PrivilegeMode mod
 
 template <typename URV>
 bool
-Trigger<URV>::matchInstAddr(URV address, TriggerTiming timing,
+Trigger<URV>::matchInstAddr(URV address, unsigned size, TriggerTiming timing,
                             PrivilegeMode mode, bool virtMode) const
 {
   if (not data1_.isAddrData())
     return false;  // Not an address trigger.
   if (data1_.isMcontrol())
-    return matchInstAddr<decltype(data1_.mcontrol_)>(address, timing, mode, virtMode);
+    return matchInstAddr<decltype(data1_.mcontrol_)>(address, size, timing, mode, virtMode);
   else
-    return matchInstAddr<decltype(data1_.mcontrol6_)>(address, timing, mode, virtMode);
+    return matchInstAddr<decltype(data1_.mcontrol6_)>(address, size, timing, mode, virtMode);
 }
 
 

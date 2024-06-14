@@ -446,9 +446,7 @@ namespace WdRiscv
 
       // Tenstorrent Ascalon CSRs
       PMACFG0  = 0x7e0,   // Physical memory protection
-      PMACFG31 = 0x7ff,
-      PMACFG32 = 0xbe0,
-      PMACFG63 = 0xbff,
+      PMACFG15 = 0x7ef,
       C_MATP   = 0x7c7,   // Machine address translation and protection
 
       MAX_CSR_ = 0xfff,
@@ -985,6 +983,16 @@ namespace WdRiscv
     void configExecOpcodeTrigger(bool flag)
     { triggers_.enableExecOpcode(flag); }
 
+    /// Enable/disable matching all addresses in a load/store access
+    /// for debug triggering.
+    void configAllLdStAddrTrigger(bool flag)
+    { triggers_.enableAllLdStAddrMatch(flag); }
+
+    /// Enable/disable matching all addresses in a instruction fetch
+    /// access for debug triggering.
+    void configAllInstAddrTrigger(bool flag)
+    { triggers_.enableAllInstAddrMatch(flag); }
+
     /// Enable triggers.
     void enableTriggers(bool flag);
 
@@ -1032,10 +1040,10 @@ namespace WdRiscv
     /// remaining triggers in its chain have tripped. Set the local-hit bit of any
     /// load/store trigger that matches. If a matching load/store trigger causes its chain
     /// to trip, then set the hit bit of all the triggers in that chain.
-    bool ldStAddrTriggerHit(URV addr, TriggerTiming t, bool isLoad,
+    bool ldStAddrTriggerHit(URV addr, unsigned size, TriggerTiming t, bool isLoad,
                             PrivilegeMode mode, bool virtMode, bool ie)
     {
-      bool chainHit = triggers_.ldStAddrTriggerHit(addr, t, isLoad, mode, virtMode, ie);
+      bool chainHit = triggers_.ldStAddrTriggerHit(addr, size, t, isLoad, mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))
@@ -1056,10 +1064,10 @@ namespace WdRiscv
     }
 
     /// Similar to ldStAddrTriggerHit but for instruction address.
-    bool instAddrTriggerHit(URV addr, TriggerTiming t, PrivilegeMode mode,
+    bool instAddrTriggerHit(URV addr, unsigned size, TriggerTiming t, PrivilegeMode mode,
                             bool virtMode, bool ie)
     {
-      bool chainHit = triggers_.instAddrTriggerHit(addr, t, mode, virtMode, ie);
+      bool chainHit = triggers_.instAddrTriggerHit(addr, size, t, mode, virtMode, ie);
       URV tselect = 0;
       peek(CsrNumber::TSELECT, tselect);
       if (triggers_.getLocalHit(tselect))
