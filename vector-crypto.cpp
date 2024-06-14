@@ -1149,7 +1149,7 @@ Hart<URV>::execVclmul_vv(const DecodedInst* di)
   switch (sew)
     {
     case EW::Word2:
-      vop_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked, MyClmul());
+      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, MyClmul());
       break;
     default:
       postVecFail(di);
@@ -1188,7 +1188,7 @@ Hart<URV>::execVclmul_vx(const DecodedInst* di)
   switch (sew)
     {
     case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyClmul());
+      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MyClmul());
       break;
     default:
       postVecFail(di);
@@ -1225,7 +1225,7 @@ Hart<URV>::execVclmulh_vv(const DecodedInst* di)
   switch (sew)
     {
     case EW::Word2:
-      vop_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked, MyClmulh());
+      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, MyClmulh());
       break;
     default:
       postVecFail(di);
@@ -1264,7 +1264,7 @@ Hart<URV>::execVclmulh_vx(const DecodedInst* di)
   switch (sew)
     {
     case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyClmulh());
+      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MyClmulh());
       break;
     default:
       postVecFail(di);
