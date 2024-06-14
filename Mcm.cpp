@@ -1507,8 +1507,8 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 
 template <typename URV>
 bool
-Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
-			      uint64_t paddr2, unsigned size, uint64_t& value)
+Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, const DecodedInst& di, uint64_t vaddr,
+			      uint64_t paddr1, uint64_t paddr2, unsigned size, uint64_t& value)
 {
   value = 0;
   if (size == 0 or size > 8)
@@ -1541,7 +1541,10 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
   instr->physAddr2_ = paddr2;
 
   // Cancel early read ops that are covered by later ones. Trim wide reads.
-  cancelReplayedReads(instr);
+  if (not di.isVector())
+    cancelReplayedReads(instr);
+  else
+    std::cerr << "Implement cancelReplayedReads for vector.\n";
 
   uint64_t mergeMask = 0;  // Mask of bits obtained from read ops.
   uint64_t merged = 0;     // Value obtained from read ops.
