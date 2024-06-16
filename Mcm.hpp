@@ -445,6 +445,9 @@ namespace WdRiscv
       return addr1 - addr2 < size2;
     }
 
+    bool vecOverlapsPhysAddr(const McmInstr& instr, uint64_t addr) const;
+
+
     /// Return true if given instruction data addresses overlap the given address. Return
     /// false if instruction is not a memory instruction. Instruction must be retired.
     bool overlapsPhysAddr(const McmInstr& instr, uint64_t addr) const
@@ -452,6 +455,10 @@ namespace WdRiscv
       if (not instr.isMemory())
 	return false;
       assert(instr.isRetired());
+
+      if (instr.di_.isVector())
+	return vecOverlapsPhysAddr(instr, addr);
+
       if (instr.physAddr_ == instr.physAddr2_)
 	return instr.physAddr_ <= addr and addr - instr.physAddr_ < instr.size_;
 

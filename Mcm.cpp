@@ -1922,6 +1922,25 @@ Mcm<URV>::latestByteTime(const McmInstr& instr, uint64_t addr) const
 
 template <typename URV>
 bool
+Mcm<URV>::vecOverlapsPhysAddr(const McmInstr& instr, uint64_t addr) const
+{
+  // FIX: Make sure instrucion memory ops are trimmed.
+  assert(instr.di_.isVector());
+
+  for (auto opIx : instr.memOps_)
+    {
+      auto& op = sysMemOps_.at(opIx);
+      if (op.overlaps(addr))
+	return true;
+      return false;
+    }
+
+  return false;
+}
+
+
+template <typename URV>
+bool
 Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
 {
   if (instrA.isCanceled())
