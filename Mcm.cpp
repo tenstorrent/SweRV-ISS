@@ -555,7 +555,13 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
   uint64_t vaddr = 0, paddr = 0, paddr2 = 0, value = 0;
   unsigned stSize = hart.lastStore(vaddr, paddr, paddr2, value);
   if (not stSize)
-    return true;   // Not a store.
+    {
+      std::vector<uint64_t> addr, data;
+      unsigned elemSize = 0;
+      if (not hart.getLastVectorMemory(addr, data, elemSize))
+	return true;   // Not a store.
+      stSize = elemSize;
+    }
 
   instr.size_ = stSize;
   instr.virtAddr_ = vaddr;
@@ -682,7 +688,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   // If instruction is a store, save address, size, and written data.
   bool ok = true;
-  if (di.isStore() or di.isAmo())
+  if (di.isStore() or di.isAmo() or di.isVectorStore())
     ok = retireStore(hart, *instr);
 
   // Check read operations of instruction comparing RTL values to model (whisper) values.
