@@ -1162,38 +1162,6 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& storeInstr) const
 }
 
 
-template <typename URV>
-void
-Mcm<URV>::clearMaskBitsForWrite(const McmInstr& store, const McmInstr& target,
-				unsigned& mask) const
-{
-  if (not store.isStore_ or not target.isMemory() or not store.overlaps(target))
-    return;
-
-  if (not store.isRetired() or not target.isRetired())
-    return;
-
-  if (store.virtAddr_ <= target.virtAddr_)
-    {
-      uint64_t overlap = store.virtAddr_ + store.size_ - target.virtAddr_;
-      if (overlap >= target.size_)
-	mask = 0;
-      else
-	{
-	  unsigned m = (1 << overlap) - 1;
-	  mask = mask & ~m;
-	}
-      return;
-    }
-  
-  uint64_t end = std::min(target.virtAddr_ + target.size_, store.virtAddr_ + store.size_);
-  uint64_t overlap = end - store.virtAddr_;
-  unsigned m = (1 << overlap) - 1;
-  m = m << (store.virtAddr_ - target.virtAddr_);
-  mask = mask & ~m;
-}
-
-
 /// Return a mask where the ith bit is set if addr + i is in the range
 /// [cover, cover + coverSize - 1]
 unsigned
@@ -2073,7 +2041,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
   // Bytes of B written by stores from the local hart.
-  std::unordered_set<uint8_t> locallyWritten;
+  std::unordered_set<uint64_t> locallyWritten;
 
   for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
@@ -2087,18 +2055,9 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	  not instrA.overlaps(instrB))
 	continue;
 
-      if (instrA.isStore_)
-	for (auto opIx : instrB.memOps_)
-	  {
-	    const auto& op = sysMemOps_.at(opIx);
-	    for (unsigned i = 0; i < op.size_; ++i)
-	      {
-		uint64_t addr = op.physAddr_ + i;
-		if (overlapsPhysAddr(instrA, addr))
-		  locallyWritten.insert(addr);
-	      }
-	  }
-
+      // If a byte of B is written by A, then put its physical address in locallyWriten.
+      identifyWrittenBytes(instrA, instrB, locallyWritten);
+ 
       if (not instrA.isLoad_ or isBeforeInMemoryTime(instrA, instrB))
 	continue;
 
@@ -2170,9 +2129,8 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 
   auto earlyB = earliestOpTime(instrB);
 
-  // Bit i of mask is 1 if byte i of data of instruction B is not written by a preceding
-  // store.
-  unsigned mask = (1 << instrB.size_) - 1;
+  // Addrresses of bytes of B written by preceeding non-atomic stores in local hart.
+  std::unordered_set<uint64_t> locallyWritten;
 
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
@@ -2191,22 +2149,26 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
       if (not instrA.isStore_ or not instrA.overlaps(instrB))
 	continue;
 
-      // If A is not atomic remove from mask the bytes of B that are covered by A. Done
-      // when all bytes of B are covered.
-      assert(instrA.di_.isValid());
-      if (not instrA.di_.isAtomic())
+      // Check if a byte of B is written by A.
+      for (auto opIx : instrB.memOps_)
 	{
-	  clearMaskBitsForWrite(instrA, instrB, mask);
-	  if (mask == 0)
-	    return true;   // All bytes of B written by non-atomic stores.
-	}
-      else if (not isBeforeInMemoryTime(instrA, instrB))
-	{
-	  cerr << "Error: PPO rule 3 failed: hart-id=" << hart.hartId() << " tag1="
-	       << instrA.tag_ << " tag2=" << instrB.tag_ << " time1="
-	       << latestOpTime(instrA) << " time2=" << earlyB
-	       << '\n';
-	  return false;
+	  const auto& op = sysMemOps_.at(opIx);
+	  for (unsigned i = 0; i < op.size_; ++i)
+	    {
+	      uint64_t addr = op.physAddr_ + i;
+	      if (locallyWritten.contains(addr))
+		continue;
+	      if (not instrA.di_.isAtomic())
+		locallyWritten.insert(addr);
+	      else if (not isBeforeInMemoryTime(instrA, instrB))
+		{
+		  cerr << "Error: PPO rule 3 failed: hart-id=" << hart.hartId() << " tag1="
+		       << instrA.tag_ << " tag2=" << instrB.tag_ << " time1="
+		       << latestOpTime(instrA) << " time2=" << earlyB
+		       << '\n';
+		  return false;
+		}
+	    }
 	}
     }
 

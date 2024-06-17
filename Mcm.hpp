@@ -445,8 +445,9 @@ namespace WdRiscv
       return addr1 - addr2 < size2;
     }
 
+    /// Return true if any of the physical addresses associated with the given instruction
+    /// overlap the given address.
     bool vecOverlapsPhysAddr(const McmInstr& instr, uint64_t addr) const;
-
 
     /// Return true if given instruction data addresses overlap the given address. Return
     /// false if instruction is not a memory instruction. Instruction must be retired.
@@ -479,10 +480,24 @@ namespace WdRiscv
 
     bool checkLoadComplete(const McmInstr& instr) const;
 
-    /// Clear in the given mask, bits corresponding to the target
-    /// instruction bytes covered by the given store instruction.
-    void clearMaskBitsForWrite(const McmInstr& storeInstr, const McmInstr& target,
-			       unsigned& mask) const;
+    /// Put in the given set the physical addresses of the target instruction that are
+    /// written by the store instruction.
+    void identifyWrittenBytes(const McmInstr& storeInstr, const McmInstr& target,
+			      std::unordered_set<uint64_t>& written) const
+    {
+      if (not storeInstr.isStore_)
+	return;
+      for (auto opIx : target.memOps_)
+	{
+	  const auto& op = sysMemOps_.at(opIx);
+	  for (unsigned i = 0; i < op.size_; ++i)
+	    {
+	      uint64_t addr = op.physAddr_ + i;
+	      if (overlapsPhysAddr(storeInstr, addr))
+		written.insert(addr);
+	    }
+	}
+    }
 
     void cancelNonRetired(unsigned hartIx, uint64_t instrTag);
 
