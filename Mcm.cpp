@@ -2121,7 +2121,7 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
   if (bdi.isStore())
     return true;  // NA: store instruction.
 
-  if (not bdi.isLoad() and not bdi.isAtomic())
+  if (not bdi.isLoad() and not bdi.isVectorLoad() and not bdi.isAtomic())
     return true;  // NA: must be load/amo.
 
   if (not instrB.complete_)
@@ -2146,7 +2146,7 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
       if (instrA.isCanceled() or not instrA.isRetired())
 	continue;
 
-      if (not instrA.isStore_ or not instrA.overlaps(instrB))
+      if (not instrA.isStore_ or not overlaps(instrA, instrB))
 	continue;
 
       // Check if a byte of B is written by A.

@@ -418,6 +418,19 @@ namespace WdRiscv
 			   std::vector<unsigned>& sourceRegs,
 			   std::vector<unsigned>& destRegs);
 
+    bool vecOverlaps(const McmInstr& instr, const MemoryOp& other) const
+    {
+      if (not instr.di_.isVector())
+	return false;
+      for (auto ix : instr.memOps_)
+	{
+	  const auto& op = sysMemOps_.at(ix);
+	  if (op.overlaps(other))
+	    return true;
+	}
+      return false;
+    }
+
     /// Return true if the data memory referenced by given instruction overlpas
     /// that of the given memory operation.
     bool overlaps(const McmInstr& instr, const MemoryOp& op) const
@@ -425,6 +438,9 @@ namespace WdRiscv
       if (instr.size_ == 0 or op.size_ == 0)
 	std::cerr << "Mcm::overlaps: Error: tag1=" << instr.tag_
 		  << " tag2=" << op.instrTag_ << " zero data size\n";
+
+      if (instr.di_.isVector())
+	return vecOverlaps(instr, op);
 
       if (instr.physAddr_ == instr.physAddr2_)   // Non-page-crossing
 	return rangesOverlap(instr.physAddr_, instr.size_, op.physAddr_, op.size_);
@@ -468,6 +484,20 @@ namespace WdRiscv
 	return instr.physAddr_ <= addr and addr - instr.physAddr_ < size1;
       unsigned size2 = instr.size_ - size1;
       return instr.physAddr2_ <= addr and addr - instr.physAddr2_ < size2;
+    }
+
+    /// Return true if the instruction have overlapping data address ranges.
+    bool overlaps(const McmInstr& i1, const McmInstr& i2) const
+    {
+      if (not i1.di_.isVector() and not i2.di_.isVector())
+	return i1.overlaps(i2);   // Both scalar.
+      for (auto ix : i1.memOps_)
+	{
+	  const auto& op = sysMemOps_.at(ix);
+	  if (overlaps(i2, op))
+	    return true;
+	}
+      return false;
     }
 
     bool instrHasRead(const McmInstr& instr) const;
