@@ -2072,9 +2072,8 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  // Bit i of mask is 1 if ith byte of data of B is not written by a preceding store from
-  // the same hart.
-  unsigned mask = (1 << instrB.size_) - 1;
+  // Bytes of B written by stores from the local hart.
+  std::unordered_set<uint8_t> locallyWritten;
 
   for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
@@ -2088,15 +2087,21 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	  not instrA.overlaps(instrB))
 	continue;
 
-      // Clear mask bits corresponding to bytes of B written by a preceding store (A).
-      clearMaskBitsForWrite(instrA, instrB, mask);
-      if (mask == 0)
-	return true; // All bytes of B written by preceding stores.
+      if (instrA.isStore_)
+	for (auto opIx : instrB.memOps_)
+	  {
+	    const auto& op = sysMemOps_.at(opIx);
+	    for (unsigned i = 0; i < op.size_; ++i)
+	      {
+		uint64_t addr = op.physAddr_ + i;
+		if (overlapsPhysAddr(instrA, addr))
+		  locallyWritten.insert(addr);
+	      }
+	  }
 
       if (not instrA.isLoad_ or isBeforeInMemoryTime(instrA, instrB))
 	continue;
 
-      // Is there a remote write between A and B memory time that covers a byte of B.
       if (instrA.memOps_.empty() or instrB.memOps_.empty())
 	{
 	  cerr << "Error: PPO Rule 2: Instruction with no memory op: hart-id="
@@ -2121,16 +2126,8 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	      if (not overlapsPhysAddr(instrA, addr) or not overlapsPhysAddr(instrB, addr))
 		continue;
 
-	      unsigned byteMask = 1 << (addr - instrB.physAddr_);  // Non page crossing
-	      if (instrB.physAddr_ != instrB.physAddr2_) // Page crossing
-		{
-		  unsigned size1 = offsetToNextPage(instrB.physAddr_);
-		  if (not (addr > instrB.physAddr_ and addr < instrB.physAddr_ + size1))
-		    byteMask = 1 << (size1 + addr - instrB.physAddr2_);
-		}
-
-	      if (not (byteMask & mask))
-		continue;   // Byte of B covered by local store.
+	      if (locallyWritten.contains(addr))
+		continue;    // Byte of B covered by local store.
 
 	      auto earlyB = earliestByteTime(instrB, addr);
 	      auto lateA = latestByteTime(instrA, addr);
@@ -2141,7 +2138,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 		  cerr << "Error: PPO Rule 2 failed: hart-id=" << hart.hartId()
 		       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_
 		       << " intermediate remote store from hart-id="
-		       << remoteOp.hartIx_ << " store-tag=" << remoteOp.instrTag_
+		       << unsigned(remoteOp.hartIx_) << " store-tag=" << remoteOp.instrTag_
 		       << " store-time=" << remoteOp.time_ << '\n';
 		  return false;
 		}
