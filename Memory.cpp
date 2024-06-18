@@ -883,7 +883,7 @@ Memory::saveSnapshot(const std::string& filename,
   constexpr size_t maxChunk = size_t(1) << 28;
 
   // Open binary file for write (compressed) and check success.
-  std::cout << "saveSnapshot starts..\n";
+  std::cerr << "saveSnapshot starts..\n";
   gzFile gzout = gzopen(filename.c_str(), "wb2");
   if (not gzout)
     {
@@ -937,10 +937,10 @@ Memory::saveSnapshot(const std::string& filename,
 #else
       uint8_t* buffer = data_ + blk.first;
 #endif
-      std::cout << "*";
+      std::cerr << "*";
       while (remainingSize)  // write in chunk due to limitation of gzwrite
         {
-          std::cout << "-";
+          std::cerr << "-";
           fflush(stdout);
           size_t currentChunk = std::min(remainingSize, maxChunk);
           int resp = gzwrite(gzout, buffer, currentChunk);
@@ -958,7 +958,7 @@ Memory::saveSnapshot(const std::string& filename,
     std::cerr << "Memory::saveSnapshot failed - write into " << filename
               << " failed with errno " << strerror(errno) << "\n";
   gzclose(gzout);
-  std::cout << "\nsaveSnapshot finished\n";
+  std::cerr << "\nsaveSnapshot finished\n";
   return success;
 }
 
@@ -968,7 +968,7 @@ Memory::loadSnapshot(const std::string & filename,
                      const std::vector<std::pair<uint64_t,uint64_t>>& usedBlocks)
 {
   constexpr size_t maxChunk = size_t(1) << 28;  // This must match saveSnapshot
-  std::cout << "loadSnapshot starts..\n";
+  std::cerr << "loadSnapshot starts..\n";
 
   // open binary file for read (decompress) and check success
   gzFile gzin = gzopen(filename.c_str(), "rb");
@@ -1011,10 +1011,10 @@ Memory::loadSnapshot(const std::string & filename,
       prevAddr = blk.first + blk.second;
       uint64_t addr = blk.first;
 
-      std::cout << "*";
+      std::cerr << "*";
       while (remainingSize) // read in chunk due to gzread limitation
         {
-          std::cout << "-";
+          std::cerr << "-";
           fflush(stdout);
           size_t currentChunk = std::min(remainingSize, maxChunk);
           int resp = gzread(gzin, temp.data(), currentChunk);
@@ -1046,7 +1046,7 @@ Memory::loadSnapshot(const std::string & filename,
     std::cerr << "Memory::loadSnapshot: Warning: Snapshot data size smaller than memory size\n";
 
   gzclose(gzin);
-  std::cout << "\nloadSnapshot finished\n";
+  std::cerr << "\nloadSnapshot finished\n";
   return success;
 }
 
