@@ -2647,7 +2647,7 @@ CsRegs<URV>::defineMachineRegs()
   mask = URV(1) << (sizeof(URV)*8 - 1);  // Most sig bit is read-only 1
   defineCsr("mncause", Csrn::MNCAUSE, !mand, !imp, mask, ~mask, ~mask);
 
-  mask = 0b1100010001000;  // Fields MNPV, MNPP, and NMIE writeable.
+  mask = 0b1101010001000;  // Fields MNPP, MNPELP, MNPV, and NMIE writeable.
   defineCsr("mnstatus", Csrn::MNSTATUS, !mand, !imp, 0, mask, pokeMask);
 
   // Define mhpmcounter3/mhpmcounter3h to mhpmcounter31/mhpmcounter31h

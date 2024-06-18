@@ -263,13 +263,15 @@ namespace WdRiscv
 
     struct Mnstatus
     {
-      unsigned res0 : 3;    // Bit 0 to 2
-      unsigned NMIE : 1;    // Bit 3
-      unsigned res1 : 3;    // Bit 4 to 6
-      unsigned MNPV : 1;    // Bit 7
-      unsigned res2 : 3;    // Bit 8 to 10
-      unsigned MNPP : 2;    // Bit 11 to 12
-      unsigned res3 : 19;   // Bit 13 to 31
+      unsigned res0   : 3;  // Bit 0 to 2
+      unsigned NMIE   : 1;  // Bit 3
+      unsigned res1   : 3;  // Bit 4 to 6
+      unsigned MNPV   : 1;  // Bit 7
+      unsigned res2   : 1;  // Bit 8
+      unsigned MNPELP : 1;  // Bit 9
+      unsigned res3   : 1;  // Bit 19
+      unsigned MNPP   : 2;  // Bit 11 to 12
+      unsigned res3   : 19; // Bit 13 to 31
     } bits_;
   };
 
