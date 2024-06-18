@@ -900,6 +900,7 @@ Memory::saveSnapshot(const std::string& filename,
   bool success = true;
   for (const auto& blk: usedBlocks)
     {
+#ifndef MEM_CALLBACK
       if (blk.first >= size_)
 	{
 	  std::cerr << "Memory::saveSnapshot: Block address (0x" << std::hex << blk.first
@@ -907,6 +908,7 @@ Memory::saveSnapshot(const std::string& filename,
 	  success = false;
 	  break;
 	}
+#endif
       size_t remainingSize = blk.second;
       if (remainingSize > size_ or size_ - remainingSize < blk.first)
 	{
