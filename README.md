@@ -764,35 +764,41 @@ When true, the lr/sc instructions will be counted as load/store
 by the performance counters.
 
 ### trigger registers
-Each trigger register is associated with 3 components tdata1, tdata2, and tdata3. Here's
+Each trigger register is associated with up to 4 components tdata1, tdata2, tdata3, and tinfo. Here's
 an example of how to configure the reset values and masks of these components in a system
 with 2 trigger registers (the mask and reset values are made up):
 ```
      "triggers" : [
          {
-	    "reset"    : [0, 0, 0],
-	    "mask"     : ["0xffffffff", "0xffffffff", "0xffffffff"],
-	    "poke_mask": ["0xffffffff", "0xffffffff", "0xffffffff"]
+	    "reset"    : [0, 0, 0, "0x1008040"],
+	    "mask"     : ["0xffffffff", "0xffffffff", "0xffffffff", 0],
+	    "poke_mask": ["0xffffffff", "0xffffffff", "0xffffffff", 0]
          },
          {
-	    "reset"    : [0, 0, 0],
-	    "mask"     : ["0xffffffff", "0xffffffff", "0xffffffff"],
-	    "poke_mask": ["0xffffffff", "0xffffffff", "0xffffffff"]
+	    "reset"    : [0, 0, 0, "0x1008040"],
+	    "mask"     : ["0xffffffff", "0xffffffff", "0xffffffff", 0],
+	    "poke_mask": ["0xffffffff", "0xffffffff", "0xffffffff", 0]
          }
      ],
 ```
-
-### load_data_trigger
-Enable support for load-data debug triggers.
-
-### exec_opcode_trigger
-Enable support for instruction opcode debug triggers.
 
 ### all_ld_st_addr_trigger
 Enable matching on all possible addresses in a load/store access [address, address+size-1].
 
 ### all_inst_addr_trigger
 Enable matching on all possible addresses in a instruction fetch access [address, address+size-1].
+
+### trigger_types
+Define the supported trigger types (type field in tdata1). Example:
+```
+     "trigger_types" : [ "none", "disabled", "mcontrol6" ]
+```
+The types "none" and "disabled" must not be excluded from "trigger_types". Possible values that
+can be included with in "trigger_types" are:
+```
+   "none", "mcontrol", "icount", "itrigger", "etriger", "mcontrol6",
+   "tmexttriger", and "disabled"
+```
 
 ### perf_count_fp_load_store
 When true, the floating point load/store instructions will be counted

@@ -347,25 +347,6 @@ namespace WdRiscv
 
       if (data1_.isAddrData())
 	{
-          Select sel = data1_.isMcontrol()? Select(data1_.mcontrol_.select_) :
-                                            Select(data1_.mcontrol6_.select_);
-
-	  // If load-data is not enabled, then turn it off when attempted. If exec-opcode
-	  // is not enabled, then turn it off when attempted.
-	  if (sel == Select::MatchData)
-	    {
-              if (not enableLoadData_)
-                {
-                  if (data1_.mcontrol_.load_)
-                    data1_.mcontrol_.load_ = false;
-                }
-              if (not enableExecOpcode_)
-                {
-                  if (data1_.mcontrol_.execute_)
-                    data1_.mcontrol_.execute_ = false;
-                }
-	    }
-
 	  if (not data1_.dmodeOnly())
 	    data1_.mcontrol_.action_ = 0;
 	}
@@ -640,14 +621,6 @@ namespace WdRiscv
       return Action::RaiseBreak;
     }
 
-    /// Enable load-data triggerring (disabled by default).
-    void enableLoadData(bool flag)
-    { enableLoadData_ = flag; }
-
-    /// Enable exec-opcode triggering (disabled by default).
-    void enableExecOpcode(bool flag)
-    { enableExecOpcode_ = flag; }
-
     /// Enable all ld/st address matching [address, address+size-1].
     void enableAllLdStAddrMatch(bool flag)
     { matchAllLdStAddr_ = flag; }
@@ -763,8 +736,6 @@ namespace WdRiscv
     bool modifiedControl_ = false;
 
     size_t chainBegin_ = 0, chainEnd_ = 0;
-    bool enableLoadData_ = false;
-    bool enableExecOpcode_ = false;
 
     bool matchAllLdStAddr_ = true; // If enabled, attempt to match address against
                                         // any [address, address+size-1].
@@ -980,14 +951,6 @@ namespace WdRiscv
           }
       return false;
     }
-
-    /// Enable load-data triggerring (disabled by default).
-    void enableLoadData(bool flag)
-    { for ( auto& trig : triggers_) trig.enableLoadData(flag); }
-
-    /// Enable exec-opcode triggering (disabled by default).
-    void enableExecOpcode(bool flag)
-    { for ( auto& trig : triggers_) trig.enableExecOpcode(flag); }
 
     /// Enable all ld/st address matching [address, address+size-1].
     void enableAllLdStAddrMatch(bool flag)

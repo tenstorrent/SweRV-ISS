@@ -975,14 +975,6 @@ namespace WdRiscv
     /// Const version.
     const Csr<URV>* getImplementedCsr(CsrNumber num, bool virtualMode) const;
 
-    /// Enable/disable load-data debug triggerring (disabled by default).
-    void configLoadDataTrigger(bool flag)
-    { triggers_.enableLoadData(flag); }
-
-    /// Enable/disable exec-opcode triggering (disabled by default).
-    void configExecOpcodeTrigger(bool flag)
-    { triggers_.enableExecOpcode(flag); }
-
     /// Enable/disable matching all addresses in a load/store access
     /// for debug triggering.
     void configAllLdStAddrTrigger(bool flag)

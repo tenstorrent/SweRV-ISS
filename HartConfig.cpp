@@ -1549,20 +1549,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 
   applySteeConfig(hart, *config_) or errors++;
 
-  tag = "load_data_trigger";
-  if (config_ -> contains(tag))
-    {
-      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
-      hart.configLoadDataTrigger(flag);
-    }
-
-  tag = "exec_opcode_trigger";
-  if (config_ -> contains(tag))
-    {
-      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
-      hart.configExecOpcodeTrigger(flag);
-    }
-
   tag = "all_ld_st_addr_trigger";
   if (config_ -> contains(tag))
     {
@@ -1575,6 +1561,27 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
       hart.configAllInstAddrTrigger(flag);
+    }
+
+  tag = "trigger_types";
+  if (config_ -> contains(tag))
+    {
+      unsigned trigErrors = 0;
+      std::vector<std::string> types;
+      const auto& items = config_ -> at(tag);
+      for (const auto& item : items)
+	{
+	  if (not item.is_string())
+	    {
+	      cerr << "Error: Invalid value in config file item " << tag << " -- expecting string\n";
+	      ++trigErrors;
+	    }
+	  else
+	    types.push_back(item.get<std::string>());
+	}
+      if (not hart.setSupportedTriggerTypes(types))
+	++trigErrors;
+      errors += trigErrors;
     }
 
   tag = "memmap";
