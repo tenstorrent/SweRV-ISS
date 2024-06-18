@@ -271,7 +271,7 @@ namespace WdRiscv
       unsigned MNPELP : 1;  // Bit 9
       unsigned res3   : 1;  // Bit 19
       unsigned MNPP   : 2;  // Bit 11 to 12
-      unsigned res3   : 19; // Bit 13 to 31
+      unsigned res4   : 19; // Bit 13 to 31
     } bits_;
   };
 
