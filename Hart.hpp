@@ -959,9 +959,13 @@ namespace WdRiscv
       return true;
     }
 
-    /// Read instruction at given address. Return true on success and
-    /// false if address is out of memory bounds.
-    bool readInst(uint64_t address, uint32_t& instr);
+    /// Read instruction at given virtual address. Return true on success and false if
+    /// address does not translate or if physical address is out of bounds. If successful
+    /// set paddr to the translated address.
+    bool readInst(uint64_t vaddr, uint64_t& paddr, uint32_t& instr);
+
+    /// Similar to above but does not expose physical address.
+    bool readInst(uint64_t vaddr, uint32_t& instr);
 
     /// Set instruction count limit: When running with tracing the
     /// run and the runUntil methods will stop if the retired instruction

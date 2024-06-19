@@ -2288,10 +2288,10 @@ Hart<URV>::execSw(const DecodedInst* di)
 
 template <typename URV>
 bool
-Hart<URV>::readInst(uint64_t va, uint32_t& inst)
+Hart<URV>::readInst(uint64_t va, uint64_t& pa, uint32_t& inst)
 {
   inst = 0;
-  uint64_t pa = va;
+  pa = va;
   bool translate = isRvs() and privMode_ != PrivilegeMode::Machine;
 
   if (translate)
@@ -2322,6 +2322,15 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
     }
 
   return false;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::readInst(uint64_t va, uint32_t& inst)
+{
+  uint64_t pa = 0;
+  return readInst(va, pa, inst);
 }
 
 
@@ -5485,8 +5494,16 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
     {
       // Attach changes to interrupted instruction.
       uint32_t inst = 0; // Load interrupted inst.
-      readInst(currPc_, inst);
-      initiateInterrupt(cause, pc_);
+      uint64_t pc = pc_, physPc = 0;
+      readInst(pc, physPc, inst);
+      if (inst)
+	{
+	  DecodedInst di;
+	  decode(pc, physPc, inst, di);
+	  if (di.instId() == InstId::wfi)
+	    pc = pc + 4;
+	}
+      initiateInterrupt(cause, pc);
       printInstTrace(inst, instCounter_, instStr, traceFile);
       if (mcycleEnabled())
 	++cycleCount_;
@@ -10350,41 +10367,45 @@ template <typename URV>
 void
 Hart<URV>::execWfi(const DecodedInst* di)
 {
+  // If running standalone, we assume that the WFI timeout (if any) has expired. If
+  // running with an external agent (e.g. test-bench), we assume that the agent will poke
+  // MIP with an interrupt (if any) before we get here so by the time we get here the
+  // wfi timeout has expired.
+
   using PM = PrivilegeMode;
+
   auto pm = privilegeMode();
 
   if (pm == PM::Machine)
     return;
 
-  if (mstatus_.bits_.TW)
+  bool tw = mstatus_.bits_.TW;
+  bool vtw = hstatus_.bits_.VTW;
+
+  if (not virtMode_)
     {
-      // TW is 1 and Executing in privilege less than machine: illegal unless
-      // complete in bounded time.
-      if (wfiTimeout_ == 0)
-	illegalInst(di);
+      if (pm == PM::Supervisor and not tw)
+	return;
+      illegalInst(di);   // Supervisor or User mode. Timeout expired.
       return;
     }
 
-  // TW is 0.
-  if (pm == PM::User and isRvs())
+  if (pm == PM::Supervisor)   // VS mode
     {
-      if (virtMode_)
-	virtualInst(di);   // VU mode and TW=0. Section 9.6 of privilege spec.
-      else if (wfiTimeout_ == 0)
-	illegalInst(di);
-      return;
-    }
-
-
-  // VS mode, VTW=1 and mstatus.TW=0
-  if (virtMode_ and pm == PM::Supervisor and hstatus_.bits_.VTW)
-    {
-      if (wfiTimeout_ == 0)
+      if (not vtw and not tw)
+	return;
+      if (vtw and not tw)
 	virtualInst(di);
+      else if (tw)
+	illegalInst(di);
       return;
     }
 
-  // No-op.
+  // VU mode.
+  if (tw)
+    illegalInst(di);
+  else
+    virtualInst(di);
 }
 
 
