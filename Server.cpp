@@ -660,9 +660,11 @@ Server<URV>::processStepChanges(Hart<URV>& hart,
   else
     {
       std::vector<uint64_t> addr;
+      std::vector<uint64_t> paddr;
+      std::vector<uint64_t> paddr2;
       std::vector<uint64_t> data;
       unsigned elemSize = 0;
-      if (hart.getLastVectorMemory(addr, data, elemSize) and not data.empty())
+      if (hart.getLastVectorMemory(addr, paddr, paddr2, data, elemSize) and not data.empty())
 	for (size_t i = 0; i < data.size(); ++i)
 	  {
 	    WhisperMessage msg(0, Change, 'm', addr.at(i), data.at(i), elemSize);

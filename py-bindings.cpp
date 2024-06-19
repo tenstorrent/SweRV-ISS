@@ -371,9 +371,11 @@ static void defineHart(M m)
           else
             {
               std::vector<uint64_t> addr;
+              std::vector<uint64_t> paddr;
+              std::vector<uint64_t> paddr2;
               std::vector<uint64_t> data;
               unsigned elemSize = 0;
-              if (self.getLastVectorMemory(addr, data, elemSize) and not data.empty())
+              if (self.getLastVectorMemory(addr, paddr, paddr2, data, elemSize) and not data.empty())
                 for (size_t i = 0; i < data.size(); ++i)
                   {
                     auto p = std::make_pair("m" + std::to_string(addr.at(i)), elemSize);

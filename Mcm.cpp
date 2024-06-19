@@ -556,20 +556,34 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
   unsigned stSize = hart.lastStore(vaddr, paddr, paddr2, value);
   if (not stSize)
     {
-      std::vector<uint64_t> addr, data;
+      std::vector<uint64_t> addr, paddr, paddr2, data;
       unsigned elemSize = 0;
-      if (not hart.getLastVectorMemory(addr, data, elemSize))
+      if (not hart.getLastVectorMemory(addr, paddr, paddr2, data, elemSize))
 	return true;   // Not a store.
       stSize = elemSize;
-    }
 
-  instr.size_ = stSize;
-  instr.virtAddr_ = vaddr;
-  instr.physAddr_ = paddr;
-  instr.physAddr2_ = paddr2;
-  instr.storeData_ = value;
-  instr.isStore_ = true;
-  instr.complete_ = checkStoreComplete(instr);
+      instr.complete_ = true;
+      for (unsigned i = 0; i < addr.size(); ++i) // each element should be drained
+        {
+          instr.size_ = stSize;
+          instr.virtAddr_ = addr.at(i);
+          instr.physAddr_ = paddr.at(i);
+          instr.physAddr2_ = paddr2.at(i);
+          instr.storeData_ = value;
+          instr.isStore_ = true;
+          instr.complete_ &= checkStoreComplete(instr);
+        }
+    }
+  else
+    {
+      instr.size_ = stSize;
+      instr.virtAddr_ = vaddr;
+      instr.physAddr_ = paddr;
+      instr.physAddr2_ = paddr2;
+      instr.storeData_ = value;
+      instr.isStore_ = true;
+      instr.complete_ = checkStoreComplete(instr);
+    }
 
   auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
 

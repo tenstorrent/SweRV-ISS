@@ -922,9 +922,12 @@ namespace WdRiscv
     }
 
     bool getLastVectorMemory(std::vector<uint64_t>& addresses,
+                             std::vector<uint64_t>& paddresses,
+                             std::vector<uint64_t>& paddresses2,
 			     std::vector<uint64_t>& data,
 			     unsigned& elementSize) const
-    { return vecRegs_.getLastMemory(addresses, data, elementSize); }
+    { return vecRegs_.getLastMemory(addresses, paddresses,
+                                    paddresses2, data, elementSize); }
 
 
     void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const

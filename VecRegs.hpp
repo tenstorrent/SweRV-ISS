@@ -309,6 +309,8 @@ namespace WdRiscv
     /// was not a store, then data will be cleared; otherwise, it will have
     /// as many entries as addresses.
     bool getLastMemory(std::vector<uint64_t>& addresses,
+                       std::vector<uint64_t>& paddresses,
+                       std::vector<uint64_t>& paddresses2,
 		       std::vector<uint64_t>& data,
 		       unsigned& elementSize) const;
 
