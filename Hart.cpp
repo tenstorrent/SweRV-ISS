@@ -10367,6 +10367,48 @@ template <typename URV>
 void
 Hart<URV>::execWfi(const DecodedInst* di)
 {
+#if 1
+
+  // Remove when RTL is ready.
+
+  using PM = PrivilegeMode;
+  auto pm = privilegeMode();
+
+  if (pm == PM::Machine)
+    return;
+
+  if (mstatus_.bits_.TW)
+    {
+      // TW is 1 and Executing in privilege less than machine: illegal unless
+      // complete in bounded time.
+      if (wfiTimeout_ == 0)
+	illegalInst(di);
+      return;
+    }
+
+  // TW is 0.
+  if (pm == PM::User and isRvs())
+    {
+      if (virtMode_)
+	virtualInst(di);   // VU mode and TW=0. Section 9.6 of privilege spec.
+      else if (wfiTimeout_ == 0)
+	illegalInst(di);
+      return;
+    }
+
+
+  // VS mode, VTW=1 and mstatus.TW=0
+  if (virtMode_ and pm == PM::Supervisor and hstatus_.bits_.VTW)
+    {
+      if (wfiTimeout_ == 0)
+	virtualInst(di);
+      return;
+    }
+
+#else
+
+  // Enable when RTL is ready.
+  
   // If running standalone, we assume that the WFI timeout (if any) has expired. If
   // running with an external agent (e.g. test-bench), we assume that the agent will poke
   // MIP with an interrupt (if any) before we get here so by the time we get here the
@@ -10406,6 +10448,8 @@ Hart<URV>::execWfi(const DecodedInst* di)
     illegalInst(di);
   else
     virtualInst(di);
+
+#endif
 }
 
 
