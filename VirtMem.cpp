@@ -226,16 +226,15 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
   // Exactly one of read/write/exec must be true.
   assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
+  pa = va;
+
   if (mode_ == Mode::Bare)
-    {
-      pa = va;
-      return ExceptionCause::NONE;
-    }
-  else
-    {
-      va = (exec or xForR_ or execReadable_)? va : applyPointerMaskVa(va, priv, false);
-      pa = va;
-    }
+    return ExceptionCause::NONE;
+
+  // Apply pointer masking unless translation is for fetch.
+  bool effExec = exec or (read and (xForR_ or execReadable_));
+  if (not effExec)
+    pa = va = applyPointerMaskVa(va, priv, false);
 
   // Lookup virtual page number in TLB.
   uint64_t virPageNum = va >> pageBits_;
@@ -442,7 +441,11 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 
   bool mxr = execReadable_ or
              (vsMode_ != Mode::Bare? s1ExecReadable_ : false);
-  va = (exec or xForR_ or mxr)? va : applyPointerMask(va, priv, true);
+
+  // Apply pointer masking unless translation is for fetch.
+  bool effExec = exec or (read and (xForR_ or mxr));
+  if (not effExec)
+    va = applyPointerMask(va, priv, true);
 
   if (vsMode_ == Mode::Bare)
     gpa = pa = va;
