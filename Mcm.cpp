@@ -1128,7 +1128,7 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
     {
       cerr << "Error: Write size exceeds store instruction size: "
 	   << "Hart-id=" << hartId << " time=" << time_ << " tag=" << instr.tag_
-	   << " write-size=" << op.size_ << " store-size=" << instr.size_ << '\n';
+	   << " write-size=" << unsigned(op.size_) << " store-size=" << unsigned(instr.size_) << '\n';
       return false;
     }
 
