@@ -1936,7 +1936,7 @@ Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
 
   assert(instrA.isRetired());
 
-  if (not instrA.isMemory() or not instrA.overlaps(instrB))
+  if (not instrA.isMemory() or not overlaps(instrA, instrB))
     return true;
 
   // Non-scalar (e.g. cbo.zero) are not drained aomically even if aligned.
