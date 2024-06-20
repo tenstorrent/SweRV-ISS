@@ -99,7 +99,7 @@ namespace WdRiscv
       // A non-successful store conditional (zero size) does not overlap anything.
       if ((di_.isSc() and size_ == 0) or (other.di_.isSc() and other.size_ == 0))
 	return false;
-	  
+
       if (size_ == 0 or other.size_ == 0)
 	std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
 		  << " tag2=" << other.tag_ << " zero data size\n";
@@ -140,7 +140,7 @@ namespace WdRiscv
     /// case where we do not forward).
     bool readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 		uint64_t physAddr, unsigned size, uint64_t rtlData);
-    
+
     /// This is a write operation bypassing the merge buffer.
     bool bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 		  uint64_t physAddr, unsigned size, uint64_t rtlData);
@@ -163,7 +163,7 @@ namespace WdRiscv
     bool mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 			   uint64_t physAddr, unsigned size,
 			   uint64_t rtlData);
-    
+
     /// Helper to mergeBufferInster. Insert a write operation for the given instruction
     /// into the merge buffer removing it from the store buffer. Return true on
     /// success. Return false if no such operation is in the store buffer.
@@ -414,7 +414,8 @@ namespace WdRiscv
 			    uint64_t addr, uint64_t data, unsigned size);
 
     /// Determine the source and destination registers of the given instruction.
-    void identifyRegisters(const DecodedInst& di,
+    void identifyRegisters(const Hart<URV>& hart,
+                           const DecodedInst& di,
 			   std::vector<unsigned>& sourceRegs,
 			   std::vector<unsigned>& destRegs);
 
@@ -558,7 +559,7 @@ namespace WdRiscv
 
     void updateDependencies(const Hart<URV>& hart, const McmInstr& instr);
 
-    void setProducerTime(unsigned hartIx, McmInstr& instr);
+    void setProducerTime(const Hart<URV>& hart, McmInstr& instr);
 
     /// Map register number of operand opIx to a unique integer by adding an offset:
     /// integer register have 0 offset, fp regs have 32, vector regs have 64, and csr regs

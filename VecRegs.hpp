@@ -600,6 +600,9 @@ namespace WdRiscv
       steps = steps_;
     }
 
+    unsigned getOpEmul(unsigned op) const
+    { return op < 3? opsEmul_.at(op) : 0; }
+
   protected:
 
     /// Clear load/address and store data used for logging/tracing.

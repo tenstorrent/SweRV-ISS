@@ -249,7 +249,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
     hartBranchTimes_.at(hartIx) = 0;
 
   std::vector<unsigned> sourceRegs, destRegs;
-  identifyRegisters(di, sourceRegs, destRegs);
+  identifyRegisters(hart, di, sourceRegs, destRegs);
 
   bool first = true; // first branch source
   for (auto regIx : sourceRegs)
@@ -282,16 +282,19 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
 template <typename URV>
 void
-Mcm<URV>::setProducerTime(unsigned hartIx, McmInstr& instr)
+Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
 {
   auto& di = instr.di_;
+  unsigned hartIx = hart.sysHartIndex();
 
   // Set producer of address register.
-  if (di.isLoad() or di.isAmo() or di.isStore())
+  if (di.isLoad() or di.isAmo() or di.isStore() or di.isVectorLoad() or di.isVectorStore())
     {
       unsigned addrReg = effectiveRegIx(di, 1);  // Addr reg is operand 1 of instr.
       instr.addrProducer_ = hartRegProducers_.at(hartIx).at(addrReg);
       instr.addrTime_ = hartRegTimes_.at(hartIx).at(addrReg);
+
+      // TODO: fix this for vector indexed ld/st (EMUL)
     }
 
   // Set producer of data register.
@@ -301,6 +304,31 @@ Mcm<URV>::setProducerTime(unsigned hartIx, McmInstr& instr)
       unsigned dataReg = effectiveRegIx(di, doi);  // Data operand may be integer/fp/csr
       instr.dataProducer_ = hartRegProducers_.at(hartIx).at(dataReg);
       instr.dataTime_ = hartRegTimes_.at(hartIx).at(dataReg);
+    }
+
+#if 0
+  if (di.isVectorLoad() or di.isVectorStore())
+    {
+      unsigned vtypeReg = unsigned(CsrNumber::VTYPE) + csRegOffset_;
+      instr.dataProducer_ = hartRegProducers_.at(hartIx).at(dataReg);
+      instr.dataTime_ = hartRegTimes_.at(hartIx).at(dataReg);
+    }
+#endif
+
+  if (di.isVectorStore())
+    {
+      unsigned dataReg = effectiveRegIx(di, 0);
+      unsigned srcGroup = hart.vecOpEmul(0);
+
+      for (unsigned i = 0; i < srcGroup; ++i)
+        {
+          uint64_t dataTime = hartRegTimes_.at(hartIx).at(dataReg + i);
+          if (dataTime >= instr.dataTime_)
+            {
+              instr.dataProducer_ = hartRegProducers_.at(hartIx).at(dataReg + i);
+              instr.dataTime_ = dataTime;
+            }
+        }
     }
 }
 
@@ -728,7 +756,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (di.isAmo())
     instr->isStore_ = true;  // AMO is both load and store.
 
-  setProducerTime(hartIx, *instr);
+  setProducerTime(hart, *instr);
   updateDependencies(hart, *instr);
 
   if (instr->isStore_ and instr->complete_)
@@ -1777,7 +1805,8 @@ Mcm<URV>::effectiveRegIx(const DecodedInst& di, unsigned opIx) const
 
 template <typename URV>
 void
-Mcm<URV>::identifyRegisters(const DecodedInst& di,
+Mcm<URV>::identifyRegisters(const Hart<URV>& hart,
+                            const DecodedInst& di,
 			    std::vector<unsigned>& sourceRegs,
 			    std::vector<unsigned>& destRegs)
 {
@@ -1794,16 +1823,36 @@ Mcm<URV>::identifyRegisters(const DecodedInst& di,
       assert(0 && "Mcm::identifyRegisters: Error invalid instr entry");
     }
 
+  auto id = entry->instId();
+
   if (entry->hasRoundingMode() and RoundingMode(di.roundingMode()) == RoundingMode::Dynamic)
     sourceRegs.push_back(unsigned(CsrNumber::FRM) + csRegOffset_);
 
   if (entry->modifiesFflags())
     destRegs.push_back(unsigned(CsrNumber::FFLAGS) + csRegOffset_);
 
-  auto id = entry->instId();
+#if 0
+  if (entry->isVector())
+    {
+      sourceRegs.push_back(unsigned(CsrNumber::VL) + csRegOffset_);
+      if (di.isMasked())) // vm is control dep
+        sourceRegs.push_back(0 + vecRegsOffset_);
+    }
+#endif
+
   bool skipCsr = ((id == InstId::csrrs or id == InstId::csrrc or
 		   id == InstId::csrrsi or id == InstId::csrrci)
 		  and di.op1() == 0);
+
+#if 0
+  if (id == InstId::vsetivli or
+      id == InstId::vsetvl or
+      id == InstId::vsetvli)
+    {
+      destRegs.push_back(unsigned(CsrNumber::VTYPE) + csRegOffset_);
+      destRegs.push_back(unsigned(CsrNumber::VL) + csRegOffset_);
+    }
+#endif
 
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
@@ -1811,10 +1860,10 @@ Mcm<URV>::identifyRegisters(const DecodedInst& di,
       bool isSource = entry->isIthOperandRead(i);
       if (not isDest and not isSource)
 	continue;
-	
+
       auto type = di.ithOperandType(i);
       // FIX: Support VecReg
-      if (type == OperandType::VecReg or type == OperandType::Imm or type == OperandType::None)
+      if (type == OperandType::Imm or type == OperandType::None)
 	continue;
       if (isSource and type == OperandType::CsReg and skipCsr)
 	continue;
@@ -1833,13 +1882,23 @@ Mcm<URV>::identifyRegisters(const DecodedInst& di,
 	      sourceRegs.push_back(size_t(CsrNumber::FRM) + csRegOffset_);
 	    }
 	}
+      else if (type == OperandType::VecReg)
+        {
+          for (unsigned off = 0; off < hart.vecOpEmul(i); ++off)
+            {
+              if (isDest)
+                destRegs.push_back(regIx + off);
+              if (isSource)
+                sourceRegs.push_back(regIx + off);
+            }
+        }
       else
-	{
-	  if (isDest)
+        {
+          if (isDest)
 	    destRegs.push_back(regIx);
 	  if (isSource)
 	    sourceRegs.push_back(regIx);
-	}
+        }
     }
 }
 
@@ -1936,7 +1995,7 @@ Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
 
   assert(instrA.isRetired());
 
-  if (not instrA.isMemory() or not overlaps(instrA, instrB))
+  if (not instrA.isMemory() or not instrA.overlaps(instrB))
     return true;
 
   // Non-scalar (e.g. cbo.zero) are not drained aomically even if aligned.
@@ -2728,7 +2787,7 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   const auto& bdi = instrB.di_;
-  if (bdi.isLoad() or bdi.isStore() or bdi.isAmo())
+  if (bdi.isLoad() or bdi.isStore() or bdi.isAmo() or bdi.isVectorStore() or bdi.isVectorLoad())
     {
       uint64_t addrTime = instrB.addrTime_;
 

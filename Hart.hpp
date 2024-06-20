@@ -488,6 +488,10 @@ namespace WdRiscv
     GroupMultiplier groupMultiplier() const
     { return vecRegs_.groupMultiplier(); }
 
+     /// Get per-operand EMUL information of last instruction executed.
+     unsigned vecOpEmul(unsigned op) const
+     { return vecRegs_.getOpEmul(op); }
+
     /// Configure the load-reserve reservation size in bytes.
     /// A size smaller than 4/8 in rv32/rv64 has the effect of 4/8.
     void configReservationSize(unsigned size)
