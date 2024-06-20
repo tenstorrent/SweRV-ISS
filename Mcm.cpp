@@ -14,28 +14,14 @@ Mcm<URV>::Mcm(unsigned hartCount, unsigned pageSize, unsigned mergeBufferSize)
 {
   sysMemOps_.reserve(200000);
 
-  hartInstrVecs_.resize(hartCount);
-  for (auto& vec : hartInstrVecs_)
-    vec.reserve(200000);
+  hartData_.resize(hartCount);
 
-  hartPendingWrites_.resize(hartCount);
-  currentInstrTag_.resize(hartCount);
-
-  hartRegTimes_.resize(hartCount);
-  for (auto& vec : hartRegTimes_)
-    vec.resize(totalRegCount_);
-
-  hartRegProducers_.resize(hartCount);
-  for (auto& vec : hartRegProducers_)
-    vec.resize(totalRegCount_);
-
-  hartBranchTimes_.resize(hartCount);
-  hartBranchProducers_.resize(hartCount);
-  hartPendingFences_.resize(hartCount);
-  hartUndrainedStores_.resize(hartCount);
-
-  sinvalVmaTime_.resize(hartCount);
-  sinvalVmaTag_.resize(hartCount);
+  for (auto& hd : hartData_)
+    {
+      hd.instrVec_.resize(200000);
+      hd.regTime_.resize(totalRegCount_);
+      hd.regProducer_.resize(totalRegCount_);
+    }
 
   // If no merge buffer, then memory is updated on insert messages.
   writeOnInsert_ = (lineSize_ == 0);
@@ -71,10 +57,10 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
     return false;
 
   unsigned hartIx = hart.sysHartIndex();
-  if (hartIx >= hartInstrVecs_.size())
+  if (hartIx >= hartData_.size())
     {
       cerr << "Mcm::readOp: Error: Hart ix out of bound\n";
-      assert(0 && "Mcm::readOp: Hart ix out of bound");
+      return false;
     }
 
   McmInstr* instr = findOrAddInstr(hartIx, instrTag);
@@ -151,7 +137,7 @@ template <typename URV>
 McmInstr*
 Mcm<URV>::findInstr(unsigned hartIx, uint32_t tag)
 {
-  auto& vec = hartInstrVecs_.at(hartIx);
+  auto& vec = hartData_.at(hartIx).instrVec_;
   if (tag < vec.size() and vec.at(tag).tag_ == tag)
     return &(vec.at(tag));
   return nullptr;
@@ -166,7 +152,7 @@ Mcm<URV>::findOrAddInstr(unsigned hartIx, uint32_t tag)
   if (ptr)
     return ptr;
 
-  auto& vec = hartInstrVecs_.at(hartIx);
+  auto& vec = hartData_.at(hartIx).instrVec_;
   if (tag >= vec.size())
     {
       if (tag > 100000000)
@@ -204,8 +190,8 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
     }
 
   unsigned hartIx = hart.sysHartIndex();
-  auto& regTimeVec = hartRegTimes_.at(hartIx);
-  auto& regProducer = hartRegProducers_.at(hartIx);
+  auto& regTimeVec = hartData_.at(hartIx).regTime_;
+  auto& regProducer = hartData_.at(hartIx).regProducer_;
 
   const DecodedInst& di = instr.di_;
   assert(di.isValid());
@@ -245,8 +231,11 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	tag = instr.tag_;
       }
 
+  auto& branchTime = hartData_.at(hartIx).branchTime_;
+  auto& branchProducer = hartData_.at(hartIx).branchProducer_;
+
   if (di.isBranch())
-    hartBranchTimes_.at(hartIx) = 0;
+    branchTime = 0;
 
   std::vector<unsigned> sourceRegs, destRegs;
   identifyRegisters(hart, di, sourceRegs, destRegs);
@@ -260,11 +249,11 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	  tag = regProducer.at(regIx);
 	}
       if (di.isBranch())
-	if (first or regTimeVec.at(regIx) > hartBranchTimes_.at(hartIx))
+	if (first or regTimeVec.at(regIx) > branchTime)
 	  {
 	    first = false;
-	    hartBranchTimes_.at(hartIx) = regTimeVec.at(regIx);
-	    hartBranchProducers_.at(hartIx) = regProducer.at(regIx);
+	    branchTime = regTimeVec.at(regIx);
+	    branchProducer = regProducer.at(regIx);
 	  }
     }
 
@@ -287,14 +276,17 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
   auto& di = instr.di_;
   unsigned hartIx = hart.sysHartIndex();
 
+  auto& regProducer = hartData_.at(hartIx).regProducer_;
+  auto& regTime = hartData_.at(hartIx).regTime_;
+
   // Set producer of address register.
   if (di.isLoad() or di.isAmo() or di.isStore() or di.isVectorLoad() or di.isVectorStore())
     {
       unsigned addrReg = effectiveRegIx(di, 1);  // Addr reg is operand 1 of instr.
-      instr.addrProducer_ = hartRegProducers_.at(hartIx).at(addrReg);
-      instr.addrTime_ = hartRegTimes_.at(hartIx).at(addrReg);
 
       // TODO: fix this for vector indexed ld/st (EMUL)
+      instr.addrProducer_ = regProducer.at(addrReg);
+      instr.addrTime_ = regTime.at(addrReg);
     }
 
   // Set producer of data register.
@@ -302,8 +294,8 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
     {
       unsigned doi = di.isAmo()? 2 : 0;  // Data-register operand index
       unsigned dataReg = effectiveRegIx(di, doi);  // Data operand may be integer/fp/csr
-      instr.dataProducer_ = hartRegProducers_.at(hartIx).at(dataReg);
-      instr.dataTime_ = hartRegTimes_.at(hartIx).at(dataReg);
+      instr.dataProducer_ = regProducer.at(dataReg);
+      instr.dataTime_ = regTime.at(dataReg);
     }
 
 #if 0
@@ -322,10 +314,10 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
 
       for (unsigned i = 0; i < srcGroup; ++i)
         {
-          uint64_t dataTime = hartRegTimes_.at(hartIx).at(dataReg + i);
+          uint64_t dataTime = regTime.at(dataReg + i);
           if (dataTime >= instr.dataTime_)
             {
-              instr.dataProducer_ = hartRegProducers_.at(hartIx).at(dataReg + i);
+              instr.dataProducer_ = regProducer.at(dataReg + i);
               instr.dataTime_ = dataTime;
             }
         }
@@ -419,7 +411,7 @@ Mcm<URV>::mergeBufferInsertScalar(Hart<URV>& hart, uint64_t time, uint64_t instr
   op.isRead_ = false;
 
   if (not writeOnInsert_)
-    hartPendingWrites_.at(hartIx).push_back(op);
+    hartData_.at(hartIx).pendingWrites_.push_back(op);
 
   McmInstr* instr = findOrAddInstr(hartIx, instrTag);
   if (not instr)
@@ -429,7 +421,7 @@ Mcm<URV>::mergeBufferInsertScalar(Hart<URV>& hart, uint64_t time, uint64_t instr
       return false;
     }
 
-  auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
+  auto& undrained = hartData_.at(hartIx).undrainedStores_;
   undrained.insert(instrTag);
 
   bool result = true;
@@ -489,7 +481,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       return false;
     }
 
-  auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
+  auto& undrained = hartData_.at(hartIx).undrainedStores_;
   undrained.insert(instrTag);
 
   bool result = true;
@@ -613,7 +605,8 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
       instr.complete_ = checkStoreComplete(instr);
     }
 
-  auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
+  auto hartIx = hart.sysHartIndex();
+  auto& undrained = hartData_.at(hartIx).undrainedStores_;
 
   if (not instr.complete_)
     {
@@ -641,11 +634,13 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
   instrB.physAddr2_ = paddr;
   instrB.storeData_ = 0;   // Determined at bypass time.
 
+  unsigned hartIx = hart.sysHartIndex();
+  auto& undrained = hartData_.at(hartIx).undrainedStores_;
+
   if (instrB.di_.instId() == InstId::cbo_zero)
     {
       instrB.isStore_ = true;  // To enable forwarding
 
-      auto& undrained = hartUndrainedStores_.at(hart.sysHartIndex());
       instrB.complete_ = checkStoreComplete(instrB);
       if (instrB.complete_)
 	{
@@ -660,9 +655,7 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
 
   // For cbo.flush/clean, all preceding (in program order) overlapping stores/amos must
   // have drained.
-  unsigned hartIx = hart.sysHartIndex();
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
-  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   for (auto storeTag : undrained)
     {
@@ -716,8 +709,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   instr->di_ = di;
   if (instr->di_.instId() == InstId::sfence_vma)
     {
-      sinvalVmaTime_.at(hartIx) = time;
-      sinvalVmaTag_.at(hartIx) = tag;
+      hartData_.at(hartIx).sinvalVmaTime_ = time;
+      hartData_.at(hartIx).sinvalVmaTag_ = tag;
     }
 
   if (instr->di_.instId() == InstId::sfence_inval_ir)
@@ -835,7 +828,7 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
 			       MemoryOpVec& coveredWrites)
 {
   unsigned hartIx = hart.sysHartIndex();
-  auto& pendingWrites = hartPendingWrites_.at(hartIx);
+  auto& pendingWrites = hartData_.at(hartIx).pendingWrites_;
   size_t pendingSize = 0;  // pendingWrite size after removal of matching writes
 
   uint64_t lineEnd = rtlAddr + rtlLineSize;
@@ -999,7 +992,8 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	break;
       }
 
-  auto& instrVec = hartInstrVecs_.at(hartIx);
+  auto& instrVec = hartData_.at(hartIx).instrVec_;
+  auto& undrained = hartData_.at(hartIx).undrainedStores_;
 
   for (size_t i = 0; i < coveredWrites.size(); ++i)
     {
@@ -1015,7 +1009,6 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       if (checkStoreComplete(*instr))
 	{
 	  instr->complete_ = true;
-	  auto& undrained = hartUndrainedStores_.at(hartIx);
 	  undrained.erase(instr->tag_);
 	  if (not ppoRule1(hart, *instr))
 	    result = false;
@@ -1074,7 +1067,7 @@ template <typename URV>
 void
 Mcm<URV>::cancelNonRetired(unsigned hartIx, uint64_t instrTag)
 {
-  auto& vec = hartInstrVecs_.at(hartIx);
+  auto& vec = hartData_.at(hartIx).instrVec_;
 
   if (instrTag > vec.size())
     vec.resize(instrTag);
@@ -1343,7 +1336,7 @@ template <typename URV>
 bool
 Mcm<URV>::setCurrentInstruction(Hart<URV>& hart, uint64_t tag)
 {
-  currentInstrTag_.at(hart.sysHartIndex()) = tag;
+  hartData_.at(hart.sysHartIndex()).currentInstrTag_ = tag;
   return true;
 }
 
@@ -1535,7 +1528,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, const DecodedInst& di, uint64_t v
     }
 
   unsigned hartIx = hart.sysHartIndex();
-  uint64_t tag = currentInstrTag_.at(hartIx);
+  uint64_t tag = hartData_.at(hartIx).currentInstrTag_;
 
   McmInstr* instr = findInstr(hartIx, tag);
   if (not instr or instr->isCanceled())
@@ -1708,9 +1701,9 @@ bool
 Mcm<URV>::forwardToRead(Hart<URV>& hart, MemoryOp& readOp)
 {
   auto hartIx = hart.sysHartIndex();
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
+  const auto& undrained = hartData_.at(hartIx).undrainedStores_;
 
   std::set<McmInstrIx> stores;
 
@@ -1816,29 +1809,22 @@ Mcm<URV>::identifyRegisters(const Hart<URV>& hart,
   if (not di.isValid())
     return;
 
-  const auto* entry = di.instEntry();
-  if (not entry)
-    {
-      cerr << "Mcm::identifyRegisters: Error invalid instr entry\n";
-      assert(0 && "Mcm::identifyRegisters: Error invalid instr entry");
-    }
-
-  auto id = entry->instId();
-
-  if (entry->hasRoundingMode() and RoundingMode(di.roundingMode()) == RoundingMode::Dynamic)
+  if (di.hasRoundingMode() and RoundingMode(di.roundingMode()) == RoundingMode::Dynamic)
     sourceRegs.push_back(unsigned(CsrNumber::FRM) + csRegOffset_);
 
-  if (entry->modifiesFflags())
+  if (di.modifiesFflags())
     destRegs.push_back(unsigned(CsrNumber::FFLAGS) + csRegOffset_);
 
 #if 0
-  if (entry->isVector())
+  if (di.isVector())
     {
       sourceRegs.push_back(unsigned(CsrNumber::VL) + csRegOffset_);
-      if (di.isMasked())) // vm is control dep
+      if (di.isMasked()) // vm is control dep
         sourceRegs.push_back(0 + vecRegsOffset_);
     }
 #endif
+
+  auto id = di.instId();
 
   bool skipCsr = ((id == InstId::csrrs or id == InstId::csrrc or
 		   id == InstId::csrrsi or id == InstId::csrrci)
@@ -1853,6 +1839,8 @@ Mcm<URV>::identifyRegisters(const Hart<URV>& hart,
       destRegs.push_back(unsigned(CsrNumber::VL) + csRegOffset_);
     }
 #endif
+
+  const auto* entry = di.instEntry();
 
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
@@ -2058,7 +2046,7 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
     return true;  // We will try again when B is complete.
 
   auto hartIx = hart.sysHartIndex();
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   auto earlyB = earliestOpTime(instrB);
 
@@ -2081,7 +2069,8 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 	}
     }
 
-  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  const auto& undrained = hartData_.at(hartIx).undrainedStores_;
+
   for (auto& tag : undrained)
     {
       if (tag >= instrB.tag_)
@@ -2117,7 +2106,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   auto earlyB = earliestOpTime(instrB);
 
   unsigned hartIx = hart.sysHartIndex();
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   // Bytes of B written by stores from the local hart.
   std::unordered_set<uint64_t> locallyWritten;
@@ -2212,7 +2201,7 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
   std::unordered_set<uint64_t> locallyWritten;
 
   unsigned hartIx = hart.sysHartIndex();
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
@@ -2262,8 +2251,8 @@ Mcm<URV>::processFence(Hart<URV>& hart, const McmInstr& instr)
   assert(instr.isRetired());
 
   unsigned hartIx = hart.sysHartIndex();
+  auto& pendingFences = hartData_.at(hartIx).pendingFences_;
 
-  auto& pendingFences = hartPendingFences_.at(hartIx);
   if (instr.di_.isFence())
     pendingFences.insert(instr.tag_);
 
@@ -2277,7 +2266,9 @@ Mcm<URV>::processFence(Hart<URV>& hart, const McmInstr& instr)
     return true;
 
   pendingFences.erase(iter);
-  auto& instrVec = hartInstrVecs_.at(hartIx);
+
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
+
   if (tag >= instrVec.size())
     {
       assert(0 && "Invalid tag in Mcm::processFence");
@@ -2299,8 +2290,9 @@ bool
 Mcm<URV>::finalChecks(Hart<URV>& hart)
 {
   unsigned hartIx = hart.sysHartIndex();
-  auto& pendingFences = hartPendingFences_.at(hartIx);
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+
+  auto& pendingFences = hartData_.at(hartIx).pendingFences_;
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   bool ok = true;
 
@@ -2312,14 +2304,16 @@ Mcm<URV>::finalChecks(Hart<URV>& hart)
 
   pendingFences.clear();
 
-  auto& pendingWrites = hartPendingWrites_.at(hartIx);
+  const auto& pendingWrites = hartData_.at(hartIx).pendingWrites_;
+
   if (not pendingWrites.empty())
     cerr << "Warning: Merge buffer is not empty at end of run.\n";
 
   uint64_t toHost = 0;
   bool hasToHost = hart.getToHostAddress(toHost);
 
-  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  const auto& undrained = hartData_.at(hartIx).undrainedStores_;
+
   for (auto tag : undrained)
     {
       const auto& instr = instrVec.at(tag);
@@ -2379,7 +2373,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
   bool succOut = instr.di_.isFencePredOutput();
 
   unsigned hartIx = hart.sysHartIndex();
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   McmInstrIx begin = instr.tag_ >= windowSize_ ? instr.tag_ - windowSize_ : 0;
   McmInstrIx end = instr.tag_ + windowSize_;
@@ -2525,7 +2519,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   unsigned hartIx = hart.sysHartIndex();
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   auto earlyB = earliestOpTime(instrB);
 
@@ -2548,7 +2542,8 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 	}
     }
 
-  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  const auto& undrained = hartData_.at(hartIx).undrainedStores_;
+
   for (auto& tag : undrained)
     {
       if (tag >= instrB.tag_)
@@ -2603,7 +2598,7 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
   // Rule 6: B has a release annotation
 
   auto hartIx = hart.sysHartIndex();
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   auto earlyB = earliestOpTime(instrB);
 
@@ -2626,7 +2621,8 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
 	}
     }
 
-  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  const auto& undrained = hartData_.at(hartIx).undrainedStores_;
+
   for (auto& tag : undrained)
     {
       if (tag >= instrB.tag_)
@@ -2690,7 +2686,7 @@ Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   auto hartIx = hart.sysHartIndex();
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   auto earlyB = earliestOpTime(instrB);
 
@@ -2713,7 +2709,8 @@ Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
 	}
     }
 
-  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  const auto& undrained = hartData_.at(hartIx).undrainedStores_;
+
   for (auto& tag : undrained)
     {
       if (tag >= instrB.tag_)
@@ -2744,7 +2741,7 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
     return true;  // Score conditional was not successful.
 
   auto hartIx = hart.sysHartIndex();
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   auto earlyB = earliestOpTime(instrB);
 
@@ -2853,11 +2850,13 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
   if (not bdi.isStore() and not bdi.isAmo())
     return true;
 
-  auto producerTag = hartBranchProducers_.at(hartIx);
-  if (hartBranchTimes_.at(hartIx) == 0)
+  auto producerTag = hartData_.at(hartIx).branchProducer_;
+
+  if (hartData_.at(hartIx).branchTime_ == 0)
     return true;
 
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
+
   if (producerTag >= instrVec.size())
     return true;
   const auto& producer = instrVec.at(producerTag);
@@ -2888,7 +2887,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 
   unsigned hartIx = hart.sysHartIndex();
   auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
   auto earlyB = earliestOpTime(instrB);
 
   // Check all preceding instructions for a store M with address overlapping that of B.
@@ -2921,7 +2920,8 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
     }
 
   // Check all preceding undrained stores for an M with address overlapping that of B.
-  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  const auto& undrained = hartData_.at(hartIx).undrainedStores_;
+
   for (auto mtag : undrained)
     {
       if (mtag >= instrB.tag_)
@@ -2963,7 +2963,7 @@ Mcm<URV>::checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const
     return true;  // NA: B is not a load.
 
   auto hartIx = hart.sysHartIndex();
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   auto earlyB = earliestOpTime(instrB);
 
@@ -3002,11 +3002,11 @@ Mcm<URV>::checkSfenceInvalIr(Hart<URV>& hart, const McmInstr& instr) const
 
   unsigned hartIx = hart.sysHartIndex();
 
-  auto invalTag = sinvalVmaTag_.at(hartIx);
+  auto invalTag = hartData_.at(hartIx).sinvalVmaTag_;
   if (invalTag == 0)
     return true;   // No sinval.vma was retired
 
-  auto invalTime = sinvalVmaTime_.at(hartIx);
+  auto invalTime = hartData_.at(hartIx).sinvalVmaTime_;
 
   for (size_t ix = sysMemOps_.size(); ix > 0; --ix)
     {
@@ -3037,7 +3037,7 @@ Mcm<URV>::checkSfenceWInval(Hart<URV>& hart, const McmInstr& instr) const
   // store/merge buffer) when the sfence.w.inval is retired.
 
   unsigned hartIx = hart.sysHartIndex();
-  auto& pendingWrites = hartPendingWrites_.at(hartIx);
+  const auto& pendingWrites = hartData_.at(hartIx).pendingWrites_;
   if (pendingWrites.empty())
     return true;
 

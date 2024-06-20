@@ -573,6 +573,8 @@ namespace WdRiscv
 
   private:
 
+
+
     const unsigned intRegOffset_ = 0;
     const unsigned fpRegOffset_ = 32;
     const unsigned vecRegOffset_ = 64;
@@ -582,14 +584,34 @@ namespace WdRiscv
     using McmInstrVec = std::vector<McmInstr>;
 
     using RegTimeVec = std::vector<uint64_t>;    // Map reg index to time.
-    using RegProducer = std::vector<uint64_t>;   // Map reg index to instr tag.
+    using RegProducerVec = std::vector<uint64_t>;   // Map reg index to instr tag.
 
-    MemoryOpVec sysMemOps_;                      // Memory ops of all cores.
-    std::vector<McmInstrVec> hartInstrVecs_;     // One vector per hart.
-    std::vector<MemoryOpVec> hartPendingWrites_; // One vector per hart.
-    std::vector<uint64_t> sinvalVmaTime_;        // One entry per hart.
-    std::vector<uint64_t> sinvalVmaTag_;         // One entry per hart.
+    // Per hart information related to MCM.
+    struct HartData
+    {
+      McmInstrVec instrVec_;
+      MemoryOpVec pendingWrites_;
+      RegTimeVec regTime_;
+      RegProducerVec regProducer_;
+      std::set<McmInstrIx> pendingFences_;
 
+      // Retired but not yet drained stores. Candidates for forwarding.
+      std::set<McmInstrIx> undrainedStores_;
+
+      // Dependency time of most recent branch in program order or 0 if branch does not
+      // depend on a prior memory instruction.
+      uint64_t branchTime_ = 0;
+      uint64_t branchProducer_;
+
+      McmInstrIx currentInstrTag_ = 0;
+      uint64_t sinvalVmaTime_ = 0;
+      uint64_t sinvalVmaTag_ = 0;
+    };
+
+    std::vector<HartData> hartData_;    // One entry per hart.
+
+    MemoryOpVec sysMemOps_;             // Memory ops of all harts ordered by time.
+    
     uint64_t time_ = 0;
     unsigned pageSize_ = 4096;
     unsigned lineSize_ = 64; // Merge buffer line size.
@@ -597,27 +619,11 @@ namespace WdRiscv
 
     bool writeOnInsert_ = false;
 
-    // Check whole merge buffer line if true otherwise check bytes
-    // covered by store instructions.
+    // Check whole merge buffer line if true otherwise check bytes covered by store
+    // instructions.
     bool checkWholeLine_ = false;
 
     bool isTso_ = false;  // True if total-store-ordering model.
-
-    std::vector<McmInstrIx> currentInstrTag_;
-
-    std::vector<RegTimeVec> hartRegTimes_;  // One vector per hart.
-    std::vector<RegProducer> hartRegProducers_;  // One vector per hart.
-    std::vector<std::set<McmInstrIx>> hartPendingFences_;
-
-    // Retired but not yet darained stores. Candidates for forwarding.
-    std::vector<std::set<McmInstrIx>> hartUndrainedStores_;
-
-    // Dependency time of most recent branch in program order or 0 if
-    // branch does not depend on a prior memory instruction.
-    std::vector<uint64_t> hartBranchTimes_;
-    std::vector<uint64_t> hartBranchProducers_;
-
-    std::unordered_set<uint64_t> skipReadCheck_;
   };
 
 }

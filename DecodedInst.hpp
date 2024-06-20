@@ -148,8 +148,13 @@ namespace WdRiscv
     bool hasRoundingMode() const
     { return entry_ and entry_->hasRoundingMode(); }
 
+    /// Relevant for floating point instructions.
     unsigned roundingMode() const
     { return ((inst_ >> 12) & 7); }
+
+    /// Return true if instruction modifies the FFLAGS CSR.
+    bool modifiesFflags() const
+    { return entry_ and entry_->modifiesFflags(); }
 
     /// Immediate values are to be (left) shifted by this size
     unsigned immediateShiftSize() const
