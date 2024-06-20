@@ -5498,10 +5498,13 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       readInst(pc, physPc, inst);
       if (inst)
 	{
+#if 0
+	  // Enable when RTL is ready.
 	  DecodedInst di;
 	  decode(pc, physPc, inst, di);
 	  if (di.instId() == InstId::wfi)
 	    pc = pc + 4;
+#endif
 	}
       initiateInterrupt(cause, pc);
       printInstTrace(inst, instCounter_, instStr, traceFile);
