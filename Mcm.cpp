@@ -219,9 +219,9 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	  time = ~uint64_t(0); // Will be updated when SC drains to memory.
 	}
     }
-  else if (instEntry->isStore())
+  else if (instEntry->isStore() or di.isVectorStore())
     return;   // No destination register.
-  else if (di.isLoad() or di.isAmo() or di.isBranch())
+  else if (di.isLoad() or di.isAmo() or di.isBranch() or di.isVectorLoad())
     hasDep = false;
 
   for (const auto& opIx : instr.memOps_)
@@ -283,10 +283,23 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
   if (di.isLoad() or di.isAmo() or di.isStore() or di.isVectorLoad() or di.isVectorStore())
     {
       unsigned addrReg = effectiveRegIx(di, 1);  // Addr reg is operand 1 of instr.
-
-      // TODO: fix this for vector indexed ld/st (EMUL)
       instr.addrProducer_ = regProducer.at(addrReg);
       instr.addrTime_ = regTime.at(addrReg);
+    }
+
+  if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
+    {
+      unsigned offsetReg = effectiveRegIx(di, 2);
+      unsigned ixGroup = hart.vecOpEmul(2);
+      for (unsigned i = 0; i < ixGroup; ++i)
+        {
+          uint64_t addrTime = regTime.at(offsetReg + i);
+          if (addrTime >= instr.addrTime_)
+            {
+              instr.addrProducer_ = regProducer.at(offsetReg + i);
+              instr.addrTime_ = addrTime;
+            }
+        }
     }
 
   // Set producer of data register.
@@ -302,8 +315,8 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
   if (di.isVectorLoad() or di.isVectorStore())
     {
       unsigned vtypeReg = unsigned(CsrNumber::VTYPE) + csRegOffset_;
-      instr.dataProducer_ = hartRegProducers_.at(hartIx).at(dataReg);
-      instr.dataTime_ = hartRegTimes_.at(hartIx).at(dataReg);
+      instr.dataProducer_ = hartRegProducers_.at(hartIx).at(vtypeReg);
+      instr.dataTime_ = hartRegTimes_.at(hartIx).at(vtypeReg);
     }
 #endif
 
@@ -311,7 +324,6 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
     {
       unsigned dataReg = effectiveRegIx(di, 0);
       unsigned srcGroup = hart.vecOpEmul(0);
-
       for (unsigned i = 0; i < srcGroup; ++i)
         {
           uint64_t dataTime = regTime.at(dataReg + i);
@@ -2900,7 +2912,7 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
   if (bdi.isStore() and bdi.op0() == 0)
     return true;  // No dependency on X0
 
-  if (bdi.isStore() or bdi.isAmo())
+  if (bdi.isStore() or bdi.isAmo() or bdi.isVectorStore())
     {
       if ((bdi.isSc() and bdi.op1() == 0) or (bdi.isStore() and bdi.op0() == 0))
 	return true;

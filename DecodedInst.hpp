@@ -266,6 +266,20 @@ namespace WdRiscv
       return (inst() & 0x7f) == 0x27 and (f3 == 0 or f3 >= 5);
     }
 
+    /// Return true if this is a vector indexed load instruction.
+    bool isVectorLoadIndexed() const
+    {
+      unsigned mop = (inst() >> 26) & 3;
+      return isVectorLoad() and (mop == 1 or mop == 3);
+    }
+
+    /// Return true if this is a vector indexed store instruction.
+    bool isVectorStoreIndexed() const
+    {
+      unsigned mop = (inst() >> 26) & 3;
+      return isVectorStore() and (mop == 1 or mop == 3);
+    }
+
     /// Return the element size in bytes of a vector load instruction. Return zero for a
     /// non-vector-load instruction.
     unsigned vecLoadElemSize() const
