@@ -312,6 +312,7 @@ namespace WdRiscv
                        std::vector<uint64_t>& paddresses,
                        std::vector<uint64_t>& paddresses2,
 		       std::vector<uint64_t>& data,
+                       std::vector<bool>& masked,
 		       unsigned& elementSize) const;
 
     /// Return true if the given element width and grouping

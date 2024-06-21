@@ -610,8 +610,9 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
   if (not stSize)
     {
       std::vector<uint64_t> addr, paddr, paddr2, data;
+      std::vector<bool> masked;
       unsigned elemSize = 0;
-      if (not hart.getLastVectorMemory(addr, paddr, paddr2, data, elemSize))
+      if (not hart.getLastVectorMemory(addr, paddr, paddr2, data, masked, elemSize))
 	return true;   // Not a store.
 
       instr.size_ = elemSize;
@@ -622,9 +623,10 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
       for (unsigned i = 0; i < addr.size(); ++i)
         {
 	  uint64_t pa1 = paddr.at(i), pa2 = paddr2.at(i), value = data.at(i);
+          bool skip = masked.at(i);
 	  VstoreOp op;
 	  if (pa1 == pa2)
-	    vstoreOps.push_back(VstoreOp{ pa1, value, elemSize });
+	    vstoreOps.push_back(VstoreOp{ pa1, value, elemSize, skip });
 	  else
 	    {
 	      unsigned size1 = offsetToNextPage(pa1);
@@ -632,8 +634,8 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	      unsigned size2 = elemSize - size1;
 	      uint64_t val1 = (value <<  ((8 - size1)*8)) >> ((8 - size1)*8);
 	      uint64_t val2 = (value >> (size1*8));
-	      vstoreOps.push_back(VstoreOp { pa1, val1, size1 } );
-	      vstoreOps.push_back(VstoreOp { pa2, val2, size2 } );
+	      vstoreOps.push_back(VstoreOp { pa1, val1, size1, skip } );
+	      vstoreOps.push_back(VstoreOp { pa2, val2, size2, skip } );
 	    }
         }
 
@@ -1359,6 +1361,8 @@ Mcm<URV>::checkStoreComplete(unsigned hartIx, const McmInstr& instr) const
       auto& vstoreOps = iter->second;
       for (const auto& vstoreOp : vstoreOps)
 	{
+          if (not checkMasked_ and vstoreOp.skip_)
+            continue;
 	  for (unsigned i = 0; i < vstoreOp.size_; ++i)
 	    {
 	      uint64_t byteAddr = vstoreOp.addr_ + i;
@@ -2987,6 +2991,8 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
             }
         }
     }
+
+  // what about vstart?
 
   return true;
 }

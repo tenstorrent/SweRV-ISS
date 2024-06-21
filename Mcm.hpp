@@ -593,6 +593,7 @@ namespace WdRiscv
       uint64_t addr_ = 0;
       uint64_t data_ = 0;
       unsigned size_ = 0;
+      bool skip_ = false;
     };
 
     using VstoreOps = std::vector<VstoreOp>;
@@ -643,6 +644,9 @@ namespace WdRiscv
     bool checkWholeLine_ = false;
 
     bool isTso_ = false;  // True if total-store-ordering model.
+
+    bool checkMasked_ = false; // True if we should skip checking masked
+                               // vector elements.
   };
 
 }
