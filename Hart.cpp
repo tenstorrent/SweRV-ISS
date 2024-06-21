@@ -2904,7 +2904,8 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
   // If exception happened while in an NMI handler, we go to the NMI exception
   // handler address.
   if (extensionIsEnabled(RvExtension::Smrnmi) and
-      MnstatusFields{csRegs_.peekMnstatus()}.bits_.NMIE == 0)
+      MnstatusFields{csRegs_.peekMnstatus()}.bits_.NMIE == 0 and
+      origMode == PM::Machine)
     {
       assert(not interrupt);
       base = nmiExceptionPc_;
