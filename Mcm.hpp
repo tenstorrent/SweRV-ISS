@@ -617,6 +617,11 @@ namespace WdRiscv
       uint64_t branchTime_ = 0;
       uint64_t branchProducer_;
 
+      // Dependency time of most recent vsetvl or vsetvli in program order or
+      // 0 if vset does not depend on prior memory instruction.
+      uint64_t vlTime_ = 0;
+      uint64_t vlProducer_;
+
       McmInstrIx currentInstrTag_ = 0;
       uint64_t sinvalVmaTime_ = 0;
       uint64_t sinvalVmaTag_ = 0;
@@ -625,7 +630,7 @@ namespace WdRiscv
     std::vector<HartData> hartData_;    // One entry per hart.
 
     MemoryOpVec sysMemOps_;             // Memory ops of all harts ordered by time.
-    
+
     uint64_t time_ = 0;
     unsigned pageSize_ = 4096;
     unsigned lineSize_ = 64; // Merge buffer line size.

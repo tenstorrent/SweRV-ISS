@@ -201,7 +201,17 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
   const auto* instEntry = di.instEntry();
 
-  if (instEntry->isIthOperandIntRegDest(0) and di.ithOperand(0) == 0)
+  bool updatesVl = false;
+  if (
+      // id == InstId::vsetivli or
+      di.instId() == InstId::vsetvl or
+      di.instId() == InstId::vsetvli)
+    {
+      if (di.op0() != 0 or di.op1() != 0)
+        updatesVl = true;
+    }
+
+  if (instEntry->isIthOperandIntRegDest(0) and di.ithOperand(0) == 0 and not updatesVl)
     return; // Destination is x0.
 
   uint64_t time = 0, tag = 0;
@@ -233,6 +243,8 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
   auto& branchTime = hartData_.at(hartIx).branchTime_;
   auto& branchProducer = hartData_.at(hartIx).branchProducer_;
+  auto& vlTime = hartData_.at(hartIx).vlTime_;
+  auto& vlProducer = hartData_.at(hartIx).vlProducer_;
 
   if (di.isBranch())
     branchTime = 0;
@@ -255,6 +267,12 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	    branchTime = regTimeVec.at(regIx);
 	    branchProducer = regProducer.at(regIx);
 	  }
+      if (updatesVl)
+        if (regTimeVec.at(regIx) > vlTime)
+          {
+            vlTime = regTimeVec.at(regIx);
+            vlProducer = regProducer.at(regIx);
+          }
     }
 
   bool noSource = sourceRegs.empty();
@@ -1911,30 +1929,11 @@ Mcm<URV>::identifyRegisters(const Hart<URV>& hart,
   if (di.modifiesFflags())
     destRegs.push_back(unsigned(CsrNumber::FFLAGS) + csRegOffset_);
 
-#if 0
-  if (di.isVector())
-    {
-      sourceRegs.push_back(unsigned(CsrNumber::VL) + csRegOffset_);
-      if (di.isMasked()) // vm is control dep
-        sourceRegs.push_back(0 + vecRegsOffset_);
-    }
-#endif
-
   auto id = di.instId();
 
   bool skipCsr = ((id == InstId::csrrs or id == InstId::csrrc or
 		   id == InstId::csrrsi or id == InstId::csrrci)
 		  and di.op1() == 0);
-
-#if 0
-  if (id == InstId::vsetivli or
-      id == InstId::vsetvl or
-      id == InstId::vsetvli)
-    {
-      destRegs.push_back(unsigned(CsrNumber::VTYPE) + csRegOffset_);
-      destRegs.push_back(unsigned(CsrNumber::VL) + csRegOffset_);
-    }
-#endif
 
   const auto* entry = di.instEntry();
 
@@ -2940,29 +2939,53 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
   // Rule 11: B is a store with a control dependency on A
 
   unsigned hartIx = hart.sysHartIndex();
+  const auto& regProducer = hartData_.at(hartIx).regProducer_;
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   const auto& bdi = instrB.di_;
-  if (not bdi.isStore() and not bdi.isAmo())
+  if (not bdi.isStore() and not bdi.isAmo() and not bdi.isVectorStore())
     return true;
+
+  auto rule11 = [this, &instrVec, &instrB] (auto producerTag) -> bool {
+    if (producerTag >= instrVec.size())
+      return true;
+    const auto& producer = instrVec.at(producerTag);
+    if (not producer.di_.isValid())
+      return true;
+
+    return producer.complete_ and not isBeforeInMemoryTime(instrB, producer);
+  };
 
   auto producerTag = hartData_.at(hartIx).branchProducer_;
 
-  if (hartData_.at(hartIx).branchTime_ == 0)
-    return true;
-
-  const auto& instrVec = hartData_.at(hartIx).instrVec_;
-
-  if (producerTag >= instrVec.size())
-    return true;
-  const auto& producer = instrVec.at(producerTag);
-  if (not producer.di_.isValid())
-    return true;
-
-  if (not producer.complete_ or isBeforeInMemoryTime(instrB, producer))
+  if (hartData_.at(hartIx).branchTime_ and not rule11(producerTag))
     {
-      cerr << "Error: PPO rule 11 failed: hart-id=" << hart.hartId() << " tag1="
-	   << producerTag << " tag2=" << instrB.tag_ << '\n';
+      cerr << "Error: PPO rule 11 failed (branch): hart-id=" << hart.hartId() << " tag1="
+           << producerTag << " tag2=" << instrB.tag_ << '\n';
       return false;
+    }
+
+  if (bdi.isVectorStore()) // VL is ctrl dep for vector instructions
+    {
+      producerTag = hartData_.at(hartIx).vlProducer_;
+      if (hartData_.at(hartIx).vlTime_ and not rule11(producerTag))
+        {
+          cerr << "Error: PPO rule 11 failed (vl): hart-id=" << hart.hartId() << " tag1="
+               << producerTag << " tag2=" << instrB.tag_ << '\n';
+          return false;
+        }
+
+      if (bdi.isMasked()) // vm is ctrl dep for masked vector instructions
+        {
+          unsigned vmReg = 0 + vecRegOffset_;
+          producerTag = regProducer.at(vmReg);
+          if (not rule11(producerTag))
+            {
+              cerr << "Error: PPO rule 11 failed (vm): hart-id=" << hart.hartId() << " tag1="
+                   << producerTag << " tag2=" << instrB.tag_ << '\n';
+              return false;
+            }
+        }
     }
 
   return true;
