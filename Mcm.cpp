@@ -1740,13 +1740,13 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, MemoryOp& readOp)
 	    continue;
 	}
 
-      if (store.complete_)
-	continue;
-
-      if (readOp.forwardTime_ == 0)
-	readOp.forwardTime_ = earliestOpTime(store);
-      else if (mask != prev)
-	readOp.forwardTime_ = std::min(earliestOpTime(store), readOp.forwardTime_);
+      if (mask != prev)
+	{
+	  if (readOp.forwardTime_ == 0)
+	    readOp.forwardTime_ = earliestOpTime(store);
+	  else
+	    readOp.forwardTime_ = std::min(earliestOpTime(store), readOp.forwardTime_);
+	}
     }
 
   return true;
