@@ -6,6 +6,7 @@
 #include <cassert>
 #include <iostream>
 #include <set>
+#include <map>
 #include <unordered_set>
 #include "DecodedInst.hpp"
 
@@ -505,7 +506,7 @@ namespace WdRiscv
 
     bool instrHasWrite(const McmInstr& instr) const;
 
-    bool checkStoreComplete(const McmInstr& instr) const;
+    bool checkStoreComplete(unsigned hartIx, const McmInstr& instr) const;
 
     bool checkStoreData(unsigned hartId, const McmInstr& insrt) const;
 
@@ -586,6 +587,16 @@ namespace WdRiscv
     using RegTimeVec = std::vector<uint64_t>;    // Map reg index to time.
     using RegProducerVec = std::vector<uint64_t>;   // Map reg index to instr tag.
 
+    /// Vector store data produced by whisper.
+    struct VstoreOp
+    {
+      uint64_t addr_ = 0;
+      uint64_t data_ = 0;
+      unsigned size_ = 0;
+    };
+
+    using VstoreOps = std::vector<VstoreOp>;
+
     // Per hart information related to MCM.
     struct HartData
     {
@@ -597,6 +608,9 @@ namespace WdRiscv
 
       // Retired but not yet drained stores. Candidates for forwarding.
       std::set<McmInstrIx> undrainedStores_;
+
+      // Reference vectore store data produced by whisper.
+      std::map<McmInstrIx, VstoreOps> vstoreMap_;
 
       // Dependency time of most recent branch in program order or 0 if branch does not
       // depend on a prior memory instruction.

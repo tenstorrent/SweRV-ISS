@@ -431,7 +431,7 @@ Mcm<URV>::mergeBufferInsertScalar(Hart<URV>& hart, uint64_t time, uint64_t instr
       // Associate write op with instruction.
       instr->addMemOp(sysMemOps_.size());
       sysMemOps_.push_back(op);
-      instr->complete_ = checkStoreComplete(*instr);
+      instr->complete_ = checkStoreComplete(hartIx, *instr);
       if (instr->complete_)
 	undrained.erase(instrTag);
 
@@ -547,7 +547,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       result = pokeHartMemory(hart, physAddr, rtlData, size) and result;
     }
 
-  instr->complete_ = checkStoreComplete(*instr);
+  instr->complete_ = checkStoreComplete(hartIx, *instr);
   if (instr->complete_)
     {
       undrained.erase(instrTag);
@@ -572,27 +572,42 @@ template <typename URV>
 bool
 Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 {
+  auto hartIx = hart.sysHartIndex();
+
   uint64_t vaddr = 0, paddr = 0, paddr2 = 0, value = 0;
   unsigned stSize = hart.lastStore(vaddr, paddr, paddr2, value);
+
   if (not stSize)
     {
       std::vector<uint64_t> addr, paddr, paddr2, data;
       unsigned elemSize = 0;
       if (not hart.getLastVectorMemory(addr, paddr, paddr2, data, elemSize))
 	return true;   // Not a store.
-      stSize = elemSize;
 
-      instr.complete_ = true;
-      for (unsigned i = 0; i < addr.size(); ++i) // each element should be drained
+      instr.size_ = elemSize;
+      instr.isStore_ = true;
+
+      auto& vstoreOps = hartData_.at(hartIx).vstoreMap_[instr.tag_];
+
+      for (unsigned i = 0; i < addr.size(); ++i)
         {
-          instr.size_ = stSize;
-          instr.virtAddr_ = addr.at(i);
-          instr.physAddr_ = paddr.at(i);
-          instr.physAddr2_ = paddr2.at(i);
-          instr.storeData_ = value;
-          instr.isStore_ = true;
-          instr.complete_ &= checkStoreComplete(instr);
+	  uint64_t pa1 = paddr.at(i), pa2 = paddr2.at(i), value = data.at(i);
+	  VstoreOp op;
+	  if (pa1 == pa2)
+	    vstoreOps.push_back(VstoreOp{ pa1, value, elemSize });
+	  else
+	    {
+	      unsigned size1 = offsetToNextPage(pa1);
+	      assert(size1 > 0 and size1 < 8);
+	      unsigned size2 = elemSize - size1;
+	      uint64_t val1 = (value <<  ((8 - size1)*8)) >> ((8 - size1)*8);
+	      uint64_t val2 = (value >> (size1*8));
+	      vstoreOps.push_back(VstoreOp { pa1, val1, size1 } );
+	      vstoreOps.push_back(VstoreOp { pa2, val2, size2 } );
+	    }
         }
+
+      instr.complete_ = checkStoreComplete(hartIx, instr);
     }
   else
     {
@@ -602,10 +617,9 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
       instr.physAddr2_ = paddr2;
       instr.storeData_ = value;
       instr.isStore_ = true;
-      instr.complete_ = checkStoreComplete(instr);
+      instr.complete_ = checkStoreComplete(hartIx, instr);
     }
 
-  auto hartIx = hart.sysHartIndex();
   auto& undrained = hartData_.at(hartIx).undrainedStores_;
 
   if (not instr.complete_)
@@ -641,7 +655,7 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
     {
       instrB.isStore_ = true;  // To enable forwarding
 
-      instrB.complete_ = checkStoreComplete(instrB);
+      instrB.complete_ = checkStoreComplete(hartIx, instrB);
       if (instrB.complete_)
 	{
 	  undrained.erase(instrB.tag_);
@@ -1006,7 +1020,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	  cerr << "Mcm::mergeBufferWrite: Covered instruction tag is invalid\n";
 	  return false;
 	}
-      if (checkStoreComplete(*instr))
+      if (checkStoreComplete(hartIx, *instr))
 	{
 	  instr->complete_ = true;
 	  undrained.erase(instr->tag_);
@@ -1145,35 +1159,86 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
       return false;
     }
 
-  if (op.size_ > instr.size_)
+  if (not instr.di_.isVector())
     {
-      cerr << "Error: Write size exceeds store instruction size: "
-	   << "Hart-id=" << hartId << " time=" << time_ << " tag=" << instr.tag_
-	   << " write-size=" << unsigned(op.size_) << " store-size=" << unsigned(instr.size_) << '\n';
+      if (op.size_ > instr.size_)
+	{
+	  cerr << "Error: Write size exceeds store instruction size: "
+	       << "Hart-id=" << hartId << " time=" << time_ << " tag=" << instr.tag_
+	       << " write-size=" << unsigned(op.size_) << " store-size=" << unsigned(instr.size_) << '\n';
+	  return false;
+	}
+
+      uint64_t data = instr.storeData_;
+
+      if (op.size_ < instr.size_)
+	{
+	  uint64_t shift = (op.physAddr_ - instr.physAddr_) * 8;
+	  data = data >> shift;
+	  shift = 64 - op.size_*8;
+	  data = (data << shift) >> shift;
+	}
+
+      if (data == op.rtlData_)
+	return true;
+
+      const char* tag = instr.di_.isAmo()? " AMO " : " ";
+
+      cerr << "Error: RTL/whisper" << tag << "write mismatch time=" << op.time_
+	   << " hart-id=" << hartId << " instr-tag="
+	   << instr.tag_ << " addr=0x" << std::hex << op.physAddr_
+	   << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
+	   << " whisper=0x" << data << std::dec << '\n';
+      return false;
+    }
+  
+  unsigned hartIx = op.hartIx_;
+  const auto& vstoreMap = hartData_.at(hartIx).vstoreMap_;  
+  auto iter = vstoreMap.find(instr.tag_);
+  if (iter == vstoreMap.end())
+    {
+      cerr << "RTL/whiper mismatch for vector store time=" << op.time_ << " hart-id="
+	   << hartId << " instr-tag=" << instr.tag_ << " addr=0x" << std::hex
+	   << op.physAddr_ << std::dec << " no whisper data\n";
       return false;
     }
 
-  uint64_t data = instr.storeData_;
+  auto& vstoreOps = iter->second;
 
-  if (op.size_ < instr.size_)
+  for (unsigned i = 0; i < op.size_; ++i)
     {
-      uint64_t shift = (op.physAddr_ - instr.physAddr_) * 8;
-      data = data >> shift;
-      shift = 64 - op.size_*8;
-      data = (data << shift) >> shift;
+      // TOD FIX : op/vstore op should have an element ix, element indices should match.
+      uint64_t byteAddr = op.physAddr_ + i;
+      uint8_t byteVal = op.rtlData_ >> (i*8);
+      bool match = false;
+      
+      for (auto& vstoreOp : vstoreOps)
+	{
+	  if (byteAddr >= vstoreOp.addr_ and byteAddr < vstoreOp.addr_ + vstoreOp.size_)
+	    {
+	      uint8_t refByte = vstoreOp.data_ >> (byteAddr - vstoreOp.addr_);
+	      match = refByte == byteVal;
+	      if (match)
+		continue;
+	      cerr << "RTL/whiper mismatch for vector store time=" << op.time_ << " hart-id="
+		   << hartId << " instr-tag=" << instr.tag_ << " addr=0x" << std::hex << byteAddr
+		   << op.physAddr_ << " rtl-data=0x" << unsigned(byteVal) << " whisper-data=0x"
+		   << unsigned(refByte) << std::dec << '\n';
+	      return false;
+	    }
+	}
+
+      if (not match)
+	{
+	  cerr << "RTL/whiper mismatch for vector store time=" << op.time_ << " hart-id="
+	       << hartId << " instr-tag=" << instr.tag_ << " addr=0x" << std::hex << byteAddr
+	       << op.physAddr_ << " rtl-data=0x" << unsigned(byteVal) << " no whisper data\n"
+	       << std::dec << '\n';
+	  return false;
+	}
     }
 
-  if (data == op.rtlData_)
-    return true;
-
-  const char* tag = instr.di_.isAmo()? " AMO " : " ";
-
-  cerr << "Error: RTL/whisper" << tag << "write mismatch time=" << op.time_
-       << " hart-id=" << hartId << " instr-tag="
-       << instr.tag_ << " addr=0x" << std::hex << op.physAddr_
-       << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
-       << " whisper=0x" << data << std::dec << '\n';
-  return false;
+  return true;
 }
 
 
@@ -1239,7 +1304,7 @@ maskCoveredBytes(uint64_t addr, unsigned size, uint64_t cover, unsigned coverSiz
 
 template <typename URV>
 bool
-Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
+Mcm<URV>::checkStoreComplete(unsigned hartIx, const McmInstr& instr) const
 {
   if (instr.isCanceled() or not instr.isStore_)
     return false;
@@ -1253,6 +1318,25 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
 	  count += op.size_;
 	}
       return count == lineSize_;
+    }
+
+  if (instr.di_.isVector())
+    {
+      const auto& vstoreMap = hartData_.at(hartIx).vstoreMap_;
+      auto iter = vstoreMap.find(instr.tag_);
+      if (iter == vstoreMap.end())
+	return false;
+      auto& vstoreOps = iter->second;
+      for (const auto& vstoreOp : vstoreOps)
+	{
+	  for (unsigned i = 0; i < vstoreOp.size_; ++i)
+	    {
+	      uint64_t byteAddr = vstoreOp.addr_ + i;
+	      if (not vecOverlapsPhysAddr(instr, byteAddr))
+		return false;
+	    }
+	}
+      return true;
     }
 
   unsigned expectedMask = (1 << instr.size_) - 1;  // Mask of bytes covered by instruction.
@@ -1967,7 +2051,6 @@ Mcm<URV>::vecOverlapsPhysAddr(const McmInstr& instr, uint64_t addr) const
       auto& op = sysMemOps_.at(opIx);
       if (op.overlaps(addr))
 	return true;
-      return false;
     }
 
   return false;
