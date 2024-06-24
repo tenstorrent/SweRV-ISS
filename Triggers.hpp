@@ -250,7 +250,7 @@ namespace WdRiscv
     bool isAddrData()  const { return isMcontrol() or isMcontrol6(); }
     bool isInstCount() const { return type() == TriggerType::Icount; }
     bool isEtrigger()  const { return type() == TriggerType::Etrigger; }
-    bool isItrigger()  const { return type() == TriggerType::Etrigger; }
+    bool isItrigger()  const { return type() == TriggerType::Itrigger; }
 
     /// Return true if trigger is writable only in debug mode.
     bool dmodeOnly() const   { return mcontrol_.dmode_; }
@@ -304,6 +304,10 @@ namespace WdRiscv
       : data1_(data1), data2_(data2), data1WriteMask_(mask1),
 	data2WriteMask_(mask2), data3WriteMask_(mask3)
     { }
+
+    /// Return the type of this trigger.
+    TriggerType type() const
+    { return data1_.type(); }
 
     /// Read the tdata1 register of the trigger. This is typically the control register of
     /// the trigger.
@@ -864,6 +868,14 @@ namespace WdRiscv
 
     /// Return true if any of the interrupt-triggers (itrigger) trips.
     bool intTriggerHit(URV cause, PrivilegeMode mode, bool virtMode, bool interruptEnabled);
+
+    /// Return the tigger at the given index. Reurn None if index is out of bounds.
+    TriggerType triggerType(URV trigger) const
+    {
+      if (trigger >= triggers_.size())
+	return TriggerType::None;
+      return triggers_.at(trigger).type();
+    }
 
     /// Reset the given trigger with the given data1, data2, and data3
     /// values and corresponding write and poke masks. Values are applied

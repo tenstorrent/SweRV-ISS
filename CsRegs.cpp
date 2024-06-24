@@ -3571,7 +3571,16 @@ CsRegs<URV>::readTrigger(CsrNumber number, PrivilegeMode mode, URV& value) const
     return false;
 
   if (number == CsrNumber::TDATA1)
-    return triggers_.readData1(trigger, value);
+    {
+      bool ok = triggers_.readData1(trigger, value);
+      if (ok and not hyperEnabled_)
+	{
+	  // Bits vs and vu are read-only zero if hypervisor is not enabled.
+	  if (triggers_.triggerType(trigger) == TriggerType::Mcontrol6)
+	    value &= ~(URV(3) << 23);  // Clear bits 23 and 24 (vs and vu).
+	}
+      return ok;
+    }
 
   if (number == CsrNumber::TDATA2)
     return triggers_.readData2(trigger, value);

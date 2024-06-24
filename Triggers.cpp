@@ -130,6 +130,14 @@ Triggers<URV>::writeData1(URV trigIx, bool debugMode, URV value)
 
   bool oldChain = trig.getChain();
 
+  // If new type is not supported, preserve old type.
+  Data1Bits<URV> valBits{value};
+  if (not isSupportedType(valBits.type()))
+    {
+      valBits.setType(trig.data1_.type());
+      value = valBits.value_;
+    }
+
   if (not trig.writeData1(debugMode, value))
     return false;
 
