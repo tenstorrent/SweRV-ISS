@@ -624,7 +624,6 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
         {
 	  uint64_t pa1 = paddr.at(i), pa2 = paddr2.at(i), value = data.at(i);
           bool skip = masked.at(i);
-	  VstoreOp op;
 	  if (pa1 == pa2)
 	    vstoreOps.push_back(VstoreOp{ pa1, value, elemSize, skip });
 	  else
