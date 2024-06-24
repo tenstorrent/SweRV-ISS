@@ -163,6 +163,7 @@ Mcm<URV>::findOrAddInstr(unsigned hartIx, uint32_t tag)
 	}
       McmInstr instr;
       instr.tag_ = tag;
+      instr.hartIx_ = hartIx;
       vec.resize(tag + 1);
       vec.at(tag) = instr;
       return &vec.at(tag);
@@ -712,7 +713,7 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
 	continue;
 
       const DecodedInst& di = instrA.di_;
-      if ((di.isStore() or di.isAmo()) and instrA.overlaps(instrB))
+      if ((di.isStore() or di.isAmo()) and overlaps(instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
 	       << instrA.tag_ << " tag2=" << instrB.tag_ << " (CMO)\n";
@@ -1991,6 +1992,54 @@ Mcm<URV>::identifyRegisters(const Hart<URV>& hart,
 
 template <typename URV>
 bool
+Mcm<URV>::overlaps(const McmInstr& i1, const McmInstr& i2) const
+{
+  if (not i1.di_.isVector() and not i2.di_.isVector())
+    return i1.overlaps(i2);   // Both scalar.
+
+  // Both vector stores.
+  if (i1.di_.isVectorStore() and i2.di_.isVectorStore())
+    {
+      const auto& vstoreMap1 = hartData_.at(i1.hartIx_).vstoreMap_;
+      const auto& vstoreMap2 = hartData_.at(i2.hartIx_).vstoreMap_;
+      auto iter1 = vstoreMap1.find(i1.tag_);
+      auto iter2 = vstoreMap2.find(i2.tag_);
+      if (iter1 == vstoreMap1.end() or
+          iter2 == vstoreMap2.end())
+        assert(false);
+
+      auto& vstoreOps1 = iter1->second;
+      auto& vstoreOps2 = iter2->second;
+      for (auto& vstoreOp1 : vstoreOps1)
+        for (auto& vstoreOp2 : vstoreOps2)
+          if (rangesOverlap(vstoreOp1.addr_, vstoreOp1.size_,
+                            vstoreOp2.addr_, vstoreOp2.size_))
+              return true;
+    }
+
+  // One of is vector store.
+  if (i1.di_.isVectorStore() ^ i2.di_.isVectorStore())
+    if (i1.di_.isVectorStore())
+      for (auto ix : i2.memOps_)
+        {
+          const auto& op = sysMemOps_.at(ix);
+          if (overlaps(i1, op))
+            return true;
+        }
+
+  // Both vector loads or i2 is vector store.
+  for (auto ix : i1.memOps_)
+    {
+      const auto& op = sysMemOps_.at(ix);
+      if (overlaps(i2, op))
+        return true;
+    }
+  return false;
+}
+
+
+template <typename URV>
+bool
 Mcm<URV>::instrHasRead(const McmInstr& instr) const
 {
   return std::ranges::any_of(instr.memOps_,
@@ -2080,7 +2129,7 @@ Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
 
   assert(instrA.isRetired());
 
-  if (not instrA.isMemory() or not instrA.overlaps(instrB))
+  if (not instrA.isMemory() or not overlaps(instrA, instrB))
     return true;
 
   // Non-scalar (e.g. cbo.zero) are not drained aomically even if aligned.
@@ -2217,7 +2266,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	break;
       const auto& instrA =  instrVec.at(op.instrTag_);
       if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory()  or
-	  not instrA.overlaps(instrB))
+	  not overlaps(instrA, instrB))
 	continue;
 
       // If a byte of B is written by A, then put its physical address in locallyWriten.
@@ -3030,7 +3079,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	    continue;
 
 	  const auto& mdi = instrM.di_;
-	  if ((not mdi.isStore() and not mdi.isAmo()) or not instrM.overlaps(instrB))
+	  if ((not mdi.isStore() and not mdi.isAmo() and not mdi.isVectorStore()) or not overlaps(instrM, instrB))
 	    continue;
 
 	  auto mapt = instrM.addrProducer_;  // M address producer tag.

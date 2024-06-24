@@ -62,6 +62,7 @@ namespace WdRiscv
     McmInstrIx dataProducer_ = 0;
     DecodedInst di_;
     McmInstrIx tag_ = 0;
+    uint8_t hartIx_ : 8  = 0;
     uint8_t size_   : 8 = 0;        // Data size for load/store instructions.
     bool retired_   : 1 = false;
     bool canceled_  : 1 = false;
@@ -423,10 +424,32 @@ namespace WdRiscv
 			   std::vector<unsigned>& sourceRegs,
 			   std::vector<unsigned>& destRegs);
 
+    /// Helper for vecOpverlaps.
+    bool vecStoreOverlaps(const McmInstr& instr, const MemoryOp& other) const
+    {
+      if (not instr.di_.isVectorStore())
+        return false;
+
+      const auto& vstoreMap = hartData_.at(instr.hartIx_).vstoreMap_;
+      auto iter = vstoreMap.find(instr.tag_);
+      if (iter == vstoreMap.end())
+        assert(false);
+
+      auto& vstoreOps = iter->second;
+      for (auto& vstoreOp : vstoreOps)
+        if (rangesOverlap(vstoreOp.addr_, vstoreOp.size_, other.physAddr_, other.size_))
+            return true;
+      return false;
+    }
+
     bool vecOverlaps(const McmInstr& instr, const MemoryOp& other) const
     {
       if (not instr.di_.isVector())
 	return false;
+
+      if (instr.di_.isVectorStore())
+        return vecStoreOverlaps(instr, other);
+
       for (auto ix : instr.memOps_)
 	{
 	  const auto& op = sysMemOps_.at(ix);
@@ -492,18 +515,7 @@ namespace WdRiscv
     }
 
     /// Return true if the instruction have overlapping data address ranges.
-    bool overlaps(const McmInstr& i1, const McmInstr& i2) const
-    {
-      if (not i1.di_.isVector() and not i2.di_.isVector())
-	return i1.overlaps(i2);   // Both scalar.
-      for (auto ix : i1.memOps_)
-	{
-	  const auto& op = sysMemOps_.at(ix);
-	  if (overlaps(i2, op))
-	    return true;
-	}
-      return false;
-    }
+    bool overlaps(const McmInstr& i1, const McmInstr& i2) const;
 
     bool instrHasRead(const McmInstr& instr) const;
 
