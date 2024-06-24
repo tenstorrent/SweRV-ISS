@@ -82,17 +82,11 @@ CsRegs<URV>::defineCsr(std::string name, CsrNumber csrn, bool mandatory,
       return nullptr;
     }
 
-  using CN = CsrNumber;
   PrivilegeMode priv = PrivilegeMode((ix & 0x300) >> 8);
-  if (priv != PrivilegeMode::Reserved)
-    csr.definePrivilegeMode(priv);
-  else if ((ix >= size_t(CN::HSTATUS) and ix <= size_t(CN::HCONTEXT)) or
-           (ix >= size_t(CN::VSSTATUS) and ix <= size_t(CN::VSATP)) or
-           (ix == size_t(CN::HGEIP)) or (ix == size_t(CN::VSTOPI)))
-    // bits 8 and 9 not sufficient for hypervisor CSRs
-    csr.definePrivilegeMode(PrivilegeMode::Supervisor);
-  else
-    assert(false);
+  if (priv == PrivilegeMode::Reserved) {
+    priv = PrivilegeMode::Supervisor;
+  }
+  csr.definePrivilegeMode(priv);
 
   csr.setDefined(true);
 
@@ -2647,7 +2641,7 @@ CsRegs<URV>::defineMachineRegs()
   mask = URV(1) << (sizeof(URV)*8 - 1);  // Most sig bit is read-only 1
   defineCsr("mncause", Csrn::MNCAUSE, !mand, !imp, mask, ~mask, ~mask);
 
-  mask = 0b1100010001000;  // Fields MNPV, MNPP, and NMIE writeable.
+  mask = 0b1101010001000;  // Fields MNPP, MNPELP, MNPV, and NMIE writeable.
   defineCsr("mnstatus", Csrn::MNSTATUS, !mand, !imp, 0, mask, pokeMask);
 
   // Define mhpmcounter3/mhpmcounter3h to mhpmcounter31/mhpmcounter31h
@@ -3577,7 +3571,16 @@ CsRegs<URV>::readTrigger(CsrNumber number, PrivilegeMode mode, URV& value) const
     return false;
 
   if (number == CsrNumber::TDATA1)
-    return triggers_.readData1(trigger, value);
+    {
+      bool ok = triggers_.readData1(trigger, value);
+      if (ok and not hyperEnabled_)
+	{
+	  // Bits vs and vu are read-only zero if hypervisor is not enabled.
+	  if (triggers_.triggerType(trigger) == TriggerType::Mcontrol6)
+	    value &= ~(URV(3) << 23);  // Clear bits 23 and 24 (vs and vu).
+	}
+      return ok;
+    }
 
   if (number == CsrNumber::TDATA2)
     return triggers_.readData2(trigger, value);

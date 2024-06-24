@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cassert>
+#include <iostream>
 
 #include "Triggers.hpp"
 
@@ -27,6 +28,18 @@ Triggers<URV>::Triggers(unsigned count)
   // Define each triggers as a single-element chain.
   for (unsigned i = 0; i < count; ++i)
     triggers_.at(i).setChainBounds(i, i+1);
+
+  // Define default enabled types.
+  unsigned typeLimit = unsigned(TriggerType::Disabled) + 1;
+  supportedTypes_.resize(typeLimit, true);
+
+  using TT = TriggerType;
+  supportedTypes_.at(unsigned(TT::Reserved0)) = false;
+  supportedTypes_.at(unsigned(TT::Reserved1)) = false;
+  supportedTypes_.at(unsigned(TT::Reserved2)) = false;
+  supportedTypes_.at(unsigned(TT::Custom0)) = false;
+  supportedTypes_.at(unsigned(TT::Custom1)) = false;
+  supportedTypes_.at(unsigned(TT::Custom2)) = false;
 }
 
 
@@ -116,6 +129,14 @@ Triggers<URV>::writeData1(URV trigIx, bool debugMode, URV value)
     }
 
   bool oldChain = trig.getChain();
+
+  // If new type is not supported, preserve old type.
+  Data1Bits<URV> valBits{value};
+  if (not isSupportedType(valBits.type()))
+    {
+      valBits.setType(trig.data1_.type());
+      value = valBits.value_;
+    }
 
   if (not trig.writeData1(debugMode, value))
     return false;
@@ -520,6 +541,81 @@ Triggers<URV>::reset()
   defineChainBounds();
 }
 
+
+template <typename URV>
+bool
+Triggers<URV>::setSupportedTypes(const std::vector<TriggerType>& types)
+{
+  using TT = TriggerType;
+
+  std::fill(supportedTypes_.begin(), supportedTypes_.end(), false);
+
+  supportedTypes_.at(unsigned(TT::None)) = true;
+  supportedTypes_.at(unsigned(TT::Disabled)) = true;
+
+  bool hasNone = false, hasDisabled = false;
+
+  for (auto type : types)
+    {
+      unsigned ix = unsigned(type);
+      if (type == TT::None)
+	hasNone = true;
+      else if (type == TT::Disabled)
+	hasDisabled = true;
+      supportedTypes_.at(ix) = true;
+    }
+
+  if (not hasNone)
+    std::cerr << "Error: Triggers::SetSupportedTypes: Missing triger-type \"none\"\n";
+
+  if (not hasDisabled)
+    std::cerr << "Error: Triggers::SetSupportedTypes: Missing triger-type \"disabled\"\n";
+
+  return hasNone and hasDisabled;
+}
+
+
+template <typename URV>
+bool
+Triggers<URV>::setSupportedTypes(const std::vector<std::string>& strings)
+{
+  using TT = TriggerType;
+  std::vector<TT> types;
+
+  unsigned errors = 0;
+
+  for (const auto& str : strings)
+    {
+      if (str == "none")
+	types.push_back(TT::None);
+      else if (str == "legacy")
+	types.push_back(TT::Legacy);
+      else if (str == "mcontrol")
+	types.push_back(TT::Mcontrol);
+      else if (str == "icount")
+	types.push_back(TT::Icount);
+      else if (str == "itrigger")
+	types.push_back(TT::Itrigger);
+      else if (str == "etrigger")
+	types.push_back(TT::Etrigger);
+      else if (str == "mcontrol6")
+	types.push_back(TT::Mcontrol6);
+      else if (str == "tmexttrigger")
+	types.push_back(TT::Tmext);
+      else if (str == "disabled")
+	types.push_back(TT::Disabled);
+      else
+	{
+	  std::cerr << "No such trigger type: " << str << '\n';
+	  errors++;
+	}
+    }
+
+  if (not setSupportedTypes(types))
+    errors++;
+
+  return errors == 0;
+}
 
 
 template <typename URV>

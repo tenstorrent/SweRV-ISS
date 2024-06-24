@@ -2288,10 +2288,10 @@ Hart<URV>::execSw(const DecodedInst* di)
 
 template <typename URV>
 bool
-Hart<URV>::readInst(uint64_t va, uint32_t& inst)
+Hart<URV>::readInst(uint64_t va, uint64_t& pa, uint32_t& inst)
 {
   inst = 0;
-  uint64_t pa = va;
+  pa = va;
   bool translate = isRvs() and privMode_ != PrivilegeMode::Machine;
 
   if (translate)
@@ -2322,6 +2322,15 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
     }
 
   return false;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::readInst(uint64_t va, uint32_t& inst)
+{
+  uint64_t pa = 0;
+  return readInst(va, pa, inst);
 }
 
 
@@ -2895,7 +2904,8 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
   // If exception happened while in an NMI handler, we go to the NMI exception
   // handler address.
   if (extensionIsEnabled(RvExtension::Smrnmi) and
-      MnstatusFields{csRegs_.peekMnstatus()}.bits_.NMIE == 0)
+      MnstatusFields{csRegs_.peekMnstatus()}.bits_.NMIE == 0 and
+      origMode == PM::Machine)
     {
       assert(not interrupt);
       base = nmiExceptionPc_;
@@ -5485,8 +5495,19 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
     {
       // Attach changes to interrupted instruction.
       uint32_t inst = 0; // Load interrupted inst.
-      readInst(currPc_, inst);
-      initiateInterrupt(cause, pc_);
+      uint64_t pc = pc_, physPc = 0;
+      readInst(pc, physPc, inst);
+      if (inst)
+	{
+#if 0
+	  // Enable when RTL is ready.
+	  DecodedInst di;
+	  decode(pc, physPc, inst, di);
+	  if (di.instId() == InstId::wfi)
+	    pc = pc + 4;
+#endif
+	}
+      initiateInterrupt(cause, pc);
       printInstTrace(inst, instCounter_, instStr, traceFile);
       if (mcycleEnabled())
 	++cycleCount_;
@@ -10350,6 +10371,10 @@ template <typename URV>
 void
 Hart<URV>::execWfi(const DecodedInst* di)
 {
+#if 1
+
+  // Remove when RTL is ready.
+
   using PM = PrivilegeMode;
   auto pm = privilegeMode();
 
@@ -10384,7 +10409,51 @@ Hart<URV>::execWfi(const DecodedInst* di)
       return;
     }
 
-  // No-op.
+#else
+
+  // Enable when RTL is ready.
+  
+  // If running standalone, we assume that the WFI timeout (if any) has expired. If
+  // running with an external agent (e.g. test-bench), we assume that the agent will poke
+  // MIP with an interrupt (if any) before we get here so by the time we get here the
+  // wfi timeout has expired.
+
+  using PM = PrivilegeMode;
+
+  auto pm = privilegeMode();
+
+  if (pm == PM::Machine)
+    return;
+
+  bool tw = mstatus_.bits_.TW;
+  bool vtw = hstatus_.bits_.VTW;
+
+  if (not virtMode_)
+    {
+      if (pm == PM::Supervisor and not tw)
+	return;
+      illegalInst(di);   // Supervisor or User mode. Timeout expired.
+      return;
+    }
+
+  if (pm == PM::Supervisor)   // VS mode
+    {
+      if (not vtw and not tw)
+	return;
+      if (vtw and not tw)
+	virtualInst(di);
+      else if (tw)
+	illegalInst(di);
+      return;
+    }
+
+  // VU mode.
+  if (tw)
+    illegalInst(di);
+  else
+    virtualInst(di);
+
+#endif
 }
 
 

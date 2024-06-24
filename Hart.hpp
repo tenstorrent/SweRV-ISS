@@ -318,19 +318,15 @@ namespace WdRiscv
 		       const std::vector<uint64_t>& pokeMasks)
     { return csRegs_.configTrigger(trigger, resets, masks, pokeMasks); }
 
+    /// Define the set of supported trigger types.
+    bool setSupportedTriggerTypes(const std::vector<std::string>& types)
+    { return csRegs_.triggers_.setSupportedTypes(types); }
+
     /// Enable the extensions defined by the given string. If
     /// updateMisa is true then the MISA CSR reset value is updated to
     /// enable the extensions defined by the given string (this is done
     /// for linux/newlib emulation).
     bool configIsa(std::string_view string, bool updateMisa);
-
-    /// Enable/disable load-data debug triggering (disabled by default).
-    void configLoadDataTrigger(bool flag)
-    { csRegs_.configLoadDataTrigger(flag); }
-
-    /// Enable/disable exec-opcode triggering (disabled by default).
-    void configExecOpcodeTrigger(bool flag)
-    { csRegs_.configExecOpcodeTrigger(flag); }
 
     /// Enable/disable matching all addresses in a load/store access
     /// for debug triggering.
@@ -971,9 +967,13 @@ namespace WdRiscv
       return true;
     }
 
-    /// Read instruction at given address. Return true on success and
-    /// false if address is out of memory bounds.
-    bool readInst(uint64_t address, uint32_t& instr);
+    /// Read instruction at given virtual address. Return true on success and false if
+    /// address does not translate or if physical address is out of bounds. If successful
+    /// set paddr to the translated address.
+    bool readInst(uint64_t vaddr, uint64_t& paddr, uint32_t& instr);
+
+    /// Similar to above but does not expose physical address.
+    bool readInst(uint64_t vaddr, uint32_t& instr);
 
     /// Set instruction count limit: When running with tracing the
     /// run and the runUntil methods will stop if the retired instruction
