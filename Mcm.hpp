@@ -27,6 +27,7 @@ namespace WdRiscv
     uint64_t   rtlData_        = 0;  // RTL data.
     McmInstrIx instrTag_       = 0;
     uint64_t   forwardTime_    = 0;  // Time of store instruction forwarding to this op.
+    uint16_t   elemIx_         = 0;  // For vector isntructions.
     uint8_t    hartIx_    : 8  = 0;
     uint8_t    size_      : 8  = 0;
     bool       isRead_    : 1  = false;

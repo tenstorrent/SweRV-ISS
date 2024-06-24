@@ -832,6 +832,45 @@ Server<URV>::translateCommand(const WhisperMessage& req,
 }
 
 
+template <typename URV>
+bool
+Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
+			    Hart<URV>& hart)
+{
+  bool ok = true;
+
+  if (req.size <= 8)
+    ok = system_.mcmRead(hart, req.time, req.instrTag, req.address, req.size, req.value);
+  else
+    {
+      if (req.size > req.buffer.size())
+	{
+	  std::cerr << "Error: Server command: McmRead data size too large: "
+		    << req.size << '\n';
+	  ok = false;
+	}
+      else
+	{
+	  // Transaction is for vector. Break it into byte size transactions. If
+	  // test-bench provides element size, we can break it into element size
+	  // transactions.
+	  for (unsigned i = 0; i < req.size; ++i)
+	    {
+	      uint64_t addr = req.address + i;
+	      uint8_t byte = req.buffer.at(i);
+	      if (not system_.mcmRead(hart, req.time, req.instrTag, addr, 1, byte))
+		ok = false;
+	    }
+	}
+    }
+
+  if (not ok)
+    reply.type = Invalid;
+
+  return ok;
+}
+
+
 /// Dump all registers contents in tracefile.
 template <typename URV>
 static void
@@ -1155,13 +1194,11 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         break;
 
       case McmRead:
+	mcmReadCommand(msg, reply, hart);
         if (commandLog)
           fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mread %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
                   hartId, msg.time, msg.instrTag, msg.address, msg.size,
                   msg.value);
-        if (not system_.mcmRead(hart, msg.time, msg.instrTag, msg.address,
-                                msg.size, msg.value))
-          reply.type = Invalid;
         break;
 
       case McmInsert:
