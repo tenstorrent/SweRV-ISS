@@ -248,6 +248,9 @@ namespace WdRiscv
     /// Check PPO rule12. See ppoRule1.
     bool ppoRule12(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check PPO rule13. See ppoRule1.
+    bool ppoRule13(Hart<URV>& hart, const McmInstr& instr) const;
+
     /// Helper to above ppoRule1.
     bool ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const;
 

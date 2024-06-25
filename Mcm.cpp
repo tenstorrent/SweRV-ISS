@@ -733,6 +733,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   ok = ppoRule10(hart, *instr) and ok;
   ok = ppoRule11(hart, *instr) and ok;
   ok = ppoRule12(hart, *instr) and ok;
+  ok = ppoRule13(hart, *instr) and ok;
 
   return ok;
 }
@@ -2889,6 +2890,59 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	}
     }
   
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Rule 13: B is a store, there is a instruction M between A and B such that
+  // M has an address dependency on A.
+
+  if (not instrB.isStore_)
+    return true;  // NA: B is not a store.
+
+  // A cannot be a store, if B has not drained yet, it will never drain ahead of A.
+  if (instrB.memOps_.empty())
+    return true;
+
+  unsigned hartIx = hart.sysHartIndex();
+  auto minTag = getMinTagWithLargerTime(hartIx, instrB);
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
+  auto earlyB = earliestOpTime(instrB);
+
+  // Check every memory instructions A preceeding B in program order with memroy time
+  // larger than that of B.
+  for (McmInstrIx aTag = instrB.tag_ - 1; aTag >= minTag; --aTag)
+    {
+      const auto& instrA = instrVec.at(aTag);
+      if (instrA.isCanceled() or not instrA.di_.isValid() or not instrA.isMemory())
+	continue;
+
+      // Check all instructions between A and B for an instruction M with address
+      // overlapping that of B and with an address dependecy on A.
+      for (McmInstrIx mTag = instrB.tag_ - 1; mTag > aTag; --mTag)
+	{
+	  const auto& instrM = instrVec.at(mTag);
+	  if (instrM.isCanceled() or not instrM.di_.isValid() or not instrM.isMemory())
+	    continue;
+
+	  auto mapt = instrM.addrProducer_;  // M address producer tag.
+	  if (mapt != aTag)
+	    continue;
+
+	  if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
+	    {
+	      cerr << "Error: PPO rule 13 failed: hart-id=" << hart.hartId() << " tag1="
+		   << aTag << " tag2=" << instrB.tag_ << " mtag=" << mTag
+		   << " time1=" << latestOpTime(instrA) << " time2=" << earlyB << '\n';
+		return false;
+	    }
+	}
+    }
+
   return true;
 }
 

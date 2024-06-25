@@ -161,13 +161,27 @@ And here's how to compile and run the above program
     $ riscv32-unknown-elf-gcc -mabi=ilp32 -march=rv32imc -nostdlib -g -o test2 test2.c
     $ whisper test2
 ```
-If no global variable named "tohost" is written by the program, the
-simulator will stop on its own if a sequence of 64 consecutive illegal
-instructions is encountered.
+If no global variable named "tohost" is written by the program, the simulator will stop on
+its own if a sequence of 8 consecutive illegal instructions is encountered.
 
-For programs requiring minimal operating system support (e.g. brk,
-open, read and write) the user can compile with the newlib C library
-and use the simulator with the "--newlib" option.
+If the above program is compiled for RV64, it will crash with 8 consecutive illegal
+instructions. The reason is that the generated code will attempt to push data on the stack
+and the default stack pointer value is 0. Pushing on the stack will make the stack pointer
+a very large number that exceeds memory size (default is 4GB) which will trigger an access
+fault and, without an exception handler, will result in a cascade of illegal instruction
+exceptions. To fix that, run the RV64 version of the test2 binary under whisper with
+"--setreg sp=0xf0000000" which initializes the stack pointer to an address within the
+default memory address range:
+
+```
+    $ riscv64-unknown-elf-gcc -mabi=lp64 -march=rv64imc -nostdlib -g -o test2 test2.c
+    $ whisper test2   # this will carsh
+    $ whisper test2  --setreg sp=0xf0000000   # this will run
+``` 
+
+For programs requiring minimal operating system support (e.g. brk, open, read and write)
+the user can compile with the newlib C library and use the simulator with the "--newlib"
+option.
 
 Here's a sample program:
 ```

@@ -2559,11 +2559,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
     consecutiveIllegalCount_ = 0;
 
   if (consecutiveIllegalCount_ > 64)  // FIX: Make a parameter
-    {
-      throw CoreException(CoreException::Stop,
-                          "64 consecutive illegal instructions",
-                          0, 3);
-    }
+    throw CoreException(CoreException::Stop, "8 consecutive illegal instructions", 0, 3);
 
   counterAtLastIllegal_ = instCounter_;
 #endif
