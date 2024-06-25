@@ -2120,7 +2120,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 		  cerr << "Error: PPO Rule 2 failed: hart-id=" << hart.hartId()
 		       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_
 		       << " intermediate remote store from hart-id="
-		       << remoteOp.hartIx_ << " store-tag=" << remoteOp.instrTag_
+		       << unsigned(remoteOp.hartIx_) << " store-tag=" << remoteOp.instrTag_
 		       << " store-time=" << remoteOp.time_ << '\n';
 		  return false;
 		}
@@ -2828,68 +2828,47 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
     return true;  // NA: B is not a load.
 
   unsigned hartIx = hart.sysHartIndex();
-  auto minTag = getSmallerMemTimeInstr(hartIx, instrB);
+  auto minTag = getMinTagWithLargerTime(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
+
   auto earlyB = earliestOpTime(instrB);
 
-  // Check all preceding instructions for a store M with address overlapping that of B.
-  for (McmInstrIx mtag = instrB.tag_ - 1; mtag > minTag; --mtag)
+  // Check every memory instructions A preceeding B in program order with memroy time
+  // larger than that of B.
+  for (McmInstrIx aTag = instrB.tag_ - 1; aTag >= minTag; --aTag)
     {
-      const auto& instrM = instrVec.at(mtag);
-      if (instrM.isCanceled() or not instrM.di_.isValid())
+      const auto& instrA = instrVec.at(aTag);
+      if (instrA.isCanceled() or not instrA.di_.isValid() or not instrA.isMemory())
 	continue;
 
-      const auto& mdi = instrM.di_;
-      if ((not mdi.isStore() and not mdi.isAmo()) or not instrM.overlaps(instrB))
-	continue;
-
-      auto apTag = instrM.addrProducer_;
-      auto dpTag = instrM.dataProducer_;
-
-      for (auto aTag : { apTag, dpTag } )
+      // Check all instructions between A and B for an instruction M with address
+      // overlapping that of B and with an address dependecy on A.
+      for (McmInstrIx mTag = instrB.tag_ - 1; mTag > aTag; --mTag)
 	{
-	  const auto& instrA = instrVec.at(aTag);
-	  if (instrA.di_.isValid())
-	    if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
-	      {
-		cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
-		     << aTag << " tag2=" << instrB.tag_ << " mtag=" << mtag
-		     << " time1=" << latestOpTime(instrA)
-		     << " time2=" << earlyB << '\n';
+	  const auto& instrM = instrVec.at(mTag);
+	  if (instrM.isCanceled() or not instrM.di_.isValid())
+	    continue;
+
+	  const auto& mdi = instrM.di_;
+	  if ((not mdi.isStore() and not mdi.isAmo()) or not instrM.overlaps(instrB))
+	    continue;
+
+	  auto mapt = instrM.addrProducer_;  // M address producer tag.
+	  auto mdpt = instrM.dataProducer_;  // M data producer tag.
+
+	  if (mapt != aTag and mdpt != aTag)
+	    continue;
+
+	  if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
+	    {
+	      cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
+		   << aTag << " tag2=" << instrB.tag_ << " mtag=" << mTag
+		   << " time1=" << latestOpTime(instrA) << " time2=" << earlyB << '\n';
 		return false;
-	      }
+	    }
 	}
     }
 
-  // Check all preceding undrained stores for an M with address overlapping that of B.
-  const auto& undrained = hartUndrainedStores_.at(hartIx);
-  for (auto mtag : undrained)
-    {
-      if (mtag >= instrB.tag_)
-	break;
-
-      const auto& instrM = instrVec.at(mtag);
-      if (instrM.isCanceled() or not instrM.di_.isValid() or not instrM.overlaps(instrB))
-	continue;
-
-      auto apTag = instrM.addrProducer_;
-      auto dpTag = instrM.dataProducer_;
-
-      for (auto aTag : { apTag, dpTag } )
-	{
-	  const auto& instrA = instrVec.at(aTag);
-	  if (instrA.di_.isValid())
-	    if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
-	      {
-		cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
-		     << aTag << " tag2=" << instrB.tag_ << " mtag=" << mtag
-		     << " time1=" << latestOpTime(instrA)
-		     << " time2=" << earlyB << '\n';
-		return false;
-	      }
-	}
-    }
-  
   return true;
 }
 
@@ -2910,7 +2889,7 @@ Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
 
   unsigned hartIx = hart.sysHartIndex();
   auto minTag = getMinTagWithLargerTime(hartIx, instrB);
-  const auto& instrVec = hartData_.at(hartIx).instrVec_;
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
   auto earlyB = earliestOpTime(instrB);
 
   // Check every memory instructions A preceeding B in program order with memroy time
