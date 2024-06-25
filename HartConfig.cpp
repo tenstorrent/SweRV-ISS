@@ -1509,7 +1509,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	     << "Add extension string \"" << ztag << "\" to \"isa\" tag instead.\n";
     }
 
-  for (std::string_view ztag : { "zbe", "zbm", "zbp", "zbr", "zbt" } )
+  for (std::string_view ztag : { "zbe", "zbp", "zbr", "zbt" } )
     {
       std::string etag = util::join("", "enable_", ztag);
       if (config_ -> contains(etag))

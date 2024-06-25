@@ -1039,12 +1039,6 @@ namespace WdRiscv
     void enableRvzbe(bool flag)
     { enableExtension(RvExtension::Zbe, flag); }
 
-    /// Enable/disable the zbm (bit manipulation matrix)
-    /// extension. When disabled all the instructions in zbm extension
-    /// result in an illegal instruction exception.
-    void enableRvzbm(bool flag)
-    { enableExtension(RvExtension::Zbm, flag); }
-
     /// Enable/disable the zbp (bit manipulation permutation)
     /// extension. When disabled all the instructions in zbp extension
     /// result in an illegal instruction exception.
@@ -1335,10 +1329,6 @@ namespace WdRiscv
     /// Return true if zbe extension is enabled in this hart.
     bool isRvzbe() const
     { return extensionIsEnabled(RvExtension::Zbe); }
-
-    /// Return true if zbm extension is enabled in this hart.
-    bool isRvzbm() const
-    { return extensionIsEnabled(RvExtension::Zbm); }
 
     /// Return true if zbp extension is enabled in this hart.
     bool isRvzbp() const

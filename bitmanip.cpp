@@ -460,7 +460,6 @@ Hart<URV>::execPack(const DecodedInst* di)
   bool zext_h = (di->op2() == 0);
 
   bool legal = isRvzbe() or isRvzbp() or isRvzbkb();
-  legal = legal or (isRv64() and isRvzbm());
   if (zext_h)
     legal = legal or (not isRv64() and isRvzbb());
 
@@ -524,7 +523,7 @@ template <typename URV>
 void
 Hart<URV>::execPacku(const DecodedInst* di)
 {
-  bool legal = isRvzbp() or (isRv64() and isRvzbm());
+  bool legal = isRvzbp();
   if (not legal)
     {
       illegalInst(di);
@@ -1466,10 +1465,6 @@ Hart<URV>::execUnshfli(const DecodedInst* di)
 
   bool legal = isRvzbp();
 
-  // Instructions zip8 and unzip16 are aliases to unshfli for
-  // immediate values of 0x18 and 0x10 and are legal when zbm is on.
-  legal = legal or (isRvzbm() and (amt == 0x18 or amt == 0x10));
-
   legal = legal or (isRvzbkb() and (amt == 0xf));  // Unzip 
 
   if (not legal)
@@ -1927,101 +1922,6 @@ Hart<URV>::execCrc32c_d(const DecodedInst* di)
     }
   URV value = crc32c(intRegs_.read(di->op1()), 64);
   intRegs_.write(di->op0(), value);
-}
-
-
-template <typename URV>
-void
-Hart<URV>::execBmator(const DecodedInst* di)
-{
-  if (not isRvzbm() or not isRv64())
-    {
-      illegalInst(di);
-      return;
-    }
-
-  std::array<uint8_t, 8> u; // rows of rs1
-  std::array<uint8_t, 8> v; // cols of rs2
-
-  uint64_t rs1 = intRegs_.read(di->op1());
-  uint64_t rs2 = intRegs_.read(di->op2());
-
-  uint64_t rs2t = rs2;
-  rs2t = shuffle64(rs2t, 31);
-  rs2t = shuffle64(rs2t, 31);
-  rs2t = shuffle64(rs2t, 31);
-
-  for (int i = 0; i < 8; i++)
-    {
-      u[i] = rs1 >> (i*8);
-      v[i] = rs2t >> (i*8);
-    }
-
-  uint64_t x = 0;
-  for (int i = 0; i < 64; i++)
-    {
-      if ((u[i / 8] & v[i % 8]) != 0)
-        x |= 1LL << i;
-    }
-
-  intRegs_.write(di->op0(), x);
-}
-
-
-template <typename URV>
-void
-Hart<URV>::execBmatxor(const DecodedInst* di)
-{
-  if (not isRvzbm() or not isRv64())
-    {
-      illegalInst(di);
-      return;
-    }
-
-  std::array<uint8_t, 8> u; // rows of rs1
-  std::array<uint8_t, 8> v; // cols of rs2
-
-  uint64_t rs1 = intRegs_.read(di->op1());
-  uint64_t rs2 = intRegs_.read(di->op2());
-
-  uint64_t rs2t = rs2;
-  rs2t = shuffle64(rs2t, 31);
-  rs2t = shuffle64(rs2t, 31);
-  rs2t = shuffle64(rs2t, 31);
-
-  for (int i = 0; i < 8; i++)
-    {
-      u[i] = rs1 >> (i*8);
-      v[i] = rs2t >> (i*8);
-    }
-
-  uint64_t x = 0;
-  for (int i = 0; i < 64; i++)
-    {
-      if (__builtin_popcount(u[i / 8] & v[i % 8]) & 1)
-        x ^= 1LL << i;
-    }
-
-  intRegs_.write(di->op0(), x);
-}
-
-
-template <typename URV>
-void
-Hart<URV>::execBmatflip(const DecodedInst* di)
-{
-  if (not isRvzbm() or not isRv64())
-    {
-      illegalInst(di);
-      return;
-    }
-
-  uint64_t rs1 = intRegs_.read(di->op1());
-  rs1 = shuffle64(rs1, 31);
-  rs1 = shuffle64(rs1, 31);
-  rs1 = shuffle64(rs1, 31);
-
-  intRegs_.write(di->op0(), rs1);
 }
 
 

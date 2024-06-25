@@ -1971,7 +1971,7 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
       { "packu", InstId::packu, 0x48004033, top7Funct3Low7Mask,
-        RvExtension::Zbm, RvFormat::R,
+        RvExtension::Zbp, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
@@ -2273,23 +2273,6 @@ InstTable::setupInstVec()
 
       { "crc32c.d", InstId::crc32c_d, 0x61B01013, 0xfff0707f,
         RvExtension::Zbr, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask },
-
-      { "bmator", InstId::bmator, 0x08003033, top7Funct3Low7Mask,
-        RvExtension::Zbm, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::IntReg, OperandMode::Read, rs2Mask },
-
-      { "bmatxor", InstId::bmatxor, 0x48003033, top7Funct3Low7Mask,
-        RvExtension::Zbm, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::IntReg, OperandMode::Read, rs2Mask },
-
-      { "bmatflip", InstId::bmatflip, 0x60301013, 0xfff0707f,
-        RvExtension::Zbm, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 

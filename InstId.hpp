@@ -396,11 +396,6 @@ namespace WdRiscv
      crc32c_w,
      crc32c_d,
 
-     // zbm
-     bmator,
-     bmatxor,
-     bmatflip,
-
      // zbt
      cmov,
      cmix,
