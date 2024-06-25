@@ -313,7 +313,7 @@ namespace WdRiscv
     /// instruction number of the load instruction. Addr/size/data are
     /// address,size, and data of the read operation.
     bool mcmRead(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
-		 unsigned size, uint64_t data);
+		 unsigned size, uint64_t data, unsigned elemIx = 0);
 
     /// Initiate a merge buffer write.  All associated store write
     /// transactions are marked completed. Write instructions where

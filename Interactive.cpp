@@ -2075,8 +2075,8 @@ bool
 Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
 			       const std::vector<std::string>& tokens)
 {
-  // Format: [hart=<number>] [time=<number>] mread <instruction-tag> <physical-address> <size> <rtl-data> <i>|<é>
-  if (tokens.size() < 5)
+  // Format: mread <instruction-tag> <physical-address> <size> <rtl-data>
+  if (tokens.size() != 5)
     {
       std::cerr << "Invalid mread command: " << line << '\n';
       std::cerr << "  Expecting: mread <tag> <addr> <size> <data>\n";

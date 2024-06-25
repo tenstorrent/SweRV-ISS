@@ -51,7 +51,8 @@ Mcm<URV>::updateTime(const char* method, uint64_t time)
 template <typename URV>
 bool
 Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-		 uint64_t physAddr, unsigned size, uint64_t rtlData)
+		 uint64_t physAddr, unsigned size, uint64_t rtlData,
+		 unsigned elemIx)
 {
   if (not updateTime("Mcm::readOp", time))
     return false;
@@ -76,6 +77,7 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   op.physAddr_ = physAddr;
   op.rtlData_ = rtlData;
   op.instrTag_ = instrTag;
+  op.elemIx_ = elemIx;
   op.hartIx_ = hartIx;
   op.size_ = size;
   op.isRead_ = true;

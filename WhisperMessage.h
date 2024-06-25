@@ -61,7 +61,7 @@ struct WhisperMessage
 
   uint32_t hart;
   uint32_t type;
-  uint32_t resource;
+  uint32_t resource;  // Also used for vector element index and element size.
   uint32_t size;
   uint32_t flags = 0;
   uint64_t instrTag; // Instruction tag.

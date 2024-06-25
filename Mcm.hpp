@@ -142,7 +142,8 @@ namespace WdRiscv
     /// success and false if global memory is not readable (in the
     /// case where we do not forward).
     bool readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-		uint64_t physAddr, unsigned size, uint64_t rtlData);
+		uint64_t physAddr, unsigned size, uint64_t rtlData,
+		unsigned elemIx = 0);
 
     /// This is a write operation bypassing the merge buffer.
     bool bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,

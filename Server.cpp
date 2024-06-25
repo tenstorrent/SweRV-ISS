@@ -839,8 +839,12 @@ Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
 {
   bool ok = true;
 
+  unsigned elemIx = req.resource & 0xff;
+  unsigned elemSize = req.resource >> 16;
+
   if (req.size <= 8)
-    ok = system_.mcmRead(hart, req.time, req.instrTag, req.address, req.size, req.value);
+    ok = system_.mcmRead(hart, req.time, req.instrTag, req.address, req.size,
+			 req.value, elemIx);
   else
     {
       if (req.size > req.buffer.size())
@@ -851,15 +855,34 @@ Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
 	}
       else
 	{
-	  // Transaction is for vector. Break it into byte size transactions. If
-	  // test-bench provides element size, we can break it into element size
-	  // transactions.
-	  for (unsigned i = 0; i < req.size; ++i)
+	  // Transaction is for vector. Break it into element transactions.
+	  // We need element size and element index from the test bench.
+	  // For now break into bytes.
+	  elemSize = 1; // Temporary
+	  elemIx = 0;   // Temporary
+
+	  unsigned elemCount = req.size / elemSize;
+	  assert(elemCount * elemSize == req.size);
+
+	  const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
+	  for (unsigned i = 0; i < elemCount and ok; ++i, ++elemIx, data += elemSize)
 	    {
-	      uint64_t addr = req.address + i;
-	      uint8_t byte = req.buffer.at(i);
-	      if (not system_.mcmRead(hart, req.time, req.instrTag, addr, 1, byte))
-		ok = false;
+	      uint64_t addr = req.address + elemSize;
+	      uint64_t value = 0;
+	      switch(elemSize)
+		{
+		case 1: value = *reinterpret_cast<const uint8_t* > (data);  break;
+		case 2: value = *reinterpret_cast<const uint16_t*> (data);  break;
+		case 4: value = *reinterpret_cast<const uint32_t*> (data);  break;
+		case 8: value = *reinterpret_cast<const uint64_t*> (data);  break;
+		default:
+		  std::cerr << "Server::mcmReadCommand: Bad element size: " << elemSize
+			    << '\n';
+		  ok = false;
+		}
+	      if (ok)
+		ok = system_.mcmRead(hart, req.time, req.instrTag, addr, elemSize, value,
+				     elemIx);
 	    }
 	}
     }
