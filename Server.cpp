@@ -867,7 +867,7 @@ Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
 	  const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
 	  for (unsigned i = 0; i < elemCount and ok; ++i, ++elemIx, data += elemSize)
 	    {
-	      uint64_t addr = req.address + elemSize;
+	      uint64_t addr = req.address + elemSize * i;
 	      uint64_t value = 0;
 	      switch(elemSize)
 		{

@@ -2075,11 +2075,11 @@ bool
 Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
 			       const std::vector<std::string>& tokens)
 {
-  // Format: mread <instruction-tag> <physical-address> <size> <rtl-data>
-  if (tokens.size() != 5)
+  // Format: mread <instr-tag> <physical-address> <size> <rtl-data> [<elem-ix> <elem-size>]
+  if (tokens.size() != 5 and tokens.size() != 7)
     {
       std::cerr << "Invalid mread command: " << line << '\n';
-      std::cerr << "  Expecting: mread <tag> <addr> <size> <data>\n";
+      std::cerr << "  Expecting: mread <tag> <addr> <size> <data> [<elem-ix> <elem-size>]\n";
       return false;
     }
 
@@ -2094,17 +2094,79 @@ Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
   uint64_t size = 0;
   if (not parseCmdLineNumber("size", tokens.at(3), size))
     return false;
-  if (size > 8 or size == 0)
+
+  if (tokens.size() == 5)
     {
-      std::cerr << "Invalid mread size: " << size << " -- Expecting 1 to 8\n";
+      if (size > 8 or size == 0)
+	{
+	  std::cerr << "Invalid mread size: " << size << " -- Expecting 1 to 8\n";
+	  return false;
+	}
+
+      uint64_t data = 0;
+      if (not parseCmdLineNumber("data", tokens.at(4), data))
+	return false;
+
+      return system_.mcmRead(hart, this->time_, tag, addr, size, data);
+    }
+
+  // mread for a vector load, expected size is half a cache line size (32)
+  // or a cache line size (64).
+  assert(tokens.size() == 7);
+
+  unsigned elemIx = 0;
+  if (not parseCmdLineNumber("element-ix", tokens.at(5), elemIx))
+    return false;
+
+  unsigned elemSize = 0;
+  if (not parseCmdLineNumber("element-size", tokens.at(6), elemSize))
+    return false;
+
+  std::vector<uint8_t> bytes;
+  if (not parseCmdLineVecData("data", tokens.at(4), bytes))
+    return false;
+
+  if (bytes.size() != size)
+    {
+      std::cerr << "Invalid mread command: size (" << size << ") does not match number "
+		<< " of bytes in data (" << bytes.size() << "\n";
       return false;
     }
 
-  uint64_t data = 0;
-  if (not parseCmdLineNumber("data", tokens.at(4), data))
-    return false;
+  unsigned clz = hart.cacheLineSize();
+  if (size != clz and size != clz / 2)
+    {
+      std::cerr << "Invalid mread command for vector: " << "size must be "
+		<< clz << " or " << (clz/2) << '\n';
+      return false;
+    }
 
-  return system_.mcmRead(hart, this->time_, tag, addr, size, data);
+  unsigned elemCount = bytes.size() / elemSize;
+  assert(elemCount * elemSize == bytes.size());
+
+  bool ok = true;
+
+  const uint8_t* vdata = bytes.data();
+  uint64_t ea = addr;  // Element address
+  unsigned es = elemSize;
+  for (unsigned i = 0; i < elemCount and ok; ++i, ++elemIx, vdata += es, ea += es)
+    {
+      uint64_t ev = 0;  // element value
+      switch(es)
+	{
+	case 1: ev = *reinterpret_cast<const uint8_t* > (vdata);  break;
+	case 2: ev = *reinterpret_cast<const uint16_t*> (vdata);  break;
+	case 4: ev = *reinterpret_cast<const uint32_t*> (vdata);  break;
+	case 8: ev = *reinterpret_cast<const uint64_t*> (vdata);  break;
+	default:
+	  std::cerr << "Invald mread command: Bad element size: " << es << '\n';
+	  ok = false;
+	}
+      if (ok)
+	ok = system_.mcmRead(hart, this->time_, tag, ea, es, ev, elemIx);
+    }
+
+  return ok;
 }
 
 

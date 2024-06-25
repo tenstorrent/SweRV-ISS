@@ -921,6 +921,10 @@ namespace WdRiscv
       return ldStSize_;
     }
 
+    /// Return the cache line size.
+    unsigned cacheLineSize() const
+    { return cacheLineSize_; }
+
     bool getLastVectorMemory(std::vector<uint64_t>& addresses,
                              std::vector<uint64_t>& paddresses,
                              std::vector<uint64_t>& paddresses2,
