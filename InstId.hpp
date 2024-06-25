@@ -386,16 +386,6 @@ namespace WdRiscv
      add_uw,
      slli_uw,
 
-     // zbr
-     crc32_b,
-     crc32_h,
-     crc32_w,
-     crc32_d,
-     crc32c_b,
-     crc32c_h,
-     crc32c_w,
-     crc32c_d,
-
      // zbt
      cmov,
      cmix,

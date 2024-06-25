@@ -1045,12 +1045,6 @@ namespace WdRiscv
     void enableRvzbp(bool flag)
     { enableExtension(RvExtension::Zbp, flag); }
 
-    /// Enable/disable the zbr (bit manipulation crc)
-    /// extension. When disabled all the instructions in zbr extension
-    /// result in an illegal instruction exception.
-    void enableRvzbr(bool flag)
-    { enableExtension(RvExtension::Zbr, flag); }
-
     /// Enable/disable the zbt (bit manipulation ternary)
     /// extension. When disabled all the instructions in zbt extension
     /// result in an illegal instruction exception.
@@ -1333,10 +1327,6 @@ namespace WdRiscv
     /// Return true if zbp extension is enabled in this hart.
     bool isRvzbp() const
     { return extensionIsEnabled(RvExtension::Zbp); }
-
-    /// Return true if zbr extension is enabled in this hart.
-    bool isRvzbr() const
-    { return extensionIsEnabled(RvExtension::Zbr); }
 
     /// Return true if zbs extension is enabled in this hart.
     bool isRvzbs() const
@@ -3407,19 +3397,6 @@ namespace WdRiscv
     void execSh2add_uw(const DecodedInst*);
     void execSh3add_uw(const DecodedInst*);
     void execAdd_uw(const DecodedInst*);
-
-    void execCrc32_b(const DecodedInst*);
-    void execCrc32_h(const DecodedInst*);
-    void execCrc32_w(const DecodedInst*);
-    void execCrc32_d(const DecodedInst*);
-    void execCrc32c_b(const DecodedInst*);
-    void execCrc32c_h(const DecodedInst*);
-    void execCrc32c_w(const DecodedInst*);
-    void execCrc32c_d(const DecodedInst*);
-
-    void execBmator(const DecodedInst*);
-    void execBmatxor(const DecodedInst*);
-    void execBmatflip(const DecodedInst*);
 
     void execCmov(const DecodedInst*);
     void execCmix(const DecodedInst*);

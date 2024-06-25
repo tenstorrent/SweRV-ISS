@@ -3972,7 +3972,6 @@ Hart<URV>::updatePerformanceCounters(const DecodedInst& di)
     case RvExtension::Zbc:
     case RvExtension::Zbe:
     case RvExtension::Zbp:
-    case RvExtension::Zbr:
     case RvExtension::Zbs:
     case RvExtension::Zbt:
       pregs.updateCounters(EventNumber::Bitmanip, prevPerfControl_, lastPriv_, lastVirt_);
@@ -6924,38 +6923,6 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::slli_uw:
       execSlli_uw(di);
-      return;
-
-    case InstId::crc32_b:
-      execCrc32_b(di);
-      return;
-
-    case InstId::crc32_h:
-      execCrc32_h(di);
-      return;
-
-    case InstId::crc32_w:
-      execCrc32_w(di);
-      return;
-
-    case InstId::crc32_d:
-      execCrc32_d(di);
-      return;
-
-    case InstId::crc32c_b:
-      execCrc32c_b(di);
-      return;
-
-    case InstId::crc32c_h:
-      execCrc32c_h(di);
-      return;
-
-    case InstId::crc32c_w:
-      execCrc32c_w(di);
-      return;
-
-    case InstId::crc32c_d:
-      execCrc32c_d(di);
       return;
 
     case InstId::cmov:

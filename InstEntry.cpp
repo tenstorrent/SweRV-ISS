@@ -2234,47 +2234,7 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::Imm, OperandMode::None, shamtMask },
 
-      // zbr
-
-      { "crc32.b", InstId::crc32_b, 0x61001013, 0xfff0707f,
-        RvExtension::Zbr, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask },
-
-      { "crc32.h", InstId::crc32_h, 0x61101013, 0xfff0707f,
-        RvExtension::Zbr, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask },
-
-      { "crc32.w", InstId::crc32_w, 0x61201013, 0xfff0707f,
-        RvExtension::Zbr, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask },
-
-      { "crc32.d", InstId::crc32_d, 0x61301013, 0xfff0707f,
-        RvExtension::Zbr, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask },
-
-      { "crc32c.b", InstId::crc32c_b, 0x61801013, 0xfff0707f,
-        RvExtension::Zbr, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask },
-
-      { "crc32c.h", InstId::crc32c_h, 0x61901013, 0xfff0707f,
-        RvExtension::Zbr, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask },
-
-      { "crc32c.w", InstId::crc32c_w, 0x61A01013, 0xfff0707f,
-        RvExtension::Zbr, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask },
-
-      { "crc32c.d", InstId::crc32c_d, 0x61B01013, 0xfff0707f,
-        RvExtension::Zbr, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask },
+      // zbt
 
       { "cmov", InstId::cmov, 0x6005033, 0x600707F,
         RvExtension::Zbt, RvFormat::R4,

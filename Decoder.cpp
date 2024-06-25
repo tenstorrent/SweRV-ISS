@@ -2430,14 +2430,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                     if (amt == 2)    return instTable_.getEntry(InstId::cpop);
                     if (amt == 0x04) return instTable_.getEntry(InstId::sext_b);
                     if (amt == 0x05) return instTable_.getEntry(InstId::sext_h);
-                    if (amt == 0x10) return instTable_.getEntry(InstId::crc32_b);
-                    if (amt == 0x11) return instTable_.getEntry(InstId::crc32_h);
-                    if (amt == 0x12) return instTable_.getEntry(InstId::crc32_w);
-                    if (amt == 0x13) return instTable_.getEntry(InstId::crc32_d);
-                    if (amt == 0x18) return instTable_.getEntry(InstId::crc32c_b);
-                    if (amt == 0x19) return instTable_.getEntry(InstId::crc32c_h);
-                    if (amt == 0x1a) return instTable_.getEntry(InstId::crc32c_w);
-                    if (amt == 0x1b) return instTable_.getEntry(InstId::crc32c_d);
                   }
                 else if (top5 == 0x0d)
                   {
