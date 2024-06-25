@@ -371,10 +371,6 @@ namespace WdRiscv
      bcompressw,
      bdecompressw,
 
-     // zbf
-     bfp,
-     bfpw,
-
      // zbc
      clmul,
      clmulh,

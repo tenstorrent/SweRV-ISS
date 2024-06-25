@@ -2738,7 +2738,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                 if (funct3 == 4) return instTable_.getEntry(InstId::packu);
                 if (funct3 == 6) return instTable_.getEntry(InstId::bdecompress);
                 if (funct3 == 5) return instTable_.getEntry(InstId::bext);
-                if (funct3 == 7) return instTable_.getEntry(InstId::bfp);
               }
             else if (funct7 == 0x28)
               {
@@ -2904,7 +2903,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               {
                 if (funct3 == 4) return instTable_.getEntry(InstId::packuw);
                 if (funct3 == 6) return instTable_.getEntry(InstId::bdecompressw);
-                if (funct3 == 7) return instTable_.getEntry(InstId::bfpw);
               }
             else if (funct7 == 0x30)
               {

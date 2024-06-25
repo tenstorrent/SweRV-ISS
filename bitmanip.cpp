@@ -459,7 +459,7 @@ Hart<URV>::execPack(const DecodedInst* di)
   // Zext.h is a zbb pseudo-inst that maps to pack: pack rd, rs1, zero.
   bool zext_h = (di->op2() == 0);
 
-  bool legal = isRvzbe() or isRvzbf() or isRvzbp() or isRvzbkb();
+  bool legal = isRvzbe() or isRvzbp() or isRvzbkb();
   legal = legal or (isRv64() and isRvzbm());
   if (zext_h)
     legal = legal or (not isRv64() and isRvzbb());
@@ -507,7 +507,7 @@ template <typename URV>
 void
 Hart<URV>::execPackh(const DecodedInst* di)
 {
-  if (not isRvzbe() and not isRvzbf() and not isRvzbp() and not isRvzbkb())
+  if (not isRvzbe() and not isRvzbp() and not isRvzbkb())
     {
       illegalInst(di);
       return;
@@ -547,7 +547,7 @@ Hart<URV>::execPackw(const DecodedInst* di)
   // zext.h is an alias for packw and is part of zbb.
   bool zext_h = (di->op2() == 0);
 
-  bool legal = isRv64() and (isRvzbf() or isRvzbp() or isRvzbkb());
+  bool legal = isRv64() and (isRvzbp() or isRvzbkb());
   if (zext_h)
     legal = legal or (isRv64() and isRvzbb());
   if (not legal)
@@ -1210,66 +1210,6 @@ Hart<URV>::execBdecompressw(const DecodedInst* di)
 
   int64_t val = int32_t(res);  // sign extend.
   intRegs_.write(di->op0(), val);
-}
-
-
-template <typename URV>
-void
-Hart<URV>::execBfp(const DecodedInst* di)
-{
-  if (not isRvzbf())
-    {
-      illegalInst(di);
-      return;
-    }
-
-  URV v1 = intRegs_.read(di->op1());
-  URV v2 = intRegs_.read(di->op2());
-
-  URV cfg = v2 >> (mxlen_ / 2);
-  if ((cfg >> 30) == 2)
-    cfg = cfg >> 16;
-
-  unsigned len = (cfg >> 8) & (mxlen_ / 2 - 1);
-  unsigned off = cfg & (mxlen_ - 1);
-  len = len ? len : mxlen_ / 2;
-  URV mask = ~(~URV(0) << len);
-  mask = mask << off;
-  URV data = v2 << off;
-
-  URV res = (data & mask) | (v1 & ~mask);
-  intRegs_.write(di->op0(), res);
-}
-
-
-template <typename URV>
-void
-Hart<URV>::execBfpw(const DecodedInst* di)
-{
-  if (not isRvzbf() or not isRv64())
-    {
-      illegalInst(di);
-      return;
-    }
-
-  uint32_t v1 = intRegs_.read(di->op1());
-  uint32_t v2 = intRegs_.read(di->op2());
-
-  uint32_t cfg = v2 >> 16;
-  if ((cfg >> 30) == 2)
-    cfg = cfg >> 16;
-
-  unsigned xlen = 32;
-  uint32_t len = (cfg >> 8) & (xlen / 2 - 1);
-  uint32_t off = cfg & (xlen - 1);
-  len = len ? len : xlen / 2;
-  uint32_t mask = ~(~uint32_t(0) << len);
-  mask = mask << off;
-  uint32_t data = v2 << off;
-
-  uint32_t value = (data & mask) | (v1 & ~mask);
-  int64_t res = int32_t(value);  // Sign extend.
-  intRegs_.write(di->op0(), res);
 }
 
 

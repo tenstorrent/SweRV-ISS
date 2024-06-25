@@ -3971,7 +3971,6 @@ Hart<URV>::updatePerformanceCounters(const DecodedInst& di)
     case RvExtension::Zbb:
     case RvExtension::Zbc:
     case RvExtension::Zbe:
-    case RvExtension::Zbf:
     case RvExtension::Zbm:
     case RvExtension::Zbp:
     case RvExtension::Zbr:
@@ -6882,14 +6881,6 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::bdecompressw:
       execBdecompressw(di);
-      return;
-
-    case InstId::bfp:
-      execBfp(di);
-      return;
-
-    case InstId::bfpw:
-      execBfpw(di);
       return;
 
     case InstId::clmul:

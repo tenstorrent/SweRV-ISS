@@ -2168,18 +2168,6 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
-      { "bfp", InstId::bfp, 0x08007033, top7Funct3Low7Mask,
-	RvExtension::Zbf, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::IntReg, OperandMode::Read, rs2Mask },
-
-      { "bfpw", InstId::bfpw, 0x4800703b, top7Funct3Low7Mask,
-	RvExtension::Zbf, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::IntReg, OperandMode::Read, rs2Mask },
-
       { "clmul", InstId::clmul, 0x0a001033, top7Funct3Low7Mask,
 	RvExtension::Zbc, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
