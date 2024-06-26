@@ -331,7 +331,7 @@ namespace WdRiscv
 
      // Was zbp
      pack,     // Alias of zext.h for RV32, in Zbb and Zbkb
-     packh,    // Alias of zext.h for RV64, in Zbkb
+     packh,    // In Zbkb
      packw,    // Alias of zext.h for RV64, in Zbb and Zbkb
      brev8,    // Was grevi
      rev8_32,  // Was greviw, rev8 has different encodings in rv32 and rv64
