@@ -628,6 +628,8 @@ unshuffle32(uint32_t x, unsigned shamt)
 }
 
 
+#if 0
+
 static
 uint64_t
 shuffleStage64(uint64_t src, uint64_t maskL, uint64_t maskR, unsigned n)
@@ -655,6 +657,8 @@ unshuffle64(uint64_t x, unsigned shamt)
 
   return x;
 }
+
+#endif
 
 
 template <typename URV>
