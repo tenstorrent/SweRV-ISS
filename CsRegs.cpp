@@ -4592,8 +4592,12 @@ CsRegs<URV>::addDebugFields()
   using Csrn = CsrNumber;
   constexpr unsigned xlen = sizeof(URV)*8;
 
+  setCsrFields(Csrn::TSELECT,
+      {{"select", xlen}});
   setCsrFields(Csrn::TDATA1,
       {{"data", xlen - 5}, {"dmode", 1}, {"ttype", 4}});
+  setCsrFields(Csrn::TDATA2,
+      {{"data", xlen}});
   setCsrFields(Csrn::TCONTROL,
       {{"zero", 3}, {"mte", 1}, {"zero", 3}, {"zero", xlen - 8}});
 
