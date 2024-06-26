@@ -319,7 +319,6 @@ namespace WdRiscv
      minu,
      orc_b,
      orn,
-     rev8,  // was bswap
      rol,
      rolw,
      ror,
@@ -332,11 +331,13 @@ namespace WdRiscv
 
      // Was zbp
      pack,     // Alias of zext.h for RV32, in Zbb and Zbkb
-     packh,    // Alias of zext.h for RV64, in Zbkb
+     packh,    // In Zbkb
      packw,    // Alias of zext.h for RV64, in Zbb and Zbkb
-     grevi,    // rev8/brev8  in Zbb and Zbkb
-     greviw,   // rev8, in Zbb
-     unshfli,  // Zbkb
+     brev8,    // Was grevi
+     rev8_32,  // Was greviw, rev8 has different encodings in rv32 and rv64
+     rev8_64,  // Was greviw, rev8 has different encodings in rv32 and rv64
+     zip,      // Was shfli, now in Zbkb
+     unzip,    // Was unshfli, now in Zbkb
      xperm_n,  // Zbkx
      xperm_b,  // Zbkx
 

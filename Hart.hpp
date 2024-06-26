@@ -3315,14 +3315,17 @@ namespace WdRiscv
     void execRolw(const DecodedInst*);
     void execRorw(const DecodedInst*);
     void execRoriw(const DecodedInst*);
-    void execRev8(const DecodedInst*);
     void execPack(const DecodedInst*);
     void execSlli_uw(const DecodedInst*);
     void execPackh(const DecodedInst*);   // Zbkb
     void execPackw(const DecodedInst*);   // rename zext_h, in Zbb
-    void execGrevi(const DecodedInst*);   // In Zbb
-    void execGreviw(const DecodedInst*);  // rename rev8, in Zbb
-    void execUnshfli(const DecodedInst*);
+    void execBrev8(const DecodedInst*);   // In Zbb
+    void execBrev8_32(const DecodedInst*);
+    void execBrev8_64(const DecodedInst*);
+    void execRev8_32(const DecodedInst*);
+    void execRev8_64(const DecodedInst*);
+    void execUnzip(const DecodedInst*);
+    void execZip(const DecodedInst*);
 
     void execXperm_n(const DecodedInst*); // Zbkx
     void execXperm_b(const DecodedInst*); // Zbkx

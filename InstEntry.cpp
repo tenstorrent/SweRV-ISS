@@ -1901,11 +1901,6 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
-      { "rev8", InstId::rev8, 0x69805013, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask },
-
       { "rol", InstId::rol, 0x60001033, top7Funct3Low7Mask,
 	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
@@ -1976,23 +1971,30 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
-      { "grevi", InstId::grevi, 0x68005013, 0xf800707f,
+      { "brev8", InstId::brev8, 0x68705013, 0xfff0707f,
 	RvExtension::Zbb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::Imm, OperandMode::None, shamtMask },
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
-      { "greviw", InstId::greviw, 0x6800501b, 0xfe00707f,
+      { "rev8_32", InstId::rev8_32, 0x69805013, 0xfff0707f,
 	RvExtension::Zbb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::Imm, OperandMode::None, shamtMask },
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
-      { "unshfli", InstId::unshfli, 0x10005013, 0xf800707f,
+      { "rev8", InstId::rev8_64, 0x6b805013, 0xfff0707f,
+	RvExtension::Zbb, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      { "zip", InstId::zip, 0x08f01013, 0xfff0707f,
 	RvExtension::Zbkb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::Imm, OperandMode::None, shamtMask },
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      { "unzip", InstId::unzip, 0x08f05013, 0xfff0707f,
+	RvExtension::Zbkb, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "xperm.n", InstId::xperm_n, 0x28002033, top7Funct3Low7Mask,
         RvExtension::Zbkx, RvFormat::R,
