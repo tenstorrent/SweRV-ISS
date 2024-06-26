@@ -1292,11 +1292,11 @@ namespace WdRiscv
 
     /// Return true if zba extension is enabled in this hart.
     bool isRvzba() const
-    { return extensionIsEnabled(RvExtension::Zba); }
+    { return isRvb() or extensionIsEnabled(RvExtension::Zba); }
 
     /// Return true if zbb extension is enabled in this hart.
     bool isRvzbb() const
-    { return extensionIsEnabled(RvExtension::Zbb); }
+    { return isRvb() or extensionIsEnabled(RvExtension::Zbb); }
 
     /// Return true if zbc extension is enabled in this hart.
     bool isRvzbc() const
@@ -1304,7 +1304,7 @@ namespace WdRiscv
 
     /// Return true if zbs extension is enabled in this hart.
     bool isRvzbs() const
-    { return extensionIsEnabled(RvExtension::Zbs); }
+    { return isRvb() or extensionIsEnabled(RvExtension::Zbs); }
 
     /// Return true if the half-precision vector floating point
     /// extension is enabled.
