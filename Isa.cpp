@@ -420,6 +420,8 @@ void splitFirstIsaToken(const std::string& tok, std::vector<std::string>& parts)
 bool
 Isa::applyIsaString(std::string_view isaStr)
 {
+  using RVE = RvExtension;
+
   std::string_view isa = isaStr;
 
   // Check and skip rv prefix.
@@ -474,8 +476,8 @@ Isa::applyIsaString(std::string_view isaStr)
       if (not parseIsa(token, extension, version, subversion))
 	return false;
 
-      RvExtension ext = stringToExtension(extension);
-      if (ext == RvExtension::None)
+      RVE ext = stringToExtension(extension);
+      if (ext == RVE::None)
 	{
 	  std::cerr << "Unknown extension: " << extension
 		    << " -- ignored\n";
@@ -483,6 +485,10 @@ Isa::applyIsaString(std::string_view isaStr)
 	}
 
       enable(ext, true);
+
+      if (ext == RVE::B)
+	for (RVE subExt : { RVE::Zba, RVE::Zbb, RVE::Zbs } )
+	  enable(subExt, true);
 
       if (version.empty())
 	continue;
