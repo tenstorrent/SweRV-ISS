@@ -1976,7 +1976,7 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
-      { "rev8", InstId::rev8_32, 0x69805013, 0xfff0707f,
+      { "rev8_32", InstId::rev8_32, 0x69805013, 0xfff0707f,
 	RvExtension::Zbb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
