@@ -3970,7 +3970,6 @@ Hart<URV>::updatePerformanceCounters(const DecodedInst& di)
     case RvExtension::Zba:
     case RvExtension::Zbb:
     case RvExtension::Zbc:
-    case RvExtension::Zbe:
     case RvExtension::Zbs:
       pregs.updateCounters(EventNumber::Bitmanip, prevPerfControl_, lastPriv_, lastVirt_);
       break;
@@ -6801,22 +6800,6 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::bexti:
       execBexti(di);
-      return;
-
-    case InstId::bcompress:
-      execBcompress(di);
-      return;
-
-    case InstId::bdecompress:
-      execBdecompress(di);
-      return;
-
-    case InstId::bcompressw:
-      execBcompressw(di);
-      return;
-
-    case InstId::bdecompressw:
-      execBdecompressw(di);
       return;
 
     case InstId::clmul:

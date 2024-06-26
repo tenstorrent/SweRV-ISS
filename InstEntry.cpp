@@ -2054,30 +2054,6 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::Imm, OperandMode::None, shamtMask },
 
-      { "bcompress", InstId::bcompress, 0x08006033, top7Funct3Low7Mask,
-	RvExtension::Zbe, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::IntReg, OperandMode::Read, rs2Mask },
-
-      { "bdecompress", InstId::bdecompress, 0x48006033, top7Funct3Low7Mask,
-	RvExtension::Zbe, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::IntReg, OperandMode::Read, rs2Mask },
-
-      { "bcompressw", InstId::bcompressw, 0x0800603b, top7Funct3Low7Mask,
-	RvExtension::Zbe, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::IntReg, OperandMode::Read, rs2Mask },
-
-      { "bdecompressw", InstId::bdecompressw, 0x4800603b, top7Funct3Low7Mask,
-	RvExtension::Zbe, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::IntReg, OperandMode::Read, rs2Mask },
-
       { "clmul", InstId::clmul, 0x0a001033, top7Funct3Low7Mask,
 	RvExtension::Zbc, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,

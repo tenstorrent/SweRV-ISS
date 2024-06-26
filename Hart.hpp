@@ -1033,12 +1033,6 @@ namespace WdRiscv
     void enableRvd(bool flag)
     { enableExtension(RvExtension::D, flag); }
 
-    /// Enable/disable the zbe (bit manipulation) extension. When
-    /// disabled all the instructions in zbe extension result in an
-    /// illegal instruction exception.
-    void enableRvzbe(bool flag)
-    { enableExtension(RvExtension::Zbe, flag); }
-
     /// Enable/disable the supervisor timer compare extension (sstc).
     void enableRvsstc(bool flag)
     { enableExtension(RvExtension::Sstc, flag); csRegs_.enableSstc(flag); }
@@ -1307,10 +1301,6 @@ namespace WdRiscv
     /// Return true if zbc extension is enabled in this hart.
     bool isRvzbc() const
     { return extensionIsEnabled(RvExtension::Zbc); }
-
-    /// Return true if zbe extension is enabled in this hart.
-    bool isRvzbe() const
-    { return extensionIsEnabled(RvExtension::Zbe); }
 
     /// Return true if zbs extension is enabled in this hart.
     bool isRvzbs() const
@@ -3346,11 +3336,6 @@ namespace WdRiscv
     void execBclri(const DecodedInst*);
     void execBinvi(const DecodedInst*);
     void execBexti(const DecodedInst*);
-
-    void execBcompress(const DecodedInst*);
-    void execBdecompress(const DecodedInst*);
-    void execBcompressw(const DecodedInst*);
-    void execBdecompressw(const DecodedInst*);
 
     void execClmul(const DecodedInst*);
     void execClmulh(const DecodedInst*);

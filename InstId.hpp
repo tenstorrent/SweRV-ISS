@@ -337,7 +337,6 @@ namespace WdRiscv
      grevi,    // rev8/brev8  in Zbb and Zbkb
      greviw,   // rev8, in Zbb
      unshfli,  // Zbkb
-
      xperm_n,  // Zbkx
      xperm_b,  // Zbkx
 
@@ -350,12 +349,6 @@ namespace WdRiscv
      bclri,
      binvi,
      bexti,
-
-     // zbe
-     bcompress,    // was bext
-     bdecompress,  // Was bdep
-     bcompressw,
-     bdecompressw,
 
      // zbc
      clmul,
