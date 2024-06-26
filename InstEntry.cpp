@@ -37,7 +37,7 @@ InstEntry::InstEntry(std::string name, InstId id,
   if (op2Type != OperandType::None) count++;
   if (op3Type != OperandType::None) count++;
   opCount_ = count;
-  isBitManip_ = ext >= RvExtension::Zba and ext <= RvExtension::Zbt;
+  isBitManip_ = ext >= RvExtension::Zba and ext <= RvExtension::Zbs;
 }
 
 
@@ -2233,72 +2233,6 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::Imm, OperandMode::None, shamtMask },
-
-      // zbt
-
-      { "cmov", InstId::cmov, 0x6005033, 0x600707F,
-        RvExtension::Zbt, RvFormat::R4,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-        OperandType::IntReg, OperandMode::Read, rs2Mask,
-        OperandType::IntReg, OperandMode::Read, rs3Mask
-      },
-
-      { "cmix", InstId::cmix, 0x6001033, 0xfff0707f,
-        RvExtension::Zbt, RvFormat::R4,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-        OperandType::IntReg, OperandMode::Read, rs2Mask,
-        OperandType::IntReg, OperandMode::Read, rs3Mask
-      },
-
-      { "fsl", InstId::fsl, 0x040001033, 0xfff0707f,
-        RvExtension::Zbt, RvFormat::R4,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-        OperandType::IntReg, OperandMode::Read, rs2Mask,
-        OperandType::IntReg, OperandMode::Read, rs3Mask
-      },
-
-      { "fsr", InstId::fsr, 0x04005033, 0xfff0707f,
-        RvExtension::Zbt, RvFormat::R4,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-        OperandType::IntReg, OperandMode::Read, rs2Mask,
-        OperandType::IntReg, OperandMode::Read, rs3Mask
-      },
-
-      { "fsri", InstId::fsri, 0x04005013, 0xfff0707f,
-        RvExtension::Zbt, RvFormat::R4,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-        OperandType::IntReg, OperandMode::Read, rs3Mask,
-        OperandType::IntReg, OperandMode::Read, 0x03f000000
-      },
-
-      { "fslw", InstId::fslw, 0x0400103b, 0x0600707f,
-        RvExtension::Zbt, RvFormat::R4,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-        OperandType::IntReg, OperandMode::Read, rs2Mask,
-        OperandType::IntReg, OperandMode::Read, rs3Mask
-      },
-
-      { "fsrw", InstId::fsrw, 0x0400503b, 0x0600707f,
-        RvExtension::Zbt, RvFormat::R4,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-        OperandType::IntReg, OperandMode::Read, rs2Mask,
-        OperandType::IntReg, OperandMode::Read, rs3Mask
-      },
-
-      { "fsriw", InstId::fsriw, 0x0400501b, 0x0600707f,
-        RvExtension::Zbt, RvFormat::R4,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-        OperandType::IntReg, OperandMode::Read, rs3Mask,
-        OperandType::IntReg, OperandMode::Read, 0x03f000000
-      },
 
       { "vsetvli", InstId::vsetvli,
         0b000000'0'00000'00000'111'00000'1010111, // Opcode

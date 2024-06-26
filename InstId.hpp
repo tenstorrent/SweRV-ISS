@@ -386,16 +386,6 @@ namespace WdRiscv
      add_uw,
      slli_uw,
 
-     // zbt
-     cmov,
-     cmix,
-     fsl,
-     fsr,
-     fsri,
-     fslw,
-     fsrw,
-     fsriw,
-
      // vector
      vsetvli,
      vsetivli,

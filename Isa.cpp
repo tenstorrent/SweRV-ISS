@@ -30,7 +30,6 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "zbe", RvExtension::Zbe },
   { "zbp", RvExtension::Zbp },
   { "zbs", RvExtension::Zbs },
-  { "zbt", RvExtension::Zbt },
   { "zfh", RvExtension::Zfh },
   { "zfhmin", RvExtension::Zfhmin },
   { "zlssegh", RvExtension::Zlsseg },

@@ -1045,12 +1045,6 @@ namespace WdRiscv
     void enableRvzbp(bool flag)
     { enableExtension(RvExtension::Zbp, flag); }
 
-    /// Enable/disable the zbt (bit manipulation ternary)
-    /// extension. When disabled all the instructions in zbt extension
-    /// result in an illegal instruction exception.
-    void enableRvzbt(bool flag)
-    { enableExtension(RvExtension::Zbt, flag); }
-
     /// Enable/disable the supervisor timer compare extension (sstc).
     void enableRvsstc(bool flag)
     { enableExtension(RvExtension::Sstc, flag); csRegs_.enableSstc(flag); }
@@ -1331,10 +1325,6 @@ namespace WdRiscv
     /// Return true if zbs extension is enabled in this hart.
     bool isRvzbs() const
     { return extensionIsEnabled(RvExtension::Zbs); }
-
-    /// Return true if zbt extension is enabled in this hart.
-    bool isRvzbt() const
-    { return extensionIsEnabled(RvExtension::Zbt); }
 
     /// Return true if the half-precision vector floating point
     /// extension is enabled.
@@ -3397,15 +3387,6 @@ namespace WdRiscv
     void execSh2add_uw(const DecodedInst*);
     void execSh3add_uw(const DecodedInst*);
     void execAdd_uw(const DecodedInst*);
-
-    void execCmov(const DecodedInst*);
-    void execCmix(const DecodedInst*);
-    void execFsl(const DecodedInst*);
-    void execFsr(const DecodedInst*);
-    void execFsri(const DecodedInst*);
-    void execFslw(const DecodedInst*);
-    void execFsrw(const DecodedInst*);
-    void execFsriw(const DecodedInst*);
 
     /// Code common to execVsetvli, and execVsetvl. Return true on success and false if an
     /// illegal instruction trap must be taken.
