@@ -4599,7 +4599,7 @@ CsRegs<URV>::addDebugFields()
   setCsrFields(Csrn::TDATA2,
       {{"data", xlen}});
   setCsrFields(Csrn::TCONTROL,
-      {{"zero", 3}, {"mte", 1}, {"zero", 3}, {"zero", xlen - 8}});
+      {{"zero", 3}, {"mte", 1}, {"zero", 3}, {"mpte", 1}, {"zero", xlen - 8}});
 
   if (rv32_)
     {
