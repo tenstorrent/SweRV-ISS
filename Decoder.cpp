@@ -2404,15 +2404,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                     op2 = amt;
                     return instTable_.getEntry(InstId::slli);
                   }
-                if (top5 == 1)
-                  {
-                    unsigned top6 = iform.uimmed() >> 6;
-                    if (top6 == 2)
-                      {
-                        op2 = amt & 0x3f;
-                        return instTable_.getEntry(InstId::shfli);
-                      }
-                  }
                 else if (top5 == 5)
                   {
                     op2 = amt;
@@ -2472,7 +2463,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                   {
                     if (shamt == 0x7)
                       return instTable_.getEntry(InstId::orc_b);
-                    return instTable_.getEntry(InstId::gorci);
+                    return instTable_.getEntry(InstId::illegal);
                   }
                 if (top5 == 0x8)  return instTable_.getEntry(InstId::srai);
                 if (top5 == 0x9)  return instTable_.getEntry(InstId::bexti);
@@ -2550,7 +2541,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               {
                 op2 = iform.fields2.shamt;
                 if (iform.top7() == 0)    return instTable_.getEntry(InstId::srliw);
-                if (iform.top7() == 0x14) return instTable_.getEntry(InstId::gorciw);
                 if (iform.top7() == 0x20) return instTable_.getEntry(InstId::sraiw);
                 if (iform.top7() == 0x30) return instTable_.getEntry(InstId::roriw);
                 if (iform.top7() == 0x34) return instTable_.getEntry(InstId::greviw);
@@ -2649,9 +2639,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               }
             else if (funct7 == 4)
               {
-                if (funct3 == 1) return instTable_.getEntry(InstId::shfl);
                 if (funct3 == 4) return instTable_.getEntry(InstId::pack);
-                if (funct3 == 5) return instTable_.getEntry(InstId::unshfl);
                 if (funct3 == 6) return instTable_.getEntry(InstId::bcompress);
                 if (funct3 == 7) return instTable_.getEntry(InstId::packh);
               }
@@ -2678,12 +2666,9 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               }
             else if (funct7 == 0x14)
               {
-                if (funct3 == 0) return instTable_.getEntry(InstId::xperm_w);
                 if (funct3 == 1) return instTable_.getEntry(InstId::bset);
                 if (funct3 == 2) return instTable_.getEntry(InstId::xperm_n);
                 if (funct3 == 4) return instTable_.getEntry(InstId::xperm_b);
-                if (funct3 == 6) return instTable_.getEntry(InstId::xperm_h);
-                if (funct3 == 5) return instTable_.getEntry(InstId::gorc);
               }
             else if (funct7 == 0x19)
               {
@@ -2712,7 +2697,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
             else if (funct7 == 0x24)
               {
                 if (funct3 == 1) return instTable_.getEntry(InstId::bclr);
-                if (funct3 == 4) return instTable_.getEntry(InstId::packu);
                 if (funct3 == 6) return instTable_.getEntry(InstId::bdecompress);
                 if (funct3 == 5) return instTable_.getEntry(InstId::bext);
               }
@@ -2748,7 +2732,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
             else if (funct7 == 0x34)
               {
                 if (funct3 == 1) return instTable_.getEntry(InstId::binv);
-                if (funct3 == 5) return instTable_.getEntry(InstId::grev);
               }
             else if (funct7 == 0x3f)
               {
@@ -2837,9 +2820,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
             else if (funct7 == 4)
               {
                 if (funct3 == 0) return instTable_.getEntry(InstId::add_uw);
-                if (funct3 == 1) return instTable_.getEntry(InstId::shflw);
                 if (funct3 == 4) return instTable_.getEntry(InstId::packw);
-                if (funct3 == 5) return instTable_.getEntry(InstId::unshflw);
                 if (funct3 == 6) return instTable_.getEntry(InstId::bcompressw);
               }
             else if (funct7 == 0x10)
@@ -2848,10 +2829,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                 if (funct3 == 4) return instTable_.getEntry(InstId::sh2add_uw);
                 if (funct3 == 6) return instTable_.getEntry(InstId::sh3add_uw);
               }
-            else if (funct7 == 0x14)
-              {
-                if (funct3 == 5) return instTable_.getEntry(InstId::gorcw);
-              }
             else if (funct7 == 0x20)
               {
                 if (funct3 == 0)  return instTable_.getEntry(InstId::subw);
@@ -2859,17 +2836,12 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               }
             else if (funct7 == 0x24)
               {
-                if (funct3 == 4) return instTable_.getEntry(InstId::packuw);
                 if (funct3 == 6) return instTable_.getEntry(InstId::bdecompressw);
               }
             else if (funct7 == 0x30)
               {
                 if (funct3 == 1) return instTable_.getEntry(InstId::rolw);
                 if (funct3 == 5) return instTable_.getEntry(InstId::rorw);
-              }
-            else if (funct7 == 0x34)
-              {
-                if (funct3 == 5) return instTable_.getEntry(InstId::grevw);
               }
           }
           return instTable_.getEntry(InstId::illegal);

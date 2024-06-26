@@ -3971,7 +3971,6 @@ Hart<URV>::updatePerformanceCounters(const DecodedInst& di)
     case RvExtension::Zbb:
     case RvExtension::Zbc:
     case RvExtension::Zbe:
-    case RvExtension::Zbp:
     case RvExtension::Zbs:
       pregs.updateCounters(EventNumber::Bitmanip, prevPerfControl_, lastPriv_, lastVirt_);
       break;
@@ -6748,72 +6747,20 @@ Hart<URV>::execute(const DecodedInst* di)
       execPackh(di);
       return;
 
-    case InstId::packu:
-      execPacku(di);
-      return;
-
     case InstId::packw:
       execPackw(di);
-      return;
-
-    case InstId::packuw:
-      execPackuw(di);
-      return;
-
-    case InstId::grev:
-      execGrev(di);
       return;
 
     case InstId::grevi:
       execGrevi(di);
       return;
 
-    case InstId::grevw:
-      execGrevw(di);
-      return;
-
     case InstId::greviw:
       execGreviw(di);
       return;
 
-    case InstId::gorc:
-      execGorc(di);
-      return;
-
-    case InstId::gorci:
-      execGorci(di);
-      return;
-
-    case InstId::gorcw:
-      execGorcw(di);
-      return;
-
-    case InstId::gorciw:
-      execGorciw(di);
-      return;
-
-    case InstId::shfl:
-      execShfl(di);
-      return;
-
-    case InstId::shflw:
-      execShflw(di);
-      return;
-
-    case InstId::shfli:
-      execShfli(di);
-      return;
-
-    case InstId::unshfl:
-      execUnshfl(di);
-      return;
-
     case InstId::unshfli:
       execUnshfli(di);
-      return;
-
-    case InstId::unshflw:
-      execUnshflw(di);
       return;
 
     case InstId::xperm_n:
@@ -6822,14 +6769,6 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::xperm_b:
       execXperm_b(di);
-      return;
-
-    case InstId::xperm_h:
-      execXperm_h(di);
-      return;
-
-    case InstId::xperm_w:
-      execXperm_w(di);
       return;
 
     case InstId::bset:

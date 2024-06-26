@@ -330,30 +330,16 @@ namespace WdRiscv
      sext_h,
      xnor,
 
-     // zbp
-     pack,
-     packh,
-     packu,
-     packw,
-     packuw,
-     grev,
-     grevi,
-     grevw,
-     greviw,
-     gorc,
-     gorci,
-     gorcw,
-     gorciw,
-     shfl,
-     shflw,
-     shfli,
-     unshfl,
-     unshfli,
-     unshflw,
-     xperm_n,
-     xperm_b,
-     xperm_h,
-     xperm_w,
+     // Was zbp
+     pack,     // Alias of zext.h for RV32, in Zbb and Zbkb
+     packh,    // Alias of zext.h for RV64, in Zbkb
+     packw,    // Alias of zext.h for RV64, in Zbb and Zbkb
+     grevi,    // rev8/brev8  in Zbb and Zbkb
+     greviw,   // rev8, in Zbb
+     unshfli,  // Zbkb
+
+     xperm_n,  // Zbkx
+     xperm_b,  // Zbkx
 
      // zbs
      bset,

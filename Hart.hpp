@@ -1039,12 +1039,6 @@ namespace WdRiscv
     void enableRvzbe(bool flag)
     { enableExtension(RvExtension::Zbe, flag); }
 
-    /// Enable/disable the zbp (bit manipulation permutation)
-    /// extension. When disabled all the instructions in zbp extension
-    /// result in an illegal instruction exception.
-    void enableRvzbp(bool flag)
-    { enableExtension(RvExtension::Zbp, flag); }
-
     /// Enable/disable the supervisor timer compare extension (sstc).
     void enableRvsstc(bool flag)
     { enableExtension(RvExtension::Sstc, flag); csRegs_.enableSstc(flag); }
@@ -1224,7 +1218,7 @@ namespace WdRiscv
     bool isRvzbkb() const
     { return extensionIsEnabled(RvExtension::Zbkb); }
 
-    /// Return true if the zbkb extension (crypto bit manip) is enabled.
+    /// Return true if the zbkx extension (crypto bit manip) is enabled.
     bool isRvzbkx() const
     { return extensionIsEnabled(RvExtension::Zbkx); }
 
@@ -1317,10 +1311,6 @@ namespace WdRiscv
     /// Return true if zbe extension is enabled in this hart.
     bool isRvzbe() const
     { return extensionIsEnabled(RvExtension::Zbe); }
-
-    /// Return true if zbp extension is enabled in this hart.
-    bool isRvzbp() const
-    { return extensionIsEnabled(RvExtension::Zbp); }
 
     /// Return true if zbs extension is enabled in this hart.
     bool isRvzbs() const
@@ -3338,28 +3328,14 @@ namespace WdRiscv
     void execRev8(const DecodedInst*);
     void execPack(const DecodedInst*);
     void execSlli_uw(const DecodedInst*);
-    void execPackh(const DecodedInst*);
-    void execPacku(const DecodedInst*);
-    void execPackw(const DecodedInst*);
-    void execPackuw(const DecodedInst*);
-    void execGrev(const DecodedInst*);
-    void execGrevi(const DecodedInst*);
-    void execGrevw(const DecodedInst*);
-    void execGreviw(const DecodedInst*);
-    void execGorc(const DecodedInst*);
-    void execGorci(const DecodedInst*);
-    void execGorcw(const DecodedInst*);
-    void execGorciw(const DecodedInst*);
-    void execShfl(const DecodedInst*);
-    void execShflw(const DecodedInst*);
-    void execShfli(const DecodedInst*);
-    void execUnshfl(const DecodedInst*);
+    void execPackh(const DecodedInst*);   // Zbkb
+    void execPackw(const DecodedInst*);   // rename zext_h, in Zbb
+    void execGrevi(const DecodedInst*);   // In Zbb
+    void execGreviw(const DecodedInst*);  // rename rev8, in Zbb
     void execUnshfli(const DecodedInst*);
-    void execUnshflw(const DecodedInst*);
-    void execXperm_n(const DecodedInst*);
-    void execXperm_b(const DecodedInst*);
-    void execXperm_h(const DecodedInst*);
-    void execXperm_w(const DecodedInst*);
+
+    void execXperm_n(const DecodedInst*); // Zbkx
+    void execXperm_b(const DecodedInst*); // Zbkx
 
     // Bit manipulation: zbs
     void execBset(const DecodedInst*);
