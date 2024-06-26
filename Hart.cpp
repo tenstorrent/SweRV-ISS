@@ -6734,10 +6734,6 @@ Hart<URV>::execute(const DecodedInst* di)
       execRoriw(di);
       return;
 
-    case InstId::rev8:
-      execRev8(di);
-      return;
-
     case InstId::pack:
       execPack(di);
       return;
@@ -6750,12 +6746,16 @@ Hart<URV>::execute(const DecodedInst* di)
       execPackw(di);
       return;
 
-    case InstId::grevi:
-      execGrevi(di);
+    case InstId::brev8:
+      execBrev8(di);
       return;
 
-    case InstId::greviw:
-      execGreviw(di);
+    case InstId::rev8_32:
+      execRev8_32(di);
+      return;
+
+    case InstId::rev8_64:
+      execRev8_64(di);
       return;
 
     case InstId::unshfli:

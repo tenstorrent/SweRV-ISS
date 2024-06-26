@@ -2468,12 +2468,12 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                 if (top5 == 0x8)  return instTable_.getEntry(InstId::srai);
                 if (top5 == 0x9)  return instTable_.getEntry(InstId::bexti);
                 if (top5 == 0xc)  return instTable_.getEntry(InstId::rori);
-                if (top5 == 0xd)
-                  {
-                    if (shamt == 0x38)
-                      return instTable_.getEntry(InstId::rev8);
-                    return instTable_.getEntry(InstId::grevi);
-                  }
+                if (imm == 0x687) return instTable_.getEntry(InstId::brev8);
+
+		unsigned ui = iform.uimmed(); // Top 12 bits of opcode.
+		bool i64 = isRv64(), i32 = not isRv64();
+		if (i64 and ui == 0x6b8)  return instTable_.getEntry(InstId::rev8_64);
+		if (i32 and ui == 0x698)  return instTable_.getEntry(InstId::rev8_32);
               }
             else if (funct3 == 6)
 	      {
@@ -2543,7 +2543,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                 if (iform.top7() == 0)    return instTable_.getEntry(InstId::srliw);
                 if (iform.top7() == 0x20) return instTable_.getEntry(InstId::sraiw);
                 if (iform.top7() == 0x30) return instTable_.getEntry(InstId::roriw);
-                if (iform.top7() == 0x34) return instTable_.getEntry(InstId::greviw);
               }
           }
           return instTable_.getEntry(InstId::illegal);

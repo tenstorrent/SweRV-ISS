@@ -1,5 +1,6 @@
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
+#include "crypto-util.hpp"
 
 using namespace WdRiscv;
 
@@ -399,29 +400,6 @@ Hart<URV>::execRoriw(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execRev8(const DecodedInst* di)
-{
-  // Byte swap.
-
-  if (not isRvzbb())
-    {
-      illegalInst(di);
-      return;
-    }
-
-  URV v1 = intRegs_.read(di->op1());
-
-  if (mxlen_ == 32)
-    v1 = __builtin_bswap32(v1);
-  else
-    v1 = __builtin_bswap64(v1);
-
-  intRegs_.write(di->op0(), v1);
-}
-
-
-template <typename URV>
-void
 Hart<URV>::execSext_b(const DecodedInst* di)
 {
   if (not isRvzbb())
@@ -556,64 +534,33 @@ Hart<URV>::execPackw(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execGrevi(const DecodedInst* di)
+Hart<URV>::execBrev8(const DecodedInst* di)
 {
-  URV shamt = di->op2();
-
-  bool rev8 = false;  // True if variant is rev8
-  if (isRv64())
-    rev8 = shamt == 0x38;
-  else
-    rev8 = shamt == 0x18;
-
-  bool brev8 = shamt == 0x7;  // True if variant is brev8
-
-  bool legal = false;
-  if (rev8)
-    legal = legal or isRvzbb() or isRvzbkb();
-
-  if (brev8)
-    legal = legal or isRvzbkb();
-
-  if (not legal)
+  if (not isRvzbb() and not isRvzbkb())
     {
       illegalInst(di);
       return;
     }
 
-  if (not checkShiftImmediate(di, shamt))
-    return;
+  URV v1 = intRegs_.read(di->op1());
+  URV result = brev8(v1);
+  intRegs_.write(di->op0(), result);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execRev8_32(const DecodedInst* di)
+{
+  if ((not isRvzbb() and not isRvzbkb()) or isRv64())
+    {
+      illegalInst(di);
+      return;
+    }
 
   URV v1 = intRegs_.read(di->op1());
 
-  if (mxlen_ == 32)
-    {
-      if (shamt & 1)
-        v1 = ((v1 & 0x55555555) << 1)  | ((v1 & 0xaaaaaaaa) >> 1);
-      if (shamt & 2)
-        v1 = ((v1 & 0x33333333) << 2)  | ((v1 & 0xcccccccc) >> 2);
-      if (shamt & 4)
-        v1 = ((v1 & 0x0f0f0f0f) << 4)  | ((v1 & 0xf0f0f0f0) >> 4);
-      if (shamt & 8)
-        v1 = ((v1 & 0x00ff00ff) << 8)  | ((v1 & 0xff00ff00) >> 8);
-      if (shamt & 16)
-        v1 = ((v1 & 0x0000ffff) << 16) | ((v1 & 0xffff0000) >> 16);
-    }
-  else
-    {
-      if (shamt & 1)
-        v1 = ((v1 & 0x5555555555555555ll) << 1)  | ((v1 & 0xaaaaaaaaaaaaaaaall) >> 1);
-      if (shamt & 2)
-        v1 = ((v1 & 0x3333333333333333ll) << 2)  | ((v1 & 0xccccccccccccccccll) >> 2);
-      if (shamt & 4)
-        v1 = ((v1 & 0x0f0f0f0f0f0f0f0fll) << 4)  | ((v1 & 0xf0f0f0f0f0f0f0f0ll) >> 4);
-      if (shamt & 8)
-        v1 = ((v1 & 0x00ff00ff00ff00ffll) << 8)  | ((v1 & 0xff00ff00ff00ff00ll) >> 8);
-      if (shamt & 16)
-        v1 = ((v1 & 0x0000ffff0000ffffll) << 16) | ((v1 & 0xffff0000ffff0000ll) >> 16);
-      if (shamt & 32)
-        v1 = ((v1 & 0x00000000ffffffffll) << 32) | ((v1 & 0xffffffff00000000ll) >> 32);
-    }
+  v1 = __builtin_bswap32(v1);
 
   intRegs_.write(di->op0(), v1);
 }
@@ -621,47 +568,19 @@ Hart<URV>::execGrevi(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execGreviw(const DecodedInst* di)
+Hart<URV>::execRev8_64(const DecodedInst* di)
 {
-  if (not isRvzbb())
+  if ((not isRvzbb() and not isRvzbkb()) or not isRv64())
     {
       illegalInst(di);
       return;
     }
 
-  URV shamt = di->op2();
+  URV v1 = intRegs_.read(di->op1());
 
-  bool legal = false;
-  if (isRv64())
-    legal = shamt == 0x38;  // rev8 is also in zbb
-  else
-    legal = shamt == 0x18;  // rev8 is also in zbb
+  v1 = __builtin_bswap64(v1);
 
-  if (not legal)
-    {
-      illegalInst(di);
-      return;
-    }
-
-  if (not checkShiftImmediate(di, shamt))
-    return;
-
-  unsigned v1 = intRegs_.read(di->op1());
-
-  if (shamt & 1)
-    v1 = ((v1 & 0x55555555) << 1)  | ((v1 & 0xaaaaaaaa) >> 1);
-  if (shamt & 2)
-    v1 = ((v1 & 0x33333333) << 2)  | ((v1 & 0xcccccccc) >> 2);
-  if (shamt & 4)
-    v1 = ((v1 & 0x0f0f0f0f) << 4)  | ((v1 & 0xf0f0f0f0) >> 4);
-  if (shamt & 8)
-    v1 = ((v1 & 0x00ff00ff) << 8)  | ((v1 & 0xff00ff00) >> 8);
-  if (shamt & 16)
-    v1 = ((v1 & 0x0000ffff) << 16) | ((v1 & 0xffff0000) >> 16);
-
-  int64_t res = int32_t(v1);  // Sign extend 32-bit to 64-bit.
-
-  intRegs_.write(di->op0(), res);
+  intRegs_.write(di->op0(), v1);
 }
 
 
