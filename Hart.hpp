@@ -3324,7 +3324,8 @@ namespace WdRiscv
     void execBrev8_64(const DecodedInst*);
     void execRev8_32(const DecodedInst*);
     void execRev8_64(const DecodedInst*);
-    void execUnshfli(const DecodedInst*);
+    void execUnzip(const DecodedInst*);
+    void execZip(const DecodedInst*);
 
     void execXperm_n(const DecodedInst*); // Zbkx
     void execXperm_b(const DecodedInst*); // Zbkx

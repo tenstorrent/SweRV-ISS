@@ -6758,8 +6758,12 @@ Hart<URV>::execute(const DecodedInst* di)
       execRev8_64(di);
       return;
 
-    case InstId::unshfli:
-      execUnshfli(di);
+    case InstId::zip:
+      execZip(di);
+      return;
+
+    case InstId::unzip:
+      execUnzip(di);
       return;
 
     case InstId::xperm_n:

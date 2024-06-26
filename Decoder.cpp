@@ -2376,6 +2376,8 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
             if (funct3 == 0)  return instTable_.getEntry(InstId::addi);
             if (funct3 == 1)
               {
+		if (iform.uimmed() == 0x08f)  // Top 12 bits of opcode
+		  return instTable_.getEntry(InstId::zip);
                 if (op2 == 0x100)
                   return instTable_.getEntry(InstId::sha256sum0);
                 if (op2 == 0x101)
@@ -2450,15 +2452,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                 op2 = shamt;
                 if (top5 == 0)
                   return instTable_.getEntry(InstId::srli);
-                if (top5 == 1)
-                  {
-                    unsigned top6 = iform.uimmed() >> 6;
-                    if (top6 == 2)
-                      {
-                        op2 = shamt & 0x3f;
-                        return instTable_.getEntry(InstId::unshfli);
-                      }
-                  }
                 if (top5 == 5)
                   {
                     if (shamt == 0x7)
@@ -2469,11 +2462,11 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                 if (top5 == 0x9)  return instTable_.getEntry(InstId::bexti);
                 if (top5 == 0xc)  return instTable_.getEntry(InstId::rori);
                 if (imm == 0x687) return instTable_.getEntry(InstId::brev8);
+		if (imm == 0x08f) return instTable_.getEntry(InstId::unzip);
 
-		unsigned ui = iform.uimmed(); // Top 12 bits of opcode.
 		bool i64 = isRv64(), i32 = not isRv64();
-		if (i64 and ui == 0x6b8)  return instTable_.getEntry(InstId::rev8_64);
-		if (i32 and ui == 0x698)  return instTable_.getEntry(InstId::rev8_32);
+		if (i64 and imm == 0x6b8)  return instTable_.getEntry(InstId::rev8_64);
+		if (i32 and imm == 0x698)  return instTable_.getEntry(InstId::rev8_32);
               }
             else if (funct3 == 6)
 	      {

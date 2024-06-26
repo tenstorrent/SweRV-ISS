@@ -336,7 +336,8 @@ namespace WdRiscv
      brev8,    // Was grevi
      rev8_32,  // Was greviw, rev8 has different encodings in rv32 and rv64
      rev8_64,  // Was greviw, rev8 has different encodings in rv32 and rv64
-     unshfli,  // Zbkb
+     zip,      // Was shfli, now in Zbkb
+     unzip,    // Was unshfli, now in Zbkb
      xperm_n,  // Zbkx
      xperm_b,  // Zbkx
 

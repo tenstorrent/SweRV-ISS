@@ -1986,11 +1986,15 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
-      { "unshfli", InstId::unshfli, 0x10005013, 0xf800707f,
+      { "zip", InstId::zip, 0x08f01013, 0xfff0707f,
 	RvExtension::Zbkb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::Imm, OperandMode::None, shamtMask },
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      { "unzip", InstId::unzip, 0x08f05013, 0xfff0707f,
+	RvExtension::Zbkb, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "xperm.n", InstId::xperm_n, 0x28002033, top7Funct3Low7Mask,
         RvExtension::Zbkx, RvFormat::R,

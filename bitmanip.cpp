@@ -596,6 +596,23 @@ shuffleStage32(uint32_t src, uint32_t maskL, uint32_t maskR, unsigned n)
 
 static
 uint32_t
+shuffle32(uint32_t x, unsigned shamt)
+{
+  if (shamt & 8)
+    x = shuffleStage32(x, 0x00ff0000, 0x0000ff00, 8);
+  if (shamt & 4)
+    x = shuffleStage32(x, 0x0f000f00, 0x00f000f0, 4);
+  if (shamt & 2)
+    x = shuffleStage32(x, 0x30303030, 0x0c0c0c0c, 2);
+  if (shamt & 1)
+    x = shuffleStage32(x, 0x44444444, 0x22222222, 1);
+
+  return x;
+}
+
+
+static
+uint32_t
 unshuffle32(uint32_t x, unsigned shamt)
 {
   if (shamt & 1)
@@ -834,38 +851,33 @@ Hart<URV>::execClmulh(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execUnshfli(const DecodedInst* di)
+Hart<URV>::execUnzip(const DecodedInst* di)
 {
-  URV amt = di->op2();
-  bool legal = isRvzbkb() and (amt == 0xf);  // Unzip 
-
-  if (not legal)
+  if (isRv64() or not isRvzbkb())
     {
       illegalInst(di);
       return;
     }
 
   URV v1 = intRegs_.read(di->op1());
-  URV val = 0;
+  URV val = unshuffle32(v1, 0xf);
 
-  if (mxlen_ == 32)
+  intRegs_.write(di->op0(), val);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execZip(const DecodedInst* di)
+{
+  if (not isRvzbkb() or isRv64())
     {
-      if (amt > 15)
-        {
-          illegalInst(di);
-          return;
-        }
-      val = unshuffle32(v1, amt);
+      illegalInst(di);
+      return;
     }
-  else
-    {
-      if (amt > 31)
-        {
-          illegalInst(di);
-          return;
-        }
-      val = unshuffle64(v1, amt);
-    }
+
+  URV v1 = intRegs_.read(di->op1());
+  URV val = shuffle32(v1, 0xf);
 
   intRegs_.write(di->op0(), val);
 }
