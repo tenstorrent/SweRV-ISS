@@ -5186,8 +5186,8 @@ namespace WdRiscv
     // Static tee (truseted execution environment).
     bool steeEnabled_ = false;
     TT_STEE::Stee stee_;
-    bool steeInsec1_ = true;  // True if last access was insecure.
-    bool steeInsec2_ = true;  // True if 2nd part of misaligned last access was insecure.
+    bool steeInsec1_ = true;  // True if insecure access targets secure region.
+    bool steeInsec2_ = true;  // Same as above but for 2nd part of misaligned access.
 
     VirtMem virtMem_;
     Isa isa_;
