@@ -434,13 +434,9 @@ template <typename URV>
 void
 Hart<URV>::execPack(const DecodedInst* di)
 {
-  // In RV32, zext.h is an zbb pseudo-inst that maps to pack: pack rd, rs1, zero.
-  bool zext_h = (di->op2() == 0);
-
-  bool legal = isRvzbkb();
-  if (zext_h)
-    legal = legal or (not isRv64() and isRvzbb());
-
+  // In RV32, zext.h is a Zbb pseudo-inst that maps to: pack rd, rs1, zero.
+  bool zext_h = isRvzbb()  and  di->op2() == 0  and  not isRv64();
+  bool legal = isRvzbkb() or zext_h;
   if (not legal)
     {
       illegalInst(di);
@@ -507,13 +503,9 @@ Hart<URV>::execPackw(const DecodedInst* di)
       return;
     }
 
-  // In RV64, zext.h is an zbb pseudo-inst that maps to pack: packw rd, rs1, zero.
-  bool zext_h = (di->op2() == 0);
-
-  bool legal = isRvzbkb();
-  if (zext_h)
-    legal = legal or isRvzbb();
-
+  // In RV64, zext.h is a Zbb pseudo-inst that maps to: packw rd, rs1, zero.
+  bool zext_h = isRvzbb()  and  di->op2() == 0;
+  bool legal = isRvzbkb() or zext_h;
   if (not legal)
     {
       illegalInst(di);
