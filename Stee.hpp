@@ -14,22 +14,16 @@ namespace TT_STEE      // TensTorrent Static Trusted Execution Environment.
     /// Constructor.
     Stee() = default;
 
-    /// Return true if given memory access is legal. If the secure world is enabled then
-    /// all accesses are legal. Otherwise, access to secure region is invalid.  In both
-    /// secure/normal world the zero-bits of the address must be zero.
-    bool isValidAccess(uint64_t physAddr, unsigned size) const
-    {
-      if ((physAddr & zmask_) != 0)
-	return false;  // Zero-mask bits must be zero
+    /// Return true if given memory access is legal: bits of the given address must be
+    /// zero if they correspond to the bits set in the zero-mask.
+    bool isValidAccess(uint64_t physAddr) const
+    { return (physAddr & zmask_) == 0; }
 
-      if (secWorld_)
-	return true;   // In secure world.
-
-      physAddr = clearSecureBits(physAddr);
-
-      // Address must not target secure area.
-      return physAddr + size - 1 < secLow_ or physAddr > secHigh_;
-    }
+    /// Return true if given memory access is insecure: either not running in
+    /// secure world, or running in secure world and the bits of the given
+    /// address corresponding to the secure mask are not all set.
+    bool isInsecureAccess(uint64_t physAddr) const
+    { return secWorld_ == 0 or (physAddr & secMask_) != secMask_; }
 
     /// Clear the bits corresponding to the secure-mask in the given address.
     uint64_t clearSecureBits(uint64_t addr) const
@@ -53,7 +47,7 @@ namespace TT_STEE      // TensTorrent Static Trusted Execution Environment.
     { return zmask_; }
 
     /// Return the mask of bits that must be one in the physical address in order for the
-    /// access to be considered valid by isValidAccess.
+    /// access to be considered secure by isValidAccess.
     uint64_t secureMask() const
     { return secMask_; }
 

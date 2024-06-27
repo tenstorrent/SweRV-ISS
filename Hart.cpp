@@ -1567,10 +1567,15 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 
   if (steeEnabled_)
     {
-      if (not stee_.isValidAccess(addr1, ldSize))
+      if (addr1 == addr2 and misal)
+	addr2 = addr1 - (addr1 % ldSize) + ldSize;
+
+      if (not stee_.isValidAccess(addr1))
 	return EC::LOAD_ACC_FAULT;
-      if (addr2 != addr1 and not stee_.isValidAccess(addr2, ldSize))
+      if (addr2 != addr1 and not stee_.isValidAccess(addr2))
 	return EC::LOAD_ACC_FAULT;
+      steeInsec1_ = stee_.isInsecureAccess(addr1);
+      steeInsec2_ = stee_.isInsecureAccess(addr2);
       addr1 = stee_.clearSecureBits(addr1);
       addr2 = stee_.clearSecureBits(addr2);
     }
@@ -11178,13 +11183,15 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 
   if (steeEnabled_)
     {
-      if (not stee_.isValidAccess(addr1, stSize))
+      if (not stee_.isValidAccess(addr1))
 	return EC::STORE_ACC_FAULT;
-      if (addr2 != addr1 and not stee_.isValidAccess(addr2, stSize))
+      if (addr2 != addr1 and not stee_.isValidAccess(addr2))
 	{
 	  ldStFaultAddr_ = va2;
 	  return EC::STORE_ACC_FAULT;
 	}
+      steeInsec1_ = stee_.isInsecureAccess(addr1);
+      steeInsec2_ = stee_.isInsecureAccess(addr2);
       addr1 = stee_.clearSecureBits(addr1);
       addr2 = stee_.clearSecureBits(addr2);
     }
