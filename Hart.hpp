@@ -1045,42 +1045,6 @@ namespace WdRiscv
     void enableRvd(bool flag)
     { enableExtension(RvExtension::D, flag); }
 
-    /// Enable/disable the zbe (bit manipulation) extension. When
-    /// disabled all the instructions in zbe extension result in an
-    /// illegal instruction exception.
-    void enableRvzbe(bool flag)
-    { enableExtension(RvExtension::Zbe, flag); }
-
-    /// Enable/disable the zbf (bit manipulation) extension. When
-    /// disabled all the instructions in zbf extension result in an
-    /// illegal instruction exception.
-    void enableRvzbf(bool flag)
-    { enableExtension(RvExtension::Zbf, flag); }
-
-    /// Enable/disable the zbm (bit manipulation matrix)
-    /// extension. When disabled all the instructions in zbm extension
-    /// result in an illegal instruction exception.
-    void enableRvzbm(bool flag)
-    { enableExtension(RvExtension::Zbm, flag); }
-
-    /// Enable/disable the zbp (bit manipulation permutation)
-    /// extension. When disabled all the instructions in zbp extension
-    /// result in an illegal instruction exception.
-    void enableRvzbp(bool flag)
-    { enableExtension(RvExtension::Zbp, flag); }
-
-    /// Enable/disable the zbr (bit manipulation crc)
-    /// extension. When disabled all the instructions in zbr extension
-    /// result in an illegal instruction exception.
-    void enableRvzbr(bool flag)
-    { enableExtension(RvExtension::Zbr, flag); }
-
-    /// Enable/disable the zbt (bit manipulation ternary)
-    /// extension. When disabled all the instructions in zbt extension
-    /// result in an illegal instruction exception.
-    void enableRvzbt(bool flag)
-    { enableExtension(RvExtension::Zbt, flag); }
-
     /// Enable/disable the supervisor timer compare extension (sstc).
     void enableRvsstc(bool flag)
     { enableExtension(RvExtension::Sstc, flag); csRegs_.enableSstc(flag); }
@@ -1260,7 +1224,7 @@ namespace WdRiscv
     bool isRvzbkb() const
     { return extensionIsEnabled(RvExtension::Zbkb); }
 
-    /// Return true if the zbkb extension (crypto bit manip) is enabled.
+    /// Return true if the zbkx extension (crypto bit manip) is enabled.
     bool isRvzbkx() const
     { return extensionIsEnabled(RvExtension::Zbkx); }
 
@@ -1340,43 +1304,19 @@ namespace WdRiscv
 
     /// Return true if zba extension is enabled in this hart.
     bool isRvzba() const
-    { return extensionIsEnabled(RvExtension::Zba); }
+    { return isRvb() or extensionIsEnabled(RvExtension::Zba); }
 
     /// Return true if zbb extension is enabled in this hart.
     bool isRvzbb() const
-    { return extensionIsEnabled(RvExtension::Zbb); }
+    { return isRvb() or extensionIsEnabled(RvExtension::Zbb); }
 
     /// Return true if zbc extension is enabled in this hart.
     bool isRvzbc() const
     { return extensionIsEnabled(RvExtension::Zbc); }
 
-    /// Return true if zbe extension is enabled in this hart.
-    bool isRvzbe() const
-    { return extensionIsEnabled(RvExtension::Zbe); }
-
-    /// Return true if zbf extension is enabled in this hart.
-    bool isRvzbf() const
-    { return extensionIsEnabled(RvExtension::Zbf); }
-
-    /// Return true if zbm extension is enabled in this hart.
-    bool isRvzbm() const
-    { return extensionIsEnabled(RvExtension::Zbm); }
-
-    /// Return true if zbp extension is enabled in this hart.
-    bool isRvzbp() const
-    { return extensionIsEnabled(RvExtension::Zbp); }
-
-    /// Return true if zbr extension is enabled in this hart.
-    bool isRvzbr() const
-    { return extensionIsEnabled(RvExtension::Zbr); }
-
     /// Return true if zbs extension is enabled in this hart.
     bool isRvzbs() const
-    { return extensionIsEnabled(RvExtension::Zbs); }
-
-    /// Return true if zbt extension is enabled in this hart.
-    bool isRvzbt() const
-    { return extensionIsEnabled(RvExtension::Zbt); }
+    { return isRvb() or extensionIsEnabled(RvExtension::Zbs); }
 
     /// Return true if the half-precision vector floating point
     /// extension is enabled.
@@ -3387,31 +3327,20 @@ namespace WdRiscv
     void execRolw(const DecodedInst*);
     void execRorw(const DecodedInst*);
     void execRoriw(const DecodedInst*);
-    void execRev8(const DecodedInst*);
     void execPack(const DecodedInst*);
     void execSlli_uw(const DecodedInst*);
-    void execPackh(const DecodedInst*);
-    void execPacku(const DecodedInst*);
-    void execPackw(const DecodedInst*);
-    void execPackuw(const DecodedInst*);
-    void execGrev(const DecodedInst*);
-    void execGrevi(const DecodedInst*);
-    void execGrevw(const DecodedInst*);
-    void execGreviw(const DecodedInst*);
-    void execGorc(const DecodedInst*);
-    void execGorci(const DecodedInst*);
-    void execGorcw(const DecodedInst*);
-    void execGorciw(const DecodedInst*);
-    void execShfl(const DecodedInst*);
-    void execShflw(const DecodedInst*);
-    void execShfli(const DecodedInst*);
-    void execUnshfl(const DecodedInst*);
-    void execUnshfli(const DecodedInst*);
-    void execUnshflw(const DecodedInst*);
-    void execXperm_n(const DecodedInst*);
-    void execXperm_b(const DecodedInst*);
-    void execXperm_h(const DecodedInst*);
-    void execXperm_w(const DecodedInst*);
+    void execPackh(const DecodedInst*);   // Zbkb
+    void execPackw(const DecodedInst*);   // rename zext_h, in Zbb
+    void execBrev8(const DecodedInst*);   // In Zbb
+    void execBrev8_32(const DecodedInst*);
+    void execBrev8_64(const DecodedInst*);
+    void execRev8_32(const DecodedInst*);
+    void execRev8_64(const DecodedInst*);
+    void execUnzip(const DecodedInst*);
+    void execZip(const DecodedInst*);
+
+    void execXperm_n(const DecodedInst*); // Zbkx
+    void execXperm_b(const DecodedInst*); // Zbkx
 
     // Bit manipulation: zbs
     void execBset(const DecodedInst*);
@@ -3422,14 +3351,6 @@ namespace WdRiscv
     void execBclri(const DecodedInst*);
     void execBinvi(const DecodedInst*);
     void execBexti(const DecodedInst*);
-
-    void execBcompress(const DecodedInst*);
-    void execBdecompress(const DecodedInst*);
-    void execBcompressw(const DecodedInst*);
-    void execBdecompressw(const DecodedInst*);
-
-    void execBfp(const DecodedInst*);
-    void execBfpw(const DecodedInst*);
 
     void execClmul(const DecodedInst*);
     void execClmulh(const DecodedInst*);
@@ -3442,28 +3363,6 @@ namespace WdRiscv
     void execSh2add_uw(const DecodedInst*);
     void execSh3add_uw(const DecodedInst*);
     void execAdd_uw(const DecodedInst*);
-
-    void execCrc32_b(const DecodedInst*);
-    void execCrc32_h(const DecodedInst*);
-    void execCrc32_w(const DecodedInst*);
-    void execCrc32_d(const DecodedInst*);
-    void execCrc32c_b(const DecodedInst*);
-    void execCrc32c_h(const DecodedInst*);
-    void execCrc32c_w(const DecodedInst*);
-    void execCrc32c_d(const DecodedInst*);
-
-    void execBmator(const DecodedInst*);
-    void execBmatxor(const DecodedInst*);
-    void execBmatflip(const DecodedInst*);
-
-    void execCmov(const DecodedInst*);
-    void execCmix(const DecodedInst*);
-    void execFsl(const DecodedInst*);
-    void execFsr(const DecodedInst*);
-    void execFsri(const DecodedInst*);
-    void execFslw(const DecodedInst*);
-    void execFsrw(const DecodedInst*);
-    void execFsriw(const DecodedInst*);
 
     /// Code common to execVsetvli, and execVsetvl. Return true on success and false if an
     /// illegal instruction trap must be taken.

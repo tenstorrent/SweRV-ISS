@@ -319,7 +319,6 @@ namespace WdRiscv
      minu,
      orc_b,
      orn,
-     rev8,  // was bswap
      rol,
      rolw,
      ror,
@@ -330,30 +329,17 @@ namespace WdRiscv
      sext_h,
      xnor,
 
-     // zbp
-     pack,
-     packh,
-     packu,
-     packw,
-     packuw,
-     grev,
-     grevi,
-     grevw,
-     greviw,
-     gorc,
-     gorci,
-     gorcw,
-     gorciw,
-     shfl,
-     shflw,
-     shfli,
-     unshfl,
-     unshfli,
-     unshflw,
-     xperm_n,
-     xperm_b,
-     xperm_h,
-     xperm_w,
+     // Was zbp
+     pack,     // Also alias of zext.h for RV32, in Zbb and Zbkb
+     packh,    // In Zbkb
+     packw,    // Also alias of zext.h for RV64, in Zbb and Zbkb
+     brev8,    // Was grevi, now in Zbkb.
+     rev8_32,  // Was greviw, rev8 has different encodings in rv32 and rv64
+     rev8_64,  // Was greviw, rev8 has different encodings in rv32 and rv64
+     zip,      // Was shfli, now in Zbkb
+     unzip,    // Was unshfli, now in Zbkb
+     xperm_n,  // Zbkx
+     xperm_b,  // Zbkx
 
      // zbs
      bset,
@@ -364,16 +350,6 @@ namespace WdRiscv
      bclri,
      binvi,
      bexti,
-
-     // zbe
-     bcompress,    // was bext
-     bdecompress,  // Was bdep
-     bcompressw,
-     bdecompressw,
-
-     // zbf
-     bfp,
-     bfpw,
 
      // zbc
      clmul,
@@ -389,31 +365,6 @@ namespace WdRiscv
      sh3add_uw,
      add_uw,
      slli_uw,
-
-     // zbr
-     crc32_b,
-     crc32_h,
-     crc32_w,
-     crc32_d,
-     crc32c_b,
-     crc32c_h,
-     crc32c_w,
-     crc32c_d,
-
-     // zbm
-     bmator,
-     bmatxor,
-     bmatflip,
-
-     // zbt
-     cmov,
-     cmix,
-     fsl,
-     fsr,
-     fsri,
-     fslw,
-     fsrw,
-     fsriw,
 
      // vector
      vsetvli,

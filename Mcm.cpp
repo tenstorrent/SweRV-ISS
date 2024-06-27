@@ -3082,7 +3082,8 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	    continue;
 
 	  const auto& mdi = instrM.di_;
-	  if ((not mdi.isStore() and not mdi.isAmo() and not mdi.isVectorStore()) or not overlaps(instrM, instrB))
+	  if ((not mdi.isStore() and not mdi.isAmo() and not mdi.isVectorStore()) or
+	      not overlaps(instrM, instrB))
 	    continue;
 
 	  auto mapt = instrM.addrProducer_;  // M address producer tag.

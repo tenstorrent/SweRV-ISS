@@ -3970,13 +3970,7 @@ Hart<URV>::updatePerformanceCounters(const DecodedInst& di)
     case RvExtension::Zba:
     case RvExtension::Zbb:
     case RvExtension::Zbc:
-    case RvExtension::Zbe:
-    case RvExtension::Zbf:
-    case RvExtension::Zbm:
-    case RvExtension::Zbp:
-    case RvExtension::Zbr:
     case RvExtension::Zbs:
-    case RvExtension::Zbt:
       pregs.updateCounters(EventNumber::Bitmanip, prevPerfControl_, lastPriv_, lastVirt_);
       break;
 
@@ -6740,10 +6734,6 @@ Hart<URV>::execute(const DecodedInst* di)
       execRoriw(di);
       return;
 
-    case InstId::rev8:
-      execRev8(di);
-      return;
-
     case InstId::pack:
       execPack(di);
       return;
@@ -6752,72 +6742,28 @@ Hart<URV>::execute(const DecodedInst* di)
       execPackh(di);
       return;
 
-    case InstId::packu:
-      execPacku(di);
-      return;
-
     case InstId::packw:
       execPackw(di);
       return;
 
-    case InstId::packuw:
-      execPackuw(di);
+    case InstId::brev8:
+      execBrev8(di);
       return;
 
-    case InstId::grev:
-      execGrev(di);
+    case InstId::rev8_32:
+      execRev8_32(di);
       return;
 
-    case InstId::grevi:
-      execGrevi(di);
+    case InstId::rev8_64:
+      execRev8_64(di);
       return;
 
-    case InstId::grevw:
-      execGrevw(di);
+    case InstId::zip:
+      execZip(di);
       return;
 
-    case InstId::greviw:
-      execGreviw(di);
-      return;
-
-    case InstId::gorc:
-      execGorc(di);
-      return;
-
-    case InstId::gorci:
-      execGorci(di);
-      return;
-
-    case InstId::gorcw:
-      execGorcw(di);
-      return;
-
-    case InstId::gorciw:
-      execGorciw(di);
-      return;
-
-    case InstId::shfl:
-      execShfl(di);
-      return;
-
-    case InstId::shflw:
-      execShflw(di);
-      return;
-
-    case InstId::shfli:
-      execShfli(di);
-      return;
-
-    case InstId::unshfl:
-      execUnshfl(di);
-      return;
-
-    case InstId::unshfli:
-      execUnshfli(di);
-      return;
-
-    case InstId::unshflw:
-      execUnshflw(di);
+    case InstId::unzip:
+      execUnzip(di);
       return;
 
     case InstId::xperm_n:
@@ -6826,14 +6772,6 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::xperm_b:
       execXperm_b(di);
-      return;
-
-    case InstId::xperm_h:
-      execXperm_h(di);
-      return;
-
-    case InstId::xperm_w:
-      execXperm_w(di);
       return;
 
     case InstId::bset:
@@ -6866,30 +6804,6 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::bexti:
       execBexti(di);
-      return;
-
-    case InstId::bcompress:
-      execBcompress(di);
-      return;
-
-    case InstId::bdecompress:
-      execBdecompress(di);
-      return;
-
-    case InstId::bcompressw:
-      execBcompressw(di);
-      return;
-
-    case InstId::bdecompressw:
-      execBdecompressw(di);
-      return;
-
-    case InstId::bfp:
-      execBfp(di);
-      return;
-
-    case InstId::bfpw:
-      execBfpw(di);
       return;
 
     case InstId::clmul:
@@ -6934,82 +6848,6 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::slli_uw:
       execSlli_uw(di);
-      return;
-
-    case InstId::crc32_b:
-      execCrc32_b(di);
-      return;
-
-    case InstId::crc32_h:
-      execCrc32_h(di);
-      return;
-
-    case InstId::crc32_w:
-      execCrc32_w(di);
-      return;
-
-    case InstId::crc32_d:
-      execCrc32_d(di);
-      return;
-
-    case InstId::crc32c_b:
-      execCrc32c_b(di);
-      return;
-
-    case InstId::crc32c_h:
-      execCrc32c_h(di);
-      return;
-
-    case InstId::crc32c_w:
-      execCrc32c_w(di);
-      return;
-
-    case InstId::crc32c_d:
-      execCrc32c_d(di);
-      return;
-
-    case InstId::bmator:
-      execBmator(di);
-      return;
-
-    case InstId::bmatxor:
-      execBmatxor(di);
-      return;
-
-    case InstId::bmatflip:
-      execBmatflip(di);
-      return;
-
-    case InstId::cmov:
-      execCmov(di);
-      return;
-
-    case InstId::cmix:
-      execCmix(di);
-      return;
-
-    case InstId::fsl:
-      execFsl(di);
-      return;
-
-    case InstId::fsr:
-      execFsr(di);
-      return;
-
-    case InstId::fsri:
-      execFsri(di);
-      return;
-
-    case InstId::fslw:
-      execFslw(di);
-      return;
-
-    case InstId::fsrw:
-      execFsrw(di);
-      return;
-
-    case InstId::fsriw:
-      execFsriw(di);
       return;
 
     case InstId::vsetvli:

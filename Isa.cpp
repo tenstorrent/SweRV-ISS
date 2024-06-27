@@ -27,13 +27,7 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "zba", RvExtension::Zba },
   { "zbb", RvExtension::Zbb },
   { "zbc", RvExtension::Zbc },
-  { "zbe", RvExtension::Zbe },
-  { "zbf", RvExtension::Zbf },
-  { "zbm", RvExtension::Zbm },
-  { "zbp", RvExtension::Zbp },
-  { "zbr", RvExtension::Zbr },
   { "zbs", RvExtension::Zbs },
-  { "zbt", RvExtension::Zbt },
   { "zfh", RvExtension::Zfh },
   { "zfhmin", RvExtension::Zfhmin },
   { "zlssegh", RvExtension::Zlsseg },
@@ -426,6 +420,8 @@ void splitFirstIsaToken(const std::string& tok, std::vector<std::string>& parts)
 bool
 Isa::applyIsaString(std::string_view isaStr)
 {
+  using RVE = RvExtension;
+
   std::string_view isa = isaStr;
 
   // Check and skip rv prefix.
@@ -480,8 +476,8 @@ Isa::applyIsaString(std::string_view isaStr)
       if (not parseIsa(token, extension, version, subversion))
 	return false;
 
-      RvExtension ext = stringToExtension(extension);
-      if (ext == RvExtension::None)
+      RVE ext = stringToExtension(extension);
+      if (ext == RVE::None)
 	{
 	  std::cerr << "Unknown extension: " << extension
 		    << " -- ignored\n";
@@ -489,6 +485,10 @@ Isa::applyIsaString(std::string_view isaStr)
 	}
 
       enable(ext, true);
+
+      if (ext == RVE::B)
+	for (RVE subExt : { RVE::Zba, RVE::Zbb, RVE::Zbs } )
+	  enable(subExt, true);
 
       if (version.empty())
 	continue;
