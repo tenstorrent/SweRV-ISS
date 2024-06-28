@@ -1604,7 +1604,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	  return EC::LOAD_ACC_FAULT;
 	}
       steeInsec1_ = stee_.isInsecureAccess(addr1);
-      steeInsec1_ = stee_.isInsecureAccess(addr2);
+      steeInsec2_ = stee_.isInsecureAccess(addr2);
       addr1 = stee_.clearSecureBits(addr1);
       addr2 = stee_.clearSecureBits(addr2);
     }
