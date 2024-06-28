@@ -390,11 +390,13 @@ Hart<URV>::processExtensions(bool verbose)
     enableSscofpmf(true);
   if (isa_.isEnabled(RvExtension::Zkr))
     enableZkr(true);
+  if (isa_.isEnabled(RvExtension::Smstateen))
+    enableSmstateen(true);
 
   if (isa_.isEnabled(RvExtension::Zvknha) and
       isa_.isEnabled(RvExtension::Zvknhb))
     {
-      std::cerr << "Both Zvknha/b enabled. Using Zvknhb.\n";
+      std::cerr << "Warning: Both Zvknha/b enabled. Using Zvknhb.\n";
       enableExtension(RvExtension::Zvknha, false);
     }
 
