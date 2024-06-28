@@ -1972,6 +1972,9 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_smstateen";
   if (config_ ->contains(tag))
     {
+      if (hart.sysHartIndex() == 0)
+	cerr << "Warning: Config tag " << tag << " is deprecated. "
+	     << "Use smstateen with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableSmstateen(flag);
     }

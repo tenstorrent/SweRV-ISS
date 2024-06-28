@@ -1039,11 +1039,17 @@ namespace WdRiscv
 
     /// Enable/disable counter overflow extension (sscofpmf)
     void enableSscofpmf(bool flag)
-    { csRegs_.enableSscofpmf(flag); }
+    {
+      enableExtension(RvExtension::Sscofpmf, flag);
+      csRegs_.enableSscofpmf(flag);
+    }
 
     /// Enable/disbale smstateen extension.
     void enableSmstateen(bool flag)
-    { csRegs_.enableSmstateen(flag); }
+    {
+      enableExtension(RvExtension::Smstateen, flag);
+      csRegs_.enableSmstateen(flag);
+    }
 
     /// Enable/disable the resumable non maskable interrupt (Smrnmi) extension.
     void enableSmrnmi(bool flag)
