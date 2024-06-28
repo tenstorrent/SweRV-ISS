@@ -1554,6 +1554,17 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
         }
     }
 
+  // Check misaligned exception.
+  if (misal)
+    {
+      uint64_t a1 = addr1;
+      if (steeEnabled_)
+	a1 = stee_.clearSecureBits(addr1);
+      Pma pma = getPma(a1);
+      if (misal and not pma.isMisalignedOk())
+	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
+    }
+
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
@@ -1563,46 +1574,11 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
       if (not pmp.isRead(effPm)  or  (virtMem_.isExecForRead() and not pmp.isExec(effPm)))
 	return EC::LOAD_ACC_FAULT;
-    }
 
-  if (steeEnabled_)
-    {
-      if (addr1 == addr2 and misal)
-	addr2 = addr1 - (addr1 % ldSize) + ldSize;
-
-      if (not stee_.isValidAccess(addr1))
-	return EC::LOAD_ACC_FAULT;
-      if (addr2 != addr1 and not stee_.isValidAccess(addr2))
-	return EC::LOAD_ACC_FAULT;
-      steeInsec1_ = stee_.isInsecureAccess(addr1);
-      steeInsec2_ = stee_.isInsecureAccess(addr2);
-      addr1 = stee_.clearSecureBits(addr1);
-      addr2 = stee_.clearSecureBits(addr2);
-    }
-
-  Pma pma = getPma(addr1);
-  if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
-    return EC::LOAD_ACC_FAULT;
-
-  if (misal)
-    {
-      if (not pma.isMisalignedOk())
-	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
-
-      uint64_t aligned = addr1 & ~alignMask;
-      uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
-      ldStFaultAddr_ = va2;
-      pma = getPma(next);
-      if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
-	return EC::LOAD_ACC_FAULT;
-      if (not pma.isMisalignedOk())
-	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
-
-      if (pmpEnabled_)
+      if (misal)
 	{
-	  auto effPm = effectivePrivilege();
-	  if (hyper)
-	    effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
+	  uint64_t aligned = addr1 & ~alignMask;
+	  uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
 	  const Pmp& pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
 	  if (not pmp2.isRead(effPm) or (virtMem_.isExecForRead() and not pmp2.isExec(effPm)))
 	    {
@@ -1612,22 +1588,42 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	}
     }
 
-  if (not misal)
+  steeInsec1_ = false;
+  steeInsec2_ = false;
+
+  if (steeEnabled_)
     {
-      if (not memory_.checkRead(addr1, ldSize))
-	return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
-    }
-  else
-    {
-      uint64_t aligned = addr1 & ~alignMask;
-      if (not memory_.checkRead(aligned, ldSize))
-	return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
-      uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
-      if (not memory_.checkRead(next, ldSize))
+      if (addr1 == addr2 and misal)
+	addr2 = addr1 - (addr1 % ldSize) + ldSize;
+
+      if (not stee_.isValidAddress(addr1))
+	return EC::LOAD_ACC_FAULT;
+      if (addr2 != addr1 and not stee_.isValidAddress(addr2))
 	{
 	  ldStFaultAddr_ = va2;
-	  return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+	  return EC::LOAD_ACC_FAULT;
 	}
+      steeInsec1_ = stee_.isInsecureAccess(addr1);
+      steeInsec1_ = stee_.isInsecureAccess(addr2);
+      addr1 = stee_.clearSecureBits(addr1);
+      addr2 = stee_.clearSecureBits(addr2);
+    }
+
+  // Check PMA.
+  Pma pma = getPma(addr1);
+  if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
+    return EC::LOAD_ACC_FAULT;
+
+  if (misal)
+    {
+      uint64_t aligned = addr1 & ~alignMask;
+      uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
+      ldStFaultAddr_ = va2;
+      pma = getPma(next);
+      if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
+	return EC::LOAD_ACC_FAULT;
+      if (not pma.isMisalignedOk())
+	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
     }
 
   return EC::NONE;
@@ -11170,6 +11166,17 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
         }
     }
 
+  // Check misaligned exception.
+  if (misal)
+    {
+      uint64_t a1 = addr1;
+      if (steeEnabled_)
+	a1 = stee_.clearSecureBits(addr1);
+      Pma pma = getPma(a1);
+      if (misal and not pma.isMisalignedOk())
+	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
+    }
+
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
@@ -11179,32 +11186,48 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
       if (not pmp.isWrite(effPm))
 	return EC::STORE_ACC_FAULT;
+
+      if (misal)
+	{
+	  uint64_t aligned = addr1 & ~alignMask;
+	  uint64_t next = addr1 == addr2? aligned + stSize : addr2;
+	  const Pmp& pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
+	  if (not pmp2.isWrite(effPm))
+	    {
+	      ldStFaultAddr_ = va2;
+	      return EC::STORE_ACC_FAULT;
+	    }
+	}
     }
+
+  steeInsec1_ = false;
+  steeInsec2_ = false;
 
   if (steeEnabled_)
     {
-      if (not stee_.isValidAccess(addr1))
+      if (addr1 == addr2 and misal)
+	addr2 = addr1 - (addr1 % stSize) + stSize;
+
+      if (not stee_.isValidAddress(addr1))
 	return EC::STORE_ACC_FAULT;
-      if (addr2 != addr1 and not stee_.isValidAccess(addr2))
+      if (addr2 != addr1 and not stee_.isValidAddress(addr2))
 	{
 	  ldStFaultAddr_ = va2;
 	  return EC::STORE_ACC_FAULT;
 	}
       steeInsec1_ = stee_.isInsecureAccess(addr1);
-      steeInsec2_ = stee_.isInsecureAccess(addr2);
+      steeInsec1_ = stee_.isInsecureAccess(addr2);
       addr1 = stee_.clearSecureBits(addr1);
       addr2 = stee_.clearSecureBits(addr2);
     }
 
+  // Check PMA.
+  Pma pma = getPma(addr1);
+  if (not pma.isWrite())
+    return EC::STORE_ACC_FAULT;
+
   if (misal)
     {
-      Pma pma = getPma(addr1);
-      if (not pma.isWrite())
-	return EC::STORE_ACC_FAULT;
-
-      if (not pma.isMisalignedOk())
-	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
-
       uint64_t aligned = addr1 & ~alignMask;
       uint64_t next = addr1 == addr2? aligned + stSize : addr2;
       pma = getPma(next);
@@ -11217,19 +11240,6 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	{
 	  ldStFaultAddr_ = va2;  // To report virtual address in MTVAL.
 	  return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
-	}
-
-      if (pmpEnabled_)
-	{
-	  auto effPm = effectivePrivilege();
-	  if (hyper)
-	    effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-	  const Pmp& pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
-	  if (not pmp2.isWrite(effPm))
-	    {
-	      ldStFaultAddr_ = va2;
-	      return EC::STORE_ACC_FAULT;
-	    }
 	}
     }
 
