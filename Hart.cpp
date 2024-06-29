@@ -1595,8 +1595,12 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 
   if (steeEnabled_)
     {
-      if (addr1 == addr2 and misal)
-	addr2 = addr1 - (addr1 % ldSize) + ldSize;
+      if (misal)
+	{
+	  uint64_t next = addr1 - (addr1 % ldSize) + ldSize;
+	  if (addr1 == addr2 and virtMem_.pageNumber(addr1) != virtMem_.pageNumber(next))
+	    addr2 = next;
+	}
 
       if (not stee_.isValidAddress(addr1))
 	return EC::LOAD_ACC_FAULT;
@@ -11207,8 +11211,12 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 
   if (steeEnabled_)
     {
-      if (addr1 == addr2 and misal)
-	addr2 = addr1 - (addr1 % stSize) + stSize;
+      if (misal)
+	{
+	  uint64_t next = addr1 - (addr1 % stSize) + stSize;
+	  if (addr1 == addr2 and virtMem_.pageNumber(addr1) != virtMem_.pageNumber(next))
+	    addr2 = next;
+	}
 
       if (not stee_.isValidAddress(addr1))
 	return EC::STORE_ACC_FAULT;
