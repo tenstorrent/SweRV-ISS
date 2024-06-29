@@ -1024,13 +1024,13 @@ applySteeConfig(Hart<URV>& hart, const nlohmann::json& config)
     }
 
   tag = "secure_mask";
+  uint64_t secMask = 0;
   if (sconf.contains(tag))
     {
-      uint64_t mask = 0;
-      if (not getJsonUnsigned(tag, sconf.at(tag), mask))
+      if (not getJsonUnsigned(tag, sconf.at(tag), secMask))
 	errors++;
       else
-	hart.configSteeSecureMask(mask);
+	hart.configSteeSecureMask(secMask);
     }
 
   tag = "secure_region";
@@ -1056,6 +1056,10 @@ applySteeConfig(Hart<URV>& hart, const nlohmann::json& config)
 		  high -= high % hart.pageSize();
 		  std::cerr << "Warning: STEE secure region bounds changed to: [0x"
 			    << std::hex << low << ", " << high << "]\n" << std::dec;
+		}
+	      if ((low & secMask) or (high & secMask))
+		{
+		  cerr << "Warning: STEE secure region bounds have secure bit(s) set.\n";
 		}
 	      if (not errors)
 		hart.configSteeSecureRegion(low, high);

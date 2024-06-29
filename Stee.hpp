@@ -64,13 +64,9 @@ namespace TT_STEE      // TensTorrent Static Trusted Execution Environment.
     /// Configure the secure access region (only one region is currently supported).  An
     /// insecure access will be ignored if the target address falls in the secure
     /// region. The region is between addresses low to high excluding high. To define an
-    /// empty region use same value for low and high. Must not be called before secure
-    /// mask is configured.
+    /// empty region use same value for low and high.
     void configSecureRegion(uint64_t low, uint64_t high)
     {
-      low = clearSecureBits(low);
-      high = clearSecureBits(high);
-
       secLow_ = low;
       secHigh_ = high;
     }

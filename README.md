@@ -827,7 +827,7 @@ load/store address; otherwise, the address will be invalid and will result in an
 access-fault exception.
 * secure_mask: if bit i is set in the secure_mask value, then bit i must be one in
 a load/sore address in order for that address to be considered secure.
-* secure_region: insecure access to this region has no effect, loads will return zero, and stores are ignored. The region bounds should not have the secure bits set. It those bits are set, they will be cleared by whisper. The secure bits of an address are cleared before checking against the secure region.
+* secure_region: insecure access to this region has no effect, loads will return zero, and stores are ignored. The region bounds should not have the secure bits set. The secure bits of an address are cleared before checking against the secure region.
 
 Example:
 ```
