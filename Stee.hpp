@@ -62,11 +62,18 @@ namespace TT_STEE      // TensTorrent Static Trusted Execution Environment.
     { return secMask_; }
 
     /// Configure the secure access region (only one region is currently supported).  An
-    /// insecure access will fail if the target address falls in the secure region. The
-    /// region is between addresses low to high inclusive. To define an empty region pass
-    /// a high value that is less than low.
+    /// insecure access will be ignored if the target address falls in the secure
+    /// region. The region is between addresses low to high excluding high. To define an
+    /// empty region use same value for low and high. Must not be called before secure
+    /// mask is configured.
     void configSecureRegion(uint64_t low, uint64_t high)
-    { secLow_ = low; secHigh_ = high; }
+    {
+      low = clearSecureBits(low);
+      high = clearSecureBits(high);
+
+      secLow_ = low;
+      secHigh_ = high;
+    }
 
     /// Set the secure world index. An index of zero implies a non-zecure world.
     void setSecureWorld(unsigned world)
