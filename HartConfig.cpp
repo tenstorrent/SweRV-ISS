@@ -1005,6 +1005,8 @@ static
 bool
 applySteeConfig(Hart<URV>& hart, const nlohmann::json& config)
 {
+  using std::cerr;
+
   if (not config.contains("stee"))
     return true;  // Nothing to apply
 
@@ -1022,13 +1024,13 @@ applySteeConfig(Hart<URV>& hart, const nlohmann::json& config)
     }
 
   tag = "secure_mask";
+  uint64_t secMask = 0;
   if (sconf.contains(tag))
     {
-      uint64_t mask = 0;
-      if (not getJsonUnsigned(tag, sconf.at(tag), mask))
+      if (not getJsonUnsigned(tag, sconf.at(tag), secMask))
 	errors++;
       else
-	hart.configSteeSecureMask(mask);
+	hart.configSteeSecureMask(secMask);
     }
 
   tag = "secure_region";
@@ -1041,11 +1043,27 @@ applySteeConfig(Hart<URV>& hart, const nlohmann::json& config)
 	{
 	  if (vec.size() != 2)
 	    {
-	      std::cerr << "Invalid config file stee.secure_region: Expecting an array of 2 integers\n";
+	      cerr << "Invalid config file stee.secure_region: Expecting an array of 2 integers\n";
 	      errors++;
 	    }
 	  else
-	    hart.configSteeSecureRegion(vec.at(0), vec.at(1));
+	    {
+	      uint64_t low = vec.at(0), high = vec.at(1);
+	      if ((low % hart.pageSize()) != 0 or (high % hart.pageSize()) != 0)
+		{
+		  cerr << "Warning: STEE secure region bounds are not page aligned\n";
+		  low -= low % hart.pageSize();	  
+		  high -= high % hart.pageSize();
+		  std::cerr << "Warning: STEE secure region bounds changed to: [0x"
+			    << std::hex << low << ", " << high << "]\n" << std::dec;
+		}
+	      if ((low & secMask) or (high & secMask))
+		{
+		  cerr << "Warning: STEE secure region bounds have secure bit(s) set.\n";
+		}
+	      if (not errors)
+		hart.configSteeSecureRegion(low, high);
+	    }
 	}
     }
 
@@ -1972,6 +1990,9 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_smstateen";
   if (config_ ->contains(tag))
     {
+      if (hart.sysHartIndex() == 0)
+	cerr << "Warning: Config tag " << tag << " is deprecated. "
+	     << "Use smstateen with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableSmstateen(flag);
     }

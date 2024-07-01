@@ -879,7 +879,18 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
     }
 
   if (args.steesr.size() == 2)
-    hart.configSteeSecureRegion(args.steesr.at(0), args.steesr.at(1));
+    {
+      uint64_t low = args.steesr.at(0), high = args.steesr.at(1);
+      if ((low % hart.pageSize()) != 0 or (high % hart.pageSize()) != 0)
+	{
+	  std::cerr << "Warning: STEE secure region bounds are not page aligned\n";
+	  low -= low % hart.pageSize();	  
+	  high -= high % hart.pageSize();
+	  std::cerr << "Warning: STEE secure region bounds changed to: [0x" << std::hex
+		    << low << ", " << high << "]\n" << std::dec;
+	}
+      hart.configSteeSecureRegion(args.steesr.at(0), args.steesr.at(1));
+    }
 
   if (args.perfApi)
     {

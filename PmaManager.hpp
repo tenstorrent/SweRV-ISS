@@ -317,59 +317,55 @@ namespace WdRiscv
     void resetMemMapped()
     { for (auto& kv  : memMappedRegs_) kv.second.value_ = 0; }
 
-    /// Set value to the value of the memory mapped register at addr
-    /// returning true if addr is valid. Return false if addr is not
-    /// word aligned or is not that of a memory-mapped register. This
-    /// interface is for word-sized registers.
+    /// Set value to the value of the memory mapped register at addr returning true if
+    /// addr is valid. Return false if addr does not fall in a memory-mapped register.
+    bool readRegister(uint64_t addr, uint8_t& value) const;
+
+    /// Set value to the value of the memory mapped register at addr returning true if
+    /// addr is valid. Return false if addr is not half-word aligned or does not fall in a
+    /// memory-mapped register.
+    bool readRegister(uint64_t addr, uint16_t& value) const;
+
+    /// Set value to the value of the memory mapped register at addr returning true if
+    /// addr is valid. Return false if addr is not word aligned or does not fall in a
+    /// memory-mapped register.
     bool readRegister(uint64_t addr, uint32_t& value) const;
 
-    /// Set value to the value of the memory mapped register at addr
-    /// returning true if addr is valid. Return false if addr is not
-    /// double-word aligned or is not that of a memory-mapped
-    /// register.  This interface is for double-word sized registers.
+    /// Set value to the value of the memory mapped register at addr returning true if
+    /// addr is valid. Return false if addr is not double-word aligned or is not that of a
+    /// memory-mapped register.
     bool readRegister(uint64_t addr, uint64_t& value) const;
 
-    /// Interface for reading a memory-mapped register where the size is neither 4 nor 8.
-    /// Fail if address is not word/double-word aligned. Fail if no such register.
-    bool readRegister(uint64_t addr, auto& value) const
-    {
-      // Try reading a double-word register.
-      uint64_t u64 = 0;
-      if (readRegister(addr, u64))
-	{
-	  value = u64;
-	  return true;
-	}
+    /// Set the value of the byte of the memory mapped regiser at addr to the given value
+    /// returning true if addr is valid. Return false if addr does not fall in a memory
+    /// mapped reg.
+    bool writeRegister(uint64_t addr, uint8_t value);
 
-      // Try a word register.
-      uint32_t u32 = 0;
-      if (readRegister(addr, u32))
-	{
-	  value = u32;
-	  return true;
-	}
+    /// Set the value of the half-word of the memory mapped regiser at addr to the given
+    /// value returning true if addr is valid. Return false if addr does not fall in a
+    /// memory mapped reg or if addr is not half-word aligned.
+    bool writeRegister(uint64_t addr, uint16_t value);
 
-      return false;
-    }
+    /// Set the value of the word of the memory mapped regiser at addr to the given
+    /// value returning true if addr is valid. Return false if addr does not fall in a
+    /// memory mapped reg or if addr is not word aligned.
+    bool writeRegister(uint64_t addr, uint32_t value);
 
-    /// Set the value of the memory mapped regiser at addr to the
-    /// given value returning true if addr is valid. Return false if
-    /// addr is not a memory mapped reg leaving vlaue unmodified.
+    /// Set the value of the the memory mapped regiser(s) overlapping addr to the given
+    /// value returning true if addr is valid. Return false if addr does not fall in a
+    /// memory mapped reg or if addr is not double-word aligned.
     bool writeRegister(uint64_t addr, uint64_t value);
 
     /// Return true if write is allowed.
     bool checkRegisterWrite(uint64_t addr, unsigned size) const;
 
+    /// Return true if read is allowed.
+    bool checkRegisterRead(uint64_t addr, unsigned size) const;
+
     /// Similar to writeRgister but no masking is applied to value.
     bool pokeRegister(uint64_t addr, uint64_t value);
 
-    /// Set the value of the memory mapped regiser byte at addr to the
-    /// given value applying masking and returning true if addr is
-    /// valid. Return false if addr is not a memory mapped reg leaving
-    /// vlaue unmodified.
-    bool writeRegisterByte(uint64_t addr, uint8_t value);
-
-    /// Similar to writeRgisterByte but no masking is applied to value.
+    /// Similar to writeRgister but no masking is applied to value.
     bool pokeRegisterByte(uint64_t addr, uint8_t value);
 
   private:

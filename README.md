@@ -818,6 +818,26 @@ can be included with in "trigger_types" are:
 When true, the floating point load/store instructions will be counted
 as load/store by the performance counters.
 
+### stee
+
+The static trusted execution environment (STEE) configuration is an object with the
+following fields:
+* zero_mask: if bit i is set in the zero_mask value, then bit i must be zero in every
+load/store address; otherwise, the address will be invalid and will result in an
+access-fault exception.
+* secure_mask: if bit i is set in the secure_mask value, then bit i must be one in
+a load/sore address in order for that address to be considered secure.
+* secure_region: insecure access to this region has no effect, loads will return zero, and stores are ignored. The region bounds should not have the secure bits set. The secure bits of an address are cleared before checking against the secure region.
+
+Example:
+```
+    "stee" : {
+      "zero_mask" :     "0xff70000000000000",
+      "secure_mask":    "0x0080000000000000",
+      "secure_region": ["0x0001000000000000", "0x0002000000000000"]
+    },
+
+
 <a name="Consistency"/>
 
 # Memory Consistency Checks
