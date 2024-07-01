@@ -554,8 +554,9 @@ namespace WdRiscv
     bool untilAddress(uint64_t address, FILE* file = nullptr);
 
     /// Helper to single step N times. Returns false if program terminated
-    /// with failing condition and true otherwise.
-    bool runSteps(uint64_t steps, FILE* file = nullptr);
+    /// with failing condition and true otherwise. Sets stop
+    /// if program is "finished".
+    bool runSteps(uint64_t steps, bool& stop, FILE* file = nullptr);
 
     /// Define the program counter value at which the run method will
     /// stop.

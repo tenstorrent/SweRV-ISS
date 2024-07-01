@@ -4815,23 +4815,26 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
 
 template <typename URV>
 bool
-Hart<URV>::runSteps(uint64_t steps, FILE* traceFile)
+Hart<URV>::runSteps(uint64_t steps, bool& stop, FILE* traceFile)
 {
   // Setup signal handlers. Restore on destruction.
   SignalHandlers handlers;
 
   uint64_t limit = instCountLim_;
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
+  stop = false;
 
   for (unsigned i = 0; i < steps; i++)
     {
       if (instCounter_ >= limit)
         {
+          stop = true;
           std::cerr << "Stopped -- Reached instruction limit\n";
           return true;
         }
       else if (pc_ == stopAddr)
         {
+          stop = true;
           std::cerr << "Stopped -- Reached end address\n";
           return true;
         }
@@ -4839,7 +4842,10 @@ Hart<URV>::runSteps(uint64_t steps, FILE* traceFile)
       singleStep(traceFile);
 
       if (hasTargetProgramFinished())
-        return stepResult_;
+        {
+          stop = true;
+          return stepResult_;
+        }
     }
   return true;
 }
