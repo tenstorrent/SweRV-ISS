@@ -46,10 +46,6 @@ build-job:
       - build-Linux/whisper
     expire_in: 8 hours
 
-
-
-
-
 riscof-job:
   stage: test
   dependencies:
@@ -88,6 +84,19 @@ riscof-job:
     # Run riscof
     - PATH=$PATH:$PWD/riscv-isa-sim/build:$PWD/../../build-Linux riscof --verbose debug run --suite riscv-arch-test/riscv-test-suite --env riscv-arch-test/riscv-test-suite/env --no-browser
   timeout: 6 hours
+
+
+linux-boot-job:
+  stage: test
+  dependencies:
+    - "build-job"
+  script:
+    # - DEBIAN_FRONTEND=noninteractive apt --yes install zip curl xz-utils
+    - curl --location --output opensbi.zip --location https://yyz-gitlab.local.tenstorrent.com/api/v4/projects/415/jobs/artifacts/tt-master/download?job=build_payload_zebu_linux_hello_world
+    - unzip opensbi.zip
+    - build-Linux/whisper --tohost 0x70000008 --fromhost 0x70000000 --configfile whisper.json --memorysize 0xc0000000 fw_payload-8c.elf --hart 8 --quitany 2>&1 | tee output.log
+    - grep -q "Halt and catch fire!" output.log
+  timeout: 2 hours
 
 notify-risc-p-cores:
   <<: *notify-template
