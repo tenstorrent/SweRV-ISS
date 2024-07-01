@@ -2190,6 +2190,8 @@ namespace WdRiscv
 	{
 	  if (not memory_.read(pa1, value))
 	    assert(0);
+	  if (steeInsec1_)
+	    value = 0;
 	  if (bigEnd_)
 	    value = util::byteswap(value);
 	  return;
@@ -2205,11 +2207,19 @@ namespace WdRiscv
       unsigned destIx = 0;
       for (unsigned i = 0; i < size1; ++i, ++destIx)
 	if (memory_.read(pa1 + i, byte))
-	  value |= LOAD_TYPE(byte) << 8*destIx;
+	  {
+	    if (steeInsec1_)
+	      byte = 0;
+	    value |= LOAD_TYPE(byte) << 8*destIx;
+	  }
 	else assert(0);
       for (unsigned i = 0; i < size2; ++i, ++destIx)
 	if (memory_.read(pa2 + i, byte))
-	  value |= LOAD_TYPE(byte) << 8*destIx;
+	  {
+	    if (steeInsec2_)
+	      byte = 0;
+	    value |= LOAD_TYPE(byte) << 8*destIx;
+	  }
 	else assert(0);
 
       if (bigEnd_)
@@ -2225,8 +2235,9 @@ namespace WdRiscv
 
       if (pa1 == pa2)
 	{
-	  if (not memory_.write(hartIx_, pa1, value))
-	    assert(0);
+	  if (not steeInsec1_)
+	    if (not memory_.write(hartIx_, pa1, value))
+	      assert(0);
 	  return;
 	}
       unsigned size = sizeof(value);
@@ -2235,12 +2246,14 @@ namespace WdRiscv
 
       if constexpr (sizeof(STORE_TYPE) > 1)
 	{
-	  for (unsigned i = 0; i < size1; ++i, value >>= 8)
-	    if (not memory_.write(hartIx_, pa1 + i, uint8_t(value & 0xff)))
+	  if (not steeInsec1_)
+	    for (unsigned i = 0; i < size1; ++i, value >>= 8)
+	      if (not memory_.write(hartIx_, pa1 + i, uint8_t(value & 0xff)))
 	      assert(0);
-	  for (unsigned i = 0; i < size2; ++i, value >>= 8)
-	    if (not memory_.write(hartIx_, pa2 + i, uint8_t(value & 0xff)))
-	      assert(0);
+	  if (not steeInsec2_)
+	    for (unsigned i = 0; i < size2; ++i, value >>= 8)
+	      if (not memory_.write(hartIx_, pa2 + i, uint8_t(value & 0xff)))
+		assert(0);
 	}
     }
 
@@ -5179,6 +5192,8 @@ namespace WdRiscv
     // Static tee (truseted execution environment).
     bool steeEnabled_ = false;
     TT_STEE::Stee stee_;
+    bool steeInsec1_ = false;  // True if insecure access to a secure region.
+    bool steeInsec2_ = false;  // True if insecure access to a secure region.
 
     VirtMem virtMem_;
     Isa isa_;
