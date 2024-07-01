@@ -355,7 +355,7 @@ PmaManager::writeRegister(uint64_t addr, uint64_t value)
 
 
 bool
-PmaManager::checkRegisterWrite(uint64_t addr, [[maybe_unused]] unsigned size) const
+PmaManager::checkRegisterRead(uint64_t addr, unsigned size) const
 {
 #if 0
   if (size != 4 and size != 8)
@@ -371,7 +371,30 @@ PmaManager::checkRegisterWrite(uint64_t addr, [[maybe_unused]] unsigned size) co
   if (iter != memMappedRegs_.end())
     return true;
 
-  addr = (addr >> 2) << 2;  // Make double-word aligned.
+  addr = (addr >> 3) << 3;  // Make double-word aligned.
+  return memMappedRegs_.find(addr) != memMappedRegs_.end();
+}
+
+
+
+bool
+PmaManager::checkRegisterWrite(uint64_t addr, unsigned size) const
+{
+#if 0
+  if (size != 4 and size != 8)
+    return false;
+#endif
+
+  unsigned mask = size - 1;
+  if ((addr & mask) != 0)
+    return false;   // Not aligned.
+
+  addr = (addr >> 2) << 2;  // Make word aligned.
+  auto iter = memMappedRegs_.find(addr);
+  if (iter != memMappedRegs_.end())
+    return true;
+
+  addr = (addr >> 3) << 3;  // Make double-word aligned.
   return memMappedRegs_.find(addr) != memMappedRegs_.end();
 }
 

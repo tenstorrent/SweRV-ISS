@@ -359,6 +359,9 @@ namespace WdRiscv
     /// Return true if write is allowed.
     bool checkRegisterWrite(uint64_t addr, unsigned size) const;
 
+    /// Return true if read is allowed.
+    bool checkRegisterRead(uint64_t addr, unsigned size) const;
+
     /// Similar to writeRgister but no masking is applied to value.
     bool pokeRegister(uint64_t addr, uint64_t value);
 
