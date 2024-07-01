@@ -535,8 +535,6 @@ namespace WdRiscv
       Pma pma1 = pmaMgr_.getPma(address);
       if (pma1.hasMemMappedReg() and pmaMgr_.isMemMappedReg(address))
         {
-          if (sizeof(T) == 4)
-	    return pmaMgr_.pokeRegister(address, value);
 	  for (unsigned i = 0; i < sizeof(T); ++i)
 	    {
 	      uint8_t byte = (value >> (i*8)) & 0xff;

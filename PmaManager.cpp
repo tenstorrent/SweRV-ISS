@@ -133,15 +133,75 @@ PmaManager::getMemMappedMask(uint64_t addr) const
 
 
 bool
+PmaManager::readRegister(uint64_t addr, uint8_t& value) const
+{
+#if 0
+  return false;  // Only word or double-word allowed.
+#endif
+
+  uint64_t aa = (addr >> 2) << 2;  // Make word aligned.
+  auto iter = memMappedRegs_.find(aa);
+  if (iter == memMappedRegs_.end())
+    {
+      aa = (addr >> 3) << 3;  // Make double-word aligned.
+      iter = memMappedRegs_.find(aa);
+      if (iter == memMappedRegs_.end())
+	return false;
+    }
+
+  uint64_t mmrv = iter->second.value_;  // MMR value
+  uint64_t offset = addr - aa;
+  value = mmrv >> (offset*8);
+  return true;
+}
+
+
+bool
+PmaManager::readRegister(uint64_t addr, uint16_t& value) const
+{
+#if 0
+  return false;  // Only word or double-word allowed.
+#endif
+
+  if ((addr & 1) != 0)
+    return false;  // Not half-word aligned.
+
+  uint64_t aa = (addr >> 2) << 2;  // Make word aligned.
+  auto iter = memMappedRegs_.find(aa);
+  if (iter == memMappedRegs_.end())
+    {
+      aa = (addr >> 3) << 3;  // Make double-word aligned.
+      iter = memMappedRegs_.find(aa);
+      if (iter == memMappedRegs_.end())
+	return false;
+    }
+
+  uint64_t mmrv = iter->second.value_;  // MMR value
+  uint64_t offset = addr - aa;
+  value = mmrv >> (offset*8);
+  return true;
+}
+
+
+bool
 PmaManager::readRegister(uint64_t addr, uint32_t& value) const
 {
   if ((addr & 3) != 0)
     return false;  // Not word aligned.
 
+  uint64_t aa = (addr >> 2) << 2;  // Make word aligned.
   auto iter = memMappedRegs_.find(addr);
-  if (iter != memMappedRegs_.end())
-    value = iter->second.value_;
+  if (iter == memMappedRegs_.end())
+    {
+      aa = (addr >> 3) << 3;  // Make double-word aligned.
+      iter = memMappedRegs_.find(aa);
+      if (iter == memMappedRegs_.end())
+	return false;
+    }
 
+  uint64_t mmrv = iter->second.value_;  // MMR value
+  uint64_t offset = addr - aa;
+  value = mmrv >> (offset*8);
   return true;
 }
 
@@ -156,10 +216,106 @@ PmaManager::readRegister(uint64_t addr, uint64_t& value) const
   if (iter == memMappedRegs_.end())
     return false;
 
-  if (iter->second.size_ != 8)
-    return false;
-
   value = iter->second.value_;
+
+  if (iter->second.size_ == 4)
+    {
+      // Loaded least sig 4 bytes from a word MMR, see if we can load most sig 4 bytes.
+      addr += 4;
+      iter = memMappedRegs_.find(addr);
+      if (iter != memMappedRegs_.end())
+	value |= iter->second.value_ << 32;
+    }
+
+  return true;
+}
+
+
+bool
+PmaManager::writeRegister(uint64_t addr, uint8_t value)
+{
+#if 0
+  return false;  // Only word or double-word allowed.
+#endif
+
+  uint64_t aa = (addr >> 2) << 2;  // Make word aligned.
+  auto iter = memMappedRegs_.find(aa);
+  if (iter == memMappedRegs_.end())
+    {
+      aa = (addr >> 3) << 3;  // Make double-word aligned.
+      iter = memMappedRegs_.find(aa);
+      if (iter == memMappedRegs_.end())
+	return false;
+    }
+
+  uint64_t shift = (addr - aa) * 8;
+  uint64_t mask = uint64_t(0xff) << shift;  // Byte mask
+  uint64_t shiftedValue = uint64_t(value) << shift;
+
+  uint64_t& mmrv = iter->second.value_;  // MMR value
+  uint64_t mmrm = iter->second.mask_;    // MMR mask
+
+  mmrv = (mmrv & ~mask & ~mmrm) | (shiftedValue & mmrm);
+  return true;
+}
+
+
+bool
+PmaManager::writeRegister(uint64_t addr, uint16_t value)
+{
+#if 0
+  return false;  // Only word or double-word allowed.
+#endif
+
+  if ((addr & 1) != 0)
+    return false;  // Not half-word aligned.
+
+  uint64_t aa = (addr >> 2) << 2;  // Make word aligned.
+  auto iter = memMappedRegs_.find(aa);
+  if (iter == memMappedRegs_.end())
+    {
+      aa = (addr >> 3) << 3;  // Make double-word aligned.
+      iter = memMappedRegs_.find(aa);
+      if (iter == memMappedRegs_.end())
+	return false;
+    }
+
+  uint64_t shift = (addr - aa) * 8;
+  uint64_t mask = uint64_t(0xffff) << shift;  // Half-word mask
+  uint64_t shiftedValue = uint64_t(value) << shift;
+
+  uint64_t& mmrv = iter->second.value_;  // MMR value
+  uint64_t mmrm = iter->second.mask_;    // MMR mask
+
+  mmrv = (mmrv & ~mask & ~mmrm) | (shiftedValue & mmrm);
+  return true;
+}
+
+
+bool
+PmaManager::writeRegister(uint64_t addr, uint32_t value)
+{
+  if ((addr & 3) != 0)
+    return false;  // Not word aligned.
+
+  uint64_t aa = (addr >> 2) << 2;  // Make word aligned.
+  auto iter = memMappedRegs_.find(aa);
+  if (iter == memMappedRegs_.end())
+    {
+      aa = (addr >> 3) << 3;  // Make double-word aligned.
+      iter = memMappedRegs_.find(aa);
+      if (iter == memMappedRegs_.end())
+	return false;
+    }
+
+  uint64_t shift = (addr - aa) * 8;
+  uint64_t mask = uint64_t(0xffffffff) << shift;  // Word mask
+  uint64_t shiftedValue = uint64_t(value) << shift;
+
+  uint64_t& mmrv = iter->second.value_;  // MMR value
+  uint64_t mmrm = iter->second.mask_;    // MMR mask
+
+  mmrv = (mmrv & ~mask & ~mmrm) | (shiftedValue & mmrm);
   return true;
 }
 
@@ -167,65 +323,79 @@ PmaManager::readRegister(uint64_t addr, uint64_t& value) const
 bool
 PmaManager::writeRegister(uint64_t addr, uint64_t value)
 {
+  if ((addr & 7) != 0)
+    return false;   // Not double-word aligned.
+
   auto iter = memMappedRegs_.find(addr);
   if (iter == memMappedRegs_.end())
     return false;
 
-  iter->second.value_ = value & iter->second.mask_;
+  uint64_t& mmrv = iter->second.value_;  // MMR value
+  uint64_t mmrm = iter->second.mask_;    // MMR mask
+
+  mmrv = value & mmrm;
+
+  if (iter->second.size_ == 4)
+    {
+      // Wrote least sig 4 bytes into a word MMR, see if we can write most sig 4 bytes.
+      addr += 4;
+      iter = memMappedRegs_.find(addr);
+      if (iter != memMappedRegs_.end())
+	{
+	  value >>= 32;
+	  uint64_t& mmrv2 = iter->second.value_;
+	  uint64_t mmrm2 = iter->second.mask_;
+	  uint64_t mask = uint64_t(0xffffffff);
+	  mmrv2 = (mmrv2 & ~mask & mmrm2) | (value & mmrm2);
+	}
+    }
+
   return true;
 }
+
 
 bool
 PmaManager::checkRegisterWrite(uint64_t addr, [[maybe_unused]] unsigned size) const
 {
-
-  auto iter = memMappedRegs_.find(addr);
-  return iter != memMappedRegs_.end();
-}
-
-
-bool
-PmaManager::pokeRegister(uint64_t addr, uint64_t value)
-{
-  auto iter = memMappedRegs_.find(addr);
-  if (iter == memMappedRegs_.end())
+#if 0
+  if (size != 4 and size != 8)
     return false;
-  iter->second.value_ = value;
-  return true;
-}
+#endif
 
+  unsigned mask = size - 1;
+  if ((addr & mask) != 0)
+    return false;   // Not aligned.
 
-bool
-PmaManager::writeRegisterByte(uint64_t addr, uint8_t value)
-{
-  unsigned byteIx = addr & 3;
+  addr = (addr >> 2) << 2;  // Make word aligned.
   auto iter = memMappedRegs_.find(addr);
-  if (iter == memMappedRegs_.end())
-    return false;
+  if (iter != memMappedRegs_.end())
+    return true;
 
-  unsigned shift = byteIx * 8;
-  uint32_t byteMask = 0xff << shift;
-  uint32_t shiftedByte = (uint64_t(value) << shift) & iter->second.mask_;
-  iter->second.value_ = iter->second.value_ & ~byteMask;
-  iter->second.value_ = iter->second.value_ | shiftedByte;
-  return true;
+  addr = (addr >> 2) << 2;  // Make double-word aligned.
+  return memMappedRegs_.find(addr) != memMappedRegs_.end();
 }
 
 
 bool
 PmaManager::pokeRegisterByte(uint64_t addr, uint8_t value)
 {
-  unsigned byteIx = addr & 3;
-  addr = (addr >> 2) << 2;
-  auto iter = memMappedRegs_.find(addr);
+  uint64_t aa = (addr >> 2) << 2;  // Make word aligned.
+  auto iter = memMappedRegs_.find(aa);
   if (iter == memMappedRegs_.end())
-    return false;
+    {
+      aa = (addr >> 3) << 3;  // Make double-word aligned.
+      iter = memMappedRegs_.find(aa);
+      if (iter == memMappedRegs_.end())
+	return false;
+    }
 
-  unsigned shift = byteIx * 8;
-  uint32_t byteMask = 0xff << shift;
-  uint32_t shiftedByte = uint64_t(value) << shift;
-  iter->second.value_ = iter->second.value_ & ~byteMask;
-  iter->second.value_ = iter->second.value_ | shiftedByte;
+  uint64_t shift = (addr - aa) * 8;
+  uint64_t mask = uint64_t(0xff) << shift;  // Byte mask
+  uint64_t shiftedValue = uint64_t(value) << shift;
+
+  uint64_t& mmrv = iter->second.value_;  // MMR value
+
+  mmrv = (mmrv & ~mask) | shiftedValue;
   return true;
 }
 
