@@ -219,7 +219,7 @@ Hart<URV>::countImplementedPmpRegisters() const
     if (csRegs_.isImplemented(CsrNumber(num)))
       count++;
 
-  if (count and count < 64 and hartIx_ == 0)
+  if (count and count != 16 and count != 64 and hartIx_ == 0)
     cerr << "Warning: Some but not all PMPADDR CSRs are implemented\n";
 
   unsigned cfgCount = 0;
@@ -229,7 +229,7 @@ Hart<URV>::countImplementedPmpRegisters() const
       for (unsigned ix = 0; ix < 16; ++ix, ++num)
         if (csRegs_.isImplemented(CsrNumber(num)))
           cfgCount++;
-      if (count and cfgCount != 16 and hartIx_ == 0)
+      if (count and cfgCount != 4 and cfgCount != 16 and hartIx_ == 0)
         cerr << "Warning: Physical memory protection enabled but only "
 	     << cfgCount << "/16" << " PMPCFG CSRs implemented\n";
     }
@@ -239,7 +239,7 @@ Hart<URV>::countImplementedPmpRegisters() const
       for (unsigned ix = 0; ix < 16; ++ix, ++num)
         if (csRegs_.isImplemented(CsrNumber(num)))
           cfgCount++;
-      if (count and cfgCount != 8 and hartIx_ == 0)  // Only even numbered implemented.
+      if (count and cfgCount != 2 and cfgCount != 8 and hartIx_ == 0)  // Only even numbered implemented.
         cerr << "Warning: Physical memory protection enabled but only "
 	     << cfgCount << "/8" << " PMPCFG CSRs implemented.\n";
     }
