@@ -551,11 +551,13 @@ Args::parseCmdLineNumber(const std::string& option, const std::string& numberStr
     {
       char suffix = str.back();
       if (suffix == 'k')
-        scale = UINT64_C(1024);
+        scale = 1024;
       else if (suffix == 'm')
-        scale = UINT64_C(1024)*1024U;
+        scale = UINT64_C(1024)*1024;
       else if (suffix == 'g')
-        scale = UINT64_C(1024)*1024U*1024U;
+        scale = UINT64_C(1024)*1024*1024;
+      else if (suffix == 't')
+        scale = UINT64_C(1024)*1024*1024*1024;
       if (scale != 1)
         {
           str = str.substr(0, str.length() - 1);

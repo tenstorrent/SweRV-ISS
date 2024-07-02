@@ -1368,8 +1368,8 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
       else
         {
           // Run all harts in one thread round-robin.
-          bool result = true;
           unsigned finished = 0;
+          std::vector<bool> stopped(sysHarts_.size(), false);
 
           for (auto hptr : sysHarts_)
             finished += hptr->hasTargetProgramFinished();
@@ -1379,21 +1379,24 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
             {
               for (auto hptr : sysHarts_)
                 {
-                  if (hptr->hasTargetProgramFinished())
-                    continue;
-                  unsigned steps = (rand() % stepWindow) + 1;
-                  // step N times
                   unsigned ix = hptr->sysHartIndex();
+                  if (stopped.at(ix))
+                    continue;
+
+                  // step N times
+                  unsigned steps = (rand() % stepWindow) + 1;
                   try
                     {
-                      result = hptr->runSteps(steps, traceFiles.at(ix)) and result;
+                      bool stop;
+                      result = hptr->runSteps(steps, stop, traceFiles.at(ix)) and result;
+                      stopped.at(ix) = stop;
                     }
                   catch (const CoreException& ce)
                     {
                       if (ce.type() == CoreException::Type::Snapshot)
                         progSnapshot = true;
                     }
-                  if (hptr->hasTargetProgramFinished())
+                  if (stopped.at(ix))
                     finished++;
                 }
 
