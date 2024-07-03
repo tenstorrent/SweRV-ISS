@@ -386,12 +386,12 @@ namespace WdRiscv
 
     /// Run the simulated harts. Return true on sucess or false if
     /// target program ends with a non-zero exit. If stepWindow is
-    /// non-zero run the harts in a single simulator thread
+    /// not empty, run the harts in a single simulator thread
     /// round-robin with each hart executing n instructions where n is
-    /// a random number in the range [1, stepWindow]. If stepWindow is
-    /// zero, each hart runs in its own simulator thread independent of
+    /// a random number in the range [stepWindowLo, stepWindowHi]. If stepWindow is
+    /// 0, each hart runs in its own simulator thread independent of
     /// the other harts.
-    bool batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t stepWindow);
+    bool batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t stepWinLo, uint64_t stepWinHi);
 
     /// Run producing a snapshot after each snapPeriod instructions. Each
     /// snapshot goes into its own directory names <dir><n> where <dir> is
