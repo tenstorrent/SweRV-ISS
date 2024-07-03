@@ -1197,15 +1197,19 @@ Session<URV>::run(const Args& args)
     return system.snapshotRun(traceFiles_, args.snapshotPeriods);
 
   bool waitAll = not args.quitOnAnyHart;
-  uint64_t stepWindow = args.deterministic.value_or(0);
   unsigned seed = args.seed.value_or(time(NULL));
   srand(seed);
 
-  if (stepWindow)
-    std::cout << "Deterministic multi-hart run with seed: " << seed
-	      << " and steps distribution between 1 and " << stepWindow << "\n";
+  uint64_t stepWinLo = 0, stepWinHi = 0;
+  if (not args.deterministic.empty())
+    {
+      stepWinLo = args.deterministic.at(0);
+      stepWinHi = args.deterministic.at(1);
+      std::cerr << "Deterministic multi-hart run with seed: " << seed
+                << " and steps distribution between " << stepWinLo << " and " << stepWinHi << "\n";
+    }
 
-  return system.batchRun(traceFiles_, waitAll, stepWindow);
+  return system.batchRun(traceFiles_, waitAll, stepWinLo, stepWinHi);
 }
 
 
