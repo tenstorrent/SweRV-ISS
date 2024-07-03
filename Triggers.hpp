@@ -553,9 +553,8 @@ namespace WdRiscv
     }
 
     /// Perform a match on the given item (maybe an address or a value) and the data2
-    /// component of this trigger (assumed to be of type Address) according to the match
-    /// field.
-    bool doMatch(URV item) const;
+    /// component of this trigger according to the match variable.
+    bool doMatch(URV item, Match match) const;
 
     /// Set the hit bit of this trigger. For a chained trigger, this is to be called only
     /// if all the triggers in the chain have tripped.
@@ -635,6 +634,12 @@ namespace WdRiscv
 
   protected:
 
+    static bool isNegatedMatch(Match m)
+    { return m >= Match::NotEqual and m <= Match::NotMaskLowEqualHigh; }
+
+    static Match negateNegatedMatch(Match m)
+    { assert(isNegatedMatch); return Match(unsigned(m) - unsigned(Match::NotEqual)); }
+
     void updateCompareMask()
     {
       // Pre-compute mask for a masked compare (match == 1 in mcontrol).
@@ -689,6 +694,7 @@ namespace WdRiscv
       return ok;
     }
 
+    // Helper to public matchLdStAddr.
     template <typename M>
     bool matchLdStAddr(URV address, unsigned size, TriggerTiming timing, bool isLoad,
                        PrivilegeMode mode, bool virtMode) const;
