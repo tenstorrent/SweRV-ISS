@@ -231,13 +231,19 @@ Args::collectCommandLineValues(const boost::program_options::variables_map& varM
       auto rangeStr = varMap["deterministic"].as<std::string>();
       StringVec tokens;
       boost::split(tokens, rangeStr, boost::is_any_of(":"));
-      if (tokens.size() != 2)
+      if (tokens.size() == 1)
 	{
-	  std::cerr << "Error: Bad value for --determinstic: \"" << rangeStr << "\". "
-		    << "Expecting a colon separated pair of numbers.\n";
-	  ok = false;
+	  uint64_t s1 = 0;
+	  if (not parseCmdLineNumber("deterministic", tokens.at(0), s1))
+	    ok = false;
+	  else
+	    {
+	      this->deterministic.clear();
+	      this->deterministic.push_back(1);
+	      this->deterministic.push_back(s1);
+	    }
 	}
-      else
+      else if (tokens.size() == 2)
         {
 	  uint64_t s0 = 0, s1 = 0;
 	  if (not parseCmdLineNumber("deterministic", tokens.at(0), s0) or
@@ -250,6 +256,12 @@ Args::collectCommandLineValues(const boost::program_options::variables_map& varM
 	      this->deterministic.push_back(s1);
 	    }
         }
+      else
+	{
+	  std::cerr << "Error: Bad value for --determinstic: \"" << rangeStr << "\". "
+		    << "Expecting a number or a colon separated pair of numbers.\n";
+	  ok = false;
+	}
     }
 
   if (varMap.count("seed"))
