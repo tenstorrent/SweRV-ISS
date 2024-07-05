@@ -2519,7 +2519,7 @@ Hart<URV>::execVsm4r_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1();
 
-  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+  if (not checkVecOpsVsEmul(di, vd, groupx8))
     return;
 
   if (start >= vecRegs_.elemCount())
