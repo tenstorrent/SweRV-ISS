@@ -79,6 +79,15 @@ namespace WdRiscv
     void setCsrNameCallback(std::function<std::string_view(unsigned)> callback)
     { csrNameCallback_ = std::move(callback); }
 
+    /// Enable/disabled rv64. Some code points will disassemble differently if rv64 is
+    /// enabled.
+    void enableRv64(bool flag)
+    { rv64_ = flag; }
+
+    /// Return true if rv64 is enabled.
+    bool isRv64() const
+    { return rv64_; }
+
   protected:
 
     /// Uncached disassembly.
@@ -93,5 +102,7 @@ namespace WdRiscv
     std::function<std::string_view(unsigned ix)> csrNameCallback_ = nullptr;
 
     std::unordered_map<uint32_t, std::string> disasMap_;
+
+    bool rv64_ = false;
   };
 }
