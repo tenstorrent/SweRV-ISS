@@ -846,15 +846,23 @@ Trigger<URV>::matchLdStAddr(URV address, unsigned size, TriggerTiming timing, bo
 	    }
 	}
 
-      if (not matchAllLdStAddr_)
-        return doMatch(address);
-      else
-        {
-          for (unsigned i = 0; i < size; ++i)
-            if (doMatch(address + i))
-              return true;
-          return false;
-        }
+      Match match = Match(data1_.mcontrol_.match_);
+      if (matchAllLdStAddr_)
+	{
+	  // Match all addresses covered by size.
+	  bool negated = isNegatedMatch(match);
+	  if (negated)
+	    match = negateNegatedMatch(match);
+
+	  bool hit = false;
+          for (unsigned i = 0; i < size and not hit; ++i)
+            hit = hit or doMatch(address + i, match);
+	  if (negated)
+	    hit = not hit;
+          return hit;
+	}
+      
+      return doMatch(address, match);
     }
 
   return false;
@@ -910,7 +918,10 @@ Trigger<URV>::matchLdStData(URV value, TriggerTiming timing, bool isLoad,
 
   if (getTiming() == timing and Select(ctl.select_) == Select::MatchData and
       ((isLoad and ctl.load_) or (isStore and ctl.store_)))
-    return doMatch(value);
+    {
+      Match match = Match(data1_.mcontrol_.match_);
+      return doMatch(value, match);
+    }
   return false;
 }
 
@@ -931,7 +942,7 @@ Trigger<URV>::matchLdStData(URV value, TriggerTiming timing, bool isLoad,
 
 template <typename URV>
 bool
-Trigger<URV>::doMatch(URV item) const
+Trigger<URV>::doMatch(URV item, Match match) const
 {
   URV data2 = data2_;
 
@@ -976,7 +987,6 @@ Trigger<URV>::doMatch(URV item) const
     return false;
   };
 
-  Match match = Match(data1_.mcontrol_.match_);
   if (match >= Match::Equal and match <= Match::MaskLowEqualHigh)
     return helper(item, data2, match);
   else
@@ -1054,15 +1064,23 @@ Trigger<URV>::matchInstAddr(URV address, unsigned size, TriggerTiming timing, Pr
 	    }
 	}
 
-      if (not matchAllInstAddr_)
-        return doMatch(address);
-      else
+      Match match = Match(data1_.mcontrol_.match_);
+      if (matchAllInstAddr_)
         {
-          for (unsigned i = 0; i < size; ++i)
-            if (doMatch(address + i))
-              return true;
-          return false;
+	  // Match all addresses covered by size.
+	  bool negated = isNegatedMatch(match);
+	  if (negated)
+	    match = negateNegatedMatch(match);
+
+	  bool hit = false;
+          for (unsigned i = 0; i < size and not hit; ++i)
+            hit = hit or doMatch(address + i, match);
+	  if (negated)
+	    hit = not hit;
+          return hit;
         }
+
+      return doMatch(address, match);
     }
 
   return false;
@@ -1115,7 +1133,11 @@ Trigger<URV>::matchInstOpcode(URV opcode, TriggerTiming timing,
     return false;
 
   if (getTiming() == timing and Select(ctl.select_) == Select::MatchData and ctl.execute_)
-    return doMatch(opcode);
+    {
+      Match match = Match(data1_.mcontrol_.match_);
+      return doMatch(opcode, match);
+    }
+
   return false;
 }
 

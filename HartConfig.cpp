@@ -1041,9 +1041,11 @@ applySteeConfig(Hart<URV>& hart, const nlohmann::json& config)
 	errors++;
       else
 	{
+	  bool complain = hart.sysHartIndex() == 0;
 	  if (vec.size() != 2)
 	    {
-	      cerr << "Invalid config file stee.secure_region: Expecting an array of 2 integers\n";
+	      if (complain)
+		cerr << "Invalid config stee.secure_region: Expecting array of 2 integers\n";
 	      errors++;
 	    }
 	  else
@@ -1051,16 +1053,18 @@ applySteeConfig(Hart<URV>& hart, const nlohmann::json& config)
 	      uint64_t low = vec.at(0), high = vec.at(1);
 	      if ((low % hart.pageSize()) != 0 or (high % hart.pageSize()) != 0)
 		{
-		  cerr << "Warning: STEE secure region bounds are not page aligned\n";
 		  low -= low % hart.pageSize();	  
 		  high -= high % hart.pageSize();
-		  std::cerr << "Warning: STEE secure region bounds changed to: [0x"
-			    << std::hex << low << ", " << high << "]\n" << std::dec;
+		  if (complain)
+		    {
+		      cerr << "Warning: STEE secure region bounds are not page aligned\n";
+		      cerr << "Warning: STEE secure region bounds changed to: [0x"
+			   << std::hex << low << ", " << high << "]\n" << std::dec;
+		    }
 		}
-	      if ((low & secMask) or (high & secMask))
-		{
-		  cerr << "Warning: STEE secure region bounds have secure bit(s) set.\n";
-		}
+	      if (((low & secMask) or (high & secMask)) and complain)
+		cerr << "Warning: STEE secure region bounds have secure bit(s) set.\n";
+
 	      if (not errors)
 		hart.configSteeSecureRegion(low, high);
 	    }

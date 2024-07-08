@@ -228,9 +228,40 @@ Args::collectCommandLineValues(const boost::program_options::variables_map& varM
 
   if (varMap.count("deterministic"))
     {
-      auto numStr = varMap["deterministic"].as<std::string>();
-      if (not parseCmdLineNumber("deterministic", numStr, this->deterministic))
-	ok = false;
+      auto rangeStr = varMap["deterministic"].as<std::string>();
+      StringVec tokens;
+      boost::split(tokens, rangeStr, boost::is_any_of(":"));
+      if (tokens.size() == 1)
+	{
+	  uint64_t s1 = 0;
+	  if (not parseCmdLineNumber("deterministic", tokens.at(0), s1))
+	    ok = false;
+	  else
+	    {
+	      this->deterministic.clear();
+	      this->deterministic.push_back(1);
+	      this->deterministic.push_back(s1);
+	    }
+	}
+      else if (tokens.size() == 2)
+        {
+	  uint64_t s0 = 0, s1 = 0;
+	  if (not parseCmdLineNumber("deterministic", tokens.at(0), s0) or
+	      not parseCmdLineNumber("deterministic", tokens.at(1), s1))
+	    ok = false;
+	  else
+	    {
+	      this->deterministic.clear();
+	      this->deterministic.push_back(s0);
+	      this->deterministic.push_back(s1);
+	    }
+        }
+      else
+	{
+	  std::cerr << "Error: Bad value for --determinstic: \"" << rangeStr << "\". "
+		    << "Expecting a number or a colon separated pair of numbers.\n";
+	  ok = false;
+	}
     }
 
   if (varMap.count("seed"))
@@ -464,11 +495,11 @@ Args::parseCmdLineArgs(std::span<char*> argv)
          "This should be combined with the pci option to declare a memory region for these devices. "
          "Currently only supports virtio-blk, which requires a file")
         ("deterministic", po::value<std::string>(),
-         "Used for deterministic multi-hart runs. Define a window size for the amount of instructions "
-         "a hart will execute before switching to the next hart (a value of 0 turns this off). The "
+         "Used for deterministic multi-hart runs. Define a window range [x:y] for the amount of instructions "
+         "a hart will execute before switching to the next hart. A range of 0:0 turns this off. The "
          "actual amount of instructions is determined by corresponding seed value.")
         ("seed", po::value<std::string>(),
-         "Corresponding seed for deterministic runs. If this is not specified, but `deterministic` is, whisper will "
+         "Corresponding seed for deterministic runs. If this is not specified, but 'deterministic' is, whisper will "
          "generate a seed value based on current time.")
 	("instcounter", po::value<std::string>(),
 	 "Set instruction counter to given value.")

@@ -528,7 +528,7 @@ template <typename URV>
 void
 Hart<URV>::execBrev8(const DecodedInst* di)
 {
-  if (not isRvzbb() and not isRvzbkb())
+  if (not isRvzbkb())
     {
       illegalInst(di);
       return;

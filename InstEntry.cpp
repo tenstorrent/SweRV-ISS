@@ -1966,13 +1966,13 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
       { "packw", InstId::packw, 0x0800403b, top7Funct3Low7Mask,
-        RvExtension::Zbb, RvFormat::R,
+        RvExtension::Zbkb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
       { "brev8", InstId::brev8, 0x68705013, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::I,
+	RvExtension::Zbkb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
@@ -7269,7 +7269,7 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
-      
+
       { "amocas.d", InstId::amocas_d, 0x2800302f, 0xf800707f,
 	RvExtension::Zacas, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,

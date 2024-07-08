@@ -1062,226 +1062,8 @@ extern void forceUserStop(int);
 
 template <typename URV>
 bool
-System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t stepWindow)
+System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t stepWinLo, uint64_t stepWinHi)
 {
-#if 0
-  uint64_t trapPc = 0, tag = 1, time = 0;
-  ExceptionCause cause = ExceptionCause::NONE;
-  bool trap = false;
-
-  unsigned hartIx = 0;
-  Hart<URV>& hart0 = *ithHart(0);
-
-  //perfApi_->setRetirePc(hart0->peekPc());
-
-  uint64_t pc = hart0.peekPc();
-  uint32_t opcode = 0xfebff0ef;
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-  perfApi_->retire(hartIx, time++, tag, traceFiles.at(0));
-
-  pc = 0x10158;   opcode = 0x80818713;  tag++;  // #2
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-  perfApi_->retire(hartIx, time++, tag, traceFiles.at(0));
-
-  pc = 0x1015c;   opcode = 0x4781;  tag++;  // #3
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-  perfApi_->retire(hartIx, time++, tag, traceFiles.at(0));
-
-  pc = 0x1015e;   opcode = 0x46a9;  tag++;  // #4
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-  perfApi_->retire(hartIx, time++, tag, traceFiles.at(0));
-
-  pc = 0x10160;   opcode = 0xc31c;  tag++; // #5
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-  perfApi_->retire(hartIx, time++, tag, traceFiles.at(0));
-  perfApi_->drainStore(hartIx, time++, tag);
-
-  pc = 0x10162;   opcode = 0x2785;  tag++;  // #6
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-  perfApi_->retire(hartIx, time++, tag, traceFiles.at(0));
-
-  pc = 0x10164;   opcode = 0x0711;  tag++; // #7
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-  perfApi_->retire(hartIx, time++, tag, traceFiles.at(0));
-
-  pc = 0x10166;   opcode = 0xfed79de3; tag++; // #8
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-  perfApi_->retire(hartIx, time++, tag, traceFiles.at(0));
-
-  pc = 0x10160;   opcode = 0xc31c;  tag++; // #9
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-  perfApi_->retire(hartIx, time++, tag, traceFiles.at(0));
-  perfApi_->drainStore(hartIx, time++, tag);
-
-  pc = 0x10162;   opcode = 0x2785;  tag++; // #10
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-
-  pc = 0x10164;   opcode = 0x711;  tag++;// #11
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-
-  perfApi_->execute(hartIx, time++, 11); // Execute #11 out of order
-  perfApi_->execute(hartIx, time++, 10);
-
-  perfApi_->retire(hartIx, time++, 10, traceFiles.at(0));
-  perfApi_->retire(hartIx, time++, 11, traceFiles.at(0));
-
-  pc = 0x10166;   opcode = 0xed79de3; tag++;  // #12
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-  perfApi_->retire(hartIx, time++, tag, traceFiles.at(0));
-  
-  pc = 0x10160;   opcode = 0xc31c; tag++;  // #13  this will not execute for a while
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-
-  pc = 0x10162;   opcode = 0x2785; tag++;  // #14
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-
-  pc = 0x10164;   opcode = 0x0711; tag++;  // #15
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-
-  pc = 0x10166;   opcode = 0xfed79de3; tag++;  // #16
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-
-  pc = 0x10160;   opcode = 0xc31c; tag++;  // #17
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-
-  pc = 0x10162;   opcode = 0x2785; tag++;  // #18
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-
-  pc = 0x10164;   opcode = 0x0711; tag++;  // #19
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-
-  pc = 0x10166;   opcode = 0xfed79de3; tag++; // #20
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-
-  pc = 0x10160;   opcode = 0xc31c; tag++;  // #21
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-
-
-  perfApi_->execute(hartIx, time++, 13);  // Execute 13
-
-  // retire 14 to 21
-  perfApi_->retire(hartIx, time++, 13, traceFiles.at(0));
-  perfApi_->retire(hartIx, time++, 14, traceFiles.at(0));
-  perfApi_->retire(hartIx, time++, 15, traceFiles.at(0));
-  perfApi_->retire(hartIx, time++, 16, traceFiles.at(0));
-  perfApi_->retire(hartIx, time++, 17, traceFiles.at(0));
-  perfApi_->retire(hartIx, time++, 18, traceFiles.at(0));
-  perfApi_->retire(hartIx, time++, 19, traceFiles.at(0));
-  perfApi_->retire(hartIx, time++, 20, traceFiles.at(0));
-  perfApi_->retire(hartIx, time++, 21, traceFiles.at(0));
-
-  perfApi_->drainStore(hartIx, time++, 13);
-  perfApi_->drainStore(hartIx, time++, 17);
-  perfApi_->drainStore(hartIx, time++, 21);
-
-  pc = 0x10162;   opcode = 0x2785; tag++; time++;  // #22
-  perfApi_->fetch(hartIx, time, tag, pc, trap, cause, trapPc);
-  pc = 0x10164;   opcode = 0x0711; tag++;  // #23
-  perfApi_->fetch(hartIx, time, tag, pc, trap, cause, trapPc);
-
-  perfApi_->decode(hartIx, time++, 22, opcode);
-  perfApi_->decode(hartIx, time, 23, opcode);
-  perfApi_->execute(hartIx, time++, 22);
-  perfApi_->execute(hartIx, time, 23);
-  perfApi_->retire(hartIx, time++, 22, traceFiles.at(0));
-  perfApi_->retire(hartIx, time, 23, traceFiles.at(0));
-
-  pc = 0x10166;   opcode = 0xfed79de3; tag++; // #24
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  pc = 0x1016a;   opcode = 0x4501; tag++; // #25, wrong fetch
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  pc = 0x1016c;   opcode = 0x8082; tag++; // #26, wrong fetch
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  pc = 0x10172;   opcode = 0x67c5; tag++; // #27, wrong fetch
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-
-  auto packet = perfApi_->getInstructionPacket(hartIx, 24);
-  packet->predictBranch(false, 0x1016a);
-  perfApi_->execute(hartIx, time++, 24);
-
-  bool flush = false;
-  uint64_t addr = 0;
-  if (perfApi_->shouldFlush(hartIx, time++, 24, flush, addr))
-    {
-      assert(flush);
-      perfApi_->flush(hartIx, time++, 24);
-    }
-
-  tag = 33;
-  pc = 0x10166;   opcode = 0xfed79de3; tag++;  // #34: redoing #24
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  pc = 0x10160;   opcode = 0xc31c; tag++; // #35
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  pc = 0x10162;   opcode = 0x2785; tag++; // #36, wrong fetch
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  pc = 0x10164;   opcode = 0x0711; tag++; // #37, wrong fetch
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-
-  perfApi_->execute(hartIx, time++, 34);
-  perfApi_->execute(hartIx, time++, 35);
-  perfApi_->execute(hartIx, time++, 36);
-  perfApi_->execute(hartIx, time++, 37);
-
-  perfApi_->retire(hartIx, time++, 34, traceFiles.at(0));
-  perfApi_->retire(hartIx, time++, 35, traceFiles.at(0));
-  perfApi_->retire(hartIx, time++, 36, traceFiles.at(0));
-  perfApi_->retire(hartIx, time++, 37, traceFiles.at(0));
-
-  pc = 0x10166;   opcode = 0xfed79de3; tag++;  // #38
-  perfApi_->fetch(hartIx, time++, tag, pc, trap, cause, trapPc);
-  perfApi_->decode(hartIx, time++, tag, opcode);
-  perfApi_->execute(hartIx, time++, tag);
-  perfApi_->retire(hartIx, time++, tag, traceFiles.at(0));
-  exit(0);
-#endif
-
   auto forceSnapshot = [this]() -> void {
       uint64_t tag = ++snapIx_;
       std::string pathStr = snapDir_ + std::to_string(tag);
@@ -1324,7 +1106,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
                 progSnapshot = true;
             }
         }
-      else if (not stepWindow)
+      else if (not stepWinLo and not stepWinHi)
         {
           // Run each hart in its own thread.
           std::vector<std::thread> threadVec;
@@ -1368,6 +1150,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
       else
         {
           // Run all harts in one thread round-robin.
+          const uint64_t stepWindow = stepWinHi - stepWinLo + 1;
           unsigned finished = 0;
           std::vector<bool> stopped(sysHarts_.size(), false);
 
@@ -1384,7 +1167,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
                     continue;
 
                   // step N times
-                  unsigned steps = (rand() % stepWindow) + 1;
+                  unsigned steps = (rand() % stepWindow) + stepWinLo;
                   try
                     {
                       bool stop;
@@ -1458,7 +1241,7 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::vector<uint6
       for (auto hartPtr : sysHarts_)
 	hartPtr->setInstructionCountLimit(nextLimit);
 
-      batchRun(traceFiles, true /*waitAll*/, 0 /*stepWindow*/);
+      batchRun(traceFiles, true /*waitAll*/, 0 /*stepWindowLo*/, 0 /*stepWindowHi*/);
 
       bool done = false;
       for (auto& hartPtr : sysHarts_)

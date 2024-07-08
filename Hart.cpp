@@ -667,6 +667,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   clearTraceData();
 
   decoder_.enableRv64(isRv64());
+  disas_.enableRv64(isRv64());
 
   // Reflect initial state of menvcfg CSR on pbmt and sstc.
   updateTranslationPbmt();
@@ -2465,7 +2466,8 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   auto cause = fetchInstNoTrap(va, physAddr, physAddr2, gPhysAddr, inst);
   if (cause != ExceptionCause::NONE)
     {
-      initiateException(cause, virtAddr, va, gPhysAddr);
+      if (not triggerTripped_)
+	initiateException(cause, virtAddr, va, gPhysAddr);
       return false;
     }
   return true;

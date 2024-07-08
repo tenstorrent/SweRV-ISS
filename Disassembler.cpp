@@ -539,6 +539,12 @@ Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out) cons
       break;
 
     case InstId::pack:
+      if (not isRv64() and di.op2() == 0)
+	out << "zext.h   " << intRegName(di.ithOperand(0)) << ", " << intRegName(di.ithOperand(1));
+      else
+	printInst(*this, out, di);
+      break;
+
     case InstId::packw:
       if (di.op2() == 0)
 	out << "zext.h   " << intRegName(di.ithOperand(0)) << ", " << intRegName(di.ithOperand(1));
