@@ -11120,9 +11120,13 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 	  if (faultFirst)
 	    {
 	      if (ix == 0)
-		initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
+                initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
 	      else
-		csRegs_.write(CsrNumber::VL, PrivilegeMode::Machine, ix);
+                {
+                  pokeCsr(CsrNumber::VL, ix);
+                  recordCsrWrite(CsrNumber::VL);
+                  vecRegs_.elemCount(ix);  // Update cached value of VL.
+                }
 	    }
 	  else
 	    {

@@ -362,6 +362,7 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
       return;
     }
 
+  ldStWrite_ = true;
   ldStPhysAddr1_ = ldStPhysAddr2_ = physAddr;
 
   if (mcm_)
