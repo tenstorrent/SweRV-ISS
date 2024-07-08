@@ -691,14 +691,20 @@ template <typename URV>
 void
 Hart<URV>::resetVector()
 {
-  // If vector extension enabled but vectors not configured, then
-  // configure for 128-bits per regiser and 32-bits per elemement.
   if (isRvv())
     {
       bool configured = vecRegs_.registerCount() > 0;
       if (not configured)
-	vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/,
-			4 /*maxBytesPerElem*/, nullptr /*minSewPerLmul*/, nullptr);
+	{
+	  // Vector extension enabled but vectors not configured: config for 16-bytes per
+	  // register, min elem size of 1 byte, and max elements size of 4-bytes (for
+	  // rv32) or 8-bytes (for rv64).
+	  unsigned bytesPerReg = 16, minBytesPerElem = 1;
+	  unsigned maxBytesPerElem = isRv64() ? 8 : 4;
+	  vecRegs_.config(bytesPerReg, minBytesPerElem, maxBytesPerElem,
+			  nullptr /*minSewPerLmul*/, nullptr /*maxSewPerLmul*/);
+	}
+
       unsigned bytesPerReg = vecRegs_.bytesPerRegister();
       csRegs_.configCsr(CsrNumber::VLENB, true, bytesPerReg, 0, 0, false /*shared*/);
       uint32_t vstartBits = static_cast<uint32_t>(std::log2(bytesPerReg*8));
