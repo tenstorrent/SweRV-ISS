@@ -983,8 +983,9 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       if (accessDirtyCheck_ and (not pte.accessed() or (write and not pte.dirty())))
 	{
 	  // We have a choice:
-	  // A. Page fault
-	  if (faultOnFirstAccess1_)
+	  // A. Page fault (if configured or, if page of PTE is non-cachable or is io).
+	  //       pbmt_ is that of leaf page of g-stage translation.
+	  if (faultOnFirstAccess1_ or pbmt_ != Pbmt::None)
             return stage1PageFaultType(read, write, exec);  // A
 
 	  // Or B
