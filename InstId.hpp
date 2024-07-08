@@ -330,16 +330,16 @@ namespace WdRiscv
      xnor,
 
      // Was zbp
-     pack,     // Also alias of zext.h for RV32, in Zbb and Zbkb
+     pack,     // In Zbkb, (in RV32, when RS2 is 0, also alias of Zbb zext.h instruction)
      packh,    // In Zbkb
-     packw,    // Also alias of zext.h for RV64, in Zbb and Zbkb
-     brev8,    // Was grevi, now in Zbkb.
-     rev8_32,  // Was greviw, rev8 has different encodings in rv32 and rv64
-     rev8_64,  // Was greviw, rev8 has different encodings in rv32 and rv64
-     zip,      // Was shfli, now in Zbkb
-     unzip,    // Was unshfli, now in Zbkb
-     xperm_n,  // Zbkx
-     xperm_b,  // Zbkx
+     packw,    // In Zbkb, (in Rv64, when RS2 is 0, also alias of Zbb zext.h instruction)
+     brev8,    // In Zbkb, Was grevi
+     rev8_32,  // In Zbkb/Zbb, was greviw, rev8 has different encodings in rv32 & rv64
+     rev8_64,  // In Zbkb/Zbb, was greviw, rev8 has different encodings in rv32 & rv64
+     zip,      // In Zbkb, was shfli
+     unzip,    // In Zbkb, was unshfli
+     xperm_n,  // In Zbkx
+     xperm_b,  // In Zbkx
 
      // zbs
      bset,
