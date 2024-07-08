@@ -1620,6 +1620,8 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 
   // Check PMA.
   Pma pma = getPma(addr1);
+  pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
+  ldStCacheable_ = pma.isCacheable();
   if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
     return EC::LOAD_ACC_FAULT;
 
@@ -11243,6 +11245,8 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 
   // Check PMA.
   Pma pma = getPma(addr1);
+  pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
+  ldStCacheable_ = pma.isCacheable();
   if (not pma.isWrite())
     return EC::STORE_ACC_FAULT;
 

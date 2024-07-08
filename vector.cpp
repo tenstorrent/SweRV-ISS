@@ -11085,10 +11085,11 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
       bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
       if (ix < vecRegs_.elemCount())
         {
-          vecRegs_.maskedAddr_.push_back(skip);
           vecRegs_.ldStVa_.push_back(addr);
           vecRegs_.ldStPa_.push_back(addr);
 	  vecRegs_.ldStPa2_.push_back(addr);
+          vecRegs_.maskedAddr_.push_back(skip);
+          vecRegs_.ldStCacheable_.push_back(true);
         }
       if (skip)
 	{
@@ -11114,6 +11115,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 	  elem = data;
           vecRegs_.ldStPa_.back() = pa1;
 	  vecRegs_.ldStPa2_.back() = pa2;
+          vecRegs_.ldStCacheable_.back() = ldStCacheable_;
         }
       else
         {
@@ -11257,6 +11259,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
       vecRegs_.ldStPa_.push_back(addr);
       vecRegs_.ldStPa2_.push_back(addr);
       vecRegs_.maskedAddr_.push_back(skip);
+      vecRegs_.ldStCacheable_.push_back(true);
       if (skip)
 	{
 	  vecRegs_.stData_.push_back(0);
@@ -11278,6 +11281,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
           vecRegs_.ldStPa_.back() = pa1;
 	  vecRegs_.ldStPa2_.back() = pa2;
 	  vecRegs_.stData_.push_back(elem);
+          vecRegs_.ldStCacheable_.back() = ldStCacheable_;
 	}
       else
         {
@@ -11502,6 +11506,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
       vecRegs_.ldStPa_.push_back(pa1);
       vecRegs_.ldStPa2_.push_back(pa1);
       vecRegs_.maskedAddr_.push_back(false);
+      vecRegs_.ldStCacheable_.push_back(ldStCacheable_);
     }
 
   return true;
@@ -11621,6 +11626,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
           vecRegs_.ldStPa_.push_back(pa1);
 	  vecRegs_.ldStPa2_.push_back(pa2);
 	  vecRegs_.maskedAddr_.push_back(false);
+          vecRegs_.ldStCacheable_.push_back(ldStCacheable_);
 	  vecRegs_.stData_.push_back(elem);
 	}
       else
@@ -11796,6 +11802,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
           vecRegs_.ldStPa_.push_back(addr);
 	  vecRegs_.ldStPa2_.push_back(addr);
           vecRegs_.maskedAddr_.push_back(skip);
+          vecRegs_.ldStCacheable_.push_back(true);
         }
       if (skip)
 	{
@@ -11819,6 +11826,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 	  elem = data;
           vecRegs_.ldStPa_.back() = pa1;
 	  vecRegs_.ldStPa2_.back() = pa2;
+          vecRegs_.ldStCacheable_.back() = ldStCacheable_;
         }
       else
         {
@@ -11951,6 +11959,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
       vecRegs_.ldStPa_.push_back(addr);
       vecRegs_.ldStPa2_.push_back(addr);
       vecRegs_.maskedAddr_.push_back(skip);
+      vecRegs_.ldStCacheable_.push_back(true);
       if (skip)
 	{
 	  vecRegs_.stData_.push_back(0);
@@ -11972,6 +11981,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 	  vecRegs_.stData_.push_back(elem);
           vecRegs_.ldStPa_.back() = pa1;
 	  vecRegs_.ldStPa2_.back() = pa2;
+          vecRegs_.ldStCacheable_.back() = ldStCacheable_;
 	}
       else
         {
@@ -12108,6 +12118,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
           vecRegs_.ldStPa_.push_back(vaddr);
           vecRegs_.ldStPa2_.push_back(vaddr);
           vecRegs_.maskedAddr_.push_back(skip);
+          vecRegs_.ldStCacheable_.push_back(true);
         }
       if (skip)
 	{
@@ -12133,6 +12144,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  vecRegs_.write(vd, ix, destGroup, elem);
           vecRegs_.ldStPa_.back() = pa1;
           vecRegs_.ldStPa2_.back() = pa2;
+          vecRegs_.ldStCacheable_.back() = ldStCacheable_;
 	}
       else
         {
@@ -12311,6 +12323,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       vecRegs_.ldStPa_.push_back(vaddr);
       vecRegs_.ldStPa2_.push_back(vaddr);
       vecRegs_.maskedAddr_.push_back(skip);
+      vecRegs_.ldStCacheable_.push_back(true);
       if (skip)
 	{
 	  vecRegs_.stData_.push_back(0);
@@ -12378,6 +12391,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       vecRegs_.stData_.push_back(data);
       vecRegs_.ldStPa_.back() = pa1;
       vecRegs_.ldStPa2_.back() = pa2;
+      vecRegs_.ldStCacheable_.back() = ldStCacheable_;
     }
 
   return true;
@@ -12565,6 +12579,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
               vecRegs_.ldStPa_.push_back(faddr);
 	      vecRegs_.ldStPa2_.push_back(faddr);
               vecRegs_.maskedAddr_.push_back(skip);
+              vecRegs_.ldStCacheable_.push_back(true);
             }
 	  if (skip)
 	    {
@@ -12589,6 +12604,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	      elem = data;
               vecRegs_.ldStPa_.back() = pa1;
               vecRegs_.ldStPa2_.back() = pa2;
+              vecRegs_.ldStCacheable_.back() = ldStCacheable_;
             }
 	  else
 	    {
@@ -12746,6 +12762,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
           vecRegs_.ldStPa_.push_back(faddr);
           vecRegs_.ldStPa2_.push_back(faddr);
 	  vecRegs_.maskedAddr_.push_back(skip);
+          vecRegs_.ldStCacheable_.push_back(true);
 	  if (skip)
 	    {
 	      vecRegs_.stData_.push_back(0);
@@ -12764,6 +12781,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	      vecRegs_.stData_.push_back(elem);
               vecRegs_.ldStPa_.back() = pa1;
               vecRegs_.ldStPa2_.back() = pa2;
+              vecRegs_.ldStCacheable_.back() = ldStCacheable_;
 	    }
 	  else
 	    {
@@ -13084,6 +13102,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
               vecRegs_.ldStPa_.push_back(faddr);
               vecRegs_.ldStPa2_.push_back(faddr);
               vecRegs_.maskedAddr_.push_back(skip);
+              vecRegs_.ldStCacheable_.push_back(true);
             }
 	  if (skip)
 	    {
@@ -13109,6 +13128,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	      vecRegs_.write(dvg, ix, destGroup, elem);
               vecRegs_.ldStPa_.back() = pa1;
               vecRegs_.ldStPa2_.back() = pa2;
+              vecRegs_.ldStCacheable_.back() = ldStCacheable_;
 	    }
 	  else
 	    {
@@ -13248,6 +13268,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
           vecRegs_.ldStPa_.push_back(faddr);
           vecRegs_.ldStPa2_.push_back(faddr);
 	  vecRegs_.maskedAddr_.push_back(skip);
+          vecRegs_.ldStCacheable_.push_back(true);
 	  if (skip)
 	    {
 	      vecRegs_.stData_.push_back(0);
@@ -13315,6 +13336,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	  vecRegs_.stData_.push_back(data);
           vecRegs_.ldStPa_.back() = pa1;
           vecRegs_.ldStPa2_.back() = pa2;
+          vecRegs_.ldStCacheable_.back() = ldStCacheable_;
 	}
     }
 
