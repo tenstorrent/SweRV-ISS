@@ -323,10 +323,9 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
 
   if (cause == EC::NONE)
     {
-      bool fail = not memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt).isRsrv();
-      fail = (fail or virtMem_.lastPbmt() == VirtMem::Pbmt::Nc or
-	      virtMem_.lastPbmt() == VirtMem::Pbmt::Io); // Non-cacheable pbmt.
-      if (fail)
+      Pma pma = memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt);
+      pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
+      if (not pma.isRsrv())
 	cause = EC::STORE_ACC_FAULT;
     }
 
