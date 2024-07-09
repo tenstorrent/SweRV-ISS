@@ -219,7 +219,7 @@ Hart<URV>::countImplementedPmpRegisters() const
     if (csRegs_.isImplemented(CsrNumber(num)))
       count++;
 
-  if (count and count < 64 and hartIx_ == 0)
+  if (count and count != 16 and count != 64 and hartIx_ == 0)
     cerr << "Warning: Some but not all PMPADDR CSRs are implemented\n";
 
   unsigned cfgCount = 0;
@@ -229,7 +229,7 @@ Hart<URV>::countImplementedPmpRegisters() const
       for (unsigned ix = 0; ix < 16; ++ix, ++num)
         if (csRegs_.isImplemented(CsrNumber(num)))
           cfgCount++;
-      if (count and cfgCount != 16 and hartIx_ == 0)
+      if (count and cfgCount != 4 and cfgCount != 16 and hartIx_ == 0)
         cerr << "Warning: Physical memory protection enabled but only "
 	     << cfgCount << "/16" << " PMPCFG CSRs implemented\n";
     }
@@ -239,7 +239,7 @@ Hart<URV>::countImplementedPmpRegisters() const
       for (unsigned ix = 0; ix < 16; ++ix, ++num)
         if (csRegs_.isImplemented(CsrNumber(num)))
           cfgCount++;
-      if (count and cfgCount != 8 and hartIx_ == 0)  // Only even numbered implemented.
+      if (count and cfgCount != 2 and cfgCount != 8 and hartIx_ == 0)  // Only even numbered implemented.
         cerr << "Warning: Physical memory protection enabled but only "
 	     << cfgCount << "/8" << " PMPCFG CSRs implemented.\n";
     }
@@ -390,11 +390,13 @@ Hart<URV>::processExtensions(bool verbose)
     enableSscofpmf(true);
   if (isa_.isEnabled(RvExtension::Zkr))
     enableZkr(true);
+  if (isa_.isEnabled(RvExtension::Smstateen))
+    enableSmstateen(true);
 
   if (isa_.isEnabled(RvExtension::Zvknha) and
       isa_.isEnabled(RvExtension::Zvknhb))
     {
-      std::cerr << "Both Zvknha/b enabled. Using Zvknhb.\n";
+      std::cerr << "Warning: Both Zvknha/b enabled. Using Zvknhb.\n";
       enableExtension(RvExtension::Zvknha, false);
     }
 
@@ -665,6 +667,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   clearTraceData();
 
   decoder_.enableRv64(isRv64());
+  disas_.enableRv64(isRv64());
 
   // Reflect initial state of menvcfg CSR on pbmt and sstc.
   updateTranslationPbmt();
@@ -688,14 +691,20 @@ template <typename URV>
 void
 Hart<URV>::resetVector()
 {
-  // If vector extension enabled but vectors not configured, then
-  // configure for 128-bits per regiser and 32-bits per elemement.
   if (isRvv())
     {
       bool configured = vecRegs_.registerCount() > 0;
-      if (not configured)
-	vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/,
-			4 /*maxBytesPerElem*/, nullptr /*minSewPerLmul*/, nullptr);
+      if (not configured) {
+        constexpr uint32_t bytesPerReg = std::is_same<URV, uint32_t>::value ? 32 : 64;
+        constexpr uint32_t maxBytesPerElem = std::is_same<URV, uint32_t>::value ? 4 : 8;
+        vecRegs_.config(
+            bytesPerReg,
+            1 /*minBytesPerElem*/,
+            maxBytesPerElem,
+            nullptr /*minSewPerLmul*/,
+            nullptr /*maxSewPerLmul*/
+        );
+      }
       unsigned bytesPerReg = vecRegs_.bytesPerRegister();
       csRegs_.configCsr(CsrNumber::VLENB, true, bytesPerReg, 0, 0, false /*shared*/);
       uint32_t vstartBits = static_cast<uint32_t>(std::log2(bytesPerReg*8));
@@ -1129,6 +1138,8 @@ Hart<URV>::execAddi(const DecodedInst* di)
 #ifdef HINT_OPS
   if (di->op0() == 0 and di->op1() == 31)
     throw CoreException(CoreException::Snapshot, "Taking snapshot from HINT.");
+  if (di->op0() == 0 and di->op1() == 30)
+    throw CoreException(CoreException::Stop, "Stopping run from HINT.");
 #endif
 }
 
@@ -1554,6 +1565,17 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
         }
     }
 
+  // Check misaligned exception.
+  if (misal)
+    {
+      uint64_t a1 = addr1;
+      if (steeEnabled_)
+	a1 = stee_.clearSecureBits(addr1);
+      Pma pma = getPma(a1);
+      if (misal and not pma.isMisalignedOk())
+	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
+    }
+
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
@@ -1563,41 +1585,11 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
       if (not pmp.isRead(effPm)  or  (virtMem_.isExecForRead() and not pmp.isExec(effPm)))
 	return EC::LOAD_ACC_FAULT;
-    }
 
-  if (steeEnabled_)
-    {
-      if (not stee_.isValidAccess(addr1, ldSize))
-	return EC::LOAD_ACC_FAULT;
-      if (addr2 != addr1 and not stee_.isValidAccess(addr2, ldSize))
-	return EC::LOAD_ACC_FAULT;
-      addr1 = stee_.clearSecureBits(addr1);
-      addr2 = stee_.clearSecureBits(addr2);
-    }
-
-  Pma pma = getPma(addr1);
-  if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
-    return EC::LOAD_ACC_FAULT;
-
-  if (misal)
-    {
-      if (not pma.isMisalignedOk())
-	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
-
-      uint64_t aligned = addr1 & ~alignMask;
-      uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
-      ldStFaultAddr_ = va2;
-      pma = getPma(next);
-      if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
-	return EC::LOAD_ACC_FAULT;
-      if (not pma.isMisalignedOk())
-	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
-
-      if (pmpEnabled_)
+      if (misal)
 	{
-	  auto effPm = effectivePrivilege();
-	  if (hyper)
-	    effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
+	  uint64_t aligned = addr1 & ~alignMask;
+	  uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
 	  const Pmp& pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
 	  if (not pmp2.isRead(effPm) or (virtMem_.isExecForRead() and not pmp2.isExec(effPm)))
 	    {
@@ -1607,22 +1599,46 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	}
     }
 
-  if (not misal)
+  steeInsec1_ = false;
+  steeInsec2_ = false;
+
+  if (steeEnabled_)
     {
-      if (not memory_.checkRead(addr1, ldSize))
-	return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
-    }
-  else
-    {
-      uint64_t aligned = addr1 & ~alignMask;
-      if (not memory_.checkRead(aligned, ldSize))
-	return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
-      uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
-      if (not memory_.checkRead(next, ldSize))
+      if (misal)
+	{
+	  uint64_t next = addr1 - (addr1 % ldSize) + ldSize;
+	  if (addr1 == addr2 and virtMem_.pageNumber(addr1) != virtMem_.pageNumber(next))
+	    addr2 = next;
+	}
+
+      if (not stee_.isValidAddress(addr1))
+	return EC::LOAD_ACC_FAULT;
+      if (addr2 != addr1 and not stee_.isValidAddress(addr2))
 	{
 	  ldStFaultAddr_ = va2;
-	  return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+	  return EC::LOAD_ACC_FAULT;
 	}
+      steeInsec1_ = stee_.isInsecureAccess(addr1);
+      steeInsec2_ = stee_.isInsecureAccess(addr2);
+      addr1 = stee_.clearSecureBits(addr1);
+      addr2 = stee_.clearSecureBits(addr2);
+    }
+
+  // Check PMA.
+  Pma pma = getPma(addr1);
+  if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
+    return EC::LOAD_ACC_FAULT;
+
+  if (misal)
+    {
+      uint64_t aligned = addr1 & ~alignMask;
+      uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
+      ldStFaultAddr_ = va2;
+      pma = getPma(next);
+      if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
+	return EC::LOAD_ACC_FAULT;
+      if (not pma.isMisalignedOk())
+	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
     }
 
   return EC::NONE;
@@ -2288,10 +2304,10 @@ Hart<URV>::execSw(const DecodedInst* di)
 
 template <typename URV>
 bool
-Hart<URV>::readInst(uint64_t va, uint32_t& inst)
+Hart<URV>::readInst(uint64_t va, uint64_t& pa, uint32_t& inst)
 {
   inst = 0;
-  uint64_t pa = va;
+  pa = va;
   bool translate = isRvs() and privMode_ != PrivilegeMode::Machine;
 
   if (translate)
@@ -2322,6 +2338,15 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
     }
 
   return false;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::readInst(uint64_t va, uint32_t& inst)
+{
+  uint64_t pa = 0;
+  return readInst(va, pa, inst);
 }
 
 
@@ -2449,7 +2474,8 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   auto cause = fetchInstNoTrap(va, physAddr, physAddr2, gPhysAddr, inst);
   if (cause != ExceptionCause::NONE)
     {
-      initiateException(cause, virtAddr, va, gPhysAddr);
+      if (not triggerTripped_)
+	initiateException(cause, virtAddr, va, gPhysAddr);
       return false;
     }
   return true;
@@ -2549,12 +2575,8 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
   else
     consecutiveIllegalCount_ = 0;
 
-  if (consecutiveIllegalCount_ > 64)  // FIX: Make a parameter
-    {
-      throw CoreException(CoreException::Stop,
-                          "64 consecutive illegal instructions",
-                          0, 3);
-    }
+  if (consecutiveIllegalCount_ > 16)  // FIX: Make a parameter
+    throw CoreException(CoreException::Stop, "16 consecutive illegal instructions", 0, 3);
 
   counterAtLastIllegal_ = instCounter_;
 #endif
@@ -2895,7 +2917,8 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
   // If exception happened while in an NMI handler, we go to the NMI exception
   // handler address.
   if (extensionIsEnabled(RvExtension::Smrnmi) and
-      MnstatusFields{csRegs_.peekMnstatus()}.bits_.NMIE == 0)
+      MnstatusFields{csRegs_.peekMnstatus()}.bits_.NMIE == 0 and
+      origMode == PM::Machine)
     {
       assert(not interrupt);
       base = nmiExceptionPc_;
@@ -3964,13 +3987,7 @@ Hart<URV>::updatePerformanceCounters(const DecodedInst& di)
     case RvExtension::Zba:
     case RvExtension::Zbb:
     case RvExtension::Zbc:
-    case RvExtension::Zbe:
-    case RvExtension::Zbf:
-    case RvExtension::Zbm:
-    case RvExtension::Zbp:
-    case RvExtension::Zbr:
     case RvExtension::Zbs:
-    case RvExtension::Zbt:
       pregs.updateCounters(EventNumber::Bitmanip, prevPerfControl_, lastPriv_, lastVirt_);
       break;
 
@@ -4808,23 +4825,26 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
 
 template <typename URV>
 bool
-Hart<URV>::runSteps(uint64_t steps, FILE* traceFile)
+Hart<URV>::runSteps(uint64_t steps, bool& stop, FILE* traceFile)
 {
   // Setup signal handlers. Restore on destruction.
   SignalHandlers handlers;
 
   uint64_t limit = instCountLim_;
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
+  stop = false;
 
   for (unsigned i = 0; i < steps; i++)
     {
       if (instCounter_ >= limit)
         {
+          stop = true;
           std::cerr << "Stopped -- Reached instruction limit\n";
           return true;
         }
       else if (pc_ == stopAddr)
         {
+          stop = true;
           std::cerr << "Stopped -- Reached end address\n";
           return true;
         }
@@ -4832,7 +4852,10 @@ Hart<URV>::runSteps(uint64_t steps, FILE* traceFile)
       singleStep(traceFile);
 
       if (hasTargetProgramFinished())
-        return stepResult_;
+        {
+          stop = true;
+          return stepResult_;
+        }
     }
   return true;
 }
@@ -5485,8 +5508,19 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
     {
       // Attach changes to interrupted instruction.
       uint32_t inst = 0; // Load interrupted inst.
-      readInst(currPc_, inst);
-      initiateInterrupt(cause, pc_);
+      uint64_t pc = pc_, physPc = 0;
+      readInst(pc, physPc, inst);
+      if (inst)
+	{
+#if 0
+	  // Enable when RTL is ready.
+	  DecodedInst di;
+	  decode(pc, physPc, inst, di);
+	  if (di.instId() == InstId::wfi)
+	    pc = pc + 4;
+#endif
+	}
+      initiateInterrupt(cause, pc);
       printInstTrace(inst, instCounter_, instStr, traceFile);
       if (mcycleEnabled())
 	++cycleCount_;
@@ -6723,10 +6757,6 @@ Hart<URV>::execute(const DecodedInst* di)
       execRoriw(di);
       return;
 
-    case InstId::rev8:
-      execRev8(di);
-      return;
-
     case InstId::pack:
       execPack(di);
       return;
@@ -6735,72 +6765,28 @@ Hart<URV>::execute(const DecodedInst* di)
       execPackh(di);
       return;
 
-    case InstId::packu:
-      execPacku(di);
-      return;
-
     case InstId::packw:
       execPackw(di);
       return;
 
-    case InstId::packuw:
-      execPackuw(di);
+    case InstId::brev8:
+      execBrev8(di);
       return;
 
-    case InstId::grev:
-      execGrev(di);
+    case InstId::rev8_32:
+      execRev8_32(di);
       return;
 
-    case InstId::grevi:
-      execGrevi(di);
+    case InstId::rev8_64:
+      execRev8_64(di);
       return;
 
-    case InstId::grevw:
-      execGrevw(di);
+    case InstId::zip:
+      execZip(di);
       return;
 
-    case InstId::greviw:
-      execGreviw(di);
-      return;
-
-    case InstId::gorc:
-      execGorc(di);
-      return;
-
-    case InstId::gorci:
-      execGorci(di);
-      return;
-
-    case InstId::gorcw:
-      execGorcw(di);
-      return;
-
-    case InstId::gorciw:
-      execGorciw(di);
-      return;
-
-    case InstId::shfl:
-      execShfl(di);
-      return;
-
-    case InstId::shflw:
-      execShflw(di);
-      return;
-
-    case InstId::shfli:
-      execShfli(di);
-      return;
-
-    case InstId::unshfl:
-      execUnshfl(di);
-      return;
-
-    case InstId::unshfli:
-      execUnshfli(di);
-      return;
-
-    case InstId::unshflw:
-      execUnshflw(di);
+    case InstId::unzip:
+      execUnzip(di);
       return;
 
     case InstId::xperm_n:
@@ -6809,14 +6795,6 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::xperm_b:
       execXperm_b(di);
-      return;
-
-    case InstId::xperm_h:
-      execXperm_h(di);
-      return;
-
-    case InstId::xperm_w:
-      execXperm_w(di);
       return;
 
     case InstId::bset:
@@ -6849,30 +6827,6 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::bexti:
       execBexti(di);
-      return;
-
-    case InstId::bcompress:
-      execBcompress(di);
-      return;
-
-    case InstId::bdecompress:
-      execBdecompress(di);
-      return;
-
-    case InstId::bcompressw:
-      execBcompressw(di);
-      return;
-
-    case InstId::bdecompressw:
-      execBdecompressw(di);
-      return;
-
-    case InstId::bfp:
-      execBfp(di);
-      return;
-
-    case InstId::bfpw:
-      execBfpw(di);
       return;
 
     case InstId::clmul:
@@ -6917,82 +6871,6 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::slli_uw:
       execSlli_uw(di);
-      return;
-
-    case InstId::crc32_b:
-      execCrc32_b(di);
-      return;
-
-    case InstId::crc32_h:
-      execCrc32_h(di);
-      return;
-
-    case InstId::crc32_w:
-      execCrc32_w(di);
-      return;
-
-    case InstId::crc32_d:
-      execCrc32_d(di);
-      return;
-
-    case InstId::crc32c_b:
-      execCrc32c_b(di);
-      return;
-
-    case InstId::crc32c_h:
-      execCrc32c_h(di);
-      return;
-
-    case InstId::crc32c_w:
-      execCrc32c_w(di);
-      return;
-
-    case InstId::crc32c_d:
-      execCrc32c_d(di);
-      return;
-
-    case InstId::bmator:
-      execBmator(di);
-      return;
-
-    case InstId::bmatxor:
-      execBmatxor(di);
-      return;
-
-    case InstId::bmatflip:
-      execBmatflip(di);
-      return;
-
-    case InstId::cmov:
-      execCmov(di);
-      return;
-
-    case InstId::cmix:
-      execCmix(di);
-      return;
-
-    case InstId::fsl:
-      execFsl(di);
-      return;
-
-    case InstId::fsr:
-      execFsr(di);
-      return;
-
-    case InstId::fsri:
-      execFsri(di);
-      return;
-
-    case InstId::fslw:
-      execFslw(di);
-      return;
-
-    case InstId::fsrw:
-      execFsrw(di);
-      return;
-
-    case InstId::fsriw:
-      execFsriw(di);
       return;
 
     case InstId::vsetvli:
@@ -10350,6 +10228,10 @@ template <typename URV>
 void
 Hart<URV>::execWfi(const DecodedInst* di)
 {
+#if 1
+
+  // Remove when RTL is ready.
+
   using PM = PrivilegeMode;
   auto pm = privilegeMode();
 
@@ -10384,7 +10266,51 @@ Hart<URV>::execWfi(const DecodedInst* di)
       return;
     }
 
-  // No-op.
+#else
+
+  // Enable when RTL is ready.
+  
+  // If running standalone, we assume that the WFI timeout (if any) has expired. If
+  // running with an external agent (e.g. test-bench), we assume that the agent will poke
+  // MIP with an interrupt (if any) before we get here so by the time we get here the
+  // wfi timeout has expired.
+
+  using PM = PrivilegeMode;
+
+  auto pm = privilegeMode();
+
+  if (pm == PM::Machine)
+    return;
+
+  bool tw = mstatus_.bits_.TW;
+  bool vtw = hstatus_.bits_.VTW;
+
+  if (not virtMode_)
+    {
+      if (pm == PM::Supervisor and not tw)
+	return;
+      illegalInst(di);   // Supervisor or User mode. Timeout expired.
+      return;
+    }
+
+  if (pm == PM::Supervisor)   // VS mode
+    {
+      if (not vtw and not tw)
+	return;
+      if (vtw and not tw)
+	virtualInst(di);
+      else if (tw)
+	illegalInst(di);
+      return;
+    }
+
+  // VU mode.
+  if (tw)
+    illegalInst(di);
+  else
+    virtualInst(di);
+
+#endif
 }
 
 
@@ -11262,6 +11188,17 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
         }
     }
 
+  // Check misaligned exception.
+  if (misal)
+    {
+      uint64_t a1 = addr1;
+      if (steeEnabled_)
+	a1 = stee_.clearSecureBits(addr1);
+      Pma pma = getPma(a1);
+      if (misal and not pma.isMisalignedOk())
+	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
+    }
+
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
@@ -11271,30 +11208,52 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
       if (not pmp.isWrite(effPm))
 	return EC::STORE_ACC_FAULT;
+
+      if (misal)
+	{
+	  uint64_t aligned = addr1 & ~alignMask;
+	  uint64_t next = addr1 == addr2? aligned + stSize : addr2;
+	  const Pmp& pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
+	  if (not pmp2.isWrite(effPm))
+	    {
+	      ldStFaultAddr_ = va2;
+	      return EC::STORE_ACC_FAULT;
+	    }
+	}
     }
+
+  steeInsec1_ = false;
+  steeInsec2_ = false;
 
   if (steeEnabled_)
     {
-      if (not stee_.isValidAccess(addr1, stSize))
+      if (misal)
+	{
+	  uint64_t next = addr1 - (addr1 % stSize) + stSize;
+	  if (addr1 == addr2 and virtMem_.pageNumber(addr1) != virtMem_.pageNumber(next))
+	    addr2 = next;
+	}
+
+      if (not stee_.isValidAddress(addr1))
 	return EC::STORE_ACC_FAULT;
-      if (addr2 != addr1 and not stee_.isValidAccess(addr2, stSize))
+      if (addr2 != addr1 and not stee_.isValidAddress(addr2))
 	{
 	  ldStFaultAddr_ = va2;
 	  return EC::STORE_ACC_FAULT;
 	}
+      steeInsec1_ = stee_.isInsecureAccess(addr1);
+      steeInsec2_ = stee_.isInsecureAccess(addr2);
       addr1 = stee_.clearSecureBits(addr1);
       addr2 = stee_.clearSecureBits(addr2);
     }
 
+  // Check PMA.
+  Pma pma = getPma(addr1);
+  if (not pma.isWrite())
+    return EC::STORE_ACC_FAULT;
+
   if (misal)
     {
-      Pma pma = getPma(addr1);
-      if (not pma.isWrite())
-	return EC::STORE_ACC_FAULT;
-
-      if (not pma.isMisalignedOk())
-	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
-
       uint64_t aligned = addr1 & ~alignMask;
       uint64_t next = addr1 == addr2? aligned + stSize : addr2;
       pma = getPma(next);
@@ -11307,19 +11266,6 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	{
 	  ldStFaultAddr_ = va2;  // To report virtual address in MTVAL.
 	  return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
-	}
-
-      if (pmpEnabled_)
-	{
-	  auto effPm = effectivePrivilege();
-	  if (hyper)
-	    effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-	  const Pmp& pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
-	  if (not pmp2.isWrite(effPm))
-	    {
-	      ldStFaultAddr_ = va2;
-	      return EC::STORE_ACC_FAULT;
-	    }
 	}
     }
 

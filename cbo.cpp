@@ -362,13 +362,17 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
       return;
     }
 
+  ldStWrite_ = true;
   ldStPhysAddr1_ = ldStPhysAddr2_ = physAddr;
 
   if (mcm_)
     return;   // We update memory when we get bypass message from test bench.
 
-  for (unsigned i = 0; i < cacheLineSize_; i+= 8)
-    pokeMemory(physAddr + i, uint64_t(0), true /*usePma*/);
+  for (unsigned i = 0; i < cacheLineSize_; i += 8)
+    {
+      uint64_t pa = physAddr + i;
+      memWrite(pa, pa, uint64_t(0));
+    }
 }
 
 

@@ -9,8 +9,7 @@ namespace WdRiscv
 {
 
   enum class RvExtension : unsigned { A, B, C, D, E, F, H, I, M, N, S, U, V,
-                                      Zba, Zbb, Zbc, Zbe, Zbf, Zbm, Zbp,
-                                      Zbr, Zbs, Zbt, Zfh, Zfhmin, Zlsseg,
+                                      Zba, Zbb, Zbc, Zbs, Zfh, Zfhmin, Zlsseg,
                                       Zknd, Zkne, Zknh, Zbkb, Zbkx, Zksed, Zksh, Zkr,
                                       Svinval, Zicbom, Zicboz, Zicbop, Zawrs, Zmmul,
                                       Zvfh, Zvfhmin, Zvbb, Zvbc, Zvkg,
@@ -19,7 +18,7 @@ namespace WdRiscv
                                       Zvfbfmin, Zvfbfwma, Sstc, Svpbmt,
 				      Smaia, Ssaia, Zacas, Zimop, Zcmop, Smrnmi,
 				      Zicsr, Zicntr, Zihpm, Zifencei, Zihintpause,
-                                      Ssnpm, Smnpm, Sscofpmf, None };
+                                      Ssnpm, Smnpm, Sscofpmf, Smstateen, None };
 
   /// Model supported extensions with primary/secondary version numbers.
   class Isa

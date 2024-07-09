@@ -116,7 +116,7 @@ namespace WdRiscv
     std::optional<uint64_t> branchWindow;
     std::optional<uint64_t> logStart;
     std::optional<unsigned> mcmls;
-    std::optional<uint64_t> deterministic;
+    Uint64Vec deterministic;
     std::optional<unsigned> seed;
 
     unsigned regWidth = 32;

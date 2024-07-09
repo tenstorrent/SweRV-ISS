@@ -89,6 +89,17 @@ On a Unix system, in the whisper directory, do the following:
 ```
 where x is the path to your boost library installation.
 
+# Options
+
+There are various Makefile options that can be used.
+
++ `SOFT_FLOAT=1` to use softfloat for RISCV fp operations.
++ `PCI=1` to build the PCI library.
++ `TRACE_READER=1` to build the trace reader library.
++ `MEM_CALLBACKS=1` to use the sparse memory model.
++ `HINT_OPS=1` to enable HINT ops implemented within whisper.
++ `FAST_SLOPPY=1` to enable faster (but not compliant) execution.
++ `LZ4_COMPRESS=1` to enable loading LZ4 files.
 
 <a name="Preparing"/>
 
@@ -161,13 +172,27 @@ And here's how to compile and run the above program
     $ riscv32-unknown-elf-gcc -mabi=ilp32 -march=rv32imc -nostdlib -g -o test2 test2.c
     $ whisper test2
 ```
-If no global variable named "tohost" is written by the program, the
-simulator will stop on its own if a sequence of 64 consecutive illegal
-instructions is encountered.
+If no global variable named "tohost" is written by the program, the simulator will stop on
+its own if a sequence of 8 consecutive illegal instructions is encountered.
 
-For programs requiring minimal operating system support (e.g. brk,
-open, read and write) the user can compile with the newlib C library
-and use the simulator with the "--newlib" option.
+If the above program is compiled for RV64, it will crash with 8 consecutive illegal
+instructions. The reason is that the generated code will attempt to push data on the stack
+and the default stack pointer value is 0. Pushing on the stack will make the stack pointer
+a very large number that exceeds memory size (default is 4GB) which will trigger an access
+fault and, without an exception handler, will result in a cascade of illegal instruction
+exceptions. To fix that, run the RV64 version of the test2 binary under whisper with
+"--setreg sp=0xf0000000" which initializes the stack pointer to an address within the
+default memory address range:
+
+```
+    $ riscv64-unknown-elf-gcc -mabi=lp64 -march=rv64imc -nostdlib -g -o test2 test2.c
+    $ whisper test2   # this will carsh
+    $ whisper test2  --setreg sp=0xf0000000   # this will run
+``` 
+
+For programs requiring minimal operating system support (e.g. brk, open, read and write)
+the user can compile with the newlib C library and use the simulator with the "--newlib"
+option.
 
 Here's a sample program:
 ```
@@ -764,29 +789,23 @@ When true, the lr/sc instructions will be counted as load/store
 by the performance counters.
 
 ### trigger registers
-Each trigger register is associated with 3 components tdata1, tdata2, and tdata3. Here's
+Each trigger register is associated with up to 4 components tdata1, tdata2, tdata3, and tinfo. Here's
 an example of how to configure the reset values and masks of these components in a system
 with 2 trigger registers (the mask and reset values are made up):
 ```
      "triggers" : [
          {
-	    "reset"    : [0, 0, 0],
-	    "mask"     : ["0xffffffff", "0xffffffff", "0xffffffff"],
-	    "poke_mask": ["0xffffffff", "0xffffffff", "0xffffffff"]
+	    "reset"    : [0, 0, 0, "0x1008040"],
+	    "mask"     : ["0xffffffff", "0xffffffff", "0xffffffff", 0],
+	    "poke_mask": ["0xffffffff", "0xffffffff", "0xffffffff", 0]
          },
          {
-	    "reset"    : [0, 0, 0],
-	    "mask"     : ["0xffffffff", "0xffffffff", "0xffffffff"],
-	    "poke_mask": ["0xffffffff", "0xffffffff", "0xffffffff"]
+	    "reset"    : [0, 0, 0, "0x1008040"],
+	    "mask"     : ["0xffffffff", "0xffffffff", "0xffffffff", 0],
+	    "poke_mask": ["0xffffffff", "0xffffffff", "0xffffffff", 0]
          }
      ],
 ```
-
-### load_data_trigger
-Enable support for load-data debug triggers.
-
-### exec_opcode_trigger
-Enable support for instruction opcode debug triggers.
 
 ### all_ld_st_addr_trigger
 Enable matching on all possible addresses in a load/store access [address, address+size-1].
@@ -794,9 +813,41 @@ Enable matching on all possible addresses in a load/store access [address, addre
 ### all_inst_addr_trigger
 Enable matching on all possible addresses in a instruction fetch access [address, address+size-1].
 
+### trigger_types
+Define the supported trigger types (type field in tdata1). Example:
+```
+     "trigger_types" : [ "none", "disabled", "mcontrol6" ]
+```
+The types "none" and "disabled" must not be excluded from "trigger_types". Possible values that
+can be included with in "trigger_types" are:
+```
+   "none", "mcontrol", "icount", "itrigger", "etriger", "mcontrol6",
+   "tmexttriger", and "disabled"
+```
+
 ### perf_count_fp_load_store
 When true, the floating point load/store instructions will be counted
 as load/store by the performance counters.
+
+### stee
+
+The static trusted execution environment (STEE) configuration is an object with the
+following fields:
+* zero_mask: if bit i is set in the zero_mask value, then bit i must be zero in every
+load/store address; otherwise, the address will be invalid and will result in an
+access-fault exception.
+* secure_mask: if bit i is set in the secure_mask value, then bit i must be one in
+a load/sore address in order for that address to be considered secure.
+* secure_region: insecure access to this region has no effect, loads will return zero, and stores are ignored. The region bounds should not have the secure bits set. The secure bits of an address are cleared before checking against the secure region.
+
+Example:
+```
+    "stee" : {
+      "zero_mask" :     "0xff70000000000000",
+      "secure_mask":    "0x0080000000000000",
+      "secure_region": ["0x0001000000000000", "0x0002000000000000"]
+    },
+
 
 <a name="Consistency"/>
 

@@ -151,7 +151,7 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
       if (prev and not prev->trapped() and prev->executed() and prev->nextIva_ != vpc)
 	{
 	  packet->shouldFlush_ = true;
-	  packet->iva_ = prev->nextIva_;
+	  packet->flushVa_ = prev->nextIva_;
 	}
     }
   else
@@ -315,9 +315,15 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
 	{
 	  auto& next = *(iter->second);
 	  if (next.iva_ != packet.nextIva_)
-	    next.shouldFlush_ = true;
+	    {
+	      next.shouldFlush_ = true;
+	      next.flushVa_ = packet.nextIva_;
+	    }
 	  if (next.executed_)
-	    packet.shouldFlush_ = true;
+	    {
+	      packet.shouldFlush_ = true;
+	      packet.flushVa_ = packet.iva_;
+	    }
 	}
     }
 
@@ -871,7 +877,7 @@ PerfApi::shouldFlush(unsigned hartIx, uint64_t time, uint64_t tag, bool& flush,
   if (packet.shouldFlush())
     {
       flush = true;
-      addr = packet.iva_;
+      addr = packet.flushVa_;
     }
   else
     {

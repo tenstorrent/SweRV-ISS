@@ -248,6 +248,9 @@ namespace WdRiscv
     /// Check PPO rule12. See ppoRule1.
     bool ppoRule12(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// Check PPO rule13. See ppoRule1.
+    bool ppoRule13(Hart<URV>& hart, const McmInstr& instr) const;
+
     /// Helper to above ppoRule1.
     bool ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const;
 
@@ -337,23 +340,25 @@ namespace WdRiscv
     void setCheckWholeMbLine(bool flag)
     { checkWholeLine_ = flag; }
 
-    /// Return the tag of the instruction with a memory time smaller than that of the
-    /// given instruction tag and associated with the same hart.  Return the tag of the
-    /// given instruction if no instruction with a smaller memory time can be found.
-    McmInstrIx getSmallerMemTimeInstr(unsigned hartIx, const McmInstr& instr) const
+    /// Return the smallest tag of an instruction preceeding the given instruction
+    /// and having a memory time larger than that of the given instruction.
+    /// Return the tag of the given instruction if no smaller tag can be found.
+    McmInstrIx getMinTagWithLargerTime(unsigned hartIx, const McmInstr& instr) const
     {
       assert(not instr.canceled_ and instr.retired_);
 
       auto eot = earliestOpTime(instr);
 
+      McmInstrIx minTag = instr.tag_;
+
       for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
 	{
 	  const auto& op = *iter;
-	  if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ < eot)
-	    return op.instrTag_;
+	  if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ > eot)
+	    minTag = std::min(minTag, op.instrTag_);
 	}
 
-      return instr.tag_;
+      return minTag;
     }
 
   protected:

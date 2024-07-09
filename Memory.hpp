@@ -170,10 +170,7 @@ namespace WdRiscv
 
       // Memory mapped region accessible only with word-size read.
       if (pma1.hasMemMappedReg() and pmaMgr_.isMemMappedReg(address))
-        {
-          if ((address & (readSize-1)) != 0)
-            return false;  // Must be aligned.
-        }
+	return pmaMgr_.checkRegisterRead(address, readSize);
 
       return true;
     }
@@ -535,8 +532,6 @@ namespace WdRiscv
       Pma pma1 = pmaMgr_.getPma(address);
       if (pma1.hasMemMappedReg() and pmaMgr_.isMemMappedReg(address))
         {
-          if (sizeof(T) == 4)
-	    return pmaMgr_.pokeRegister(address, value);
 	  for (unsigned i = 0; i < sizeof(T); ++i)
 	    {
 	      uint8_t byte = (value >> (i*8)) & 0xff;

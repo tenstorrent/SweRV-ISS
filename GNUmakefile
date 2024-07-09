@@ -39,6 +39,13 @@ ifdef PCI
   pci_lib := $(PWD)/pci/libpci.a
 endif
 
+TRACE_READER := 1
+ifdef TRACE_READER
+  override CPPFLAGS += -I$(PWD)/trace-reader
+  trace_reader_build := $(wildcard $(PWD)/trace-reader/)
+  trace_reader_lib := $(PWD)/trace-reader/TraceReader.a
+endif
+
 MEM_CALLBACKS := 1
 ifeq ($(MEM_CALLBACKS), 1)
   ifdef FAST_SLOPPY
@@ -134,13 +141,13 @@ RVCORE_SRCS := IntRegs.cpp CsRegs.cpp FpRegs.cpp instforms.cpp \
             Memory.cpp Hart.cpp InstEntry.cpp Triggers.cpp \
             PerfRegs.cpp gdb.cpp HartConfig.cpp \
             Server.cpp Interactive.cpp Disassembler.cpp printTrace.cpp \
-	    Syscall.cpp PmaManager.cpp DecodedInst.cpp snapshot.cpp \
-	    PmpManager.cpp VirtMem.cpp Core.cpp System.cpp Cache.cpp \
-	    Tlb.cpp VecRegs.cpp vector.cpp wideint.cpp float.cpp bitmanip.cpp \
-	    amo.cpp SparseMem.cpp InstProfile.cpp Isa.cpp Mcm.cpp \
-	    crypto.cpp Decoder.cpp Trace.cpp cbo.cpp Uart8250.cpp \
-	    Uartsf.cpp hypervisor.cpp vector-crypto.cpp WhisperMessage.cpp \
-	    Imsic.cpp Args.cpp Session.cpp PerfApi.cpp dot-product.cpp
+            Syscall.cpp PmaManager.cpp DecodedInst.cpp snapshot.cpp \
+            PmpManager.cpp VirtMem.cpp Core.cpp System.cpp Cache.cpp \
+            Tlb.cpp VecRegs.cpp vector.cpp wideint.cpp float.cpp bitmanip.cpp \
+            amo.cpp SparseMem.cpp InstProfile.cpp Isa.cpp Mcm.cpp \
+            crypto.cpp Decoder.cpp Trace.cpp cbo.cpp Uart8250.cpp \
+            Uartsf.cpp hypervisor.cpp vector-crypto.cpp WhisperMessage.cpp \
+            Imsic.cpp Args.cpp Session.cpp PerfApi.cpp dot-product.cpp
 
 # List of All CPP Sources for the project
 SRCS_CXX += $(RVCORE_SRCS) whisper.cpp
@@ -169,6 +176,9 @@ $(soft_float_lib):
 $(pci_lib):
 	$(MAKE) -C $(pci_build)
 
+$(trace_reader_lib):
+	$(MAKE) -C $(trace_reader_build)
+
 all: $(BUILD_DIR)/$(PROJECT) $(BUILD_DIR)/$(PY_PROJECT)
 
 install: $(BUILD_DIR)/$(PROJECT)
@@ -185,8 +195,9 @@ install-py: $(BUILD_DIR)/$(PY_PROJECT)
 
 clean:
 	$(RM) $(BUILD_DIR)/$(PROJECT) $(BUILD_DIR)/$(PY_PROJECT) $(OBJS_GEN) $(BUILD_DIR)/librvcore.a $(DEPS_FILES) ; \
-  $(if $(soft_float_build),$(MAKE) -C $(soft_float_build) clean ;,) \
-  $(if $(pci_build),$(MAKE) -C $(pci_build) clean,)
+	$(if $(soft_float_build),$(MAKE) -C $(soft_float_build) clean ;,) \
+	$(if $(pci_build),$(MAKE) -C $(pci_build) clean;,) \
+	$(if $(trace_reader_build),$(MAKE) -C $(trace_reader_build) clean;,)
 
 help:
 	@echo "Possible targets: $(BUILD_DIR)/$(PROJECT) $(BUILD_DIR)/$(PY_PROJECT) all install install-py clean"

@@ -82,17 +82,11 @@ CsRegs<URV>::defineCsr(std::string name, CsrNumber csrn, bool mandatory,
       return nullptr;
     }
 
-  using CN = CsrNumber;
   PrivilegeMode priv = PrivilegeMode((ix & 0x300) >> 8);
-  if (priv != PrivilegeMode::Reserved)
-    csr.definePrivilegeMode(priv);
-  else if ((ix >= size_t(CN::HSTATUS) and ix <= size_t(CN::HCONTEXT)) or
-           (ix >= size_t(CN::VSSTATUS) and ix <= size_t(CN::VSATP)) or
-           (ix == size_t(CN::HGEIP)) or (ix == size_t(CN::VSTOPI)))
-    // bits 8 and 9 not sufficient for hypervisor CSRs
-    csr.definePrivilegeMode(PrivilegeMode::Supervisor);
-  else
-    assert(false);
+  if (priv == PrivilegeMode::Reserved) {
+    priv = PrivilegeMode::Supervisor;
+  }
+  csr.definePrivilegeMode(priv);
 
   csr.setDefined(true);
 
@@ -2647,7 +2641,7 @@ CsRegs<URV>::defineMachineRegs()
   mask = URV(1) << (sizeof(URV)*8 - 1);  // Most sig bit is read-only 1
   defineCsr("mncause", Csrn::MNCAUSE, !mand, !imp, mask, ~mask, ~mask);
 
-  mask = 0b1100010001000;  // Fields MNPV, MNPP, and NMIE writeable.
+  mask = 0b1101010001000;  // Fields MNPP, MNPELP, MNPV, and NMIE writeable.
   defineCsr("mnstatus", Csrn::MNSTATUS, !mand, !imp, 0, mask, pokeMask);
 
   // Define mhpmcounter3/mhpmcounter3h to mhpmcounter31/mhpmcounter31h
@@ -3577,7 +3571,16 @@ CsRegs<URV>::readTrigger(CsrNumber number, PrivilegeMode mode, URV& value) const
     return false;
 
   if (number == CsrNumber::TDATA1)
-    return triggers_.readData1(trigger, value);
+    {
+      bool ok = triggers_.readData1(trigger, value);
+      if (ok and not hyperEnabled_)
+	{
+	  // Bits vs and vu are read-only zero if hypervisor is not enabled.
+	  if (triggers_.triggerType(trigger) == TriggerType::Mcontrol6)
+	    value &= ~(URV(3) << 23);  // Clear bits 23 and 24 (vs and vu).
+	}
+      return ok;
+    }
 
   if (number == CsrNumber::TDATA2)
     return triggers_.readData2(trigger, value);
@@ -3677,10 +3680,7 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
   auto mideleg = getImplementedCsr(CsrNumber::MIDELEG);
   URV midelegMask = mideleg? mideleg->read() : 0;
 
-  const uint8_t iidShift = 16;
   auto highest_prio = [](uint64_t bits) -> unsigned {
-    using IC = InterruptCause;
-
     for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_SOFTWARE, IC::M_TIMER,
                                IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
                                IC::G_EXTERNAL,
@@ -3700,7 +3700,7 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
       // We can set IPRIO=1 for read-only zero iprio arrays
       unsigned iid = highest_prio(mip & mie & ~midelegMask);
       if (iid)
-        value = (iid << iidShift) | 1;
+        value = (iid << 16) | 1;
       return true;
     }
 
@@ -3709,25 +3709,42 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
       auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
       URV hidelegMask = hideleg? hideleg->read() : 0;
 
-      if (not virtMode_)
+      if (not virtMode_ and number == CsrNumber::STOPI)
         {
           unsigned iid = highest_prio(mip & mie & midelegMask & ~hidelegMask);
           if (iid)
-            value = (iid << iidShift) | 1;
+            value = (iid << 16) | 1;
           return true;
         }
 
-      auto vs = mip & mie & midelegMask & hidelegMask & ~(URV(1) << unsigned(IC::G_EXTERNAL));
-      bool external = (vs & (URV(1) << unsigned(IC::VS_EXTERNAL))) != 0;
+      auto vsip = getImplementedCsr(CsrNumber::VSIP);
+      auto vsie = getImplementedCsr(CsrNumber::VSIE);
+      if (not vsip or not vsie)
+        return false;
+      auto vs = vsip->read() & vsie->read();
 
-      auto csr = getImplementedCsr(CsrNumber::HVICTL);
-      HvictlFields hvictl = csr? csr->read() : 0;
-      unsigned iprio = hvictl.bits_.IPRIO;
-      unsigned dpr = hvictl.bits_.DPR;
-      unsigned iid = hvictl.bits_.IID;
-      unsigned sExternal = unsigned(IC::S_EXTERNAL);
+      auto hvictl = getImplementedCsr(CsrNumber::HVICTL);
+      HvictlFields hvf = hvictl? hvictl->read() : 0;
+      unsigned iprio = hvf.bits_.IPRIO;
+      unsigned dpr = hvf.bits_.DPR;
+      unsigned iid = hvf.bits_.IID;
+      bool vti = hvf.bits_.VTI;
 
-      if (external)
+      if (not vti)
+        {
+          if ((vs >> unsigned(IC::S_SOFTWARE)) & 1)
+            value = unsigned(IC::S_SOFTWARE) << 16;
+          else if ((vs >> unsigned(IC::S_TIMER)) & 1)
+            value = unsigned(IC::S_TIMER) << 16;
+        }
+      else if (iid != unsigned(IC::S_EXTERNAL))
+        value = (iid << 16) | iprio;
+
+      if (not dpr and value)
+        // DPR determines whether SEI is higher/lower prio
+        return true;
+
+      if ((vs >> unsigned(IC::S_EXTERNAL)) & 1)
         {
           unsigned id = 0;
           if (imsic_)
@@ -3736,29 +3753,16 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
               HstatusFields<URV> hsf(hsVal);
               unsigned vgein = hsf.bits_.VGEIN;
 
-              if (not vgein or vgein >= imsic_->guestCount())
-                return false;
-              id = imsic_->guestTopId(vgein);
+              if (vgein and not (vgein >= imsic_->guestCount()))
+                id = imsic_->guestTopId(vgein);
             }
           if (id != 0)
-            value = (sExternal << iidShift) | id;
-          else if (iid == sExternal and iprio != 0)
-            value = (sExternal << iidShift) | iprio;
+            value = (unsigned(IC::S_EXTERNAL) << 16) | id;
+          else if (iid == unsigned(IC::S_EXTERNAL) and iprio != 0)
+            value = (unsigned(IC::S_EXTERNAL) << 16) | iprio;
           else
-            value = (sExternal << iidShift) | 256;
+            value = (unsigned(IC::S_EXTERNAL) << 16) | 256;
         }
-
-      bool vti = hvictl.bits_.VTI;
-      if (not vti and not value)
-        {
-          if (vs & (URV(1) << unsigned(IC::VS_SOFTWARE)))
-            value = unsigned(IC::S_SOFTWARE) << iidShift; // TODO: read-only zero hivprio
-          else if (vs & (URV(1) << unsigned(IC::VS_TIMER)))
-            value = unsigned(IC::S_TIMER) << iidShift;
-        }
-      if (vti and iid != sExternal and not (dpr and value))
-          // DPR solely determines priority between candidates
-          value = (iid << iidShift) | iprio;
 
       return true;
     }
@@ -4589,10 +4593,14 @@ CsRegs<URV>::addDebugFields()
   using Csrn = CsrNumber;
   constexpr unsigned xlen = sizeof(URV)*8;
 
+  setCsrFields(Csrn::TSELECT,
+      {{"select", xlen}});
   setCsrFields(Csrn::TDATA1,
       {{"data", xlen - 5}, {"dmode", 1}, {"ttype", 4}});
+  setCsrFields(Csrn::TDATA2,
+      {{"data", xlen}});
   setCsrFields(Csrn::TCONTROL,
-      {{"zero", 3}, {"mte", 1}, {"zero", 3}, {"zero", xlen - 8}});
+      {{"zero", 3}, {"mte", 1}, {"zero", 3}, {"mpte", 1}, {"zero", xlen - 8}});
 
   if (rv32_)
     {

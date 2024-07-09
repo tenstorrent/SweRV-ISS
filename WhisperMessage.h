@@ -85,7 +85,7 @@ union WhisperFlags
   struct             // Second variant of union.
   {
     unsigned privMode  : 2;    // privilege mode
-    unsigned fpFlags   : 4;    // floating point flags from last instruction
+    unsigned fpFlags   : 5;    // floating point flags from last instruction
     bool     trap      : 1;    // true if last instruction trapped
     bool     stop      : 1;    // true if target program stopped
     bool     interrupt : 1;    // true if last instruction interrupted

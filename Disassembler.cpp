@@ -123,59 +123,6 @@ printInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
 
 
 /// Helper to disassemble method. Print on the given stream given
-/// instruction which is of the form: inst rd, rs2, rs1, rs3
-static
-void
-printRdRs2Rs1Rs3(const Disassembler& disas, std::ostream& stream,
-		 const char* inst, const DecodedInst& di)
-{
-  unsigned rd = di.op0(), rs1 = di.op1(), rs2 = di.op2(), rs3 = di.op3();
-
-  // Print instruction in a 9 character field.
-  stream << std::left << std::setw(9) << inst;
-
-  stream << disas.intRegName(rd) << ", " << disas.intRegName(rs2)
-         << ", " << disas.intRegName(rs1) << ", " << disas.intRegName(rs3);
-}
-
-
-/// Helper to disassemble method. Print on the given stream given
-/// instruction which is of the form: inst rd, rs1, rs3, rs2
-static
-void
-printRdRs1Rs3Rs2(const Disassembler& disas, std::ostream& stream,
-		 const char* inst, const DecodedInst& di)
-{
-  unsigned rd = di.op0(), rs1 = di.op1(), rs2 = di.op2(), rs3 = di.op3();
-
-  // Print instruction in a 9 character field.
-  stream << std::left << std::setw(9) << inst;
-
-  stream << disas.intRegName(rd) << ", " << disas.intRegName(rs1)
-         << ", " << disas.intRegName(rs3) << ", " << disas.intRegName(rs2);
-}
-
-
-/// Helper to disassemble method. Print on the given stream given
-/// instruction which is of the form: inst rd, rs1, rs3, immed
-static
-void
-printRdRs1Rs3Imm(const Disassembler& disas, std::ostream& stream,
-		 const char* inst, const DecodedInst& di)
-{
-  unsigned rd = di.op0(), rs1 = di.op1(), rs3 = di.op2();
-  unsigned imm = di.op3();
-
-  // Print instruction in a 9 character field.
-  stream << std::left << std::setw(9) << inst;
-
-  stream << disas.intRegName(rd) << ", " << disas.intRegName(rs1)
-         << ", " << disas.intRegName(rs3) << ", 0x" << std::hex << imm
-         << std::dec;
-}
-
-
-/// Helper to disassemble method. Print on the given stream given
 /// instruction which is of the form: csrinst rd, csrn, rs1
 static
 void
@@ -592,6 +539,12 @@ Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out) cons
       break;
 
     case InstId::pack:
+      if (not isRv64() and di.op2() == 0)
+	out << "zext.h   " << intRegName(di.ithOperand(0)) << ", " << intRegName(di.ithOperand(1));
+      else
+	printInst(*this, out, di);
+      break;
+
     case InstId::packw:
       if (di.op2() == 0)
 	out << "zext.h   " << intRegName(di.ithOperand(0)) << ", " << intRegName(di.ithOperand(1));
@@ -811,38 +764,6 @@ Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out) cons
       out << "c.sb     " << intRegName(di.op0()) << ", 0x"
 	  << std::hex << di.op2As<int32_t>() << std::dec
 	  << "(" << intRegName(di.op1()) << ")";
-      break;
-
-    case InstId::cmov:
-      printRdRs2Rs1Rs3(*this, out, "cmov", di);
-      break;
-
-    case InstId::cmix:
-      printRdRs2Rs1Rs3(*this, out, "cmix", di);
-      break;
-
-    case InstId::fsl:
-      printRdRs1Rs3Rs2(*this, out, "fsl", di);
-      break;
-
-    case InstId::fsr:
-      printRdRs1Rs3Rs2(*this, out, "fsr", di);
-      break;
-
-    case InstId::fsri:
-      printRdRs1Rs3Imm(*this, out, "fsri", di);
-      break;
-
-    case InstId::fslw:
-      printRdRs1Rs3Rs2(*this, out, "fslw", di);
-      break;
-
-    case InstId::fsrw:
-      printRdRs1Rs3Rs2(*this, out, "fsrw", di);
-      break;
-
-    case InstId::fsriw:
-      printRdRs1Rs3Imm(*this, out, "fsriw", di);
       break;
 
     case InstId::cbo_clean:

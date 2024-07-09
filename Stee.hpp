@@ -14,21 +14,25 @@ namespace TT_STEE      // TensTorrent Static Trusted Execution Environment.
     /// Constructor.
     Stee() = default;
 
-    /// Return true if given memory access is legal. If the secure world is enabled then
-    /// all accesses are legal. Otherwise, access to secure region is invalid.  In both
-    /// secure/normal world the zero-bits of the address must be zero.
-    bool isValidAccess(uint64_t physAddr, unsigned size) const
+    /// Return true if given memory access is legal: bits of the given address must be
+    /// zero if they correspond to the bits set in the zero-mask.
+    bool isValidAddress(uint64_t physAddr) const
+    { return (physAddr & zmask_) == 0; }
+
+    /// Return true if given memory address is insecure: either not running in
+    /// secure world, or running in secure world and the bits of the given
+    /// address corresponding to the secure mask are not all set.
+    bool isInsecureAddress(uint64_t physAddr) const
+    { return secWorld_ == 0 or (physAddr & secMask_) != secMask_; }
+
+    /// Return true if given memory access is insecure: The address is
+    /// insecure and it overlaps a secure memory region.
+    bool isInsecureAccess(uint64_t physAddr) const
     {
-      if ((physAddr & zmask_) != 0)
-	return false;  // Zero-mask bits must be zero
-
-      if (secWorld_)
-	return true;   // In secure world.
-
-      physAddr = clearSecureBits(physAddr);
-
-      // Address must not target secure area.
-      return physAddr + size - 1 < secLow_ or physAddr > secHigh_;
+      if (not isInsecureAddress(physAddr))
+	return false;  // Secure address.
+      uint64_t effAddr = clearSecureBits(physAddr);
+      return effAddr >= secLow_ and effAddr < secHigh_;
     }
 
     /// Clear the bits corresponding to the secure-mask in the given address.
@@ -48,21 +52,24 @@ namespace TT_STEE      // TensTorrent Static Trusted Execution Environment.
     { secMask_ = mask; }
 
     /// Return the mask of bits that must be zero in the physical address in order for the
-    /// access to be considered valid by isValidAccess.
+    /// access to be considered valid by isValidAddress.
     uint64_t zeroMask() const
     { return zmask_; }
 
     /// Return the mask of bits that must be one in the physical address in order for the
-    /// access to be considered valid by isValidAccess.
+    /// address to be considered secure.
     uint64_t secureMask() const
     { return secMask_; }
 
     /// Configure the secure access region (only one region is currently supported).  An
-    /// insecure access will fail if the target address falls in the secure region. The
-    /// region is between addresses low to high inclusive. To define an empty region pass
-    /// a high value that is less than low.
+    /// insecure access will be ignored if the target address falls in the secure
+    /// region. The region is between addresses low to high excluding high. To define an
+    /// empty region use same value for low and high.
     void configSecureRegion(uint64_t low, uint64_t high)
-    { secLow_ = low; secHigh_ = high; }
+    {
+      secLow_ = low;
+      secHigh_ = high;
+    }
 
     /// Set the secure world index. An index of zero implies a non-zecure world.
     void setSecureWorld(unsigned world)

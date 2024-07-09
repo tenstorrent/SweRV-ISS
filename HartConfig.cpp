@@ -18,6 +18,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <unordered_set>
+#include <bit>
 #include "HartConfig.hpp"
 #include "System.hpp"
 #include "Core.hpp"
@@ -1004,6 +1005,8 @@ static
 bool
 applySteeConfig(Hart<URV>& hart, const nlohmann::json& config)
 {
+  using std::cerr;
+
   if (not config.contains("stee"))
     return true;  // Nothing to apply
 
@@ -1021,13 +1024,13 @@ applySteeConfig(Hart<URV>& hart, const nlohmann::json& config)
     }
 
   tag = "secure_mask";
+  uint64_t secMask = 0;
   if (sconf.contains(tag))
     {
-      uint64_t mask = 0;
-      if (not getJsonUnsigned(tag, sconf.at(tag), mask))
+      if (not getJsonUnsigned(tag, sconf.at(tag), secMask))
 	errors++;
       else
-	hart.configSteeSecureMask(mask);
+	hart.configSteeSecureMask(secMask);
     }
 
   tag = "secure_region";
@@ -1038,13 +1041,33 @@ applySteeConfig(Hart<URV>& hart, const nlohmann::json& config)
 	errors++;
       else
 	{
+	  bool complain = hart.sysHartIndex() == 0;
 	  if (vec.size() != 2)
 	    {
-	      std::cerr << "Invalid config file stee.secure_region: Expecting an array of 2 integers\n";
+	      if (complain)
+		cerr << "Invalid config stee.secure_region: Expecting array of 2 integers\n";
 	      errors++;
 	    }
 	  else
-	    hart.configSteeSecureRegion(vec.at(0), vec.at(1));
+	    {
+	      uint64_t low = vec.at(0), high = vec.at(1);
+	      if ((low % hart.pageSize()) != 0 or (high % hart.pageSize()) != 0)
+		{
+		  low -= low % hart.pageSize();	  
+		  high -= high % hart.pageSize();
+		  if (complain)
+		    {
+		      cerr << "Warning: STEE secure region bounds are not page aligned\n";
+		      cerr << "Warning: STEE secure region bounds changed to: [0x"
+			   << std::hex << low << ", " << high << "]\n" << std::dec;
+		    }
+		}
+	      if (((low & secMask) or (high & secMask)) and complain)
+		cerr << "Warning: STEE secure region bounds have secure bit(s) set.\n";
+
+	      if (not errors)
+		hart.configSteeSecureRegion(low, high);
+	    }
 	}
     }
 
@@ -1548,20 +1571,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 
   applySteeConfig(hart, *config_) or errors++;
 
-  tag = "load_data_trigger";
-  if (config_ -> contains(tag))
-    {
-      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
-      hart.configLoadDataTrigger(flag);
-    }
-
-  tag = "exec_opcode_trigger";
-  if (config_ -> contains(tag))
-    {
-      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
-      hart.configExecOpcodeTrigger(flag);
-    }
-
   tag = "all_ld_st_addr_trigger";
   if (config_ -> contains(tag))
     {
@@ -1574,6 +1583,27 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
       hart.configAllInstAddrTrigger(flag);
+    }
+
+  tag = "trigger_types";
+  if (config_ -> contains(tag))
+    {
+      unsigned trigErrors = 0;
+      std::vector<std::string> types;
+      const auto& items = config_ -> at(tag);
+      for (const auto& item : items)
+	{
+	  if (not item.is_string())
+	    {
+	      cerr << "Error: Invalid value in config file item " << tag << " -- expecting string\n";
+	      ++trigErrors;
+	    }
+	  else
+	    types.push_back(item.get<std::string>());
+	}
+      if (not hart.setSupportedTriggerTypes(types))
+	++trigErrors;
+      errors += trigErrors;
     }
 
   tag = "memmap";
@@ -1964,6 +1994,9 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_smstateen";
   if (config_ ->contains(tag))
     {
+      if (hart.sysHartIndex() == 0)
+	cerr << "Warning: Config tag " << tag << " is deprecated. "
+	     << "Use smstateen with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableSmstateen(flag);
     }
@@ -2189,13 +2222,19 @@ HartConfig::applyImsicConfig(System<URV>& system) const
     if (not getJsonUnsigned("imsic.ids", imsic.at(tag), ids))
       return false;
 
+  uint64_t thresholdMask = std::bit_ceil(ids) - 1;
+  tag = "eithreshold_mask";
+  if (imsic.contains(tag))
+    if (not getJsonUnsigned("imsic.eithreshold_mask", imsic.at(tag), thresholdMask))
+      return false;
+
   bool trace = false;
   tag = "trace";
   if (imsic.contains(tag))
     if (not getJsonBoolean("imsic.trace", imsic.at(tag), trace))
       return false;
 
-  return system.configImsic(mbase, mstride, sbase, sstride, guests, ids, trace);
+  return system.configImsic(mbase, mstride, sbase, sstride, guests, ids, thresholdMask, trace);
 }
 
 

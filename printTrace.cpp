@@ -380,7 +380,18 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     }
 
   // Process memory diff.
-  if (ldStWrite_ and not di.isVector())
+  if (di.instId() == InstId::cbo_zero)
+    {
+      for (unsigned i = 0; i < cacheLineSize_; i += sizeof(URV))
+	{
+	  if (pending)
+	    fprintf(out, "  +\n");
+	  formatInstTrace<URV>(out, tag, *this, instSV, 'm',
+			       URV(ldStAddr_ + i), URV(0), tmp);
+	  pending = true;
+	}
+    }
+  else if (ldStWrite_ and not di.isVector())
     {
       if (pending)
         fprintf(out, "  +\n");

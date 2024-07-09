@@ -318,19 +318,15 @@ namespace WdRiscv
 		       const std::vector<uint64_t>& pokeMasks)
     { return csRegs_.configTrigger(trigger, resets, masks, pokeMasks); }
 
+    /// Define the set of supported trigger types.
+    bool setSupportedTriggerTypes(const std::vector<std::string>& types)
+    { return csRegs_.triggers_.setSupportedTypes(types); }
+
     /// Enable the extensions defined by the given string. If
     /// updateMisa is true then the MISA CSR reset value is updated to
     /// enable the extensions defined by the given string (this is done
     /// for linux/newlib emulation).
     bool configIsa(std::string_view string, bool updateMisa);
-
-    /// Enable/disable load-data debug triggering (disabled by default).
-    void configLoadDataTrigger(bool flag)
-    { csRegs_.configLoadDataTrigger(flag); }
-
-    /// Enable/disable exec-opcode triggering (disabled by default).
-    void configExecOpcodeTrigger(bool flag)
-    { csRegs_.configExecOpcodeTrigger(flag); }
 
     /// Enable/disable matching all addresses in a load/store access
     /// for debug triggering.
@@ -558,8 +554,9 @@ namespace WdRiscv
     bool untilAddress(uint64_t address, FILE* file = nullptr);
 
     /// Helper to single step N times. Returns false if program terminated
-    /// with failing condition and true otherwise.
-    bool runSteps(uint64_t steps, FILE* file = nullptr);
+    /// with failing condition and true otherwise. Sets stop
+    /// if program is "finished".
+    bool runSteps(uint64_t steps, bool& stop, FILE* file = nullptr);
 
     /// Define the program counter value at which the run method will
     /// stop.
@@ -963,9 +960,13 @@ namespace WdRiscv
       return true;
     }
 
-    /// Read instruction at given address. Return true on success and
-    /// false if address is out of memory bounds.
-    bool readInst(uint64_t address, uint32_t& instr);
+    /// Read instruction at given virtual address. Return true on success and false if
+    /// address does not translate or if physical address is out of bounds. If successful
+    /// set paddr to the translated address.
+    bool readInst(uint64_t vaddr, uint64_t& paddr, uint32_t& instr);
+
+    /// Similar to above but does not expose physical address.
+    bool readInst(uint64_t vaddr, uint32_t& instr);
 
     /// Set instruction count limit: When running with tracing the
     /// run and the runUntil methods will stop if the retired instruction
@@ -1033,53 +1034,23 @@ namespace WdRiscv
     void enableRvd(bool flag)
     { enableExtension(RvExtension::D, flag); }
 
-    /// Enable/disable the zbe (bit manipulation) extension. When
-    /// disabled all the instructions in zbe extension result in an
-    /// illegal instruction exception.
-    void enableRvzbe(bool flag)
-    { enableExtension(RvExtension::Zbe, flag); }
-
-    /// Enable/disable the zbf (bit manipulation) extension. When
-    /// disabled all the instructions in zbf extension result in an
-    /// illegal instruction exception.
-    void enableRvzbf(bool flag)
-    { enableExtension(RvExtension::Zbf, flag); }
-
-    /// Enable/disable the zbm (bit manipulation matrix)
-    /// extension. When disabled all the instructions in zbm extension
-    /// result in an illegal instruction exception.
-    void enableRvzbm(bool flag)
-    { enableExtension(RvExtension::Zbm, flag); }
-
-    /// Enable/disable the zbp (bit manipulation permutation)
-    /// extension. When disabled all the instructions in zbp extension
-    /// result in an illegal instruction exception.
-    void enableRvzbp(bool flag)
-    { enableExtension(RvExtension::Zbp, flag); }
-
-    /// Enable/disable the zbr (bit manipulation crc)
-    /// extension. When disabled all the instructions in zbr extension
-    /// result in an illegal instruction exception.
-    void enableRvzbr(bool flag)
-    { enableExtension(RvExtension::Zbr, flag); }
-
-    /// Enable/disable the zbt (bit manipulation ternary)
-    /// extension. When disabled all the instructions in zbt extension
-    /// result in an illegal instruction exception.
-    void enableRvzbt(bool flag)
-    { enableExtension(RvExtension::Zbt, flag); }
-
     /// Enable/disable the supervisor timer compare extension (sstc).
     void enableRvsstc(bool flag)
     { enableExtension(RvExtension::Sstc, flag); csRegs_.enableSstc(flag); }
 
     /// Enable/disable counter overflow extension (sscofpmf)
     void enableSscofpmf(bool flag)
-    { csRegs_.enableSscofpmf(flag); }
+    {
+      enableExtension(RvExtension::Sscofpmf, flag);
+      csRegs_.enableSscofpmf(flag);
+    }
 
     /// Enable/disbale smstateen extension.
     void enableSmstateen(bool flag)
-    { csRegs_.enableSmstateen(flag); }
+    {
+      enableExtension(RvExtension::Smstateen, flag);
+      csRegs_.enableSmstateen(flag);
+    }
 
     /// Enable/disable the resumable non maskable interrupt (Smrnmi) extension.
     void enableSmrnmi(bool flag)
@@ -1248,7 +1219,7 @@ namespace WdRiscv
     bool isRvzbkb() const
     { return extensionIsEnabled(RvExtension::Zbkb); }
 
-    /// Return true if the zbkb extension (crypto bit manip) is enabled.
+    /// Return true if the zbkx extension (crypto bit manip) is enabled.
     bool isRvzbkx() const
     { return extensionIsEnabled(RvExtension::Zbkx); }
 
@@ -1328,43 +1299,19 @@ namespace WdRiscv
 
     /// Return true if zba extension is enabled in this hart.
     bool isRvzba() const
-    { return extensionIsEnabled(RvExtension::Zba); }
+    { return isRvb() or extensionIsEnabled(RvExtension::Zba); }
 
     /// Return true if zbb extension is enabled in this hart.
     bool isRvzbb() const
-    { return extensionIsEnabled(RvExtension::Zbb); }
+    { return isRvb() or extensionIsEnabled(RvExtension::Zbb); }
 
     /// Return true if zbc extension is enabled in this hart.
     bool isRvzbc() const
     { return extensionIsEnabled(RvExtension::Zbc); }
 
-    /// Return true if zbe extension is enabled in this hart.
-    bool isRvzbe() const
-    { return extensionIsEnabled(RvExtension::Zbe); }
-
-    /// Return true if zbf extension is enabled in this hart.
-    bool isRvzbf() const
-    { return extensionIsEnabled(RvExtension::Zbf); }
-
-    /// Return true if zbm extension is enabled in this hart.
-    bool isRvzbm() const
-    { return extensionIsEnabled(RvExtension::Zbm); }
-
-    /// Return true if zbp extension is enabled in this hart.
-    bool isRvzbp() const
-    { return extensionIsEnabled(RvExtension::Zbp); }
-
-    /// Return true if zbr extension is enabled in this hart.
-    bool isRvzbr() const
-    { return extensionIsEnabled(RvExtension::Zbr); }
-
     /// Return true if zbs extension is enabled in this hart.
     bool isRvzbs() const
-    { return extensionIsEnabled(RvExtension::Zbs); }
-
-    /// Return true if zbt extension is enabled in this hart.
-    bool isRvzbt() const
-    { return extensionIsEnabled(RvExtension::Zbt); }
+    { return isRvb() or extensionIsEnabled(RvExtension::Zbs); }
 
     /// Return true if the half-precision vector floating point
     /// extension is enabled.
@@ -2244,6 +2191,8 @@ namespace WdRiscv
 	{
 	  if (not memory_.read(pa1, value))
 	    assert(0);
+	  if (steeInsec1_)
+	    value = 0;
 	  if (bigEnd_)
 	    value = util::byteswap(value);
 	  return;
@@ -2259,11 +2208,19 @@ namespace WdRiscv
       unsigned destIx = 0;
       for (unsigned i = 0; i < size1; ++i, ++destIx)
 	if (memory_.read(pa1 + i, byte))
-	  value |= LOAD_TYPE(byte) << 8*destIx;
+	  {
+	    if (steeInsec1_)
+	      byte = 0;
+	    value |= LOAD_TYPE(byte) << 8*destIx;
+	  }
 	else assert(0);
       for (unsigned i = 0; i < size2; ++i, ++destIx)
 	if (memory_.read(pa2 + i, byte))
-	  value |= LOAD_TYPE(byte) << 8*destIx;
+	  {
+	    if (steeInsec2_)
+	      byte = 0;
+	    value |= LOAD_TYPE(byte) << 8*destIx;
+	  }
 	else assert(0);
 
       if (bigEnd_)
@@ -2279,8 +2236,9 @@ namespace WdRiscv
 
       if (pa1 == pa2)
 	{
-	  if (not memory_.write(hartIx_, pa1, value))
-	    assert(0);
+	  if (not steeInsec1_)
+	    if (not memory_.write(hartIx_, pa1, value))
+	      assert(0);
 	  return;
 	}
       unsigned size = sizeof(value);
@@ -2289,12 +2247,14 @@ namespace WdRiscv
 
       if constexpr (sizeof(STORE_TYPE) > 1)
 	{
-	  for (unsigned i = 0; i < size1; ++i, value >>= 8)
-	    if (not memory_.write(hartIx_, pa1 + i, uint8_t(value & 0xff)))
+	  if (not steeInsec1_)
+	    for (unsigned i = 0; i < size1; ++i, value >>= 8)
+	      if (not memory_.write(hartIx_, pa1 + i, uint8_t(value & 0xff)))
 	      assert(0);
-	  for (unsigned i = 0; i < size2; ++i, value >>= 8)
-	    if (not memory_.write(hartIx_, pa2 + i, uint8_t(value & 0xff)))
-	      assert(0);
+	  if (not steeInsec2_)
+	    for (unsigned i = 0; i < size2; ++i, value >>= 8)
+	      if (not memory_.write(hartIx_, pa2 + i, uint8_t(value & 0xff)))
+		assert(0);
 	}
     }
 
@@ -3375,31 +3335,18 @@ namespace WdRiscv
     void execRolw(const DecodedInst*);
     void execRorw(const DecodedInst*);
     void execRoriw(const DecodedInst*);
-    void execRev8(const DecodedInst*);
     void execPack(const DecodedInst*);
     void execSlli_uw(const DecodedInst*);
-    void execPackh(const DecodedInst*);
-    void execPacku(const DecodedInst*);
-    void execPackw(const DecodedInst*);
-    void execPackuw(const DecodedInst*);
-    void execGrev(const DecodedInst*);
-    void execGrevi(const DecodedInst*);
-    void execGrevw(const DecodedInst*);
-    void execGreviw(const DecodedInst*);
-    void execGorc(const DecodedInst*);
-    void execGorci(const DecodedInst*);
-    void execGorcw(const DecodedInst*);
-    void execGorciw(const DecodedInst*);
-    void execShfl(const DecodedInst*);
-    void execShflw(const DecodedInst*);
-    void execShfli(const DecodedInst*);
-    void execUnshfl(const DecodedInst*);
-    void execUnshfli(const DecodedInst*);
-    void execUnshflw(const DecodedInst*);
-    void execXperm_n(const DecodedInst*);
-    void execXperm_b(const DecodedInst*);
-    void execXperm_h(const DecodedInst*);
-    void execXperm_w(const DecodedInst*);
+    void execPackh(const DecodedInst*);   // Zbkb
+    void execPackw(const DecodedInst*);   // rename zext_h, in Zbb
+    void execBrev8(const DecodedInst*);   // In Zbkb
+    void execRev8_32(const DecodedInst*);
+    void execRev8_64(const DecodedInst*);
+    void execUnzip(const DecodedInst*);
+    void execZip(const DecodedInst*);
+
+    void execXperm_n(const DecodedInst*); // Zbkx
+    void execXperm_b(const DecodedInst*); // Zbkx
 
     // Bit manipulation: zbs
     void execBset(const DecodedInst*);
@@ -3410,14 +3357,6 @@ namespace WdRiscv
     void execBclri(const DecodedInst*);
     void execBinvi(const DecodedInst*);
     void execBexti(const DecodedInst*);
-
-    void execBcompress(const DecodedInst*);
-    void execBdecompress(const DecodedInst*);
-    void execBcompressw(const DecodedInst*);
-    void execBdecompressw(const DecodedInst*);
-
-    void execBfp(const DecodedInst*);
-    void execBfpw(const DecodedInst*);
 
     void execClmul(const DecodedInst*);
     void execClmulh(const DecodedInst*);
@@ -3430,28 +3369,6 @@ namespace WdRiscv
     void execSh2add_uw(const DecodedInst*);
     void execSh3add_uw(const DecodedInst*);
     void execAdd_uw(const DecodedInst*);
-
-    void execCrc32_b(const DecodedInst*);
-    void execCrc32_h(const DecodedInst*);
-    void execCrc32_w(const DecodedInst*);
-    void execCrc32_d(const DecodedInst*);
-    void execCrc32c_b(const DecodedInst*);
-    void execCrc32c_h(const DecodedInst*);
-    void execCrc32c_w(const DecodedInst*);
-    void execCrc32c_d(const DecodedInst*);
-
-    void execBmator(const DecodedInst*);
-    void execBmatxor(const DecodedInst*);
-    void execBmatflip(const DecodedInst*);
-
-    void execCmov(const DecodedInst*);
-    void execCmix(const DecodedInst*);
-    void execFsl(const DecodedInst*);
-    void execFsr(const DecodedInst*);
-    void execFsri(const DecodedInst*);
-    void execFslw(const DecodedInst*);
-    void execFsrw(const DecodedInst*);
-    void execFsriw(const DecodedInst*);
 
     /// Code common to execVsetvli, and execVsetvl. Return true on success and false if an
     /// illegal instruction trap must be taken.
@@ -5274,6 +5191,8 @@ namespace WdRiscv
     // Static tee (truseted execution environment).
     bool steeEnabled_ = false;
     TT_STEE::Stee stee_;
+    bool steeInsec1_ = false;  // True if insecure access to a secure region.
+    bool steeInsec2_ = false;  // True if insecure access to a secure region.
 
     VirtMem virtMem_;
     Isa isa_;

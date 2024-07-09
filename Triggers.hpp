@@ -27,9 +27,11 @@ namespace WdRiscv
   enum class TriggerTiming { Before, After };
 
   /// Trigger type.
-  enum class TriggerType { None = 0, Legacy = 1, AddrData = 2, Mcontrol = AddrData, InstCount = 3,
-			   Itrigger = 4, Etrigger = 5, Mcontrol6 = 6, Tmext = 7, Custom0 = 12,
-			   Custom1 = 13, Custom2 = 14, Disabled = 15 };
+  enum class TriggerType : uint32_t {
+    None = 0, Legacy = 1, AddrData = 2, Mcontrol = AddrData, Icount = 3, Itrigger = 4,
+    Etrigger = 5, Mcontrol6 = 6, Tmext = 7, Reserved0 = 8, Reserved1 = 9, Reserved2 = 10,
+    Reserved3 = 11, Custom0 = 12, Custom1 = 13, Custom2 = 14, Disabled = 15
+  };
 
   enum class TriggerOffset { Tdata1 = 0, Tdata2 = 1, Tdata3 = 2, Tinfo = 3 };
 
@@ -236,6 +238,7 @@ namespace WdRiscv
       value_(value)
     { }
 
+    /// Return trigger type field of Tdata1.
     TriggerType type() const { return TriggerType(mcontrol_.type_); }
 
     /// Return true if type is None or Disabled.
@@ -245,12 +248,16 @@ namespace WdRiscv
     bool isMcontrol()  const { return type() == TriggerType::Mcontrol; }
     bool isMcontrol6() const { return type() == TriggerType::Mcontrol6; }
     bool isAddrData()  const { return isMcontrol() or isMcontrol6(); }
-    bool isInstCount() const { return type() == TriggerType::InstCount; }
+    bool isInstCount() const { return type() == TriggerType::Icount; }
     bool isEtrigger()  const { return type() == TriggerType::Etrigger; }
-    bool isItrigger()  const { return type() == TriggerType::Etrigger; }
+    bool isItrigger()  const { return type() == TriggerType::Itrigger; }
 
     /// Return true if trigger is writable only in debug mode.
     bool dmodeOnly() const   { return mcontrol_.dmode_; }
+
+    /// Set the type field of tdata1.
+    void setType(TriggerType type)
+    { mcontrol_.type_ = unsigned(type); }
 
     template <typename T>
     const T& mcontrol() const
@@ -298,6 +305,10 @@ namespace WdRiscv
 	data2WriteMask_(mask2), data3WriteMask_(mask3)
     { }
 
+    /// Return the type of this trigger.
+    TriggerType type() const
+    { return data1_.type(); }
+
     /// Read the tdata1 register of the trigger. This is typically the control register of
     /// the trigger.
     URV readData1() const
@@ -331,8 +342,8 @@ namespace WdRiscv
 
       // Writing 0 (None) into type is changed to 15 (Disabled). Section 5.7.2 of spec.
       Data1Bits<URV> valBits{val};
-      if (valBits.mcontrol_.type_ == unsigned(TriggerType::None))
-	valBits.mcontrol_.type_ = unsigned(TriggerType::Disabled);
+      if (valBits.type() == TriggerType::None)
+	valBits.setType(TriggerType::Disabled);
       val = valBits.value_;
 
       data1_.value_ = (val & mask) | (data1_.value_ & ~mask);
@@ -340,25 +351,6 @@ namespace WdRiscv
 
       if (data1_.isAddrData())
 	{
-          Select sel = data1_.isMcontrol()? Select(data1_.mcontrol_.select_) :
-                                            Select(data1_.mcontrol6_.select_);
-
-	  // If load-data is not enabled, then turn it off when attempted. If exec-opcode
-	  // is not enabled, then turn it off when attempted.
-	  if (sel == Select::MatchData)
-	    {
-              if (not enableLoadData_)
-                {
-                  if (data1_.mcontrol_.load_)
-                    data1_.mcontrol_.load_ = false;
-                }
-              if (not enableExecOpcode_)
-                {
-                  if (data1_.mcontrol_.execute_)
-                    data1_.mcontrol_.execute_ = false;
-                }
-	    }
-
 	  if (not data1_.dmodeOnly())
 	    data1_.mcontrol_.action_ = 0;
 	}
@@ -561,9 +553,8 @@ namespace WdRiscv
     }
 
     /// Perform a match on the given item (maybe an address or a value) and the data2
-    /// component of this trigger (assumed to be of type Address) according to the match
-    /// field.
-    bool doMatch(URV item) const;
+    /// component of this trigger according to the match variable.
+    bool doMatch(URV item, Match match) const;
 
     /// Set the hit bit of this trigger. For a chained trigger, this is to be called only
     /// if all the triggers in the chain have tripped.
@@ -633,14 +624,6 @@ namespace WdRiscv
       return Action::RaiseBreak;
     }
 
-    /// Enable load-data triggerring (disabled by default).
-    void enableLoadData(bool flag)
-    { enableLoadData_ = flag; }
-
-    /// Enable exec-opcode triggering (disabled by default).
-    void enableExecOpcode(bool flag)
-    { enableExecOpcode_ = flag; }
-
     /// Enable all ld/st address matching [address, address+size-1].
     void enableAllLdStAddrMatch(bool flag)
     { matchAllLdStAddr_ = flag; }
@@ -650,6 +633,12 @@ namespace WdRiscv
     { matchAllInstAddr_ = flag; }
 
   protected:
+
+    static bool isNegatedMatch(Match m)
+    { return m >= Match::NotEqual and m <= Match::NotMaskLowEqualHigh; }
+
+    static Match negateNegatedMatch(Match m)
+    { assert(isNegatedMatch); return Match(unsigned(m) - unsigned(Match::NotEqual)); }
 
     void updateCompareMask()
     {
@@ -705,6 +694,7 @@ namespace WdRiscv
       return ok;
     }
 
+    // Helper to public matchLdStAddr.
     template <typename M>
     bool matchLdStAddr(URV address, unsigned size, TriggerTiming timing, bool isLoad,
                        PrivilegeMode mode, bool virtMode) const;
@@ -756,8 +746,6 @@ namespace WdRiscv
     bool modifiedControl_ = false;
 
     size_t chainBegin_ = 0, chainEnd_ = 0;
-    bool enableLoadData_ = false;
-    bool enableExecOpcode_ = false;
 
     bool matchAllLdStAddr_ = true; // If enabled, attempt to match address against
                                         // any [address, address+size-1].
@@ -887,6 +875,14 @@ namespace WdRiscv
     /// Return true if any of the interrupt-triggers (itrigger) trips.
     bool intTriggerHit(URV cause, PrivilegeMode mode, bool virtMode, bool interruptEnabled);
 
+    /// Return the tigger at the given index. Reurn None if index is out of bounds.
+    TriggerType triggerType(URV trigger) const
+    {
+      if (trigger >= triggers_.size())
+	return TriggerType::None;
+      return triggers_.at(trigger).type();
+    }
+
     /// Reset the given trigger with the given data1, data2, and data3
     /// values and corresponding write and poke masks. Values are applied
     /// without masking. Subsequent writes will be masked.
@@ -974,14 +970,6 @@ namespace WdRiscv
       return false;
     }
 
-    /// Enable load-data triggerring (disabled by default).
-    void enableLoadData(bool flag)
-    { for ( auto& trig : triggers_) trig.enableLoadData(flag); }
-
-    /// Enable exec-opcode triggering (disabled by default).
-    void enableExecOpcode(bool flag)
-    { for ( auto& trig : triggers_) trig.enableExecOpcode(flag); }
-
     /// Enable all ld/st address matching [address, address+size-1].
     void enableAllLdStAddrMatch(bool flag)
     { for ( auto& trig : triggers_) trig.enableAllLdStAddrMatch(flag); }
@@ -1005,6 +993,26 @@ namespace WdRiscv
     /// Enable/disable firing of triggers in machine mode when interrupts are enabled.
     void enableMmodeWithIe(bool flag)
     { mmodeWithIe_ = flag; }
+
+    /// Return true if given trigger type is supported.
+    bool isSupportedType(TriggerType type) const
+    {
+      unsigned ix = unsigned(type);
+      return ix < supportedTypes_.size() ? supportedTypes_.at(ix) : false;
+    }
+
+    /// Set the supported trigger types to the types in the given vector. Items not in the
+    /// vector are not supported. Return true on success. Return false if
+    /// "none"/"disabled" is not in types vector or if a string in the vector does not correspond
+    /// to a trigger type. Valid strings:
+    ///   "none", "legacy", "mcontrol", "icount", "itrigger", "etrigger", "mcontrol6",
+    //    "tmexttrigger", "disabled"
+    bool setSupportedTypes(const std::vector<std::string>& types);
+
+    /// Set the supported trigger types to the types in the given vector. Items not in the
+    /// vector are not supported. Return true on success. Return false if None/Disabled is
+    /// not in types vector.
+    bool setSupportedTypes(const std::vector<TriggerType>& types);
 
     void getTriggerChange(URV ix, std::vector<std::pair<TriggerOffset, uint64_t>>& changes) const
     {
@@ -1045,16 +1053,17 @@ namespace WdRiscv
       return nullptr;
     }
 
-    /// If all the triggers in the chain of the given trigger have
-    /// tripped (in isolation using local-hit), then return true
-    /// setting the hit bit of these triggers. Otherwise, return
-    /// false.
+    /// If all the triggers in the chain of the given trigger have tripped (in isolation
+    /// using local-hit), then return true setting the hit bit of these
+    /// triggers. Otherwise, return false.
     bool updateChainHitBit(Trigger<URV>& trigger);
 
     /// Define the chain bounds of each trigger.
     void defineChainBounds();
 
   private:
+
+    std::vector<bool> supportedTypes_;   // Indexed by a TriggerMode.
 
     std::vector< Trigger<URV> > triggers_;
     bool mmodeEnabled_ = true;  // Triggers trip in Machine mode when true.

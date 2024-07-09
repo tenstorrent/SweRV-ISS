@@ -56,6 +56,18 @@ stage2PageFaultType(bool read, bool write, bool exec)
 }
 
 
+static constexpr
+ExceptionCause
+accessFaultType(bool read, bool write, bool exec)
+{
+  if (exec)  return ExceptionCause::INST_ACC_FAULT;
+  if (read)  return ExceptionCause::LOAD_ACC_FAULT;
+  if (write) return ExceptionCause::STORE_ACC_FAULT;
+  assert(0);
+  return ExceptionCause::LOAD_ACC_FAULT;
+}
+
+
 /// Change the exception resulting from an implicit access during the
 /// VS-stage to the exception type corresponding to the original
 /// explicit access (determined by one of read/write/exec). We keep
@@ -69,19 +81,9 @@ stage2ExceptionToStage1(ExceptionCause ec2, bool read, bool write, bool exec)
   if (ec2 == EC::INST_GUEST_PAGE_FAULT or ec2 == EC::LOAD_GUEST_PAGE_FAULT or
       ec2 == EC::STORE_GUEST_PAGE_FAULT)
     return stage2PageFaultType(read, write, exec);
+  if (ec2 == EC::INST_ACC_FAULT or ec2 == EC::LOAD_ACC_FAULT or ec2 == EC::STORE_ACC_FAULT)
+    return accessFaultType(read, write, exec);
   return ec2;
-}
-
-
-static constexpr
-ExceptionCause
-accessFaultType(bool read, bool write, bool exec)
-{
-  if (exec)  return ExceptionCause::INST_ACC_FAULT;
-  if (read)  return ExceptionCause::LOAD_ACC_FAULT;
-  if (write) return ExceptionCause::STORE_ACC_FAULT;
-  assert(0);
-  return ExceptionCause::LOAD_ACC_FAULT;
 }
 
 
@@ -226,16 +228,15 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
   // Exactly one of read/write/exec must be true.
   assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
+  pa = va;
+
   if (mode_ == Mode::Bare)
-    {
-      pa = va;
-      return ExceptionCause::NONE;
-    }
-  else
-    {
-      va = (exec or xForR_ or execReadable_)? va : applyPointerMaskVa(va, priv, false);
-      pa = va;
-    }
+    return ExceptionCause::NONE;
+
+  // Apply pointer masking unless translation is for fetch.
+  bool effExec = exec or (read and (xForR_ or execReadable_));
+  if (not effExec)
+    pa = va = applyPointerMaskVa(va, priv, false);
 
   // Lookup virtual page number in TLB.
   uint64_t virPageNum = va >> pageBits_;
@@ -442,7 +443,11 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 
   bool mxr = execReadable_ or
              (vsMode_ != Mode::Bare? s1ExecReadable_ : false);
-  va = (exec or xForR_ or mxr)? va : applyPointerMask(va, priv, true);
+
+  // Apply pointer masking unless translation is for fetch.
+  bool effExec = exec or (read and (xForR_ or mxr));
+  if (not effExec)
+    va = applyPointerMask(va, priv, true);
 
   if (vsMode_ == Mode::Bare)
     gpa = pa = va;
@@ -978,8 +983,9 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       if (accessDirtyCheck_ and (not pte.accessed() or (write and not pte.dirty())))
 	{
 	  // We have a choice:
-	  // A. Page fault
-	  if (faultOnFirstAccess1_)
+	  // A. Page fault (if configured or, if page of PTE is non-cachable or is io).
+	  //       pbmt_ is that of leaf page of g-stage translation.
+	  if (faultOnFirstAccess1_ or pbmt_ != Pbmt::None)
             return stage1PageFaultType(read, write, exec);  // A
 
 	  // Or B
