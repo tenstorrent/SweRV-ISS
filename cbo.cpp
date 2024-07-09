@@ -77,9 +77,9 @@ Hart<URV>::determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, boo
   Pma pma = getPma(pa);
   pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
   ldStCacheable_ = pma.isCacheable();
-  if (not pma.isWrite() and not pma.isRead())
-    return EC::STORE_ACC_FAULT;
   if (isZero and not pma.isWrite())
+    return EC::STORE_ACC_FAULT;
+  else if (not pma.isWrite() and not pma.isRead())
     return EC::STORE_ACC_FAULT;
 
   // Physical memory protection.
