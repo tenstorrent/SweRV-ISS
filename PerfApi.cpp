@@ -149,10 +149,7 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
       trap = false;
 
       if (prev and not prev->trapped() and prev->executed() and prev->nextIva_ != vpc)
-	{
-	  packet->shouldFlush_ = true;
-	  packet->iva_ = prev->nextIva_;
-	}
+	packet->shouldFlush_ = true;
     }
   else
     {
