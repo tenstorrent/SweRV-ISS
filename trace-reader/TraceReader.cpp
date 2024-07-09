@@ -203,6 +203,7 @@ TraceRecord::clear()
   physAddrs.clear();
   memVals.clear();
   maskedAddrs.clear();
+  cacheableAddrs.clear();
   contextCSRs.clear();
   priv = PrivMode::Machine;
   virt = false;
@@ -300,6 +301,8 @@ TraceRecord::print(std::ostream& os) const
 	    os << "=" << std::hex << memVals.size();
 	  if (i < maskedAddrs.size() and maskedAddrs.at(i))
 	    os << " masked";
+          if (i < cacheableAddrs.size() and not cacheableAddrs.at(i))
+            os << " non-cacheable";
 	  os << '\n';
 	}
     }
@@ -357,34 +360,53 @@ bool
 TraceReader::extractAddressPair(uint64_t lineNum, const char* tag,
 				const char* pairStr,
 				uint64_t& virt, uint64_t& phys,
-				bool& masked)
+				bool& masked, bool& cacheable)
 {
   masked = false;
+  cacheable = true;
 
   const char* rest = nullptr;
   virt = hexStrToNum(pairStr, rest);
   phys = virt;
+
+  if (staticMemmap_ and phys < 0x80000000)
+    cacheable = false;
+
   if (rest == nullptr or *rest == 0)
     return true;
 
-  if (*rest == 'm')
+  unsigned tags = 0;
+
+  while (*rest != 0)
     {
-      masked = true;
-      rest++;
+      if (*rest == 'm')
+        {
+          masked = true;
+          rest++;
+          tags++;
+        }
+      if (*rest == 'n')
+        {
+          cacheable = false;
+          rest++;
+          tags++;
+        }
+      if (*rest == ':')
+        {
+          rest++;
+          tags++;
+          phys = hexStrToNum(rest, rest);
+          if (staticMemmap_ and phys < 0x80000000)
+            cacheable = false;
+        }
     }
-  if (*rest == 0)
+
+  if (not tags or tags > 3)
+    std::cerr << "Line " << lineNum << ": Bad " << tag << " address field: "
+              << pairStr << '\n';
+  else
     return true;
 
-  if (*rest == ':')
-    {
-      rest++;
-      phys = hexStrToNum(rest, rest);
-      if (rest == nullptr or *rest == 0)
-	return true;
-    }
-
-  std::cerr << "Line " << lineNum << ": Bad " << tag << " address field: "
-	    << pairStr << '\n';
   return false;
 }
 
@@ -579,12 +601,14 @@ TraceReader::parseMem(uint64_t lineNum, char* memStr, TraceRecord& rec)
 	{
 	  uint64_t virt = 0, phys = 0;
 	  bool masked = false;
+          bool cacheable = true;
 	  if (not extractAddressPair(lineNum, "Memory", keyvals_.at(0),
-				     virt, phys, masked))
+				     virt, phys, masked, cacheable))
 	    return false;
 	  rec.virtAddrs.push_back(virt);
 	  rec.physAddrs.push_back(phys);
 	  rec.maskedAddrs.push_back(masked);
+          rec.cacheableAddrs.push_back(cacheable);
 	  if (keyvals_.size() == 2)
 	    {
 	      uint64_t val = hexStrToNum(keyvals_.at(1));
@@ -757,8 +781,9 @@ TraceReader::parseLine(std::string& line, uint64_t lineNum, TraceRecord& record)
   if (ix >= 0)
     {
       bool masked = false;
+      bool cacheable = true; // ignored for PC fetch
       if (not extractAddressPair(lineNum, "PC", fields_.at(ix),
-				 record.virtPc, record.physPc, masked))
+				 record.virtPc, record.physPc, masked, cacheable))
 	return false;
     }
 
@@ -986,31 +1011,6 @@ TraceReader::nextRecord(TraceRecord& record, std::string& line)
   if (not parseLine(line_, lineNum_, record))
     return false;
 
-  return true;
-}
-
-
-template<class Mode>
-bool
-TraceReader::definePageTableMaker(uint64_t addr,
-				  Mode mode,
-				  uint64_t arenaSize)
-{
-  delete pageMaker_;
-  pageMaker_ = nullptr;
-
-  unsigned pageSize = 4096;
-
-  if ((addr % pageSize) != 0)
-    return false;
-
-  if ((arenaSize % pageSize) != 0)
-    return false;
-
-  if (arenaSize < pageSize)
-    return false;
-
-  pageMaker_ = new PageTableMaker(addr, mode, arenaSize);
   return true;
 }
 
