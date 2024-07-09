@@ -243,6 +243,10 @@ namespace WhisperUtil  {
     const std::vector<uint8_t>& vecRegValue(unsigned ix) const
     { return vecRegs_.at(ix); }
 
+    // Mark all addresses < 0x80000000 as non-cacheable.
+    void enableStaticMemmap(bool flag)
+    { staticMemmap_ = flag; }
+
   protected:
 
     /// Read the file containing initial vlues of registers.
@@ -299,6 +303,8 @@ namespace WhisperUtil  {
     std::ifstream fileStream_;
     std::istream* input_ = nullptr;
     boost::iostreams::filtering_streambuf<boost::iostreams::input> inStreambuf_;
+
+    bool staticMemmap_ = false;      // If true, all addresses < 0x80000000 are non-cacheable.
   };
 }
 

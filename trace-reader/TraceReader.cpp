@@ -368,6 +368,10 @@ TraceReader::extractAddressPair(uint64_t lineNum, const char* tag,
   const char* rest = nullptr;
   virt = hexStrToNum(pairStr, rest);
   phys = virt;
+
+  if (staticMemmap_ and phys < 0x80000000)
+    cacheable = false;
+
   if (rest == nullptr or *rest == 0)
     return true;
 
@@ -392,6 +396,8 @@ TraceReader::extractAddressPair(uint64_t lineNum, const char* tag,
           rest++;
           tags++;
           phys = hexStrToNum(rest, rest);
+          if (staticMemmap_ and phys < 0x80000000)
+            cacheable = false;
         }
     }
 
