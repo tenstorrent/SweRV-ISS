@@ -52,7 +52,6 @@ namespace WhisperUtil  {
     std::vector<uint64_t> physAddrs;  // Memory addresses
     std::vector<uint64_t> memVals;    // Correspondign data for store
     std::vector<bool> maskedAddrs;    // Maked addresses (for vector instructions).
-    std::vector<bool> cacheableAddrs; // Cacheable memory address.
     PrivMode priv = PrivMode::Machine;
     bool virt = false;
     bool hasTrap = false;
@@ -182,28 +181,10 @@ namespace WhisperUtil  {
     // Return true on success and false on failure (we fail if addr
     // is not a multiple of the page size, if arenaSize is not
     // a multiple of the page size or is smaller than 1 page).
-    template<class Mode>
+    template<class Mode> 
     bool definePageTableMaker(uint64_t addr,
-			      Mode mode,
-			      uint64_t arenaSize)
-    {
-      delete pageMaker_;
-      pageMaker_ = nullptr;
-
-      unsigned pageSize = 4096;
-
-      if ((addr % pageSize) != 0)
-        return false;
-
-      if ((arenaSize % pageSize) != 0)
-        return false;
-
-      if (arenaSize < pageSize)
-        return false;
-
-      pageMaker_ = new PageTableMaker(addr, mode, arenaSize);
-      return true;
-    };
+			      /* PageTableMaker:: */ Mode mode,
+			      uint64_t arenaSize);
 
     // Generate a page table walk that would be suitable for
     // translating the given virtual address to the given physical
@@ -243,10 +224,6 @@ namespace WhisperUtil  {
     const std::vector<uint8_t>& vecRegValue(unsigned ix) const
     { return vecRegs_.at(ix); }
 
-    // Mark all addresses < 0x80000000 as non-cacheable.
-    void enableStaticMemmap(bool flag)
-    { staticMemmap_ = flag; }
-
   protected:
 
     /// Read the file containing initial vlues of registers.
@@ -257,7 +234,7 @@ namespace WhisperUtil  {
     bool extractAddressPair(uint64_t lineNum, const char* tag,
 			    const char* pairString,
 			    uint64_t& virt, uint64_t& phys,
-			    bool& masked, bool& cacheable);
+			    bool& masked);
 
     // Parse the register value in the given value string into the given
     // operand.  Return true on success and false on failure. Update the
@@ -303,8 +280,6 @@ namespace WhisperUtil  {
     std::ifstream fileStream_;
     std::istream* input_ = nullptr;
     boost::iostreams::filtering_streambuf<boost::iostreams::input> inStreambuf_;
-
-    bool staticMemmap_ = false;      // If true, all addresses < 0x80000000 are non-cacheable.
   };
 }
 

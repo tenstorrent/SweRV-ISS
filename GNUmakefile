@@ -41,6 +41,7 @@ endif
 
 TRACE_READER := 1
 ifdef TRACE_READER
+  override CPPFLAGS += -I$(PWD)/trace-reader
   trace_reader_build := $(wildcard $(PWD)/trace-reader/)
   trace_reader_lib := $(PWD)/trace-reader/TraceReader.a
 endif

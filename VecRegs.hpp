@@ -609,7 +609,6 @@ namespace WdRiscv
       ldStPa2_.clear();
       maskedAddr_.clear();
       stData_.clear();
-      ldStCacheable_.clear();
       fpFlags_.clear();
       vxsat_.clear();
       steps_.clear();
@@ -902,7 +901,6 @@ namespace WdRiscv
     std::vector<uint64_t> ldStPa_;    // Phys addresses of vector load/store instruction.
     std::vector<uint64_t> ldStPa2_;   // For page crossers: addr on 2nd page, otherwise same as ldStPa_.
     std::vector<bool> maskedAddr_;    // True if address is masked off (element skipped).
-    std::vector<bool> ldStCacheable_; // True if address is cacheable.
     std::vector<Step> steps_;         // Incremental steps taken by previous instruction (useful for vector instruction debug).
     std::vector<uint8_t> fpFlags_;    // Incremental fp flags (useful for vector instruction debug).
     std::vector<uint8_t> vxsat_;      // VXSAT per-element operation (useful for vector instruction debug).

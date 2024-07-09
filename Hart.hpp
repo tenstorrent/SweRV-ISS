@@ -946,10 +946,6 @@ namespace WdRiscv
     unsigned lastLdStSize() const
     { return ldStSize_; }
 
-    /// Return true if last ld/st instruction used a cacheable address.
-    bool lastLdStCacheable() const
-    { return ldStCacheable_; }
-
     /// Return true if last branch instruction was taken.
     bool lastBranchTaken() const
     { return lastBranchTaken_; }
@@ -5113,7 +5109,6 @@ namespace WdRiscv
     uint64_t ldStFaultAddr_ = 0;
     bool ldStWrite_ = false;        // True if memory written by last store.
     bool ldStAtomic_ = false;       // True if amo or lr/sc
-    bool ldStCacheable_ = false;    // True if last access was cacheable.
 
     PrivilegeMode privMode_ = PrivilegeMode::Machine;   // Privilege mode.
     PrivilegeMode lastPriv_ = PrivilegeMode::Machine;   // Before current inst.

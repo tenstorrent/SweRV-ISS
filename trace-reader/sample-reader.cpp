@@ -1,5 +1,4 @@
 #include <TraceReader.hpp>
-#include <PageTableMaker.hpp>
 #include "Pte.hpp"
 
 
@@ -33,7 +32,7 @@ main(int argc, char* argv[])
 
   std::vector<uint64_t> walk;
 
-  reader->definePageTableMaker(0x100000000, PageTableMaker::Mode::Sv57, 4*1024*1024);
+  reader->definePageTableMaker(0x100000000, PageTableMaker::Sv57, 4*1024*1024);
 
   uint64_t nn = 0;
   while (reader->nextRecord(record))

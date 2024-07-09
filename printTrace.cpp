@@ -729,8 +729,6 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
             buffer.printChar(':').print(vecRegs_.ldStPa_.at(i));
           if (i < vecRegs_.maskedAddr_.size() and vecRegs_.maskedAddr_.at(i))
             buffer.printChar('m');
-          if (i < vecRegs_.ldStCacheable_.size() and not vecRegs_.ldStCacheable_.at(i))
-            buffer.printChar('n');
           if (i < vecRegs_.stData_.size())
             buffer.printChar('=').print(vecRegs_.stData_.at(i));
         }
@@ -741,8 +739,6 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       buffer.print(virtDataAddr);
       if (physDataAddr != virtDataAddr)
         buffer.printChar(':').print(physDataAddr);
-      if (not ldStCacheable_)
-        buffer.printChar('n');
       if (store)
         buffer.printChar('=').print(ldStData_);
     }
