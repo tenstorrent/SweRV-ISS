@@ -3021,8 +3021,8 @@ namespace WdRiscv
 			     unsigned op2, unsigned groupX8);
 
     /// Similar to above but 2 vector operands and 1st operand is wide.
-    bool checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0, unsigned op1,
-			     unsigned groupX8);
+    [[deprecated]] bool checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0, unsigned op1,
+			                      unsigned groupX8);
 
     /// Similar to above but ternary and 1st operand is wide.
     bool checkVecTernaryOpsVsEmulW0(const DecodedInst* di, unsigned op0, unsigned op1,
