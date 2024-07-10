@@ -212,6 +212,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     uint64_t dpa_ = 0;        // ld/st data physical address
     uint64_t dsize_ = 0;      // ld/st data size (total)
     uint64_t storeData_ = 0;  // Store data.
+    uint64_t flushVa_ = 0;    // Redirect PC for packets that should be flushed.
 
     WdRiscv::DecodedInst di_; // decoded instruction.
 
@@ -315,7 +316,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// Called by performance model to determine whether or not it should redirect
     /// fetch. Return true on success and false on failure. If successful set flush to
     /// true if flush is required and false otherwise. If flush is required, the new fetch
-    /// address will be in addr.
+    /// address will be in addr. Note: This is not being used, we should deprecate it.
     bool shouldFlush(unsigned hartIx, uint64_t time, uint64_t tag, bool& flush,
 		     uint64_t& addr);
 

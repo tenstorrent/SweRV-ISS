@@ -691,14 +691,20 @@ template <typename URV>
 void
 Hart<URV>::resetVector()
 {
-  // If vector extension enabled but vectors not configured, then
-  // configure for 128-bits per regiser and 32-bits per elemement.
   if (isRvv())
     {
       bool configured = vecRegs_.registerCount() > 0;
-      if (not configured)
-	vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/,
-			4 /*maxBytesPerElem*/, nullptr /*minSewPerLmul*/, nullptr);
+      if (not configured) {
+        constexpr uint32_t bytesPerReg = std::is_same<URV, uint32_t>::value ? 32 : 64;
+        constexpr uint32_t maxBytesPerElem = std::is_same<URV, uint32_t>::value ? 4 : 8;
+        vecRegs_.config(
+            bytesPerReg,
+            1 /*minBytesPerElem*/,
+            maxBytesPerElem,
+            nullptr /*minSewPerLmul*/,
+            nullptr /*maxSewPerLmul*/
+        );
+      }
       unsigned bytesPerReg = vecRegs_.bytesPerRegister();
       csRegs_.configCsr(CsrNumber::VLENB, true, bytesPerReg, 0, 0, false /*shared*/);
       uint32_t vstartBits = static_cast<uint32_t>(std::log2(bytesPerReg*8));
@@ -1132,6 +1138,8 @@ Hart<URV>::execAddi(const DecodedInst* di)
 #ifdef HINT_OPS
   if (di->op0() == 0 and di->op1() == 31)
     throw CoreException(CoreException::Snapshot, "Taking snapshot from HINT.");
+  if (di->op0() == 0 and di->op1() == 30)
+    throw CoreException(CoreException::Stop, "Stopping run from HINT.");
 #endif
 }
 

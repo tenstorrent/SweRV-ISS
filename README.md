@@ -89,6 +89,17 @@ On a Unix system, in the whisper directory, do the following:
 ```
 where x is the path to your boost library installation.
 
+# Options
+
+There are various Makefile options that can be used.
+
++ `SOFT_FLOAT=1` to use softfloat for RISCV fp operations.
++ `PCI=1` to build the PCI library.
++ `TRACE_READER=1` to build the trace reader library.
++ `MEM_CALLBACKS=1` to use the sparse memory model.
++ `HINT_OPS=1` to enable HINT ops implemented within whisper.
++ `FAST_SLOPPY=1` to enable faster (but not compliant) execution.
++ `LZ4_COMPRESS=1` to enable loading LZ4 files.
 
 <a name="Preparing"/>
 
