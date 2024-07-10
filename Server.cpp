@@ -835,18 +835,24 @@ Server<URV>::translateCommand(const WhisperMessage& req,
 template <typename URV>
 bool
 Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
-			    Hart<URV>& hart)
+			    Hart<URV>& hart, FILE* cmdLog)
 {
   bool ok = true;
-
-  unsigned elemIx = req.resource & 0xff;
-  unsigned elemSize = req.resource >> 16;
+  uint32_t hartId = req.hart;
 
   if (req.size <= 8)
-    ok = system_.mcmRead(hart, req.time, req.instrTag, req.address, req.size,
-			 req.value, elemIx);
+    {
+      ok = system_.mcmRead(hart, req.time, req.instrTag, req.address, req.size,
+			   req.value);
+      if (cmdLog)
+          fprintf(cmdLog, "hart=%" PRIu32 " time=%" PRIu64 " mread %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
+                  hartId, req.time, req.instrTag, req.address, req.size, req.value);
+    }
   else
     {
+      unsigned elemSize = req.resource;
+      unsigned elemIx = req.value;
+
       if (req.size > req.buffer.size())
 	{
 	  std::cerr << "Error: Server command: McmRead data size too large: "
@@ -856,11 +862,6 @@ Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
       else
 	{
 	  // Transaction is for vector. Break it into element transactions.
-	  // We need element size and element index from the test bench.
-	  // For now break into bytes.
-	  elemSize = 1; // Temporary
-	  elemIx = 0;   // Temporary
-
 	  unsigned elemCount = req.size / elemSize;
 	  assert(elemCount * elemSize == req.size);
 
@@ -883,6 +884,19 @@ Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
 	      if (ok)
 		ok = system_.mcmRead(hart, req.time, req.instrTag, addr, elemSize, value,
 				     elemIx);
+	    }
+
+	  if (cmdLog)
+	    {
+	      fprintf(cmdLog, "hart=%" PRIu32 " time=%" PRIu64 " mread %" PRIu64 " 0x%" PRIx64 "%" PRIu32 "0x",
+		      hartId, req.time, req.instrTag, req.address, req.size);
+	      const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
+	      for (unsigned i = req.size; i > 0; --i)
+		{
+		  unsigned val = data[i-1];
+		  fprintf(cmdLog, "%02x", val);
+		}
+	      fprintf(cmdLog, " %d %d\n", elemSize, elemIx);
 	    }
 	}
     }
@@ -1217,11 +1231,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         break;
 
       case McmRead:
-	mcmReadCommand(msg, reply, hart);
-        if (commandLog)
-          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mread %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
-                  hartId, msg.time, msg.instrTag, msg.address, msg.size,
-                  msg.value);
+	mcmReadCommand(msg, reply, hart, commandLog);
         break;
 
       case McmInsert:

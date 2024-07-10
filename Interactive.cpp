@@ -2079,7 +2079,7 @@ Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
   if (tokens.size() != 5 and tokens.size() != 7)
     {
       std::cerr << "Invalid mread command: " << line << '\n';
-      std::cerr << "  Expecting: mread <tag> <addr> <size> <data> [<elem-ix> <elem-size>]\n";
+      std::cerr << "  Expecting: mread <tag> <addr> <size> <data> [<elem-size> <elem-ix>]\n";
       return false;
     }
 
@@ -2114,12 +2114,12 @@ Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
   // or a cache line size (64).
   assert(tokens.size() == 7);
 
-  unsigned elemIx = 0;
-  if (not parseCmdLineNumber("element-ix", tokens.at(5), elemIx))
+  unsigned elemSize = 0;
+  if (not parseCmdLineNumber("element-size", tokens.at(5), elemSize))
     return false;
 
-  unsigned elemSize = 0;
-  if (not parseCmdLineNumber("element-size", tokens.at(6), elemSize))
+  unsigned elemIx = 0;
+  if (not parseCmdLineNumber("element-ix", tokens.at(6), elemIx))
     return false;
 
   std::vector<uint8_t> bytes;
