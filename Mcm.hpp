@@ -354,8 +354,13 @@ namespace WdRiscv
       for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
 	{
 	  const auto& op = *iter;
-	  if (not op.canceled_ and op.hartIx_ == hartIx and op.time_ > eot)
-	    minTag = std::min(minTag, op.instrTag_);
+	  if (not op.canceled_ and op.hartIx_ == hartIx)
+	    {
+	      if (op.time_ > eot)
+		minTag = std::min(minTag, op.instrTag_);
+	      else
+		break;
+	    }
 	}
 
       return minTag;
