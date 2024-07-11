@@ -210,6 +210,10 @@ namespace WdRiscv
     /// instruction.
     uint64_t latestByteTime(const McmInstr& instr, uint64_t addr) const;
 
+    /// Skip checking preserve program order (PPO) rules if flag is true.
+    void enablePpo(bool flag)
+    { enablePpo_ = flag; }
+
     /// Check PPO rule1 for the given instruction as instruction B, all relevant
     /// preceding instructions (in program order) are considered as instruction A.
     /// Return true if no violation of rule1 is found and false otherwise.
@@ -557,6 +561,8 @@ namespace WdRiscv
     // Check whole merge buffer line if true otherwise check bytes
     // covered by store instructions.
     bool checkWholeLine_ = false;
+
+    bool enablePpo_ = true;  // Skip checking PPO rules when false.
 
     bool isTso_ = false;  // True if total-store-ordering model.
 

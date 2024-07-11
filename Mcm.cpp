@@ -421,12 +421,15 @@ Mcm<URV>::mergeBufferInsertScalar(Hart<URV>& hart, uint64_t time, uint64_t instr
 	  return false;
 	}
 
-      if (not ppoRule1(hart, *instr))
-	result = false;
+      if (enablePpo_)
+	{
+	  if (not ppoRule1(hart, *instr))
+	    result = false;
 
-      if (instr->di_.isAmo())
-	if (not ppoRule3(hart, *instr))
-	  result = false;
+	  if (instr->di_.isAmo())
+	    if (not ppoRule3(hart, *instr))
+	      result = false;
+	}
 
       // We commit the RTL data to memory but we check them against whisper data
       // (checkRtlWrite below). This is simpler than committing part of whisper
@@ -539,8 +542,11 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 	      if (not op.isCanceled() and not op.isRead_)
 		result = checkRtlWrite(hart.hartId(), *instr, op) and result;
 	    }
-	  result = ppoRule1(hart, *instr) and result;
-	  result = ppoRule3(hart, *instr) and result;
+	  if (enablePpo_)
+	    {
+	      result = ppoRule1(hart, *instr) and result;
+	      result = ppoRule3(hart, *instr) and result;
+	    }
 	}
     }
 
@@ -602,7 +608,8 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
       if (instrB.complete_)
 	{
 	  undrained.erase(instrB.tag_);
-	  return ppoRule1(hart, instrB);
+	  if (enablePpo_)
+	    return ppoRule1(hart, instrB);
 	}
       else
 	undrained.insert(instrB.tag_);
@@ -714,7 +721,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (instr->isStore_ and instr->complete_)
     {
       ok = checkStoreData(hartIx, *instr) and ok;
-      ok = ppoRule1(hart, *instr) and ok;
+      if (enablePpo_)
+	ok = ppoRule1(hart, *instr) and ok;
     }
 
   if (instr->isLoad_)
@@ -722,18 +730,21 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   assert(di.isValid());
 
-  ok = ppoRule2(hart, *instr) and ok;
-  ok = ppoRule3(hart, *instr) and ok;
-  ok = processFence(hart, *instr) and ok;  // ppo rule 4.
-  ok = ppoRule5(hart, *instr) and ok;
-  ok = ppoRule6(hart, *instr) and ok;
-  ok = ppoRule7(hart, *instr) and ok;
-  ok = ppoRule8(hart, *instr) and ok;
-  ok = ppoRule9(hart, *instr) and ok;
-  ok = ppoRule10(hart, *instr) and ok;
-  ok = ppoRule11(hart, *instr) and ok;
-  ok = ppoRule12(hart, *instr) and ok;
-  ok = ppoRule13(hart, *instr) and ok;
+  if (enablePpo_)
+    {
+      ok = ppoRule2(hart, *instr) and ok;
+      ok = ppoRule3(hart, *instr) and ok;
+      ok = processFence(hart, *instr) and ok;  // ppo rule 4.
+      ok = ppoRule5(hart, *instr) and ok;
+      ok = ppoRule6(hart, *instr) and ok;
+      ok = ppoRule7(hart, *instr) and ok;
+      ok = ppoRule8(hart, *instr) and ok;
+      ok = ppoRule9(hart, *instr) and ok;
+      ok = ppoRule10(hart, *instr) and ok;
+      ok = ppoRule11(hart, *instr) and ok;
+      ok = ppoRule12(hart, *instr) and ok;
+      ok = ppoRule13(hart, *instr) and ok;
+    }
 
   return ok;
 }
@@ -970,8 +981,9 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	  instr->complete_ = true;
 	  auto& undrained = hartUndrainedStores_.at(hartIx);
 	  undrained.erase(instr->tag_);
-	  if (not ppoRule1(hart, *instr))
-	    result = false;
+	  if (enablePpo_)
+	    if (not ppoRule1(hart, *instr))
+	      result = false;
 	}
       if (instr->retired_ and instr->di_.instEntry()->isSc())
 	{
