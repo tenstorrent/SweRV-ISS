@@ -344,31 +344,12 @@ namespace WdRiscv
     void setCheckWholeMbLine(bool flag)
     { checkWholeLine_ = flag; }
 
-    /// Return the smallest tag of an instruction preceeding the given instruction
-    /// and having a memory time larger than that of the given instruction.
-    /// Return the tag of the given instruction if no smaller tag can be found.
-    McmInstrIx getMinTagWithLargerTime(unsigned hartIx, const McmInstr& instr) const
-    {
-      assert(not instr.canceled_ and instr.retired_);
-
-      auto eot = earliestOpTime(instr);
-
-      McmInstrIx minTag = instr.tag_;
-
-      for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
-	{
-	  const auto& op = *iter;
-	  if (not op.canceled_ and op.hartIx_ == hartIx)
-	    {
-	      if (op.time_ > eot)
-		minTag = std::min(minTag, op.instrTag_);
-	      else
-		break;
-	    }
-	}
-
-      return minTag;
-    }
+    /// Return the smallest tag of a load/amo instruction preceeding the given instruction
+    /// and having a memory time larger than that of the given instruction. Return the tag
+    /// of the given instruction if no smaller tag can be found. This supports ppo rules
+    /// 12 and 13. We only check read tags because a write cannot generate a data or
+    /// address dependency.
+    McmInstrIx getMinReadTagWithLargerTime(unsigned hartIx, const McmInstr& instr) const;
 
   protected:
 

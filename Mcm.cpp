@@ -2829,6 +2829,32 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
 
 
 template <typename URV>
+McmInstrIx
+Mcm<URV>::getMinReadTagWithLargerTime(unsigned hartIx, const McmInstr& instr) const
+{
+  assert(not instr.canceled_ and instr.retired_);
+
+  auto eot = earliestOpTime(instr);
+
+  McmInstrIx minTag = instr.tag_;
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+    {
+      const auto& op = *iter;
+      if (op.canceled_ or op.hartIx_ != hartIx or not op.isRead_)
+	continue;
+
+      if (op.time_ > eot)
+	minTag = std::min(minTag, op.instrTag_);
+      else
+	break;
+    }
+
+  return minTag;
+}
+
+
+template <typename URV>
 bool
 Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 {
@@ -2840,7 +2866,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
     return true;  // NA: B is not a load.
 
   unsigned hartIx = hart.sysHartIndex();
-  auto minTag = getMinTagWithLargerTime(hartIx, instrB);
+  auto minTag = getMinReadTagWithLargerTime(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
   auto earlyB = earliestOpTime(instrB);
@@ -2900,7 +2926,7 @@ Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   unsigned hartIx = hart.sysHartIndex();
-  auto minTag = getMinTagWithLargerTime(hartIx, instrB);
+  auto minTag = getMinReadTagWithLargerTime(hartIx, instrB);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
   auto earlyB = earliestOpTime(instrB);
 
