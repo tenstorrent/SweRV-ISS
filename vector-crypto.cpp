@@ -1037,7 +1037,7 @@ Hart<URV>::execVwsll_vx(const DecodedInst* di)
 
   unsigned elems = vecRegs_.elemMax(dsew);
 
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
   URV e2 = SRV(intRegs_.read(rs2));
@@ -1094,7 +1094,7 @@ Hart<URV>::execVwsll_vi(const DecodedInst* di)
 
   unsigned elems = vecRegs_.elemMax(dsew);
 
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
   URV e2 = imm;

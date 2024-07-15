@@ -214,6 +214,10 @@ namespace WdRiscv
     /// instruction.
     uint64_t latestByteTime(const McmInstr& instr, uint64_t addr) const;
 
+    /// Skip checking preserve program order (PPO) rules if flag is true.
+    void enablePpo(bool flag)
+    { enablePpo_ = flag; }
+
     /// Check PPO rule1 for the given instruction as instruction B, all relevant
     /// preceding instructions (in program order) are considered as instruction A.
     /// Return true if no violation of rule1 is found and false otherwise.
@@ -267,6 +271,12 @@ namespace WdRiscv
     /// Helper to above ppoRule7.
     bool ppoRule7(const McmInstr& instrA, const McmInstr& instrB) const;
 
+    /// Check that all preceeding stores preceeding fence in program order have drained
+    /// given that the fence has predecessor write. Reutrn true on success and fail
+    /// if any preceeding store have not drained. This is stronger than what is requied
+    /// by ppo rule4 and it simplifies that rule.
+    bool checkFence(Hart<URV>& hart, const McmInstr& fence) const;
+
     /// If B is a load and A is cbo.flush/clean instruction that overlaps B and precedes
     /// it in program order, then B cannot have a read operation prior to to A's retire
     /// time.  Return true if this rule followed and false otherwise.
@@ -282,11 +292,6 @@ namespace WdRiscv
     /// to the current RISC-V hart are ordered before subsequent SINVAL.VMA instructions
     /// executed by the same hart.
     bool checkSfenceWInval(Hart<URV>& hart, const McmInstr& instr) const;
-
-    /// If given instruction is a fence add it to the set of pending
-    /// fences. If oldest pending fence instruction is within window,
-    /// then remove it from pending set and check rule 4 on it.
-    bool processFence(Hart<URV>& hart, const McmInstr& instr);
 
     uint64_t latestOpTime(const McmInstr& instr) const
     {
@@ -344,31 +349,12 @@ namespace WdRiscv
     void setCheckWholeMbLine(bool flag)
     { checkWholeLine_ = flag; }
 
-    /// Return the smallest tag of an instruction preceeding the given instruction
-    /// and having a memory time larger than that of the given instruction.
-    /// Return the tag of the given instruction if no smaller tag can be found.
-    McmInstrIx getMinTagWithLargerTime(unsigned hartIx, const McmInstr& instr) const
-    {
-      assert(not instr.canceled_ and instr.retired_);
-
-      auto eot = earliestOpTime(instr);
-
-      McmInstrIx minTag = instr.tag_;
-
-      for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
-	{
-	  const auto& op = *iter;
-	  if (not op.canceled_ and op.hartIx_ == hartIx)
-	    {
-	      if (op.time_ > eot)
-		minTag = std::min(minTag, op.instrTag_);
-	      else
-		break;
-	    }
-	}
-
-      return minTag;
-    }
+    /// Return the smallest tag of a load/amo instruction preceeding the given instruction
+    /// and having a memory time larger than that of the given instruction. Return the tag
+    /// of the given instruction if no smaller tag can be found. This supports ppo rules
+    /// 12 and 13. We only check read tags because a write cannot generate a data or
+    /// address dependency.
+    McmInstrIx getMinReadTagWithLargerTime(unsigned hartIx, const McmInstr& instr) const;
 
   protected:
 
@@ -666,6 +652,8 @@ namespace WdRiscv
     // Check whole merge buffer line if true otherwise check bytes covered by store
     // instructions.
     bool checkWholeLine_ = false;
+
+    bool enablePpo_ = true;  // Skip checking PPO rules when false.
 
     bool isTso_ = false;  // True if total-store-ordering model.
 

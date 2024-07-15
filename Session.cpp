@@ -874,7 +874,7 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
       config.getMcmCheckAll(checkAll);
       if (args.mcmca)
 	checkAll = true;
-      if (not system.enableMcm(mcmLineSize, checkAll))
+      if (not system.enableMcm(mcmLineSize, checkAll, not args.noPpo))
 	errors++;
     }
 

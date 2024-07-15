@@ -474,6 +474,8 @@ Args::parseCmdLineArgs(std::span<char*> argv)
          "sequence.")
 	("mcm", po::bool_switch(&this->mcm),
 	 "Enable memory consistency checks. This is meaningful in server/interactive mode.")
+	("noppo", po::bool_switch(&this->noPpo),
+	 "Skip preserve program order rule check in MCM when this is used.")
 	("mcmca", po::bool_switch(&this->mcmca),
 	 "Check all bytes of the memory consistency check merge buffer. If not used "
 	 "we only check the bytes inserted into the merge buffer.")

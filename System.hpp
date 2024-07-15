@@ -281,7 +281,7 @@ namespace WdRiscv
     /// transactions. Behavior is undefined if used in non-server/non-interactive mode or
     /// if used after execution has started. The mergeBuffserSize is the merge buffer line
     /// size in bytes.
-    bool enableMcm(unsigned mergeBufferSize, bool mbLineCheckAll);
+    bool enableMcm(unsigned mergeBufferSize, bool mbLineCheckAll, bool enablePpo = true);
 
     /// Enable the performance mode API.
     bool enablePerfApi(std::vector<FILE*>& traceFiles);
