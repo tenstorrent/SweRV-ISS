@@ -31,7 +31,6 @@ Mcm<URV>::Mcm(unsigned hartCount, unsigned pageSize, unsigned mergeBufferSize)
 
   hartBranchTimes_.resize(hartCount);
   hartBranchProducers_.resize(hartCount);
-  hartPendingFences_.resize(hartCount);
   hartUndrainedStores_.resize(hartCount);
 
   sinvalVmaTime_.resize(hartCount);
@@ -732,9 +731,12 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   if (enablePpo_)
     {
+      if (di.isFence())
+	ok = checkFence(hart, *instr) and ok;
+
       ok = ppoRule2(hart, *instr) and ok;
       ok = ppoRule3(hart, *instr) and ok;
-      ok = processFence(hart, *instr) and ok;  // ppo rule 4.
+      ok = ppoRule4(hart, *instr) and ok;
       ok = ppoRule5(hart, *instr) and ok;
       ok = ppoRule6(hart, *instr) and ok;
       ok = ppoRule7(hart, *instr) and ok;
@@ -2210,60 +2212,12 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 
 template <typename URV>
 bool
-Mcm<URV>::processFence(Hart<URV>& hart, const McmInstr& instr)
-{
-  assert(instr.isRetired());
-
-  unsigned hartIx = hart.sysHartIndex();
-
-  auto& pendingFences = hartPendingFences_.at(hartIx);
-  if (instr.di_.isFence())
-    pendingFences.insert(instr.tag_);
-
-  // If head of pending fence instructions is within window, process it.
-  auto iter = pendingFences.begin();
-  if (iter == pendingFences.end())
-    return true;
-
-  auto tag = *iter;
-  if (instr.tag_ - tag < windowSize_)
-    return true;
-
-  pendingFences.erase(iter);
-  auto& instrVec = hartInstrVecs_.at(hartIx);
-  if (tag >= instrVec.size())
-    {
-      assert(0 && "Invalid tag in Mcm::processFence");
-      return false;
-    }
-  const auto& pending = instrVec.at(tag);
-  if (not pending.retired_ or not pending.di_.isValid() or not pending.di_.isFence())
-    {
-      assert(0 && "Invalid fence instruction in Mcm::processFence");
-      return false;
-    }
-
-  return ppoRule4(hart, pending);
-}
-
-
-template <typename URV>
-bool
 Mcm<URV>::finalChecks(Hart<URV>& hart)
 {
   unsigned hartIx = hart.sysHartIndex();
-  auto& pendingFences = hartPendingFences_.at(hartIx);
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
   bool ok = true;
-
-  for (auto fenceIx : pendingFences)
-    {
-      const auto& fence = instrVec.at(fenceIx);
-      ok = ppoRule4(hart, fence) and ok;
-    }
-
-  pendingFences.clear();
 
   auto& pendingWrites = hartPendingWrites_.at(hartIx);
   if (not pendingWrites.empty())
@@ -2313,55 +2267,109 @@ Mcm<URV>::effectiveReadTime(const McmInstr& instr) const
 
 template <typename URV>
 bool
-Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
+Mcm<URV>::checkFence(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  assert(instrB.isRetired());
+
+  const DecodedInst& bdi = instrB.di_;
+
+  // If fence instruction has predecessor write, then check that all preceeding stores
+  // have drained. This is stronger thatn what is required by ppo rule 4 but it makes
+  // that rule simpler to implement.
+  if (not bdi.isFencePredWrite())
+    return true;
+  
+  unsigned hartIx = hart.sysHartIndex();
+  const auto& undrained = hartUndrainedStores_.at(hartIx);
+  if (not undrained.empty())
+    {
+      cerr << "Error: PPO rule 4 failed: Hart-id=" << hart.hartId() << " tag=" << instrB.tag_
+	   << " fence instruction with predecessor-write retired with undrained stores\n";
+      return false;
+    }
+  
+  return true;
+}
+  
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 4: There is a fence that orders A before B.
 
-  assert(instr.isRetired());
-
-  if (not instr.di_.isFence())
+  assert(instrB.isRetired());
+  if (not instrB.isMemory())
     return true;
 
-  bool predRead = instr.di_.isFencePredRead();
-  bool predWrite = instr.di_.isFencePredWrite();
-  bool succRead = instr.di_.isFenceSuccRead();
-  bool succWrite = instr.di_.isFenceSuccWrite();
-  bool predIn = instr.di_.isFencePredInput();
-  bool predOut = instr.di_.isFencePredOutput();
-  bool succIn = instr.di_.isFencePredInput();
-  bool succOut = instr.di_.isFencePredOutput();
+  // We assume that stores preceeding a fence are drained before fence retires if fence
+  // has predecessor write. This is checked in checkFence.
 
+  auto earlyB = earliestOpTime(instrB);
+  if (earlyB > instrB.retireTime_)
+    return true;
+
+  // Find smallest tag of instructions out of order with respect to B (excluding those
+  // with write).
   unsigned hartIx = hart.sysHartIndex();
+  McmInstrIx minTag = getMinReadTagWithLargerTime(hartIx, instrB);
+
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  McmInstrIx begin = instr.tag_ >= windowSize_ ? instr.tag_ - windowSize_ : 0;
-  McmInstrIx end = instr.tag_ + windowSize_;
-  if (end >= instrVec.size())
-    end = instrVec.size();
-
-  bool ok = true;
-
-  for (McmInstrIx predIx = begin; predIx < instr.tag_; ++predIx)
+  bool hasFence = false;  // True if there is a fence preceeding B.
+  for (unsigned tag = minTag; tag < instrB.tag_ and not hasFence; ++tag)
     {
-      const McmInstr& pred = instrVec.at(predIx);
-      if (instr.canceled_ or not pred.di_.isValid() or not pred.isMemory())
+      const auto& pred = instrVec.at(tag);
+      if (pred.isCanceled())
+	continue;
+      hasFence = pred.di_.isFence();
+    }
+  if (not hasFence)
+    return true;  // No fence among instructions out of order with respect to B.
+
+  for (unsigned tag = instrB.tag_ - 1; tag <= minTag; --tag)
+    {
+      const auto& instr = instrVec.at(tag);
+      if (instr.isCanceled() or not instr.di_.isFence())
 	continue;
 
-      Pma predPma = hart.getPma(pred.physAddr_);
+      const auto& fence = instr;
 
-      if (not (predRead and pred.isLoad_)
-	  and not (predWrite and pred.isStore_)
-	  and not (predIn and pred.isLoad_ and predPma.isIo())
-	  and not (predOut and pred.isStore_ and predPma.isIo()))
-	continue;
+      bool predRead = fence.di_.isFencePredRead();
+      bool predWrite = fence.di_.isFencePredWrite();
+      bool succRead = fence.di_.isFenceSuccRead();
+      bool succWrite = fence.di_.isFenceSuccWrite();
+      bool predIn = fence.di_.isFencePredInput();
+      bool predOut = fence.di_.isFencePredOutput();
+      bool succIn = fence.di_.isFencePredInput();
+      bool succOut = fence.di_.isFencePredOutput();
 
-      for (McmInstrIx succIx = instr.tag_ + 1; succIx < end; ++succIx)
+      for (unsigned aTag = tag - 1; tag <= minTag; --tag)
 	{
-	  const McmInstr& succ = instrVec.at(succIx);
-	  if (succ.canceled_ or not succ.di_.isValid() or not succ.isMemory())
+	  const auto& pred = instrVec.at(aTag);
+	  if (pred.isCanceled() or not pred.isMemory())
 	    continue;
 
-	  Pma succPma = hart.getPma(pred.physAddr_);
+	  // We assume that stores following a fence in program order cannot drain before
+	  // fence is retired.
+	  if (instrB.isStore_ and earlyB <= fence.retireTime_)
+	    {
+	      cerr << "Error: PPO rule 4 failed: Hart-id=" << hart.hartId() << " tag="
+		   << instrB.tag_ << " fence-tag= " << fence.tag_ << " store instruction "
+		   << "drains before preceeding fence instruction retires\n";
+	      return false;
+	    }
+
+	  Pma predPma = hart.getPma(pred.physAddr_);
+
+	  if (not (predRead and pred.isLoad_)
+	      and not (predWrite and pred.isStore_)
+	      and not (predIn and pred.isLoad_ and predPma.isIo())
+	      and not (predOut and pred.isStore_ and predPma.isIo()))
+	    continue;
+
+	  const McmInstr& succ = instrB;
+	  Pma succPma = hart.getPma(succ.physAddr_);
 
 	  if (not (succRead and succ.isLoad_)
 	      and not (succWrite and succ.isStore_)
@@ -2412,11 +2420,11 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
 	       << " tag1=" << pred.tag_ << " tag2=" << succ.tag_
 	       << " fence-tag=" << instr.tag_
 	       << " time1=" << predTime << " time2=" << succTime << '\n';
-	  ok = false;
+	  return false;
 	}
     }
 
-  return ok;
+  return true;
 }
 
 

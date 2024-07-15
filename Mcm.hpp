@@ -267,6 +267,12 @@ namespace WdRiscv
     /// Helper to above ppoRule7.
     bool ppoRule7(const McmInstr& instrA, const McmInstr& instrB) const;
 
+    /// Check that all preceeding stores preceeding fence in program order have drained
+    /// given that the fence has predecessor write. Reutrn true on success and fail
+    /// if any preceeding store have not drained. This is stronger than what is requied
+    /// by ppo rule4 and it simplifies that rule.
+    bool checkFence(Hart<URV>& hart, const McmInstr& fence) const;
+
     /// If B is a load and A is cbo.flush/clean instruction that overlaps B and precedes
     /// it in program order, then B cannot have a read operation prior to to A's retire
     /// time.  Return true if this rule followed and false otherwise.
@@ -282,11 +288,6 @@ namespace WdRiscv
     /// to the current RISC-V hart are ordered before subsequent SINVAL.VMA instructions
     /// executed by the same hart.
     bool checkSfenceWInval(Hart<URV>& hart, const McmInstr& instr) const;
-
-    /// If given instruction is a fence add it to the set of pending
-    /// fences. If oldest pending fence instruction is within window,
-    /// then remove it from pending set and check rule 4 on it.
-    bool processFence(Hart<URV>& hart, const McmInstr& instr);
 
     uint64_t latestOpTime(const McmInstr& instr) const
     {
@@ -551,7 +552,6 @@ namespace WdRiscv
 
     std::vector<RegTimeVec> hartRegTimes_;  // One vector per hart.
     std::vector<RegProducer> hartRegProducers_;  // One vector per hart.
-    std::vector<std::set<McmInstrIx>> hartPendingFences_;
 
     // Retired but not yet darained stores. Candidates for forwarding.
     std::vector<std::set<McmInstrIx>> hartUndrainedStores_;
