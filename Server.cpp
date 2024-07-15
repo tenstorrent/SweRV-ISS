@@ -850,9 +850,6 @@ Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
     }
   else
     {
-      unsigned elemSize = req.resource;
-      unsigned elemIx = req.value;
-
       if (req.size > req.buffer.size())
 	{
 	  std::cerr << "Error: Server command: McmRead data size too large: "
@@ -861,29 +858,12 @@ Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
 	}
       else
 	{
-	  // Transaction is for vector. Break it into element transactions.
-	  unsigned elemCount = req.size / elemSize;
-	  assert(elemCount * elemSize == req.size);
-
 	  const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
-	  for (unsigned i = 0; i < elemCount and ok; ++i, ++elemIx, data += elemSize)
+	  for (unsigned i = 0; i < req.size and ok; ++i, ++data)
 	    {
-	      uint64_t addr = req.address + elemSize * i;
-	      uint64_t value = 0;
-	      switch(elemSize)
-		{
-		case 1: value = *reinterpret_cast<const uint8_t* > (data);  break;
-		case 2: value = *reinterpret_cast<const uint16_t*> (data);  break;
-		case 4: value = *reinterpret_cast<const uint32_t*> (data);  break;
-		case 8: value = *reinterpret_cast<const uint64_t*> (data);  break;
-		default:
-		  std::cerr << "Server::mcmReadCommand: Bad element size: " << elemSize
-			    << '\n';
-		  ok = false;
-		}
-	      if (ok)
-		ok = system_.mcmRead(hart, req.time, req.instrTag, addr, elemSize, value,
-				     elemIx);
+	      uint64_t addr = req.address + i;
+	      uint64_t value = *data;
+	      ok = system_.mcmRead(hart, req.time, req.instrTag, addr, 1, value);
 	    }
 
 	  if (cmdLog)
@@ -896,7 +876,7 @@ Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
 		  unsigned val = data[i-1];
 		  fprintf(cmdLog, "%02x", val);
 		}
-	      fprintf(cmdLog, " %d %d\n", elemSize, elemIx);
+	      fprintf(cmdLog, "\n");
 	    }
 	}
     }
