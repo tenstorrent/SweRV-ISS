@@ -5305,16 +5305,16 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
       // Check for interrupts destined for machine-mode (not-delegated).
       // VS interrupts (e.g. VSEIP) are always delegated.
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_SOFTWARE, IC::M_TIMER,
- 				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
-				 IC::G_EXTERNAL, IC::LCOF } )
-	{
-	  URV mask = URV(1) << unsigned(ic);
-	  if ((mdest & mask) != 0)
-	    {
-	      cause = ic;
-	      return true;
-	    }
-	}
+                                 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
+                                 IC::G_EXTERNAL, IC::LCOF } )
+        {
+          URV mask = URV(1) << unsigned(ic);
+          if ((mdest & mask) != 0)
+            {
+              cause = ic;
+              return true;
+            }
+        }
     }
   if (privMode_ == PM::Machine)
     return false;   // Interrupts destined for lower privileges are disabled.
@@ -5325,17 +5325,17 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if ((mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User) and sdest != 0)
     {
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_SOFTWARE, IC::M_TIMER,
-				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
-				 IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
-				 IC::VS_TIMER, IC::LCOF } )
-	{
-	  URV mask = URV(1) << unsigned(ic);
-	  if ((sdest & mask) != 0)
-	    {
-	      cause = ic;
-	      return true;
-	    }
-	}
+                                 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
+                                 IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
+                                 IC::VS_TIMER, IC::LCOF } )
+        {
+          URV mask = URV(1) << unsigned(ic);
+          if ((sdest & mask) != 0)
+            {
+              cause = ic;
+              return true;
+            }
+        }
     }
 
   // We now check for interrupts destined for VS mode. These are disabled if running in
@@ -5354,30 +5354,36 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 #if 0
   if (isRvaia())
     {
-      // TODO: cache this
       URV vstopi;
-      if (peekCsr(CsrNumber::VSTOPI, vstopi) and vstopi != 0)
+      peekCsr(CsrNumber::VSTOPI, vstopi);
+      if (vstopi)
         {
-	  cause = static_cast<InterruptCause>(vstopi >> 16);
-	  return true;
+          cause = vstopi >> 16;
+          return true;
         }
     }
 #endif
-
   URV vsMask = possible & delegVal & hDelegVal;
+  if (isRvaia())
+    {
+      URV hvip = csRegs_.peekHvip();
+      URV hvien = csRegs_.peekHvien();
+
+      vsMask |= hvip & hvien & ~hDelegVal;
+    }
   if (vsMask)
     {
       // Only VS interrupts can be delegated in HIDELEG.
       for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
-				 IC::VS_TIMER } )
-	{
-	  URV mask = URV(1) << unsigned(ic);
-	  if ((vsMask & mask) != 0)
-	    {
-	      cause = ic;
-	      return true;
-	    }
-	}
+                                 IC::VS_TIMER } )
+        {
+          URV mask = URV(1) << unsigned(ic);
+          if ((vsMask & mask) != 0)
+            {
+              cause = ic;
+              return true;
+            }
+        }
     }
 
   return false;

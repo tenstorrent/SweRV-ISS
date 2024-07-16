@@ -1404,6 +1404,13 @@ namespace WdRiscv
       return csr.read();
     }
 
+    /// Fast peek method for HVIEN
+    URV peekHvien() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::HVIEN));
+      return csr.read();
+    }
+
     /// Fast peek method for SSTATUS or VSSTATUS
     URV peekSstatus(bool virtMode) const
     {
@@ -1536,6 +1543,12 @@ namespace WdRiscv
     bool readSie(URV& value) const;
 
     /// Helper to read method.
+    bool readVsip(URV& value) const;
+
+    /// Helper to read method.
+    bool readVsie(URV& value) const;
+
+    /// Helper to read method.
     bool readMvip(URV& value) const;
 
     /// Helper to write method.
@@ -1568,6 +1581,12 @@ namespace WdRiscv
 
     /// Helper to write method: Mask with SIP/MIDELEG.
     bool writeSie(URV value);
+
+    /// Helper to write method.
+    bool writeVsip(URV value);
+
+    /// Helper to write method.
+    bool writeVsie(URV value);
 
     /// Helper to write method: Mask with MSTATEEN/HSTATEEN.
     bool writeSstateen(CsrNumber num, URV value);
@@ -2033,6 +2052,32 @@ namespace WdRiscv
     /// Returns true if CSR is defined as part of a STATEEN and enabled, or
     /// not part of STATEEN. Returns false otherwise.
     bool isStateEnabled(CsrNumber num, PrivilegeMode mode, bool virtMode) const;
+
+    /// Shift VS-interrupt bit positions to S-interrupt bit positions.
+    static URV vsInterruptToS(URV bits)
+    {
+      using IC = InterruptCause;
+      URV mask = ((URV(1) << unsigned(IC::VS_SOFTWARE))  |
+                  (URV(1) << unsigned(IC::VS_TIMER))     |
+                  (URV(1) << unsigned(IC::VS_EXTERNAL))) ;
+
+      URV vs = bits & mask;
+      bits &= ~mask;
+      return bits | (vs >> 1);
+    }
+
+    /// Same as above but from S to VS.
+    static URV sInterruptToVs(URV bits)
+    {
+      using IC = InterruptCause;
+      URV mask = ((URV(1) << unsigned(IC::S_SOFTWARE))  |
+                  (URV(1) << unsigned(IC::S_TIMER))     |
+                  (URV(1) << unsigned(IC::S_EXTERNAL))) ;
+
+      URV s = bits & mask;
+      bits &= ~mask;
+      return bits | (s << 1);
+    }
 
   private:
 
