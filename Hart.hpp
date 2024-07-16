@@ -2779,10 +2779,9 @@ namespace WdRiscv
     bool fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
 			      FILE* trace);
 
-    /// Helper to fetchInstWithTrigger. Fetch an instruction given
-    /// that a trigger has tripped. Return true on success. Return
-    /// false on a a fail in which case either a trigger exception is
-    /// initiated (as opposed to an instruction-fail exception).
+    /// Helper to fetchInstWithTrigger. Fetch an instruction given that a trigger has
+    /// tripped. Return true on success. Return false on a a fail in which case a trigger
+    /// exception is initiated (as opposed to an instruction-fail exception).
     bool fetchInstPostTrigger(URV virtAddr, uint64_t& physAddr, uint32_t& inst,
 			      FILE* trace);
 
@@ -5051,6 +5050,7 @@ namespace WdRiscv
     bool csrException_ = false;      // True if there is a CSR related exception.
     bool hasInterrupt_ = false;      // True if there is an interrupt.
     bool triggerTripped_ = false;    // True if a trigger trips.
+    bool dataAddrTrig_ = false;      // True if data address trigger hit.
 
     bool lastBranchTaken_ = false; // Useful for performance counters
     bool misalignedLdSt_ = false;  // Useful for performance counters

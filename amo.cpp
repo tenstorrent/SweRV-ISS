@@ -70,7 +70,10 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
   if (hasActiveTrigger())
     {
       if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
-	triggerTripped_ = true;
+	{
+	  dataAddrTrig_ = not triggerTripped_;
+	  triggerTripped_ = true;
+	}
     }
 
   uint64_t gaddr = virtAddr;
@@ -128,7 +131,10 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
   if (hasActiveTrigger())
     {
       if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
-	triggerTripped_ = true;
+	{
+	  dataAddrTrig_ = not triggerTripped_;
+	  triggerTripped_ = true;
+	}
     }
 
   uint64_t gaddr = virtAddr;
@@ -182,7 +188,10 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
     {
       bool isLd = true;
       if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, isLd))
-	triggerTripped_ = true;
+	{
+	  dataAddrTrig_ = not triggerTripped_;
+	  triggerTripped_ = true;
+	}
       if (triggerTripped_)
 	return false;
     }
@@ -300,7 +309,10 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   bool isLd = false;  // Not a load.
   if (hasTrig and (ldStAddrTriggerHit(virtAddr, ldStSize_, timing, isLd) or
                    ldStDataTriggerHit(storeVal, timing, isLd)))
-    triggerTripped_ = true;
+    {
+      dataAddrTrig_ = not triggerTripped_;
+      triggerTripped_ = true;
+    }
 
   // Misaligned store causes an exception.
   constexpr unsigned alignMask = sizeof(STORE_TYPE) - 1;

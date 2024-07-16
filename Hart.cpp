@@ -1801,7 +1801,10 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
   if (hasActiveTrigger())
     {
       if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
-	triggerTripped_ = true;
+	{
+	  dataAddrTrig_ = not triggerTripped_;
+	  triggerTripped_ = true;
+	}
     }
 
   uint64_t addr1 = virtAddr;
@@ -1920,7 +1923,10 @@ Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr
       TriggerTiming timing = TriggerTiming::Before;
       bool isLoad = true;
       if (ldStDataTriggerHit(uval, timing, isLoad))
-	triggerTripped_ = true;
+	{
+	  dataAddrTrig_ = not triggerTripped_;
+	  triggerTripped_ = true;
+	}
     }
   if (triggerTripped_)
     return false;
@@ -2052,7 +2058,10 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   bool isLd = false;  // Not a load.
   if (hasTrig and (ldStAddrTriggerHit(virtAddr, ldStSize_, timing, isLd) or
                    ldStDataTriggerHit(storeVal, timing, isLd)))
+    {
+      dataAddrTrig_ = not triggerTripped_;
       triggerTripped_ = true;
+    }
 
   // Determine if a store exception is possible. Determine sore exception will do address
   // translation and change pa1/pa2 to physical addresses. Ga1/ga2 are the guest addresses
@@ -4585,6 +4594,7 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst, FI
   bool fetchOk = true;
   if (triggerTripped_)
     {
+      dataAddrTrig_ = false;
       if (not fetchInstPostTrigger(addr, physAddr, inst, file))
         {
 	  if (mcycleEnabled())
@@ -4612,7 +4622,10 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst, FI
 
   // Process pre-execute opcode trigger.
   if (hasTrig and instOpcodeTriggerHit(inst, TriggerTiming::Before))
-    triggerTripped_ = true;
+    {
+      dataAddrTrig_ = false;
+      triggerTripped_ = true;
+    }
 
   return true;
 }
@@ -4746,9 +4759,9 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  if (triggerTripped_)
 	    {
-	      // This is an address or data trigger. MTVAL/STVAL/... gets the virtual
-	      // address of the data.
-	      URV tval = ldStAddr_;
+	      // If this is an address or data trigger, set xTVAL to the virtual address
+	      // of the data.
+	      URV tval = dataAddrTrig_? ldStAddr_ : currPc_;
 	      undoForTrigger();
 	      if (takeTriggerAction(traceFile, currPc_, tval, instCounter_, true))
 		return true;
@@ -5641,8 +5654,11 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 
       if (triggerTripped_)
 	{
+	  // If this is an address or data trigger, set xTVAL to the virtual address of
+	  // the data.
+	  URV tval = dataAddrTrig_? ldStAddr_ : currPc_;
 	  undoForTrigger();
-	  takeTriggerAction(traceFile, currPc_, currPc_, instCounter_, true);
+	  takeTriggerAction(traceFile, currPc_, tval, instCounter_, true);
 	  return;
 	}
 
