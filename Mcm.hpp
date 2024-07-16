@@ -194,7 +194,7 @@ namespace WdRiscv
     /// loaded data. Pa2 is the same as paddr1 except for page crossing loads where pa2 is
     /// the physical address of the second page. Va is the virtual address of the load
     /// data.
-    bool getCurrentLoadValue(Hart<URV>& hart, const DecodedInst& di, uint64_t va,
+    bool getCurrentLoadValue(Hart<URV>& hart, uint64_t va,
 			     uint64_t pa1, uint64_t pa2, unsigned size, uint64_t& value);
 
     /// Return the merge buffer line size in bytes.

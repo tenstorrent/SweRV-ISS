@@ -2295,7 +2295,7 @@ namespace WdRiscv
     }
 
     /// Get the data value for an out of order read (mcm or perfApi).
-    bool getOooLoadValue(const DecodedInst& di, uint64_t va, uint64_t pa1, uint64_t pa2,
+    bool getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2,
 			 unsigned size, uint64_t& value);
 
     /// Set current privilege mode.

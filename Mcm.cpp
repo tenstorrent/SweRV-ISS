@@ -1637,7 +1637,7 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 
 template <typename URV>
 bool
-Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, const DecodedInst& di, uint64_t vaddr,
+Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr,
 			      uint64_t paddr1, uint64_t paddr2, unsigned size, uint64_t& value)
 {
   value = 0;
