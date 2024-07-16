@@ -513,7 +513,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
       std::cerr << "  example:  peek r x3\n";
       std::cerr << "  example:  peek f f4\n";
       std::cerr << "  example:  peek c mtval\n";
-      std::cerr << "  example:  peek c mtval v\n";
+      std::cerr << "  example:  peek c mtval 1\n";
       std::cerr << "  example:  peek v v2\n";
       std::cerr << "  example:  peek m 0x4096\n";
       std::cerr << "  example:  peek t 0\n";
@@ -657,28 +657,15 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
 	  std::cerr << "No such CSR: " << addrStr << '\n';
 	  return false;
 	}
-      if (hart.peekCsr(csr->getNumber(), val))
-	{
-          std::string verbose;
-          if (tokens.size() > 3)
-            verbose = tokens.at(3);
-          if (verbose == "v")
-            {
-              auto fields = csr->fields();
-              if (fields.size())
-                {
-                  for (auto& field : fields)
-                    {
-                      URV mask = ((1 << field.width) - 1);
-                      std::string form = "0x%0" + std::to_string((field.width / 4) + 1) + "x";
-                      out << (boost::format("%-8s: " + form)
-                              % field.field % (val & mask)) << std::endl;
-                      val >>= field.width;
-                    }
-                }
-            }
-          else
-            out << (boost::format(hexForm) % val) << std::endl;
+
+      bool virtMode = false;
+      if (tokens.size() > 3)
+        if (not parseCmdLineNumber("peek-csr-virt-mode", tokens.at(3), virtMode))
+          return false;
+
+      if (hart.peekCsr(csr->getNumber(), val, virtMode))
+        {
+          out << (boost::format(hexForm) % val) << std::endl;
 	  return true;
 	}
       std::cerr << "Failed to read CSR: " << addrStr << '\n';
@@ -823,6 +810,7 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
       std::cerr << "Invalid poke command: " << line << '\n';
       std::cerr << "  Expecting: poke pc <value>\n";
       std::cerr << "    or       poke <resource> <address> <value>\n";
+      std::cerr << "    or       poke c <address> <value> <virt>\n";
       std::cerr << "    or       poke t <number> <value1> <value2> <value3>\n";
       std::cerr << "  where <resource> is one of r, f, c, t, pc or m\n";
       return false;
@@ -916,7 +904,12 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
       auto csr = hart.findCsr(addrStr);
       if (csr)
 	{
-	  if (hart.externalPokeCsr(csr->getNumber(), value))
+          bool virtMode = false;
+          if (tokens.size() > 4)
+            if (not parseCmdLineNumber("poke-csr-virt-mode", tokens.at(4), virtMode))
+              return false;
+
+	  if (hart.externalPokeCsr(csr->getNumber(), value, virtMode))
 	    return true;
 	  std::cerr << "Failed to write CSR " << addrStr << '\n';
 	  return false;

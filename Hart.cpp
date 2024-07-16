@@ -3155,13 +3155,13 @@ Hart<URV>::peekCsr(CsrNumber csrn) const
 template <typename URV>
 bool
 Hart<URV>::peekCsr(CsrNumber csrn, URV& val, URV& reset, URV& writeMask,
-		   URV& pokeMask, URV& readMask) const
+		   URV& pokeMask, URV& readMask, bool virtMode) const
 {
   const Csr<URV>* csr = csRegs_.getImplementedCsr(csrn);
   if (not csr)
     return false;
 
-  if (not peekCsr(csrn, val))
+  if (not peekCsr(csrn, val, virtMode))
     return false;
 
   reset = csr->getResetValue();
@@ -3433,14 +3433,14 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 
 template <typename URV>
 bool
-Hart<URV>::pokeCsr(CsrNumber csr, URV val)
+Hart<URV>::pokeCsr(CsrNumber csr, URV val, bool virtMode)
 {
   URV lastVal;
 
   // Some/all bits of some CSRs are read only to CSR instructions but
   // are modifiable. Use the poke method (instead of write) to make
   // sure modifiable value are changed.
-  if (not csRegs_.peek(csr, lastVal) or not csRegs_.poke(csr, val))
+  if (not csRegs_.peek(csr, lastVal, virtMode) or not csRegs_.poke(csr, val, virtMode))
     return false;
 
   postCsrUpdate(csr, val, lastVal);
