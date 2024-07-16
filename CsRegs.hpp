@@ -1170,7 +1170,11 @@ namespace WdRiscv
     /// read-only register can be changed this way as long as its poke
     /// mask is non-zero. Return true on success and false if number is
     /// out of bounds.
-    bool poke(CsrNumber number, URV value);
+    bool poke(CsrNumber number, URV value, bool virtMode);
+
+    /// Same as above, but uses current virtual mode.
+    bool poke(CsrNumber number, URV value)
+    { return poke(number, value, virtMode_); }
 
     /// Reset all CSRs to their initial (power-on) values.
     void reset();
@@ -1302,7 +1306,7 @@ namespace WdRiscv
 
     bool pokeTrigger(CsrNumber number, URV value);
 
-    bool readTopi(CsrNumber number, URV& value) const;
+    bool readTopi(CsrNumber number, URV& value, bool virtMode) const;
 
     bool setCsrFields(CsrNumber number, const std::vector<typename Csr<URV>::Field>& fields)
     {
@@ -1539,25 +1543,25 @@ namespace WdRiscv
 
     /// Adjust the value of TIME/TIMEH by adding the time delta in
     /// virtual mode.
-    URV adjustTimeValue(CsrNumber csrn, URV value) const;
+    URV adjustTimeValue(CsrNumber csrn, URV value, bool virtMode) const;
 
     /// Adjust the value of SSTATEEN by masking with MSTATEEN and HSTATEEN.
-    URV adjustSstateenValue(CsrNumber csrn, URV value) const;
+    URV adjustSstateenValue(CsrNumber csrn, URV value, bool virtMode) const;
 
     /// Adjust the value of HSTATEEN by masking with MSTATEEN.
     URV adjustHstateenValue(CsrNumber csrn, URV value) const;
 
     // Adjust the value of SCOUNTOVF by masking with MCOUNTEREN/HCOUNTEREN
-    URV adjustScountovfValue(URV value) const;
+    URV adjustScountovfValue(URV value, bool virtMode) const;
 
     /// Heler to read method.
-    bool readMireg(CsrNumber num, URV& value) const;
+    bool readMireg(CsrNumber num, URV& value, bool virtMode) const;
 
     /// Heler to read method.
-    bool readSireg(CsrNumber num, URV& value) const;
+    bool readSireg(CsrNumber num, URV& value, bool virtMode) const;
 
     /// Helper to read method.
-    bool readVsireg(CsrNumber num, URV& value) const;
+    bool readVsireg(CsrNumber num, URV& value, bool virtMode) const;
 
     /// Helper to write method: Mask with MIP/MIDELEG.
     bool writeSip(URV value);

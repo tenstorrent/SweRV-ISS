@@ -300,9 +300,9 @@ CsRegs<URV>::writeMvip(URV value)
 
 template <typename URV>
 URV
-CsRegs<URV>::adjustTimeValue(CsrNumber num, URV value) const
+CsRegs<URV>::adjustTimeValue(CsrNumber num, URV value, bool virtMode) const
 {
-  if (not virtMode_)
+  if (not virtMode)
     return value;
 
   auto delta = getImplementedCsr(CsrNumber::HTIMEDELTA);
@@ -329,7 +329,7 @@ CsRegs<URV>::adjustTimeValue(CsrNumber num, URV value) const
 
 template <typename URV>
 URV
-CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value) const
+CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value, bool virtMode) const
 {
   using CN = CsrNumber;
 
@@ -345,7 +345,7 @@ CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value) const
 	  value &= mcsr->read();
 
       // If a bit is zero in HSTATEEN, it becomes zero in SSTATEEN
-      if (virtMode_)
+      if (virtMode)
 	{
 	  CsrNumber hnum = advance(CN::HSTATEEN0, ix);
 	  auto hcsr = getImplementedCsr(hnum);
@@ -387,12 +387,12 @@ CsRegs<URV>::adjustHstateenValue(CsrNumber num, URV value) const
 
 template <typename URV>
 URV
-CsRegs<URV>::adjustScountovfValue(URV value) const
+CsRegs<URV>::adjustScountovfValue(URV value, bool virtMode) const
 {
   auto csr = getImplementedCsr(CsrNumber::MCOUNTEREN);
   assert(csr and "MCOUNTEREN not implemented");
   URV mask = csr->read();
-  if (virtMode_)
+  if (virtMode)
     {
       csr = getImplementedCsr(CsrNumber::HCOUNTEREN);
       assert(csr and "HCOUNTERN not implemented");
@@ -404,13 +404,13 @@ CsRegs<URV>::adjustScountovfValue(URV value) const
 
 template <typename URV>
 bool
-CsRegs<URV>::readMireg(CsrNumber num, URV& value) const
+CsRegs<URV>::readMireg(CsrNumber num, URV& value, bool virtMode) const
 {
   URV sel = 0;
   peek(CsrNumber::MISELECT, sel);
   if (imsic_)
     {
-      auto csr = getImplementedCsr(num, virtMode_);
+      auto csr = getImplementedCsr(num, virtMode);
       if (not csr)
 	return false;
 
@@ -422,18 +422,18 @@ CsRegs<URV>::readMireg(CsrNumber num, URV& value) const
 
 template <typename URV>
 bool
-CsRegs<URV>::readSireg(CsrNumber num, URV& value) const
+CsRegs<URV>::readSireg(CsrNumber num, URV& value, bool virtMode) const
 {
   URV sel = 0;
   peek(CsrNumber::SISELECT, sel);
   if (imsic_)
     {
-      auto csr = getImplementedCsr(num, virtMode_);
+      auto csr = getImplementedCsr(num, virtMode);
       if (not csr)
 	return false;
 
       unsigned guest = 0;
-      if (virtMode_)
+      if (virtMode)
 	{
 	  URV hs = 0;
 	  peek(CsrNumber::HSTATUS, hs);
@@ -441,7 +441,7 @@ CsRegs<URV>::readSireg(CsrNumber num, URV& value) const
 	  guest = hsf.bits_.VGEIN;
 	}
 
-      return imsic_->readSireg(virtMode_, guest, sel, value);
+      return imsic_->readSireg(virtMode, guest, sel, value);
     }
   return false;
 }
@@ -449,13 +449,13 @@ CsRegs<URV>::readSireg(CsrNumber num, URV& value) const
 
 template <typename URV>
 bool
-CsRegs<URV>::readVsireg(CsrNumber num, URV& value) const
+CsRegs<URV>::readVsireg(CsrNumber num, URV& value, bool virtMode) const
 {
   URV sel = 0;
   peek(CsrNumber::VSISELECT, sel);
   if (imsic_)
     {
-      auto csr = getImplementedCsr(num, virtMode_);
+      auto csr = getImplementedCsr(num, virtMode);
       if (not csr)
 	return false;
 
@@ -500,11 +500,11 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
       return true;
     }
   else if (num == CN::MIREG)
-    return readMireg(num, value);
+    return readMireg(num, value, virtMode_);
   else if (num == CN::SIREG)
-    return readSireg(num, value);
+    return readSireg(num, value, virtMode_);
   else if (num == CN::VSIREG)
-    return readVsireg(num, value);
+    return readVsireg(num, value, virtMode_);
   else if (num == CN::SIP)
     return readSip(value);
   else if (num == CN::SIE)
@@ -542,7 +542,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
     }
 
   if (num == CN::MTOPI or num == CN::STOPI or num == CN::VSTOPI)
-    return readTopi(num, value);
+    return readTopi(num, value, virtMode_);
   else if (num == CN::SIE)
     return readSie(value);
   else if (num == CN::SIP)
@@ -553,16 +553,16 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
   value = csr->read();
 
   if (virtMode_ and (num == CN::TIME or num == CN::TIMEH))
-    value = adjustTimeValue(num, value);  // In virt mode, time is time + htimedelta.
+    value = adjustTimeValue(num, value, virtMode_);  // In virt mode, time is time + htimedelta.
   else if (num >= CN::PMPADDR0 and num <= CN::PMPADDR63)
     value = adjustPmpValue(num, value);
   else if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
-    value = adjustSstateenValue(num, value);
+    value = adjustSstateenValue(num, value, virtMode_);
   else if ((num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3) or
            (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H))
     value = adjustHstateenValue(num, value);
   else if (num == CN::SCOUNTOVF)
-    value = adjustScountovfValue(value);
+    value = adjustScountovfValue(value, virtMode_);
 
   return true;
 }
@@ -3413,7 +3413,13 @@ CsRegs<URV>::peek(CsrNumber num, URV& value, bool virtMode) const
 
   if (num == CsrNumber::MTOPI or num == CsrNumber::STOPI or
       num == CsrNumber::VSTOPI)
-    return readTopi(num, value);
+    return readTopi(num, value, virtMode);
+  else if (num == CN::MIREG)
+    return readMireg(num, value, virtMode);
+  else if (num == CN::SIREG)
+    return readSireg(num, value, virtMode);
+  else if (num == CN::VSIREG)
+    return readVsireg(num, value, virtMode);
   else if (num == CN::SIP)
     return readSip(value);
   else if (num == CN::SIE)
@@ -3424,16 +3430,16 @@ CsRegs<URV>::peek(CsrNumber num, URV& value, bool virtMode) const
   value = csr->read();
 
   if (virtMode and (num == CN::TIME or num == CN::TIMEH))
-    value = adjustTimeValue(num, value);  // In virt mode, time is time + htimedelta.
+    value = adjustTimeValue(num, value, virtMode);  // In virt mode, time is time + htimedelta.
   else if (num >= CN::PMPADDR0 and num <= CN::PMPADDR63)
     value = adjustPmpValue(num, value);
   else if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
-    value = adjustSstateenValue(num, value);
+    value = adjustSstateenValue(num, value, virtMode);
   else if ((num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3) or
            (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H))
     value = adjustHstateenValue(num, value);
   else if (num == CN::SCOUNTOVF)
-    value = adjustScountovfValue(value);
+    value = adjustScountovfValue(value, virtMode);
 
   return true;
 }
@@ -3441,11 +3447,11 @@ CsRegs<URV>::peek(CsrNumber num, URV& value, bool virtMode) const
 
 template <typename URV>
 bool
-CsRegs<URV>::poke(CsrNumber num, URV value)
+CsRegs<URV>::poke(CsrNumber num, URV value, bool virtMode)
 {
   using CN = CsrNumber;
 
-  Csr<URV>* csr = getImplementedCsr(num, virtMode_);
+  Csr<URV>* csr = getImplementedCsr(num, virtMode);
   if (not csr)
     return false;
 
@@ -3667,7 +3673,7 @@ CsRegs<URV>::pokeTrigger(CsrNumber number, URV value)
 
 template <typename URV>
 bool
-CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
+CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
 {
   using IC = InterruptCause;
 
@@ -3709,7 +3715,7 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
       auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
       URV hidelegMask = hideleg? hideleg->read() : 0;
 
-      if (not virtMode_ and number == CsrNumber::STOPI)
+      if (not virtMode and number == CsrNumber::STOPI)
         {
           unsigned iid = highest_prio(mip & mie & midelegMask & ~hidelegMask);
           if (iid)

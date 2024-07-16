@@ -165,7 +165,8 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
     case 'c':
       {
 	URV val = static_cast<URV>(req.value);
-	if (hart.externalPokeCsr(CsrNumber(req.address), val))
+        bool virtMode = WhisperFlags{req.flags}.bits.virt;
+	if (hart.externalPokeCsr(CsrNumber(req.address), val, virtMode))
 	  return true;
       }
       break;
@@ -288,7 +289,8 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
     case 'c':
       {
 	URV reset = 0, mask = 0, pokeMask = 0, readMask = 0;
-	if (hart.peekCsr(CsrNumber(req.address), value, reset, mask, pokeMask, readMask))
+        bool virtMode = WhisperFlags{req.flags}.bits.virt;
+	if (hart.peekCsr(CsrNumber(req.address), value, reset, mask, pokeMask, readMask, virtMode))
 	  {
 	    reply.value = value;
 	    reply.address = mask;
@@ -988,6 +990,10 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
               fprintf(commandLog, "hart=%" PRIu32 " poke s %s 0x%" PRIxMAX " # ts=%s tag=%s\n",
 		      hartId, specialResourceToStr(msg.address), uintmax_t(msg.value),
 		      timeStamp.c_str(), msg.tag.data());
+            else if (msg.resource == 'c')
+              fprintf(commandLog, "hart=%" PRIu32 " poke c 0x%" PRIxMAX " 0x%" PRIxMAX " 0x%" PRIu8 " # ts=%s tag=%s\n",
+		      hartId, uintmax_t(msg.address), uintmax_t(msg.value), WhisperFlags{msg.flags}.bits.virt,
+		      timeStamp.c_str(), msg.tag.data());
             else if (msg.resource == 'v')
               {
                 fprintf(commandLog, "hart=%" PRIu32 " poke v 0x%" PRIxMAX " 0x",
@@ -1019,6 +1025,10 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
             else if (msg.resource == 's')
               fprintf(commandLog, "hart=%" PRIu32 " peek s %s # ts=%s tag=%s\n",
                       hartId, specialResourceToStr(msg.address),
+                      timeStamp.c_str(), msg.tag.data());
+            else if (msg.resource == 'c')
+              fprintf(commandLog, "hart=%" PRIu32 " peek c 0x%" PRIxMAX " 0x%" PRIu8 " # ts=%s tag=%s\n",
+                      hartId, uintmax_t(msg.address), WhisperFlags{msg.flags}.bits.virt,
                       timeStamp.c_str(), msg.tag.data());
             else
               fprintf(commandLog, "hart=%" PRIu32 " peek %c 0x%" PRIxMAX " # ts=%s tag=%s\n",
