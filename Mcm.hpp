@@ -43,6 +43,7 @@ namespace WdRiscv
 
     bool isCanceled() const { return canceled_; }
     void cancel() { canceled_ = true; }
+    void used() { canceled_ = false; }
   };
 
 
@@ -560,11 +561,26 @@ namespace WdRiscv
 	std::cerr << "Instr with tag=" << instr.tag_ << " already canceled\n";
       instr.cancel();
       for (auto memIx : instr.memOps_)
-	{
-	  if (sysMemOps_.at(memIx).isCanceled())
-	    std::cerr << "Mcm::cancelInstr: Error: op already canceled\n";
 	  sysMemOps_.at(memIx).cancel();
-	}
+    }
+
+    void removeMemOps(McmInstr& instr)
+    {
+      // Remove canceled ops.
+      auto& ops = instr.memOps_;
+
+      size_t count = 0;
+      for (size_t i = 0; i < ops.size(); ++i)
+        {
+          auto opIx = ops.at(i);
+          if (opIx < sysMemOps_.size() and not sysMemOps_.at(opIx).isCanceled())
+            {
+              if (count < i)
+                ops.at(count) = opIx;
+              count++;
+            }
+        }
+      ops.resize(count);
     }
 
     void updateDependencies(const Hart<URV>& hart, const McmInstr& instr);

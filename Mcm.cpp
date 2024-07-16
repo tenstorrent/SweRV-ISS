@@ -79,6 +79,7 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   op.hartIx_ = hartIx;
   op.size_ = size;
   op.isRead_ = true;
+  op.canceled_ = true; // To be later marked as used.
 
   // Set whisper load data. This may be updated by forwarding.
   if (size == 1)
@@ -750,6 +751,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	   << " tag=" << tag << " Instruction retired multiple times\n";
       return false;
     }
+
+  removeMemOps(*instr);
 
   if (not di.isValid() or trapped)
     {
@@ -1615,36 +1618,20 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 
       instr->isLoad_ = true;
 
-      bool cancel = (readMask == expectedMask);
-      if (not cancel)
+      if (readMask != expectedMask)
 	{
 	  unsigned mask = determineOpMask(*instr, op);
 	  mask &= expectedMask;
-          if (not mask)
-            cancel = false;
-          else if ((mask & readMask) == mask)
-	    cancel = true;  // Read op already covered by other read ops
+          if (not mask or
+              ((mask & readMask) == mask))
+            continue; // Not matched, or read op already covered by other read ops
 	  else
-	    readMask |= mask;
-	}
-
-      if (cancel)
-	op.cancel();
-    }
-
-  // Remove canceled ops.
-  size_t count = 0;
-  for (size_t i = 0; i < ops.size(); ++i)
-    {
-      auto opIx = ops.at(i);
-      if (opIx < sysMemOps_.size() and not sysMemOps_.at(opIx).isCanceled())
-	{
-	  if (count < i)
-	    ops.at(count) = opIx;
-	  count++;
+            {
+              readMask |= mask;
+              op.used();
+            }
 	}
     }
-  ops.resize(count);
 }
 
 
@@ -1684,10 +1671,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, const DecodedInst& di, uint64_t v
   instr->physAddr2_ = paddr2;
 
   // Cancel early read ops that are covered by later ones. Trim wide reads.
-  if (not di.isVector())
-    cancelReplayedReads(instr);
-  else
-    std::cerr << "Implement cancelReplayedReads for vector.\n";
+  cancelReplayedReads(instr);
 
   uint64_t mergeMask = 0;  // Mask of bits obtained from read ops.
   uint64_t merged = 0;     // Value obtained from read ops.
