@@ -2562,10 +2562,13 @@ namespace WdRiscv
     bool isInterruptEnabled() const
     { return csRegs_.isInterruptEnabled(); }
 
-    /// Based on current trigger configurations, either take an
-    /// exception returning false or enter debug mode returning true.
+    /// Based on current trigger configurations, either take an exception returning false
+    /// or enter debug mode returning true. If we take an exception epc goes into the
+    /// MEPC/SEPC/... CSR and info goes into the MTVAL/STVAL/... CSR. The instrTag
+    /// parameter is used to annotate the instruction rectord in the log file (if logging
+    /// is enabeld).
     bool takeTriggerAction(FILE* traceFile, URV epc, URV info,
-			   uint64_t& counter, bool beforeTiming);
+			   uint64_t instrTag, bool beforeTiming);
 
     /// Helper to load methods: Initiate an exception with the given
     /// cause and data address.

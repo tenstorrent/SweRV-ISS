@@ -4483,7 +4483,7 @@ handleExceptionForGdb(WdRiscv::Hart<URV>& hart, int fd);
 template <typename URV>
 bool
 Hart<URV>::takeTriggerAction(FILE* traceFile, URV pc, URV info,
-			     uint64_t& counter, bool beforeTiming)
+			     uint64_t instrTag, bool beforeTiming)
 {
   // Check triggers configuration to determine action: take breakpoint
   // exception or enter debugger.
@@ -4511,7 +4511,7 @@ Hart<URV>::takeTriggerAction(FILE* traceFile, URV pc, URV info,
       readInst(currPc_, inst);
 
       std::string instStr;
-      printInstTrace(inst, counter, instStr, traceFile);
+      printInstTrace(inst, instrTag, instStr, traceFile);
     }
 
   return enteredDebug;
@@ -4746,8 +4746,11 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  if (triggerTripped_)
 	    {
+	      // This is an address or data trigger. MTVAL/STVAL/... gets the virtual
+	      // address of the data.
+	      URV tval = ldStAddr_;
 	      undoForTrigger();
-	      if (takeTriggerAction(traceFile, currPc_, currPc_, instCounter_, true))
+	      if (takeTriggerAction(traceFile, currPc_, tval, instCounter_, true))
 		return true;
 	      continue;
 	    }
