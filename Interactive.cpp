@@ -965,7 +965,7 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 	    return true;
 	  break;
 	default:
-	  std::cerr << "Imvalid poke memory size " << size << '\n';
+	  std::cerr << "Invalid poke memory size " << size << '\n';
 	  return false;
 	}
       std::cerr << "Address out of bounds: " << addrStr << '\n';

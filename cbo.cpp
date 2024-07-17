@@ -152,12 +152,17 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
 #endif
 
   bool isZero = false;
-  ldStAddr_ = virtAddr;
+  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
-    initiateStoreException(di, cause, virtAddr, gPhysAddr);
+    {
+      initiateStoreException(di, cause, virtAddr, gPhysAddr);
+      return;
+    }
+
+  ldStPhysAddr1_ = ldStPhysAddr2_ = physAddr;
 }
 
 
@@ -215,12 +220,15 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
 #endif
 
   bool isZero = false;
-  ldStAddr_ = virtAddr;
+  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
-    initiateStoreException(di, cause, virtAddr, gPhysAddr);
+    {
+      initiateStoreException(di, cause, virtAddr, gPhysAddr);
+      return;
+    }
 
   ldStPhysAddr1_ = ldStPhysAddr2_ = physAddr;
 }
@@ -298,12 +306,15 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
     }
 #endif
 
-  ldStAddr_ = virtAddr;
+  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
-    initiateStoreException(di, cause, virtAddr, gPhysAddr);
+    {
+      initiateStoreException(di, cause, virtAddr, gPhysAddr);
+      return;
+    }
 
   ldStPhysAddr1_ = ldStPhysAddr2_ = physAddr;
 }
@@ -363,7 +374,7 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
     }
 #endif
 
-  ldStAddr_ = virtAddr;
+  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
   bool isZero = true;
