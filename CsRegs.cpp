@@ -254,7 +254,7 @@ CsRegs<URV>::readVsip(URV& value) const
     hvipVal = hvip->read() >> 13;
 
   URV sipVal; readSip(sipVal);
-  sipVal >>= 13;
+  sipVal >>= 13; // Not OR-ing with sei pin here.
 
   // for bits 13-63, where hideleg is 1, alias of sip/sie
   value = (value & ~delegMask) | (sipVal & delegMask);
@@ -3800,15 +3800,15 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
   using IC = InterruptCause;
 
   value = 0;
+
+  auto mideleg = getImplementedCsr(CsrNumber::MIDELEG);
+  URV midelegMask = mideleg? mideleg->read() : 0;
+
   if (number == CsrNumber::MTOPI)
     {
       auto mip = getImplementedCsr(CsrNumber::MIP)->read();
-      if (seiPin_)
-        mip |= URV(1) << URV(IC::S_EXTERNAL);
+      mip |= URV(seiPin_) << URV(IC::S_EXTERNAL);
       auto mie = getImplementedCsr(CsrNumber::MIE)->read();
-
-      auto mideleg = getImplementedCsr(CsrNumber::MIDELEG);
-      URV midelegMask = mideleg? mideleg->read() : 0;
 
       unsigned iid = highestIidPrio(mip & mie & ~midelegMask);
       if (iid)
@@ -3826,6 +3826,8 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
           URV sip, sie;
           if (not readSip(sip) or not readSie(sie))
             return false;
+
+          sip |= (URV(seiPin_) << URV(IC::S_EXTERNAL) & midelegMask);
 
           auto hip = getImplementedCsr(CsrNumber::HIP);
           URV hipVal = hip? hip->read() : 0;

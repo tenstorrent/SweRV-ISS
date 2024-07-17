@@ -1265,7 +1265,7 @@ namespace WdRiscv
     /// success and false if register is not implemented.
     bool setStoreErrorAddrCapture(URV value);
 
-    /// The the supervisor interruppt externa pin.
+    /// The the supervisor interrupt external pin.
     void setSeiPin(bool flag)
     { seiPin_ = flag; }
 
