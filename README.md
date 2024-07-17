@@ -848,6 +848,7 @@ Example:
       "secure_region": ["0x0001000000000000", "0x0002000000000000"]
     },
 
+```
 
 <a name="Consistency"/>
 
