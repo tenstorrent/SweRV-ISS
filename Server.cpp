@@ -784,7 +784,7 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   flags.bits.stop = hart.hasTargetProgramFinished();
   flags.bits.interrupt = interrupted;
   flags.bits.virt = hart.lastVirtMode();
-  flags.bits.debug = hart.inDebugMode();
+  flags.bits.debug = wasInDebug;
   flags.bits.load = di.isLoad() or di.isAmo() or di.isVectorLoad();
   reply.flags = flags.value;
 
