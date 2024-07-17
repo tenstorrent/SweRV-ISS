@@ -2617,11 +2617,11 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrA, const McmInstr& inst
 
   assert(instrA.isRetired());
 
-  bool hasAquire = instrA.di_.isAtomicAcquire();
+  bool hasAcquire = instrA.di_.isAtomicAcquire();
   if (isTso_)
-    hasAquire = hasAquire or instrA.di_.isLoad() or instrA.di_.isAmo();
+    hasAcquire = hasAcquire or instrA.di_.isLoad() or instrA.di_.isAmo();
 
-  if (not hasAquire)
+  if (not hasAcquire)
     return true;
 
   if (instrA.di_.isAmo())
@@ -2666,6 +2666,32 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartData_.at(hartIx).instrVec_;
+  const auto& undrained = hartData_.at(hartIx).undrainedStores_;
+
+  // If B is a store, make sure that there are no undrained store, with acquire
+  // annotation, preceeding B in program order. This is stricter than what the spec
+  // mandates.
+  if (instrB.isStore_)
+    {
+      for (auto& tag : undrained)
+	{
+	  if (tag < instrB.tag_)
+	    {
+	      const auto& instrA = instrVec.at(tag);
+	      bool hasAcquire = instrA.di_.isAtomicAcquire();
+	      if (isTso_)
+		hasAcquire = hasAcquire or instrA.di_.isLoad() or instrA.di_.isAmo();
+	      if (hasAcquire)
+		{
+		  cerr << "Error: PPO rule 5 failed: hart-id=" << hart.hartId()
+		       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+		  return false;
+		}
+	    }
+	  else
+	    break;
+	}
+    }
 
   auto earlyB = earliestOpTime(instrB);
 
@@ -2687,8 +2713,6 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 	  return false;
 	}
     }
-
-  const auto& undrained = hartData_.at(hartIx).undrainedStores_;
 
   for (auto& tag : undrained)
     {

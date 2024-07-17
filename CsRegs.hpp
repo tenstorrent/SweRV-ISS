@@ -1170,7 +1170,11 @@ namespace WdRiscv
     /// read-only register can be changed this way as long as its poke
     /// mask is non-zero. Return true on success and false if number is
     /// out of bounds.
-    bool poke(CsrNumber number, URV value);
+    bool poke(CsrNumber number, URV value, bool virtMode);
+
+    /// Same as above, but uses current virtual mode.
+    bool poke(CsrNumber number, URV value)
+    { return poke(number, value, virtMode_); }
 
     /// Reset all CSRs to their initial (power-on) values.
     void reset();
@@ -1261,7 +1265,7 @@ namespace WdRiscv
     /// success and false if register is not implemented.
     bool setStoreErrorAddrCapture(URV value);
 
-    /// The the supervisor interruppt externa pin.
+    /// The the supervisor interrupt external pin.
     void setSeiPin(bool flag)
     { seiPin_ = flag; }
 
@@ -1302,7 +1306,7 @@ namespace WdRiscv
 
     bool pokeTrigger(CsrNumber number, URV value);
 
-    bool readTopi(CsrNumber number, URV& value) const;
+    bool readTopi(CsrNumber number, URV& value, bool virtMode) const;
 
     bool setCsrFields(CsrNumber number, const std::vector<typename Csr<URV>::Field>& fields)
     {
@@ -1397,6 +1401,13 @@ namespace WdRiscv
     URV peekHvip() const
     {
       const auto& csr = regs_.at(size_t(CsrNumber::HVIP));
+      return csr.read();
+    }
+
+    /// Fast peek method for HVIEN
+    URV peekHvien() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::HVIEN));
       return csr.read();
     }
 
@@ -1532,6 +1543,12 @@ namespace WdRiscv
     bool readSie(URV& value) const;
 
     /// Helper to read method.
+    bool readVsip(URV& value) const;
+
+    /// Helper to read method.
+    bool readVsie(URV& value) const;
+
+    /// Helper to read method.
     bool readMvip(URV& value) const;
 
     /// Helper to write method.
@@ -1539,31 +1556,37 @@ namespace WdRiscv
 
     /// Adjust the value of TIME/TIMEH by adding the time delta in
     /// virtual mode.
-    URV adjustTimeValue(CsrNumber csrn, URV value) const;
+    URV adjustTimeValue(CsrNumber csrn, URV value, bool virtMode) const;
 
     /// Adjust the value of SSTATEEN by masking with MSTATEEN and HSTATEEN.
-    URV adjustSstateenValue(CsrNumber csrn, URV value) const;
+    URV adjustSstateenValue(CsrNumber csrn, URV value, bool virtMode) const;
 
     /// Adjust the value of HSTATEEN by masking with MSTATEEN.
     URV adjustHstateenValue(CsrNumber csrn, URV value) const;
 
     // Adjust the value of SCOUNTOVF by masking with MCOUNTEREN/HCOUNTEREN
-    URV adjustScountovfValue(URV value) const;
+    URV adjustScountovfValue(URV value, bool virtMode) const;
 
     /// Heler to read method.
-    bool readMireg(CsrNumber num, URV& value) const;
+    bool readMireg(CsrNumber num, URV& value, bool virtMode) const;
 
     /// Heler to read method.
-    bool readSireg(CsrNumber num, URV& value) const;
+    bool readSireg(CsrNumber num, URV& value, bool virtMode) const;
 
     /// Helper to read method.
-    bool readVsireg(CsrNumber num, URV& value) const;
+    bool readVsireg(CsrNumber num, URV& value, bool virtMode) const;
 
     /// Helper to write method: Mask with MIP/MIDELEG.
     bool writeSip(URV value);
 
     /// Helper to write method: Mask with SIP/MIDELEG.
     bool writeSie(URV value);
+
+    /// Helper to write method.
+    bool writeVsip(URV value);
+
+    /// Helper to write method.
+    bool writeVsie(URV value);
 
     /// Helper to write method: Mask with MSTATEEN/HSTATEEN.
     bool writeSstateen(CsrNumber num, URV value);
@@ -2029,6 +2052,32 @@ namespace WdRiscv
     /// Returns true if CSR is defined as part of a STATEEN and enabled, or
     /// not part of STATEEN. Returns false otherwise.
     bool isStateEnabled(CsrNumber num, PrivilegeMode mode, bool virtMode) const;
+
+    /// Shift VS-interrupt bit positions to S-interrupt bit positions.
+    static URV vsInterruptToS(URV bits)
+    {
+      using IC = InterruptCause;
+      URV mask = ((URV(1) << unsigned(IC::VS_SOFTWARE))  |
+                  (URV(1) << unsigned(IC::VS_TIMER))     |
+                  (URV(1) << unsigned(IC::VS_EXTERNAL))) ;
+
+      URV vs = bits & mask;
+      bits &= ~mask;
+      return bits | (vs >> 1);
+    }
+
+    /// Same as above but from S to VS.
+    static URV sInterruptToVs(URV bits)
+    {
+      using IC = InterruptCause;
+      URV mask = ((URV(1) << unsigned(IC::S_SOFTWARE))  |
+                  (URV(1) << unsigned(IC::S_TIMER))     |
+                  (URV(1) << unsigned(IC::S_EXTERNAL))) ;
+
+      URV s = bits & mask;
+      bits &= ~mask;
+      return bits | (s << 1);
+    }
 
   private:
 

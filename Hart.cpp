@@ -1801,7 +1801,10 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
   if (hasActiveTrigger())
     {
       if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
-	triggerTripped_ = true;
+	{
+	  dataAddrTrig_ = not triggerTripped_;
+	  triggerTripped_ = true;
+	}
     }
 
   uint64_t addr1 = virtAddr;
@@ -1920,7 +1923,10 @@ Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr
       TriggerTiming timing = TriggerTiming::Before;
       bool isLoad = true;
       if (ldStDataTriggerHit(uval, timing, isLoad))
-	triggerTripped_ = true;
+	{
+	  dataAddrTrig_ = not triggerTripped_;
+	  triggerTripped_ = true;
+	}
     }
   if (triggerTripped_)
     return false;
@@ -2052,7 +2058,10 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   bool isLd = false;  // Not a load.
   if (hasTrig and (ldStAddrTriggerHit(virtAddr, ldStSize_, timing, isLd) or
                    ldStDataTriggerHit(storeVal, timing, isLd)))
+    {
+      dataAddrTrig_ = not triggerTripped_;
       triggerTripped_ = true;
+    }
 
   // Determine if a store exception is possible. Determine sore exception will do address
   // translation and change pa1/pa2 to physical addresses. Ga1/ga2 are the guest addresses
@@ -3155,13 +3164,13 @@ Hart<URV>::peekCsr(CsrNumber csrn) const
 template <typename URV>
 bool
 Hart<URV>::peekCsr(CsrNumber csrn, URV& val, URV& reset, URV& writeMask,
-		   URV& pokeMask, URV& readMask) const
+		   URV& pokeMask, URV& readMask, bool virtMode) const
 {
   const Csr<URV>* csr = csRegs_.getImplementedCsr(csrn);
   if (not csr)
     return false;
 
-  if (not peekCsr(csrn, val))
+  if (not peekCsr(csrn, val, virtMode))
     return false;
 
   reset = csr->getResetValue();
@@ -3433,14 +3442,14 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 
 template <typename URV>
 bool
-Hart<URV>::pokeCsr(CsrNumber csr, URV val)
+Hart<URV>::pokeCsr(CsrNumber csr, URV val, bool virtMode)
 {
   URV lastVal;
 
   // Some/all bits of some CSRs are read only to CSR instructions but
   // are modifiable. Use the poke method (instead of write) to make
   // sure modifiable value are changed.
-  if (not csRegs_.peek(csr, lastVal) or not csRegs_.poke(csr, val))
+  if (not csRegs_.peek(csr, lastVal, virtMode) or not csRegs_.poke(csr, val, virtMode))
     return false;
 
   postCsrUpdate(csr, val, lastVal);
@@ -4483,7 +4492,7 @@ handleExceptionForGdb(WdRiscv::Hart<URV>& hart, int fd);
 template <typename URV>
 bool
 Hart<URV>::takeTriggerAction(FILE* traceFile, URV pc, URV info,
-			     uint64_t& counter, bool beforeTiming)
+			     uint64_t instrTag, bool beforeTiming)
 {
   // Check triggers configuration to determine action: take breakpoint
   // exception or enter debugger.
@@ -4511,7 +4520,7 @@ Hart<URV>::takeTriggerAction(FILE* traceFile, URV pc, URV info,
       readInst(currPc_, inst);
 
       std::string instStr;
-      printInstTrace(inst, counter, instStr, traceFile);
+      printInstTrace(inst, instrTag, instStr, traceFile);
     }
 
   return enteredDebug;
@@ -4585,6 +4594,7 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst, FI
   bool fetchOk = true;
   if (triggerTripped_)
     {
+      dataAddrTrig_ = false;
       if (not fetchInstPostTrigger(addr, physAddr, inst, file))
         {
 	  if (mcycleEnabled())
@@ -4612,7 +4622,10 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst, FI
 
   // Process pre-execute opcode trigger.
   if (hasTrig and instOpcodeTriggerHit(inst, TriggerTiming::Before))
-    triggerTripped_ = true;
+    {
+      dataAddrTrig_ = false;
+      triggerTripped_ = true;
+    }
 
   return true;
 }
@@ -4746,8 +4759,11 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  if (triggerTripped_)
 	    {
+	      // If this is an address or data trigger, set xTVAL to the virtual address
+	      // of the data.
+	      URV tval = dataAddrTrig_? ldStAddr_ : currPc_;
 	      undoForTrigger();
-	      if (takeTriggerAction(traceFile, currPc_, currPc_, instCounter_, true))
+	      if (takeTriggerAction(traceFile, currPc_, tval, instCounter_, true))
 		return true;
 	      continue;
 	    }
@@ -5305,16 +5321,16 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
       // Check for interrupts destined for machine-mode (not-delegated).
       // VS interrupts (e.g. VSEIP) are always delegated.
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_SOFTWARE, IC::M_TIMER,
- 				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
-				 IC::G_EXTERNAL, IC::LCOF } )
-	{
-	  URV mask = URV(1) << unsigned(ic);
-	  if ((mdest & mask) != 0)
-	    {
-	      cause = ic;
-	      return true;
-	    }
-	}
+                                 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
+                                 IC::G_EXTERNAL, IC::LCOF } )
+        {
+          URV mask = URV(1) << unsigned(ic);
+          if ((mdest & mask) != 0)
+            {
+              cause = ic;
+              return true;
+            }
+        }
     }
   if (privMode_ == PM::Machine)
     return false;   // Interrupts destined for lower privileges are disabled.
@@ -5325,17 +5341,17 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if ((mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User) and sdest != 0)
     {
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_SOFTWARE, IC::M_TIMER,
-				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
-				 IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
-				 IC::VS_TIMER, IC::LCOF } )
-	{
-	  URV mask = URV(1) << unsigned(ic);
-	  if ((sdest & mask) != 0)
-	    {
-	      cause = ic;
-	      return true;
-	    }
-	}
+                                 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
+                                 IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
+                                 IC::VS_TIMER, IC::LCOF } )
+        {
+          URV mask = URV(1) << unsigned(ic);
+          if ((sdest & mask) != 0)
+            {
+              cause = ic;
+              return true;
+            }
+        }
     }
 
   // We now check for interrupts destined for VS mode. These are disabled if running in
@@ -5354,30 +5370,36 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 #if 0
   if (isRvaia())
     {
-      // TODO: cache this
       URV vstopi;
-      if (peekCsr(CsrNumber::VSTOPI, vstopi) and vstopi != 0)
+      peekCsr(CsrNumber::VSTOPI, vstopi);
+      if (vstopi)
         {
-	  cause = static_cast<InterruptCause>(vstopi >> 16);
-	  return true;
+          cause = vstopi >> 16;
+          return true;
         }
     }
 #endif
-
   URV vsMask = possible & delegVal & hDelegVal;
+  if (isRvaia())
+    {
+      URV hvip = csRegs_.peekHvip();
+      URV hvien = csRegs_.peekHvien();
+
+      vsMask |= hvip & hvien & ~hDelegVal;
+    }
   if (vsMask)
     {
       // Only VS interrupts can be delegated in HIDELEG.
       for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
-				 IC::VS_TIMER } )
-	{
-	  URV mask = URV(1) << unsigned(ic);
-	  if ((vsMask & mask) != 0)
-	    {
-	      cause = ic;
-	      return true;
-	    }
-	}
+                                 IC::VS_TIMER } )
+        {
+          URV mask = URV(1) << unsigned(ic);
+          if ((vsMask & mask) != 0)
+            {
+              cause = ic;
+              return true;
+            }
+        }
     }
 
   return false;
@@ -5638,8 +5660,11 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 
       if (triggerTripped_)
 	{
+	  // If this is an address or data trigger, set xTVAL to the virtual address of
+	  // the data.
+	  URV tval = dataAddrTrig_? ldStAddr_ : currPc_;
 	  undoForTrigger();
-	  takeTriggerAction(traceFile, currPc_, currPc_, instCounter_, true);
+	  takeTriggerAction(traceFile, currPc_, tval, instCounter_, true);
 	  return;
 	}
 

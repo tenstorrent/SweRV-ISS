@@ -142,19 +142,27 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
   if (hasActiveTrigger())
     {
       if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
-        triggerTripped_ = true;
+	{
+	  dataAddrTrig_ = not triggerTripped_;
+	  triggerTripped_ = true;
+	}
       if (triggerTripped_)
         return;
     }
 #endif
 
   bool isZero = false;
-  ldStAddr_ = virtAddr;
+  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
-    initiateStoreException(di, cause, virtAddr, gPhysAddr);
+    {
+      initiateStoreException(di, cause, virtAddr, gPhysAddr);
+      return;
+    }
+
+  ldStPhysAddr1_ = ldStPhysAddr2_ = physAddr;
 }
 
 
@@ -202,19 +210,25 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
   if (hasActiveTrigger())
     {
       if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
-        triggerTripped_ = true;
+	{
+	  dataAddrTrig_ = not triggerTripped_;
+	  triggerTripped_ = true;
+	}
       if (triggerTripped_)
         return;
     }
 #endif
 
   bool isZero = false;
-  ldStAddr_ = virtAddr;
+  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
-    initiateStoreException(di, cause, virtAddr, gPhysAddr);
+    {
+      initiateStoreException(di, cause, virtAddr, gPhysAddr);
+      return;
+    }
 
   ldStPhysAddr1_ = ldStPhysAddr2_ = physAddr;
 }
@@ -283,18 +297,24 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
   if (hasActiveTrigger())
     {
       if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
-        triggerTripped_ = true;
+	{
+	  dataAddrTrig_ = not triggerTripped_;
+	  triggerTripped_ = true;
+	}
       if (triggerTripped_)
         return;
     }
 #endif
 
-  ldStAddr_ = virtAddr;
+  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
-    initiateStoreException(di, cause, virtAddr, gPhysAddr);
+    {
+      initiateStoreException(di, cause, virtAddr, gPhysAddr);
+      return;
+    }
 
   ldStPhysAddr1_ = ldStPhysAddr2_ = physAddr;
 }
@@ -345,13 +365,16 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   if (hasActiveTrigger())
     {
       if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
-        triggerTripped_ = true;
+	{
+	  dataAddrTrig_ = not triggerTripped_;
+	  triggerTripped_ = true;
+	}
       if (triggerTripped_)
         return;
     }
 #endif
 
-  ldStAddr_ = virtAddr;
+  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
   bool isZero = true;

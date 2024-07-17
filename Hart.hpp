@@ -237,7 +237,11 @@ namespace WdRiscv
     /// the control and status register csr returning true on success.
     /// Return false leaving parameters unmodified if csr is out of bounds.
     bool peekCsr(CsrNumber csr, URV& val, URV& reset, URV& writeMask,
-		 URV& pokeMask, URV& readMask) const;
+		 URV& pokeMask, URV& readMask) const
+    { return peekCsr(csr, val, reset, writeMask, pokeMask, readMask, virtMode_); }
+
+    bool peekCsr(CsrNumber csr, URV& val, URV& reset, URV& writeMask,
+		 URV& pokeMask, URV& readMask, bool virtMode) const;
 
     /// Set val/name to the value/name of the control and status
     /// register csr returning true on success. Return false leaving
@@ -252,13 +256,16 @@ namespace WdRiscv
     /// Set the given control and status register, csr, to the given
     /// value returning true on success. Return false if csr is out of
     /// bound.
-    bool pokeCsr(CsrNumber csr, URV val);
+    bool pokeCsr(CsrNumber csr, URV val)
+    { return pokeCsr(csr, val, virtMode_); }
+
+    bool pokeCsr(CsrNumber csr, URV val, bool virtMode);
 
     /// Similar to pokeCsr but meant for server/interactive code: Keep
     /// track of external MIP pokes to avoid clobbering them with internal
     /// ones.
-    bool externalPokeCsr(CsrNumber csr, URV val)
-    { if (csr == CsrNumber::MIP) mipPoked_ = true; return pokeCsr(csr, val); }
+    bool externalPokeCsr(CsrNumber csr, URV val, bool virtMode)
+    { if (csr == CsrNumber::MIP) mipPoked_ = true; return pokeCsr(csr, val, virtMode); }
 
     /// Put in value the bytes of the given vector register (most
     /// significant byte first). Return true on success, return false
@@ -2574,10 +2581,13 @@ namespace WdRiscv
     bool isInterruptEnabled() const
     { return csRegs_.isInterruptEnabled(); }
 
-    /// Based on current trigger configurations, either take an
-    /// exception returning false or enter debug mode returning true.
+    /// Based on current trigger configurations, either take an exception returning false
+    /// or enter debug mode returning true. If we take an exception epc goes into the
+    /// MEPC/SEPC/... CSR and info goes into the MTVAL/STVAL/... CSR. The instrTag
+    /// parameter is used to annotate the instruction rectord in the log file (if logging
+    /// is enabeld).
     bool takeTriggerAction(FILE* traceFile, URV epc, URV info,
-			   uint64_t& counter, bool beforeTiming);
+			   uint64_t instrTag, bool beforeTiming);
 
     /// Helper to load methods: Initiate an exception with the given
     /// cause and data address.
@@ -2788,10 +2798,9 @@ namespace WdRiscv
     bool fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
 			      FILE* trace);
 
-    /// Helper to fetchInstWithTrigger. Fetch an instruction given
-    /// that a trigger has tripped. Return true on success. Return
-    /// false on a a fail in which case either a trigger exception is
-    /// initiated (as opposed to an instruction-fail exception).
+    /// Helper to fetchInstWithTrigger. Fetch an instruction given that a trigger has
+    /// tripped. Return true on success. Return false on a a fail in which case a trigger
+    /// exception is initiated (as opposed to an instruction-fail exception).
     bool fetchInstPostTrigger(URV virtAddr, uint64_t& physAddr, uint32_t& inst,
 			      FILE* trace);
 
@@ -5060,6 +5069,7 @@ namespace WdRiscv
     bool csrException_ = false;      // True if there is a CSR related exception.
     bool hasInterrupt_ = false;      // True if there is an interrupt.
     bool triggerTripped_ = false;    // True if a trigger trips.
+    bool dataAddrTrig_ = false;      // True if data address trigger hit.
 
     bool lastBranchTaken_ = false; // Useful for performance counters
     bool misalignedLdSt_ = false;  // Useful for performance counters

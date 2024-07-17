@@ -231,6 +231,78 @@ CsRegs<URV>::readSie(URV& value) const
 
 template <typename URV>
 bool
+CsRegs<URV>::readVsip(URV& value) const
+{
+  auto vsip = getImplementedCsr(CsrNumber::VSIP);
+  if (not vsip)
+    return false;
+  value = vsip->read() >> 13;
+
+  URV delegMask = 0;
+  auto deleg = getImplementedCsr(CsrNumber::HIDELEG);
+  if (deleg)
+    delegMask = deleg->read() >> 13;
+
+  URV hvienMask = 0;
+  auto hvien = getImplementedCsr(CsrNumber::HVIEN);
+  if (hvien)
+    hvienMask = hvien->read() >> 13;
+
+  URV hvipVal = 0;
+  auto hvip = getImplementedCsr(CsrNumber::HVIP);
+  if (hvip)
+    hvipVal = hvip->read() >> 13;
+
+  URV sipVal; readSip(sipVal);
+  sipVal >>= 13; // Not OR-ing with sei pin here.
+
+  // for bits 13-63, where hideleg is 1, alias of sip/sie
+  value = (value & ~delegMask) | (sipVal & delegMask);
+  // where hideleg is 0, hvien is 1, alias of hvip
+  URV hvipMask = URV(~delegMask & hvienMask);
+  value = (value & ~hvipMask) | (hvipVal & hvipMask);
+  // where hideleg is 0, hvien is 0, read-only zero
+  value &= URV(delegMask | hvienMask);
+  value = (value << 13) | (vsip->read() & 0x1fff);
+  return true;
+}
+
+
+template <typename URV>
+bool
+CsRegs<URV>::readVsie(URV& value) const
+{
+  value = 0;
+
+  auto vsie = getImplementedCsr(CsrNumber::VSIE);
+  if (not vsie)
+    return false;
+  value = vsie->read() >> 13;
+
+  URV delegMask = 0;
+  auto deleg = getImplementedCsr(CsrNumber::HIDELEG);
+  if (deleg)
+    delegMask = deleg->read() >> 13;
+
+  URV hvienMask = 0;
+  auto hvien = getImplementedCsr(CsrNumber::HVIEN);
+  if (hvien)
+    hvienMask = hvien->read() >> 13;
+
+  URV sieVal; readSie(sieVal);
+  sieVal >>= 13;
+
+  // for bits 13-63, where hideleg is 1, alias of sip/sie
+  value = (value & ~delegMask) | (sieVal & delegMask);
+  // where hideleg is 0, hvien is 0, read-only zero
+  value &= URV(delegMask | hvienMask);
+  value = (value << 13) | (vsie->read() & 0x1fff);
+  return true;
+}
+
+
+template <typename URV>
+bool
 CsRegs<URV>::readMvip(URV& value) const
 {
   value = 0;
@@ -300,9 +372,9 @@ CsRegs<URV>::writeMvip(URV value)
 
 template <typename URV>
 URV
-CsRegs<URV>::adjustTimeValue(CsrNumber num, URV value) const
+CsRegs<URV>::adjustTimeValue(CsrNumber num, URV value, bool virtMode) const
 {
-  if (not virtMode_)
+  if (not virtMode)
     return value;
 
   auto delta = getImplementedCsr(CsrNumber::HTIMEDELTA);
@@ -329,7 +401,7 @@ CsRegs<URV>::adjustTimeValue(CsrNumber num, URV value) const
 
 template <typename URV>
 URV
-CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value) const
+CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value, bool virtMode) const
 {
   using CN = CsrNumber;
 
@@ -345,7 +417,7 @@ CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value) const
 	  value &= mcsr->read();
 
       // If a bit is zero in HSTATEEN, it becomes zero in SSTATEEN
-      if (virtMode_)
+      if (virtMode)
 	{
 	  CsrNumber hnum = advance(CN::HSTATEEN0, ix);
 	  auto hcsr = getImplementedCsr(hnum);
@@ -387,12 +459,12 @@ CsRegs<URV>::adjustHstateenValue(CsrNumber num, URV value) const
 
 template <typename URV>
 URV
-CsRegs<URV>::adjustScountovfValue(URV value) const
+CsRegs<URV>::adjustScountovfValue(URV value, bool virtMode) const
 {
   auto csr = getImplementedCsr(CsrNumber::MCOUNTEREN);
   assert(csr and "MCOUNTEREN not implemented");
   URV mask = csr->read();
-  if (virtMode_)
+  if (virtMode)
     {
       csr = getImplementedCsr(CsrNumber::HCOUNTEREN);
       assert(csr and "HCOUNTERN not implemented");
@@ -404,13 +476,13 @@ CsRegs<URV>::adjustScountovfValue(URV value) const
 
 template <typename URV>
 bool
-CsRegs<URV>::readMireg(CsrNumber num, URV& value) const
+CsRegs<URV>::readMireg(CsrNumber num, URV& value, bool virtMode) const
 {
   URV sel = 0;
   peek(CsrNumber::MISELECT, sel);
   if (imsic_)
     {
-      auto csr = getImplementedCsr(num, virtMode_);
+      auto csr = getImplementedCsr(num, virtMode);
       if (not csr)
 	return false;
 
@@ -422,18 +494,18 @@ CsRegs<URV>::readMireg(CsrNumber num, URV& value) const
 
 template <typename URV>
 bool
-CsRegs<URV>::readSireg(CsrNumber num, URV& value) const
+CsRegs<URV>::readSireg(CsrNumber num, URV& value, bool virtMode) const
 {
   URV sel = 0;
   peek(CsrNumber::SISELECT, sel);
   if (imsic_)
     {
-      auto csr = getImplementedCsr(num, virtMode_);
+      auto csr = getImplementedCsr(num, virtMode);
       if (not csr)
 	return false;
 
       unsigned guest = 0;
-      if (virtMode_)
+      if (virtMode)
 	{
 	  URV hs = 0;
 	  peek(CsrNumber::HSTATUS, hs);
@@ -441,7 +513,7 @@ CsRegs<URV>::readSireg(CsrNumber num, URV& value) const
 	  guest = hsf.bits_.VGEIN;
 	}
 
-      return imsic_->readSireg(virtMode_, guest, sel, value);
+      return imsic_->readSireg(virtMode, guest, sel, value);
     }
   return false;
 }
@@ -449,13 +521,13 @@ CsRegs<URV>::readSireg(CsrNumber num, URV& value) const
 
 template <typename URV>
 bool
-CsRegs<URV>::readVsireg(CsrNumber num, URV& value) const
+CsRegs<URV>::readVsireg(CsrNumber num, URV& value, bool virtMode) const
 {
   URV sel = 0;
   peek(CsrNumber::VSISELECT, sel);
   if (imsic_)
     {
-      auto csr = getImplementedCsr(num, virtMode_);
+      auto csr = getImplementedCsr(num, virtMode);
       if (not csr)
 	return false;
 
@@ -500,15 +572,19 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
       return true;
     }
   else if (num == CN::MIREG)
-    return readMireg(num, value);
+    return readMireg(num, value, virtMode_);
   else if (num == CN::SIREG)
-    return readSireg(num, value);
+    return readSireg(num, value, virtMode_);
   else if (num == CN::VSIREG)
-    return readVsireg(num, value);
+    return readVsireg(num, value, virtMode_);
   else if (num == CN::SIP)
     return readSip(value);
   else if (num == CN::SIE)
     return readSie(value);
+  else if (num == CN::VSIP)
+    return readVsip(value);
+  else if (num == CN::VSIE)
+    return readVsie(value);
 
   if (num == CN::MTOPEI)
     {
@@ -542,7 +618,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
     }
 
   if (num == CN::MTOPI or num == CN::STOPI or num == CN::VSTOPI)
-    return readTopi(num, value);
+    return readTopi(num, value, virtMode_);
   else if (num == CN::SIE)
     return readSie(value);
   else if (num == CN::SIP)
@@ -553,16 +629,16 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
   value = csr->read();
 
   if (virtMode_ and (num == CN::TIME or num == CN::TIMEH))
-    value = adjustTimeValue(num, value);  // In virt mode, time is time + htimedelta.
+    value = adjustTimeValue(num, value, virtMode_);  // In virt mode, time is time + htimedelta.
   else if (num >= CN::PMPADDR0 and num <= CN::PMPADDR63)
     value = adjustPmpValue(num, value);
   else if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
-    value = adjustSstateenValue(num, value);
+    value = adjustSstateenValue(num, value, virtMode_);
   else if ((num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3) or
            (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H))
     value = adjustHstateenValue(num, value);
   else if (num == CN::SCOUNTOVF)
-    value = adjustScountovfValue(value);
+    value = adjustScountovfValue(value, virtMode_);
 
   return true;
 }
@@ -3413,27 +3489,37 @@ CsRegs<URV>::peek(CsrNumber num, URV& value, bool virtMode) const
 
   if (num == CsrNumber::MTOPI or num == CsrNumber::STOPI or
       num == CsrNumber::VSTOPI)
-    return readTopi(num, value);
+    return readTopi(num, value, virtMode);
+  else if (num == CN::MIREG)
+    return readMireg(num, value, virtMode);
+  else if (num == CN::SIREG)
+    return readSireg(num, value, virtMode);
+  else if (num == CN::VSIREG)
+    return readVsireg(num, value, virtMode);
   else if (num == CN::SIP)
     return readSip(value);
   else if (num == CN::SIE)
     return readSie(value);
+  else if (num == CN::VSIP)
+    return readVsip(value);
+  else if (num == CN::VSIE)
+    return readVsie(value);
   else if (num == CN::MVIP)
     return readMvip(value);
 
   value = csr->read();
 
   if (virtMode and (num == CN::TIME or num == CN::TIMEH))
-    value = adjustTimeValue(num, value);  // In virt mode, time is time + htimedelta.
+    value = adjustTimeValue(num, value, virtMode);  // In virt mode, time is time + htimedelta.
   else if (num >= CN::PMPADDR0 and num <= CN::PMPADDR63)
     value = adjustPmpValue(num, value);
   else if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
-    value = adjustSstateenValue(num, value);
+    value = adjustSstateenValue(num, value, virtMode);
   else if ((num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3) or
            (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H))
     value = adjustHstateenValue(num, value);
   else if (num == CN::SCOUNTOVF)
-    value = adjustScountovfValue(value);
+    value = adjustScountovfValue(value, virtMode);
 
   return true;
 }
@@ -3441,11 +3527,11 @@ CsRegs<URV>::peek(CsrNumber num, URV& value, bool virtMode) const
 
 template <typename URV>
 bool
-CsRegs<URV>::poke(CsrNumber num, URV value)
+CsRegs<URV>::poke(CsrNumber num, URV value, bool virtMode)
 {
   using CN = CsrNumber;
 
-  Csr<URV>* csr = getImplementedCsr(num, virtMode_);
+  Csr<URV>* csr = getImplementedCsr(num, virtMode);
   if (not csr)
     return false;
 
@@ -3665,40 +3751,66 @@ CsRegs<URV>::pokeTrigger(CsrNumber number, URV value)
 }
 
 
+static std::vector<unsigned> iidPrioTable =
+{
+47u, 23u, 46u, 45u, 22u, 44u, 43u, 21u, 42u, 41u, 20u, 40u,
+unsigned(InterruptCause::M_EXTERNAL),
+unsigned(InterruptCause::M_SOFTWARE),
+unsigned(InterruptCause::M_TIMER),
+unsigned(InterruptCause::S_EXTERNAL),
+unsigned(InterruptCause::S_SOFTWARE),
+unsigned(InterruptCause::S_TIMER),
+unsigned(InterruptCause::G_EXTERNAL),
+unsigned(InterruptCause::VS_EXTERNAL),
+unsigned(InterruptCause::VS_SOFTWARE),
+unsigned(InterruptCause::VS_TIMER),
+unsigned(InterruptCause::LCOF),
+39u, 19u, 38u, 37u, 18u, 36u, 35u, 17u, 34u, 33u, 16u, 32u
+};
+
+
+static unsigned highestIidPrio(uint64_t bits)
+{
+  for (unsigned ic : iidPrioTable)
+    {
+      uint64_t mask = uint64_t(1) << ic;
+      if (bits & mask)
+        return unsigned(ic);
+    }
+  return 0;
+}
+
+
+[[maybe_unused]]
+static bool higherIidPrio(uint64_t prio1, uint64_t prio2)
+{
+  auto it1 = std::find(iidPrioTable.begin(), iidPrioTable.end(), prio1);
+  auto it2 = std::find(iidPrioTable.begin(), iidPrioTable.end(), prio2);
+
+  assert(it1 != iidPrioTable.end() and it2 != iidPrioTable.end());
+
+  return it1 < it2;
+}
+
+
 template <typename URV>
 bool
-CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
+CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
 {
   using IC = InterruptCause;
 
-  auto mip = getImplementedCsr(CsrNumber::MIP)->read();
-  if (seiPin_)
-    mip |= URV(1) << URV(IC::S_EXTERNAL);
-
-  auto mie = getImplementedCsr(CsrNumber::MIE)->read();
+  value = 0;
 
   auto mideleg = getImplementedCsr(CsrNumber::MIDELEG);
   URV midelegMask = mideleg? mideleg->read() : 0;
 
-  auto highest_prio = [](uint64_t bits) -> unsigned {
-    for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_SOFTWARE, IC::M_TIMER,
-                               IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
-                               IC::G_EXTERNAL,
-                               IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER,
-                               IC::LCOF } )
-	{
-          URV mask = URV(1) << unsigned(ic);
-          if (bits & mask)
-            return unsigned(ic);
-        }
-    return 0;
-  };
-
-  value = 0;
   if (number == CsrNumber::MTOPI)
     {
-      // We can set IPRIO=1 for read-only zero iprio arrays
-      unsigned iid = highest_prio(mip & mie & ~midelegMask);
+      auto mip = getImplementedCsr(CsrNumber::MIP)->read();
+      mip |= URV(seiPin_) << URV(IC::S_EXTERNAL);
+      auto mie = getImplementedCsr(CsrNumber::MIE)->read();
+
+      unsigned iid = highestIidPrio(mip & mie & ~midelegMask);
       if (iid)
         value = (iid << 16) | 1;
       return true;
@@ -3706,62 +3818,151 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
 
   if (number == CsrNumber::STOPI or number == CsrNumber::VSTOPI)
     {
-      auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
-      URV hidelegMask = hideleg? hideleg->read() : 0;
-
-      if (not virtMode_ and number == CsrNumber::STOPI)
+      if (not virtMode and number == CsrNumber::STOPI)
         {
-          unsigned iid = highest_prio(mip & mie & midelegMask & ~hidelegMask);
+          auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
+          URV hidelegMask = hideleg? hideleg->read() : 0;
+
+          URV sip, sie;
+          if (not readSip(sip) or not readSie(sie))
+            return false;
+
+          sip |= (URV(seiPin_) << URV(IC::S_EXTERNAL) & midelegMask);
+
+          auto hip = getImplementedCsr(CsrNumber::HIP);
+          URV hipVal = hip? hip->read() : 0;
+
+          auto hie = getImplementedCsr(CsrNumber::HIE);
+          URV hieVal = hie? hie->read() : 0;
+
+          unsigned iid = highestIidPrio(((sip & sie) | (hipVal & hieVal)) & ~hidelegMask);
           if (iid)
             value = (iid << 16) | 1;
           return true;
         }
 
-      auto vsip = getImplementedCsr(CsrNumber::VSIP);
-      auto vsie = getImplementedCsr(CsrNumber::VSIE);
-      if (not vsip or not vsie)
+      URV vsip, vsie;
+      if (not readVsip(vsip) or not readVsie(vsie))
         return false;
-      auto vs = vsip->read() & vsie->read();
+      auto vs = vsip & vsie;
 
       auto hvictl = getImplementedCsr(CsrNumber::HVICTL);
-      HvictlFields hvf = hvictl? hvictl->read() : 0;
-      unsigned iprio = hvf.bits_.IPRIO;
-      unsigned dpr = hvf.bits_.DPR;
-      unsigned iid = hvf.bits_.IID;
-      bool vti = hvf.bits_.VTI;
-
-      if (not vti)
+      if (hvictl)
         {
-          if ((vs >> unsigned(IC::S_SOFTWARE)) & 1)
-            value = unsigned(IC::S_SOFTWARE) << 16;
-          else if ((vs >> unsigned(IC::S_TIMER)) & 1)
-            value = unsigned(IC::S_TIMER) << 16;
-        }
-      else if (iid != unsigned(IC::S_EXTERNAL))
-        value = (iid << 16) | iprio;
+          HvictlFields hvf = hvictl->read();
 
-      if (not dpr and value)
-        // DPR determines whether SEI is higher/lower prio
-        return true;
-
-      if ((vs >> unsigned(IC::S_EXTERNAL)) & 1)
-        {
-          unsigned id = 0;
-          if (imsic_)
+          URV prio = 0;
+          if (not hvf.bits_.VTI)
             {
-              URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
-              HstatusFields<URV> hsf(hsVal);
-              unsigned vgein = hsf.bits_.VGEIN;
-
-              if (vgein and not (vgein >= imsic_->guestCount()))
-                id = imsic_->guestTopId(vgein);
+              unsigned iid = highestIidPrio(vs & ~(URV(1) << unsigned(IC::S_EXTERNAL)));
+              if (iid)
+                value = iid << 16 | hvf.bits_.IPRIOM? 0 : 1;
             }
-          if (id != 0)
-            value = (unsigned(IC::S_EXTERNAL) << 16) | id;
-          else if (iid == unsigned(IC::S_EXTERNAL) and iprio != 0)
-            value = (unsigned(IC::S_EXTERNAL) << 16) | iprio;
-          else
-            value = (unsigned(IC::S_EXTERNAL) << 16) | 256;
+          else if (hvf.bits_.IID != unsigned(IC::S_EXTERNAL))
+            {
+              prio = hvf.bits_.IPRIO;
+              value = (hvf.bits_.IID << 16) | hvf.bits_.IPRIOM? prio : 1;
+              if (not hvf.bits_.DPR)
+                return true;
+            }
+
+          URV prio2 = 0;
+          URV value2 = 0;
+          if ((vs >> unsigned(IC::S_EXTERNAL)) & 1)
+            {
+              unsigned id = 0;
+              if (imsic_)
+                {
+                  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
+                  HstatusFields<URV> hsf(hsVal);
+                  unsigned vgein = hsf.bits_.VGEIN;
+
+                  if (vgein and not (vgein >= imsic_->guestCount()))
+                    id = imsic_->guestTopId(vgein);
+                }
+              if (id != 0)
+                {
+                  prio2 = id;
+                  if (prio2 > 255)
+                    value2 = (unsigned(IC::S_EXTERNAL) << 16) | 255;
+                  else
+                    value2 = (unsigned(IC::S_EXTERNAL) << 16) | prio2;
+                }
+              else if (hvf.bits_.IID == unsigned(IC::S_EXTERNAL) and hvf.bits_.IPRIO != 0)
+                {
+                  prio2 = hvf.bits_.IPRIO;
+                  value2 = (unsigned(IC::S_EXTERNAL) << 16) | prio2;
+                }
+              else
+                {
+                  prio2 = 256;
+                  value2 = (unsigned(IC::S_EXTERNAL) << 16) | 255;
+                }
+
+              value2 |= hvf.bits_.IPRIOM? (value2 & 0xff) : 1;
+            }
+
+          if (value and value2)
+            {
+              if (prio2 < prio)
+                {
+                  prio = prio2;
+                  value = value2;
+                }
+              else if (prio2 == prio)
+                {
+                  // ties broken by default priority (IID)
+                  auto iid1 = value >> 16;
+                  auto iid2 = value2 >> 16;
+                  assert(iid1 != iid2);
+
+                  if (higherIidPrio(iid2, iid1))
+                    {
+                      prio = prio2;
+                      value = value2;
+                    }
+                }
+            }
+          else if (not value and value2)
+            {
+              prio = prio2;
+              value = value2;
+            }
+          else if (not value and not value2)
+            return true;
+
+          // if prio == 0, then adjust based on relative priority
+          // compared to S_EXTERNAL
+          if (not prio and hvf.bits_.IPRIOM)
+            {
+              unsigned iid = value >> 16;
+              assert(iid != unsigned(IC::S_EXTERNAL));
+              assert((value & 0xff) == 0);
+              if (not higherIidPrio(iid, unsigned(IC::S_EXTERNAL)))
+                value |= 255;
+            }
+        }
+      else
+        {
+          unsigned iid = highestIidPrio(vs);
+          if (iid)
+            {
+              value = iid << 16;
+              if (iid == unsigned(IC::S_EXTERNAL))
+                {
+                  unsigned id = 0;
+                  if (imsic_)
+                    {
+                      URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
+                      HstatusFields<URV> hsf(hsVal);
+                      unsigned vgein = hsf.bits_.VGEIN;
+
+                      if (vgein and not (vgein >= imsic_->guestCount()))
+                        id = imsic_->guestTopId(vgein);
+                    }
+                  value |= id? id : 255;
+                }
+            }
         }
 
       return true;
@@ -4631,6 +4832,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
   auto vsip = getImplementedCsr(CsrNumber::VSIP);
   auto vsie = getImplementedCsr(CsrNumber::VSIE);
   auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
+  auto hvien = getImplementedCsr(CsrNumber::HVIEN);
 
   URV prevHipVal = hip->prevValue();
 
@@ -4644,11 +4846,12 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       }
   };
 
-  if (num == CsrNumber::HIDELEG)
+  if (num == CsrNumber::HIDELEG or num == CsrNumber::HVIEN)
     {
       assert(hideleg);
-      URV mask = 0x222;   // Bits VSEIP, VSTIP, and VSSIP of VSIP
-      mask &= (hideleg->read() >> 1);
+      URV mask = vsInterruptToS(hideleg->read());
+      if (hvien)
+        mask |= hvien->read();
       if (vsip)
 	vsip->setReadMask(mask);
       if (vsie)
@@ -4659,14 +4862,14 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       // Updating MIP is reflected into HIP/VSIP.
       URV val = mip->read() & hieMask;
       hip->poke(val | (hip->read() & ~hieMask));
-      updateCsr(vsip, val >> 1);
+      updateCsr(vsip, vsInterruptToS(val));
     }
   else if (num == CsrNumber::HIP)
     {
       // Updating HIP is reflected into MIP/VSIP.
       URV val = hip->read() & hieMask;
       updateCsr(mip, val | (mip->read() & ~hieMask));
-      updateCsr(vsip, val >> 1);
+      updateCsr(vsip, vsInterruptToS(val));
     }
   else if (num == CsrNumber::HVIP)
     {
@@ -4685,7 +4888,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	  hip->poke(value);
 	}
 
-      updateCsr(vsip, value >> 1);
+      updateCsr(vsip, vsInterruptToS(value));
     }
   else if (num == CsrNumber::HGEIP or num == CsrNumber::HSTATUS)
     {
@@ -4710,7 +4913,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       // Updating VSIP injects values into writeable bits of HIP
       if (hip)
         {
-	  value = value << 1;  // Aliased bits shifted in HIP
+	  value = sInterruptToVs(value);  // Aliased bits shifted in HIP
 	  if (hideleg)
 	    {
 	      URV newVal = (hip->read() & ~hideleg->read()) | (value & hideleg->read());
@@ -4720,6 +4923,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	    hip->poke(value);
         }
     }
+
 
   bool hipUpdated = false;
   if (hip->read() != prevHipVal)
@@ -4741,8 +4945,9 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       // Updating HIP is reflected in VSIP.
       if (vsip and num != CsrNumber::VSIP)
 	{
-	  URV val = hip->read() & ~ URV(0x1000);  // Clear bit 12 (SGEIP)
-	  updateCsr(vsip, val >> 1);
+          URV mask = 0x1000;
+	  URV newVal = (vsip->read() & ~mask) | (hip->read() & mask);  // Clear bit 12 (SGEIP)
+	  updateCsr(vsip, newVal);
 	}
 
       // Updating HIP is reflected in MIP.
@@ -4761,7 +4966,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       URV val = hie->read() & hieMask;
       URV mieVal = (mie->read() & ~hieMask) | val;
       updateCsr(mie, mieVal);
-      updateCsr(vsie, val >> 1);
+      updateCsr(vsie, vsInterruptToS(val));
     }
   else if (num == CsrNumber::MIE)
     {
@@ -4769,15 +4974,12 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       URV val = (mie->read() & hieMask);
       URV hieVal = val | (hie->read() & ~hieMask);
       updateCsr(hie, hieVal);
-      updateCsr(vsie, val >> 1);
+      updateCsr(vsie, vsInterruptToS(val));
     }
   else if (num == CsrNumber::VSIE)
     {
-      URV vsMask = 0x444;  // VSEIP, VSTIP and VSSIP.
-      if (hideleg)
-	vsMask = vsMask & hideleg->read();
-
-      URV val = ((vsie->read() << 1) & vsMask);
+      URV vsMask = hideleg? hideleg->read() : 0;
+      URV val = sInterruptToVs(vsie->read()) & vsMask;
       URV mieVal = (mie->read() & ~vsMask) | val;
       updateCsr(mie, mieVal);
 
@@ -4799,6 +5001,7 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
   auto mip = getImplementedCsr(CsrNumber::MIP);
   auto vsip = getImplementedCsr(CsrNumber::VSIP);
   auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
+  auto hvien = getImplementedCsr(CsrNumber::HVIEN);
 
   bool hipUpdated = num == CsrNumber::HIP;
   URV hieMask = 0x1444; // SGEIE, VSEIE, VSTIE and VSSIE.
@@ -4816,7 +5019,7 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 	{
 	  if (hideleg)
 	    val &= hideleg->read();
-	  vsip->poke(val >> 1);
+	  vsip->poke(vsInterruptToS(val));
 	}
     }
   else if (num == CsrNumber::HIP)
@@ -4831,7 +5034,7 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 	{
 	  if (hideleg)
 	    val &= hideleg->read();
-	  vsip->poke(val >> 1);
+	  vsip->poke(vsInterruptToS(val));
 	}
     }
   else if (num == CsrNumber::HVIP)
@@ -4852,8 +5055,17 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
       if (vsip)
 	{
 	  if (hideleg)
-	    value &= hideleg->read();
-	  vsip->poke(value >> 1);
+            {
+              URV pending = value & 0x1fff;
+              value &= ~URV(0x1fff);
+              value |= pending & hideleg->read();
+            }
+          if (hvien)
+            {
+              URV pending = (value >> 13) << 13;
+              value |= pending & hvien->read() & ~hideleg->read();
+            }
+	  vsip->poke(vsInterruptToS(value));
 	}
     }
   else if (num == CsrNumber::HGEIP or num == CsrNumber::HSTATUS)
@@ -4879,7 +5091,7 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
       // Updating VSIP injects values into writeable bits of HIP
       if (hip)
         {
-	  value = value << 1;  // Aliased bits shifter in HIP
+	  value = sInterruptToVs(value);  // Aliased bits shifter in HIP
 	  if (hideleg)
 	    {
 	      URV newVal = (hip->read() & ~hideleg->read()) | (value & hideleg->read());
@@ -4905,7 +5117,7 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
       if (vsip and num != CsrNumber::VSIP)
 	{
 	  URV val = hip->read() & ~ URV(0x1000);  // Clear bit 12 (SGEIP)
-	  vsip->poke(val >> 1);
+	  vsip->poke(vsInterruptToS(val));
 	}
 
       // Updating HIP is reflected in MIP.
@@ -4928,7 +5140,7 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 	{
 	  if (hideleg)
 	    val &= hideleg->read();
-          vsie->poke(val >> 1);
+          vsie->poke(vsInterruptToS(val));
 	}
     }
   else if (num == CsrNumber::MIE)
@@ -4940,15 +5152,13 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
         {
 	  if (hideleg)
 	    val &= hideleg->read();
-          vsie->poke(val >> 1);
+          vsie->poke(vsInterruptToS(val));
         }
     }
   else if (num == CsrNumber::VSIE)
     {
-      URV vsMask = 0x444;  // VSEIP, VSTIP and VSSIP.
-      if (hideleg)
-	vsMask = vsMask & hideleg->read();
-      URV val = ((vsie->read() << 1) & vsMask);
+      URV vsMask = hideleg? hideleg->read() : 0;
+      URV val = sInterruptToVs(vsie->read()) & vsMask;
       if (mie)
         mie->poke((mie->read() & ~vsMask) | val);
       if (hie)
