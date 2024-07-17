@@ -1258,7 +1258,6 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
 
   for (unsigned i = 0; i < op.size_; ++i)
     {
-      // TOD FIX : op/vstore op should have an element ix, element indices should match.
       uint64_t byteAddr = op.physAddr_ + i;
       uint8_t byteVal = op.rtlData_ >> (i*8);
       bool match = false;
@@ -1949,7 +1948,7 @@ Mcm<URV>::identifyRegisters(const Hart<URV>& hart,
 	continue;
 
       auto type = di.ithOperandType(i);
-      // FIX: Support VecReg
+
       if (type == OperandType::Imm or type == OperandType::None)
 	continue;
       if (isSource and type == OperandType::CsReg and skipCsr)
@@ -2106,7 +2105,6 @@ template <typename URV>
 bool
 Mcm<URV>::vecOverlapsPhysAddr(const McmInstr& instr, uint64_t addr) const
 {
-  // FIX: Make sure instrucion memory ops are trimmed.
   assert(instr.di_.isVector());
 
   for (auto opIx : instr.memOps_)
