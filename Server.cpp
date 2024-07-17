@@ -734,11 +734,14 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   // Execute instruction. Determine if an interrupt was taken or if a
   // trigger got tripped.
 
-  bool wasInDebug = false;
+  bool prevDebug = hart.inDebugMode();
+
+  bool reenterDebug = false;  // True if we should re-enter debug after step.
+
   if (not hart.hasDebugParkLoop())
     {
-      wasInDebug = hart.inDebugMode();
-      if (wasInDebug)
+      reenterDebug = prevDebug;
+      if (prevDebug)
 	hart.exitDebugMode();
     }
 
@@ -784,11 +787,11 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   flags.bits.stop = hart.hasTargetProgramFinished();
   flags.bits.interrupt = interrupted;
   flags.bits.virt = hart.lastVirtMode();
-  flags.bits.debug = wasInDebug;
+  flags.bits.debug = prevDebug;
   flags.bits.load = di.isLoad() or di.isAmo() or di.isVectorLoad();
   reply.flags = flags.value;
 
-  if (wasInDebug)
+  if (reenterDebug)
     hart.enterDebugMode(hart.peekPc());
   return ok;
 }
