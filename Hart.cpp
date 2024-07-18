@@ -4728,6 +4728,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	  DecodedInst* di = &decodeCache_[ix];
 	  if (not di->isValid() or di->physAddress() != physPc or di->inst() != inst)
 	    decode(pc_, physPc, inst, *di);
+          di->resetAddr(pc_);
 
           // Increment pc and execute instruction
 	  pc_ += di->instSize();
@@ -5039,6 +5040,7 @@ Hart<URV>::simpleRunWithLimit()
       DecodedInst* di = &decodeCache_[ix];
       if (not di->isValid() or di->physAddress() != physPc or di->inst() != inst)
 	decode(pc_, physPc, inst, *di);
+      di->resetAddr(pc_);
 
       pc_ += di->instSize();
       execute(di);
