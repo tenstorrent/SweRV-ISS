@@ -3856,12 +3856,12 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
             {
               unsigned iid = highestIidPrio(vs & ~(URV(1) << unsigned(IC::S_EXTERNAL)));
               if (iid)
-                value = iid << 16 | hvf.bits_.IPRIOM? 0 : 1;
+                value = (iid << 16) | (hvf.bits_.IPRIOM? 0 : 1);
             }
           else if (hvf.bits_.IID != unsigned(IC::S_EXTERNAL))
             {
               prio = hvf.bits_.IPRIO;
-              value = (hvf.bits_.IID << 16) | hvf.bits_.IPRIOM? prio : 1;
+              value = (hvf.bits_.IID << 16) | (hvf.bits_.IPRIOM? prio : 1);
               if (not hvf.bits_.DPR)
                 return true;
             }
