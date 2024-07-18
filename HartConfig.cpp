@@ -2304,7 +2304,13 @@ HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
     if (not getJsonBoolean(tag, config_ -> at(tag), enableMcm))
       return false;
 
-  if (enableMcm and not system.enableMcm(mbLineSize, checkAll))
+  tag = "enable_ppo";
+  bool enablePpo = true;
+  if (config_ -> contains(tag))
+    if (not getJsonBoolean(tag, config_ -> at(tag), enablePpo))
+      return false;
+
+  if (enableMcm and not system.enableMcm(mbLineSize, checkAll, enablePpo))
     return false;
 
   tag = "enable_tso";

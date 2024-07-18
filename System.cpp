@@ -750,7 +750,7 @@ System<URV>::addPciDevices(const std::vector<std::string>& devs)
 
 template <typename URV>
 bool
-System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll)
+System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll, bool enablePpo)
 {
   if (mbLineSize != 0)
     if (not isPowerOf2(mbLineSize) or mbLineSize > 512)
@@ -763,6 +763,7 @@ System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll)
   mcm_ = std::make_shared<Mcm<URV>>(this->hartCount(), pageSize(), mbLineSize);
   mbSize_ = mbLineSize;
   mcm_->setCheckWholeMbLine(mbLineCheckAll);
+  mcm_->enablePpo(enablePpo);
 
   for (auto& hart :  sysHarts_)
     hart->setMcm(mcm_);

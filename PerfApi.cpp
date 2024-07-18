@@ -446,7 +446,11 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 	}
     }
 
-  packet.nextIva_ = hart.peekPc();
+  if (hart.hasTargetProgramFinished())
+    packet.nextIva_ = haltPc;
+  else
+    packet.nextIva_ = hart.peekPc();
+
   if (di.isBranch()) packet.taken_ = hart.lastBranchTaken();
 
   // Record the values of the dstination register.
@@ -842,10 +846,16 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
         }
 
       ++iter;
-      packetMap.erase(pacPtr->tag_);
     }
 
-  if (prevFetch_->tag_ > tag)
+  // delete input tag and all newer instructions
+  std::erase_if(packetMap, [&tag](const auto &packet)
+  {
+    auto const& [_, pacPtr] = packet;
+    return pacPtr->tag_ >= tag;
+  });
+
+  if (prevFetch_ && prevFetch_->tag_ > tag)
     prevFetch_ = nullptr;
 
   return true;
