@@ -10829,7 +10829,8 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
-  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+  else if (not virtMode_ and csr == CsrNumber::SIP and
+            (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
@@ -10879,7 +10880,8 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
-  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+  else if (not virtMode_ and csr == CsrNumber::SIP and
+            (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (di->op1() == 0)
@@ -10938,7 +10940,8 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
-  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+  else if (not virtMode_ and csr == CsrNumber::SIP and
+            (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (di->op1() == 0)
@@ -10989,7 +10992,8 @@ Hart<URV>::execCsrrwi(const DecodedInst* di)
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
-  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+  else if (not virtMode_ and csr == CsrNumber::SIP and
+            (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   doCsrWrite(di, csr, di->op1(), di->op0(), prev);
@@ -11041,7 +11045,8 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
-  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+  else if (not virtMode_ and csr == CsrNumber::SIP and
+            (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (imm == 0)
@@ -11102,7 +11107,8 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
-  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+  else if (not virtMode_ and csr == CsrNumber::SIP and
+            (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (imm == 0)
