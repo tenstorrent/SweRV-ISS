@@ -100,13 +100,13 @@ namespace WdRiscv
     /// exception in this region. Returns false if misaligned access
     /// is supported.
     bool misalOnMisal() const
-    { return isMisalignedOk() and not (attrib_ & MisalAccFault); }
+    { return not (attrib_ & MisalAccFault); }
 
     /// Return true if misaligned access generates an access fault
     /// exception in this region. Returns false if misaligned access
     /// is supported.
     bool accessFaultOnMisal() const
-    { return isMisalignedOk() and (attrib_ & MisalAccFault); }
+    { return (attrib_ & MisalAccFault); }
 
     /// Return true if this object has the same attributes as the
     /// given object.
