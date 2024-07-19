@@ -2504,32 +2504,31 @@ namespace WdRiscv
     /// given value
     void setFpFlags(unsigned value)
     {
-      uint32_t mask = uint32_t(FpFlags::FcsrMask);
-      fcsrValue_ = (fcsrValue_ & ~mask) | (value & mask);
+      FcsrFields fields{fcsrValue_};
+      fields.bits_.FFLAGS = value;
+      fcsrValue_ = fields.value_;
     }
 
     /// Set the rounding-mode field in FCSR to the least sig 3 bits of
     /// the given value
     void setFpRoundingMode(unsigned value)
     {
-      uint32_t mask = uint32_t(RoundingMode::FcsrMask);
-      uint32_t shift = uint32_t(RoundingMode::FcsrShift);
-      fcsrValue_ = (fcsrValue_ & ~mask) | ((value << shift) & mask);
+      FcsrFields fields{fcsrValue_};
+      fields.bits_.FRM = value;
+      fcsrValue_ = fields.value_;
     }
 
     /// Return the rounding mode in FCSR.
     RoundingMode getFpRoundingMode() const
-    {
-      uint32_t mask = uint32_t(RoundingMode::FcsrMask);
-      uint32_t shift = uint32_t(RoundingMode::FcsrShift);
-      return RoundingMode((fcsrValue_ & mask) >> shift);
+    { 
+      unsigned frm = FcsrFields{fcsrValue_}.bits_.FRM;
+      return RoundingMode(frm);
     }
 
     /// Return the flags in FCSR.
     uint32_t getFpFlags() const
     {
-      uint32_t mask = uint32_t(FpFlags::FcsrMask);
-      return fcsrValue_ & mask;
+      return FcsrFields{fcsrValue_}.bits_.FFLAGS;
     }
 
     /// Intended to be called from within the checkRoundingMode<size>

@@ -42,7 +42,6 @@ roundingModeString(RoundingMode mode)
     case RoundingMode::Invalid1:    return "inv1";
     case RoundingMode::Invalid2:    return "inv2";
     case RoundingMode::Dynamic:     return "dyn";
-    case RoundingMode::FcsrMask:    return "inv";
     }
   return "inv";
 }

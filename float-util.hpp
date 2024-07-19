@@ -47,9 +47,7 @@ enum class RoundingMode : uint32_t
     NearestMax,      // Round to nearest, ties to max magnitude
     Invalid1,
     Invalid2,
-    Dynamic,
-    FcsrMask = 0xe0, // Mask of mode-bits in FCSR.
-    FcsrShift = 5    // Index of least-significant mode bit in FCSR.
+    Dynamic
   };
 
 
@@ -61,8 +59,7 @@ enum class FpFlags : uint32_t
     Underflow = 2,
     Overflow = 4,
     DivByZero = 8,
-    Invalid = 16,
-    FcsrMask = 0x1f   // Mask of flag-bits in the FCSR.
+    Invalid = 16
   };
 
 
