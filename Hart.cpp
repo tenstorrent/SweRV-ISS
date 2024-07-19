@@ -3244,6 +3244,7 @@ unpackPmacfg(uint64_t val, bool& valid, uint64_t& low, uint64_t& high, Pma& pma)
     {
       attrib |= Pma::Attrib::Io;
       attrib &= ~Pma::Attrib::MisalOk;  // No misaligned IO region access.
+      attrib |= Pma::Attrib::MisalAccFault;
     }
   else
     {
