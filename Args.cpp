@@ -582,7 +582,7 @@ Args::parseCmdLineNumber(const std::string& option, const std::string& numberStr
   uint64_t scale = 1;
   if (good)
     {
-      char suffix = str.back();
+      char suffix = std::tolower(str.back());
       if (suffix == 'k')
         scale = 1024;
       else if (suffix == 'm')
