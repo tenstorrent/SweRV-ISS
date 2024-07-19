@@ -97,14 +97,12 @@ namespace WdRiscv
     { return attrib_& MisalOk; }
 
     /// Return true if misaligned access generates a misaligned
-    /// exception in this region. Returns false if misaligned access
-    /// is supported.
+    /// exception in this region.
     bool misalOnMisal() const
     { return not (attrib_ & MisalAccFault); }
 
     /// Return true if misaligned access generates an access fault
-    /// exception in this region. Returns false if misaligned access
-    /// is supported.
+    /// exception in this region.
     bool accessFaultOnMisal() const
     { return (attrib_ & MisalAccFault); }
 
