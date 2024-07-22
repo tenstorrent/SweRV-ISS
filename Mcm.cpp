@@ -3026,7 +3026,7 @@ Mcm<URV>::checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const
 	{
 	  cerr << "Error: Read op of load instruction happens before retire time of "
 	       << "preceding overlapping cbo.clean/flush: hart-id=" << hart.hartId()
-	       << " cbo-tag=" << instrA.tag_ << "load-tag=" << instrB.tag_ << '\n';
+	       << " cbo-tag=" << instrA.tag_ << " load-tag=" << instrB.tag_ << '\n';
 	  return false;
 	}
     }
