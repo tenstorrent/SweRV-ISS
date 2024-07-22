@@ -2327,7 +2327,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
   if (not hasFence)
     return true;  // No fence among instructions out of order with respect to B.
 
-  for (unsigned tag = instrB.tag_ - 1; tag <= minTag; --tag)
+  for (unsigned tag = instrB.tag_ - 1; tag >= minTag; --tag)
     {
       const auto& instr = instrVec.at(tag);
       if (instr.isCanceled() or not instr.di_.isFence())
@@ -2344,7 +2344,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
       bool succIn = fence.di_.isFencePredInput();
       bool succOut = fence.di_.isFencePredOutput();
 
-      for (unsigned aTag = tag - 1; tag <= minTag; --tag)
+      for (unsigned aTag = tag - 1; aTag >= minTag; --aTag)
 	{
 	  const auto& pred = instrVec.at(aTag);
 	  if (pred.isCanceled() or not pred.isMemory())
