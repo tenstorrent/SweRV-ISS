@@ -832,7 +832,7 @@ Hart<URV>::checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned 
       if (fieldCount > 1)
         {
           unsigned offsetGroup = offsetGroupX8 >= 8 ? offsetGroupX8/8 : 1;
-          unsigned group = (groupX8*fieldCount) >= 8 ? (groupX8*fieldCount)/8 : 1;
+          unsigned group = (groupX8*fieldCount + 7)/8;
 
           ok = (vi >= vd + group or vd >= vi + offsetGroup);
         }

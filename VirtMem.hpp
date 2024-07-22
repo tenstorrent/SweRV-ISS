@@ -382,6 +382,8 @@ namespace WdRiscv
         {
           pma.disable(Pma::Attrib::Idempotent);
           pma.enable(Pma::Attrib::Io);
+          pma.disable(Pma::Attrib::MisalOk);
+          pma.enable(Pma::Attrib::MisalAccFault);
         }
       return pma;
     }
