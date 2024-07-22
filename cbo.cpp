@@ -74,6 +74,18 @@ Hart<URV>::determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, boo
         }
     }
 
+  for (uint64_t offset = 0; offset < cacheLineSize_; offset += 8)
+    {
+      Pma pma = getPma(pa + offset);
+      if (isZero)
+        {
+          if (not pma.isWrite())
+            return EC::STORE_ACC_FAULT;
+        }
+      else if (not pma.isRead() and not pma.isWrite())
+        return EC::STORE_ACC_FAULT;
+    }
+
   // Physical memory protection.
   if (pmpEnabled_)
     {
