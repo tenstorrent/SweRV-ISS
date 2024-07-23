@@ -2504,7 +2504,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
   if (not hasFence)
     return true;  // No fence among instructions out of order with respect to B.
 
-  for (unsigned tag = instrB.tag_ - 1; tag <= minTag; --tag)
+  for (unsigned tag = instrB.tag_ - 1; tag >= minTag; --tag)
     {
       const auto& instr = instrVec.at(tag);
       if (instr.isCanceled() or not instr.di_.isFence())
@@ -2521,7 +2521,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
       bool succIn = fence.di_.isFencePredInput();
       bool succOut = fence.di_.isFencePredOutput();
 
-      for (unsigned aTag = tag - 1; tag <= minTag; --tag)
+      for (unsigned aTag = tag - 1; aTag >= minTag; --aTag)
 	{
 	  const auto& pred = instrVec.at(aTag);
 	  if (pred.isCanceled() or not pred.isMemory())
@@ -3226,18 +3226,19 @@ Mcm<URV>::checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const
     {
       const auto& instrA = instrVec.at(ix-1);
 
-      if (instrA.isCanceled()  or  not instrA.isRetired())
+      if (instrA.isCanceled() or not instrA.isRetired())
 	continue;
   
       if (earlyB > instrA.retireTime_)
 	break;
 
       auto instId = instrA.di_.instId();
-      if (instId == InstId::cbo_flush or instId == InstId::cbo_clean)
+      if ((instId == InstId::cbo_flush or instId == InstId::cbo_clean) and
+          instrA.overlaps(instrB))
 	{
 	  cerr << "Error: Read op of load instruction happens before retire time of "
 	       << "preceding overlapping cbo.clean/flush: hart-id=" << hart.hartId()
-	       << " cbo-tag=" << instrA.tag_ << "load-tag=" << instrB.tag_ << '\n';
+	       << " cbo-tag=" << instrA.tag_ << " load-tag=" << instrB.tag_ << '\n';
 	  return false;
 	}
     }

@@ -566,9 +566,9 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
         return false;
       value = fcsr->read();
       if (num == CN::FFLAGS)
-        value = value & URV(FpFlags::FcsrMask);
+        value = FcsrFields{value}.bits_.FFLAGS;
       else
-        value = (value & URV(RoundingMode::FcsrMask)) >> URV(RoundingMode::FcsrShift);
+        value = FcsrFields{value}.bits_.FRM;
       return true;
     }
   else if (num == CN::MIREG)
@@ -2346,10 +2346,9 @@ CsRegs<URV>::updateFcsrGroupForWrite(CsrNumber number, URV value)
       auto fcsr = getImplementedCsr(CsrNumber::FCSR);
       if (fcsr)
 	{
-          URV mask = URV(FpFlags::FcsrMask);
-	  URV fcsrVal = fcsr->read();
-          fcsrVal = (fcsrVal & ~mask) | (value & mask);
-	  fcsr->write(fcsrVal);
+	  FcsrFields fields{fcsr->read()};
+	  fields.bits_.FFLAGS = value;
+	  fcsr->write(fields.value_);
 	  // recordWrite(CsrNumber::FCSR);
 	}
       return;
@@ -2360,35 +2359,32 @@ CsRegs<URV>::updateFcsrGroupForWrite(CsrNumber number, URV value)
       auto fcsr = getImplementedCsr(CsrNumber::FCSR);
       if (fcsr)
 	{
-	  URV fcsrVal = fcsr->read();
-          URV mask = URV(RoundingMode::FcsrMask);
-          URV shift = URV(RoundingMode::FcsrShift);
-          fcsrVal = (fcsrVal & ~mask) | ((value << shift) & mask);
-	  fcsr->write(fcsrVal);
+	  FcsrFields fields{fcsr->read()};
+	  fields.bits_.FRM = value;
+	  fcsr->write(fields.value_);
 	  // recordWrite(CsrNumber::FCSR);
-          setSimulatorRoundingMode(RoundingMode((fcsrVal & mask) >> shift));
+          setSimulatorRoundingMode(RoundingMode(fields.bits_.FRM));
 	}
       return;
     }
 
   if (number == CsrNumber::FCSR)
     {
-      URV newVal = value & URV(FpFlags::FcsrMask);
+      FcsrFields fields{value};
       auto fflags = getImplementedCsr(CsrNumber::FFLAGS);
-      if (fflags and fflags->read() != newVal)
+      if (fflags and fflags->read() != fields.bits_.FFLAGS)
 	{
-	  fflags->write(newVal);
+	  fflags->write(fields.bits_.FFLAGS);
 	  // recordWrite(CsrNumber::FFLAGS);
 	}
 
-      newVal = (value & URV(RoundingMode::FcsrMask)) >> URV(RoundingMode::FcsrShift);
       auto frm = getImplementedCsr(CsrNumber::FRM);
-      if (frm and frm->read() != newVal)
+      if (frm and frm->read() != fields.bits_.FRM)
 	{
-	  frm->write(newVal);
+	  frm->write(fields.bits_.FRM);
 	  // recordWrite(CsrNumber::FRM);
 	}
-      setSimulatorRoundingMode(RoundingMode(newVal));
+      setSimulatorRoundingMode(RoundingMode(fields.bits_.FRM));
     }
 }
 
@@ -2402,10 +2398,9 @@ CsRegs<URV>::updateFcsrGroupForPoke(CsrNumber number, URV value)
       auto fcsr = getImplementedCsr(CsrNumber::FCSR);
       if (fcsr)
 	{
-          URV mask = URV(FpFlags::FcsrMask);
-	  URV fcsrVal = fcsr->read();
-          fcsrVal = (fcsrVal & ~mask) | (value & mask);
-	  fcsr->poke(fcsrVal);
+	  FcsrFields fields{fcsr->read()};
+	  fields.bits_.FFLAGS = value;
+	  fcsr->poke(fields.value_);
 	}
       return;
     }
@@ -2415,28 +2410,25 @@ CsRegs<URV>::updateFcsrGroupForPoke(CsrNumber number, URV value)
       auto fcsr = getImplementedCsr(CsrNumber::FCSR);
       if (fcsr)
 	{
-	  URV fcsrVal = fcsr->read();
-          URV mask = URV(RoundingMode::FcsrMask);
-          URV shift = URV(RoundingMode::FcsrShift);
-          fcsrVal = (fcsrVal & ~mask) | ((value << shift) & mask);
-	  fcsr->poke(fcsrVal);
-          setSimulatorRoundingMode(RoundingMode((fcsrVal & mask) >> shift));
+	  FcsrFields fields{fcsr->read()};
+	  fields.bits_.FRM = value;
+	  fcsr->poke(fields.value_);
+          setSimulatorRoundingMode(RoundingMode(fields.bits_.FRM));
 	}
       return;
     }
 
   if (number == CsrNumber::FCSR)
     {
-      URV newVal = value & URV(FpFlags::FcsrMask);
+      FcsrFields fields{value};
       auto fflags = getImplementedCsr(CsrNumber::FFLAGS);
-      if (fflags and fflags->read() != newVal)
-        fflags->poke(newVal);
+      if (fflags and fflags->read() != fields.bits_.FFLAGS)
+        fflags->poke(fields.bits_.FFLAGS);
 
-      newVal = (value & URV(RoundingMode::FcsrMask)) >> URV(RoundingMode::FcsrShift);
       auto frm = getImplementedCsr(CsrNumber::FRM);
-      if (frm and frm->read() != newVal)
-        frm->poke(newVal);
-      setSimulatorRoundingMode(RoundingMode(newVal));
+      if (frm and frm->read() != fields.bits_.FRM)
+        frm->poke(fields.bits_.FRM);
+      setSimulatorRoundingMode(RoundingMode(fields.bits_.FRM));
     }
 }
 
@@ -3450,9 +3442,9 @@ CsRegs<URV>::peek(CsrNumber num, URV& value, bool virtMode) const
         return false;
       value = fcsr->read();
       if (num == CN::FFLAGS)
-        value = value & URV(FpFlags::FcsrMask);
+        value = FcsrFields{value}.bits_.FFLAGS;
       else
-        value = (value & URV(RoundingMode::FcsrMask)) >> URV(RoundingMode::FcsrShift);
+        value = FcsrFields{value}.bits_.FRM;
       return true;
     }
 
@@ -3856,12 +3848,12 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
             {
               unsigned iid = highestIidPrio(vs & ~(URV(1) << unsigned(IC::S_EXTERNAL)));
               if (iid)
-                value = iid << 16 | hvf.bits_.IPRIOM? 0 : 1;
+                value = (iid << 16) | (hvf.bits_.IPRIOM? 0 : 1);
             }
           else if (hvf.bits_.IID != unsigned(IC::S_EXTERNAL))
             {
               prio = hvf.bits_.IPRIO;
-              value = (hvf.bits_.IID << 16) | hvf.bits_.IPRIOM? prio : 1;
+              value = (hvf.bits_.IID << 16) | (hvf.bits_.IPRIOM? prio : 1);
               if (not hvf.bits_.DPR)
                 return true;
             }

@@ -444,6 +444,10 @@ namespace WdRiscv
     void setVecFieldCount(uint32_t count)
     { vecFields_ = count; }
 
+    /// Reset address to given value.
+    void resetAddr(uint64_t addr)
+    { addr_ = addr; }
+
   protected:
 
     void setAddr(uint64_t addr)

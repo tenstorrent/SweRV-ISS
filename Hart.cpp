@@ -2414,7 +2414,11 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, [[maybe_unuse
   uint16_t half = 0;
   bool done = false;
   if (mcm_)
-    done = readInstFromFetchCache(physAddr, half);
+    {
+      Pma pma = memory_.pmaMgr_.accessPma(physAddr, PmaManager::AccessReason::Fetch);
+      if (not pma.isIo() and pma.isCacheable())
+	done = readInstFromFetchCache(physAddr, half);
+    }
 
   if (not done and not memory_.readInst(physAddr, half))
     return ExceptionCause::INST_ACC_FAULT;
@@ -2453,7 +2457,11 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, [[maybe_unuse
   uint16_t upperHalf = 0;
   done = false;
   if (mcm_)
-    done = readInstFromFetchCache(physAddr2, upperHalf);
+    {
+      Pma pma = memory_.pmaMgr_.accessPma(physAddr2, PmaManager::AccessReason::Fetch);
+      if (not pma.isIo() and pma.isCacheable())
+	done = readInstFromFetchCache(physAddr2, upperHalf);
+    }
 
   if (not done and not memory_.readInst(physAddr2, upperHalf))
     {
@@ -3244,6 +3252,7 @@ unpackPmacfg(uint64_t val, bool& valid, uint64_t& low, uint64_t& high, Pma& pma)
     {
       attrib |= Pma::Attrib::Io;
       attrib &= ~Pma::Attrib::MisalOk;  // No misaligned IO region access.
+      attrib |= Pma::Attrib::MisalAccFault;
     }
   else
     {
@@ -4728,6 +4737,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	  DecodedInst* di = &decodeCache_[ix];
 	  if (not di->isValid() or di->physAddress() != physPc or di->inst() != inst)
 	    decode(pc_, physPc, inst, *di);
+          di->resetAddr(pc_);
 
           // Increment pc and execute instruction
 	  pc_ += di->instSize();
@@ -5039,6 +5049,7 @@ Hart<URV>::simpleRunWithLimit()
       DecodedInst* di = &decodeCache_[ix];
       if (not di->isValid() or di->physAddress() != physPc or di->inst() != inst)
 	decode(pc_, physPc, inst, *di);
+      di->resetAddr(pc_);
 
       pc_ += di->instSize();
       execute(di);
@@ -10827,7 +10838,8 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
-  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+  else if (not virtMode_ and csr == CsrNumber::SIP and
+            (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
@@ -10877,7 +10889,8 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
-  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+  else if (not virtMode_ and csr == CsrNumber::SIP and
+            (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (di->op1() == 0)
@@ -10936,7 +10949,8 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
-  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+  else if (not virtMode_ and csr == CsrNumber::SIP and
+            (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (di->op1() == 0)
@@ -10987,7 +11001,8 @@ Hart<URV>::execCsrrwi(const DecodedInst* di)
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
-  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+  else if (not virtMode_ and csr == CsrNumber::SIP and
+            (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   doCsrWrite(di, csr, di->op1(), di->op0(), prev);
@@ -11039,7 +11054,8 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
-  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+  else if (not virtMode_ and csr == CsrNumber::SIP and
+            (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (imm == 0)
@@ -11100,7 +11116,8 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
-  else if (csr == CsrNumber::SIP and (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
+  else if (not virtMode_ and csr == CsrNumber::SIP and
+            (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
     prev |= seiPin_ << URV(IC::S_EXTERNAL);
 
   if (imm == 0)

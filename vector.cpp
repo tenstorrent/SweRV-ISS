@@ -832,7 +832,7 @@ Hart<URV>::checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned 
       if (fieldCount > 1)
         {
           unsigned offsetGroup = offsetGroupX8 >= 8 ? offsetGroupX8/8 : 1;
-          unsigned group = (groupX8*fieldCount) >= 8 ? (groupX8*fieldCount)/8 : 1;
+          unsigned group = (groupX8*fieldCount + 7)/8;
 
           ok = (vi >= vd + group or vd >= vi + offsetGroup);
         }
@@ -12558,7 +12558,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	{
 	  unsigned dvg = vd + field*eg;   // Destination vector gorup.
 	  ELEM_TYPE elem(0);
-	  bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
+	  bool skip = not vecRegs_.isDestActive(dvg, ix, destGroup, masked, elem);
           if (ix < vecRegs_.elemCount())
             {
               vecRegs_.ldStVa_.push_back(faddr);
@@ -12566,6 +12566,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	      vecRegs_.ldStPa2_.push_back(faddr);
               vecRegs_.maskedAddr_.push_back(skip);
             }
+
 	  if (skip)
 	    {
 	      vecRegs_.write(dvg, ix, destGroup, elem);
@@ -13072,7 +13073,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
           uint64_t faddr;
 	  unsigned dvg = vd + field*eg;  // Destination vector grop.
 	  ELEM_TYPE elem = 0;
-	  bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
+	  bool skip = not vecRegs_.isDestActive(dvg, ix, destGroup, masked, elem);
           if (ix < vecRegs_.elemCount())
             {
               uint64_t offset = 0;
