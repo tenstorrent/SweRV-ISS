@@ -873,7 +873,7 @@ Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
 
 	  if (cmdLog)
 	    {
-	      fprintf(cmdLog, "hart=%" PRIu32 " time=%" PRIu64 " mread %" PRIu64 " 0x%" PRIx64 "%" PRIu32 "0x",
+	      fprintf(cmdLog, "hart=%" PRIu32 " time=%" PRIu64 " mread %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x",
 		      hartId, req.time, req.instrTag, req.address, req.size);
 	      const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
 	      for (unsigned i = req.size; i > 0; --i)

@@ -2117,17 +2117,18 @@ Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
     }
 
   unsigned clz = hart.cacheLineSize();
-  if (size != clz and size != clz / 2)
+  if (size > clz)
     {
-      std::cerr << "Invalid mread command for vector: " << "size must be "
-		<< clz << " or " << (clz/2) << '\n';
+      std::cerr << "Invalid size for mread command for vector: " << size << ", must be "
+		<< "less than cache line size (" << clz << ")\n";
       return false;
     }
 
   bool ok = true;
 
   const uint8_t* vdata = bytes.data();
-  for (unsigned i = 0; i < size and ok; ++i, ++vdata, ++addr)
+  addr = addr + size - 1;
+  for (unsigned i = 0; i < size and ok; ++i, ++vdata, --addr)
     {
       uint64_t value = *vdata;
       ok = system_.mcmRead(hart, this->time_, tag, addr, 1, value);
