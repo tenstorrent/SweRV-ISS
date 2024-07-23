@@ -2309,32 +2309,38 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
   if (earlyB > instrB.retireTime_)
     return true;
 
-  // Find smallest tag of instructions out of order with respect to B (excluding those
-  // with write).
-  unsigned hartIx = hart.sysHartIndex();
-  McmInstrIx minTag = getMinReadTagWithLargerTime(hartIx, instrB);
-
+  unsigned hartIx = hart.sysHartIndex();  
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  bool hasFence = false;  // True if there is a fence preceeding B.
-  for (unsigned tag = minTag; tag < instrB.tag_ and not hasFence; ++tag)
+  // Collect all fence instructions that can affect B.
+  std::vector<McmInstrIx> fences;
+  for (McmInstrIx ix = instrB.tag_; ix > 0; --ix)
     {
-      const auto& pred = instrVec.at(tag);
-      if (pred.isCanceled())
-	continue;
-      hasFence = pred.di_.isFence();
-    }
-  if (not hasFence)
-    return true;  // No fence among instructions out of order with respect to B.
-
-  for (unsigned tag = instrB.tag_ - 1; tag >= minTag; --tag)
-    {
+      McmInstrIx tag = ix - 1;
       const auto& instr = instrVec.at(tag);
-      if (instr.isCanceled() or not instr.di_.isFence())
+      if (not instr.isCanceled() and instr.di_.isFence() and instr.retireTime_ >= earlyB)
+	fences.push_back(tag);
+    }
+  if (fences.empty())
+    return true;
+
+  // Collect all instructions out of order with respect to B.
+  std::vector<McmInstrIx> reordered;
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+    {
+      const auto& op = *iter;
+      if (op.canceled_ or op.hartIx_ != hartIx or op.instrTag_ >= instrB.tag_)
 	continue;
-
-      const auto& fence = instr;
-
+      if (op.time_ < earlyB)
+	break;
+      reordered.push_back(op.instrTag_);
+    }
+  if (reordered.empty())
+    return true;
+      
+  for (auto fenceTag : fences)
+    {
+      const auto& fence = instrVec.at(fenceTag);
       bool predRead = fence.di_.isFencePredRead();
       bool predWrite = fence.di_.isFencePredWrite();
       bool succRead = fence.di_.isFenceSuccRead();
@@ -2344,7 +2350,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
       bool succIn = fence.di_.isFencePredInput();
       bool succOut = fence.di_.isFencePredOutput();
 
-      for (unsigned aTag = tag - 1; aTag >= minTag; --aTag)
+      for (auto aTag : reordered)
 	{
 	  const auto& pred = instrVec.at(aTag);
 	  if (pred.isCanceled() or not pred.isMemory())
@@ -2380,7 +2386,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
 	  if (not pred.complete_ or not pred.retired_)
 	    {
 	      cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
-		   << " tag1=" << pred.tag_ << " fence-tag=" << instr.tag_
+		   << " tag1=" << pred.tag_ << " fence-tag=" << fence.tag_
 		   << " memory instruction before fence is not retired/complete\n";
 	      return false;
 	    }
@@ -2418,7 +2424,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
 
 	  cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
 	       << " tag1=" << pred.tag_ << " tag2=" << succ.tag_
-	       << " fence-tag=" << instr.tag_
+	       << " fence-tag=" << fence.tag_
 	       << " time1=" << predTime << " time2=" << succTime << '\n';
 	  return false;
 	}
