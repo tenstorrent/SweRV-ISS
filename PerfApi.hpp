@@ -96,6 +96,9 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     uint64_t isBranch() const
     { return di_.isBranch(); }
 
+    uint64_t isBranchToRegister() const
+    { return di_.isBranchToRegister(); }
+
     /// Return true if this branch instruction is taken. Will return false if
     /// instruction has not executed or is not a branch.
     bool isTakenBranch() const
@@ -189,6 +192,20 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// Return true if this a store conditional (sc) instruction.  Packet must be decoded.
     bool isSc() const
     { return di_.isSc(); }
+
+    /// Return true if this is a privileged instruction (ebreak/ecall)
+    bool isPrivileged() const
+    {
+      if (di_.instEntry())
+        {
+          auto instId = di_.instEntry()->instId();
+          if (instId == WdRiscv::InstId::ebreak)
+            return true;
+          else if (instId == WdRiscv::InstId::ecall)
+            return true;
+        }
+      return false;
+    }
 
     /// Fill the given array with the source operands of this instruction (which must be
     /// decoded). Value of each operand will be zero unless the instruction is executed.
