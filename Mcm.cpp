@@ -3239,14 +3239,21 @@ Mcm<URV>::checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const
 	break;
 
       auto instId = instrA.di_.instId();
-      if ((instId == InstId::cbo_flush or instId == InstId::cbo_clean) and
-          instrA.overlaps(instrB))
-	{
-	  cerr << "Error: Read op of load instruction happens before retire time of "
-	       << "preceding overlapping cbo.clean/flush: hart-id=" << hart.hartId()
-	       << " cbo-tag=" << instrA.tag_ << " load-tag=" << instrB.tag_ << '\n';
-	  return false;
-	}
+      if (not (instId == InstId::cbo_flush) and not (instId == InstId::cbo_clean))
+        continue;
+
+      for (const auto& opIx : instrB.memOps_)
+        if (opIx < sysMemOps_.size())
+          {
+            const auto& op = sysMemOps_.at(opIx);
+            if (overlaps(instrA, op) and op.time_ < instrA.retireTime_)
+              {
+                cerr << "Error: Read op of load instruction happens before retire time of "
+                     << "preceding overlapping cbo.clean/flush: hart-id=" << hart.hartId()
+                     << " cbo-tag=" << instrA.tag_ << " load-tag=" << instrB.tag_ << '\n';
+                return false;
+              }
+          }
     }
 
   return true;
