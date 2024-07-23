@@ -14609,7 +14609,7 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
-          WidenedFpScalar e2dw{-e2};
+          WidenedFpScalar e2dw{e2};
 	  vecRegs_.read(vs1, ix, group2x, e1dw);
 	  dest = doFadd<ELEM_TYPE2X>(e1dw, e2dw);
           URV incFlags = activeSimulatorFpFlags(); 
