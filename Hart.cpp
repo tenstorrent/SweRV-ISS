@@ -2414,7 +2414,11 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, [[maybe_unuse
   uint16_t half = 0;
   bool done = false;
   if (mcm_)
-    done = readInstFromFetchCache(physAddr, half);
+    {
+      Pma pma = memory_.pmaMgr_.accessPma(physAddr, PmaManager::AccessReason::Fetch);
+      if (not pma.isIo() and pma.isCacheable())
+	done = readInstFromFetchCache(physAddr, half);
+    }
 
   if (not done and not memory_.readInst(physAddr, half))
     return ExceptionCause::INST_ACC_FAULT;
@@ -2453,7 +2457,11 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, [[maybe_unuse
   uint16_t upperHalf = 0;
   done = false;
   if (mcm_)
-    done = readInstFromFetchCache(physAddr2, upperHalf);
+    {
+      Pma pma = memory_.pmaMgr_.accessPma(physAddr2, PmaManager::AccessReason::Fetch);
+      if (not pma.isIo() and pma.isCacheable())
+	done = readInstFromFetchCache(physAddr2, upperHalf);
+    }
 
   if (not done and not memory_.readInst(physAddr2, upperHalf))
     {
