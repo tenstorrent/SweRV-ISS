@@ -156,10 +156,11 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
     }
   else
     {
+      // TOOD: To support full system mode, the trapPc will be modified depending on the exception encountered
       prevFetch_ = nullptr;
       trap = true;
-      assert(0 && "get trap pc");
       trapPc = 0;
+      return false;
     }
 
   return true;

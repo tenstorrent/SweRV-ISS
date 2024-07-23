@@ -14306,7 +14306,6 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  WidenedFpScalar e2dw{e2};
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group*2);
 
@@ -14317,6 +14316,7 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar e2dw{e2};
 	  vecRegs_.read(vs1, ix, group, e1);
 	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
 	  dest = doFadd<ELEM_TYPE2X>(e1dw, e2dw);
@@ -14453,7 +14453,6 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  WidenedFpScalar negE2dw{-e2};
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group*2);
 
@@ -14464,6 +14463,7 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar negE2dw{-e2};
 	  vecRegs_.read(vs1, ix, group, e1);
 	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
 	  dest = doFadd<ELEM_TYPE2X>(e1dw, negE2dw);
@@ -14598,7 +14598,6 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  WidenedFpScalar e2dw{e2};
 
   unsigned group2x = group*2;
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group2x);
@@ -14610,6 +14609,7 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar e2dw{e2};
 	  vecRegs_.read(vs1, ix, group2x, e1dw);
 	  dest = doFadd<ELEM_TYPE2X>(e1dw, e2dw);
           URV incFlags = activeSimulatorFpFlags(); 
@@ -14741,7 +14741,6 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  WidenedFpScalar negE2dw{-e2};
 
   unsigned group2x = group*2;
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group2x);
@@ -14753,6 +14752,7 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar negE2dw{-e2};
 	  vecRegs_.read(vs1, ix, group2x, e1dw);
 	  dest = doFadd<ELEM_TYPE2X>(e1dw, negE2dw);
           URV incFlags = activeSimulatorFpFlags(); 
@@ -15141,7 +15141,6 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  WidenedFpScalar e2dw{e2};
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group*2);
 
@@ -15152,6 +15151,7 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar e2dw{e2};
 	  vecRegs_.read(vs1, ix, group, e1);
 	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
 	  dest = doFmul<ELEM_TYPE2X>(e1dw, e2dw);
@@ -16269,7 +16269,6 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
   ELEM_TYPE2X e2dw{}, dest{};
-  WidenedFpScalar e1dw{e1};
 
   unsigned group2x = group*2;
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group2x);
@@ -16281,6 +16280,7 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar e1dw{e1};
 	  vecRegs_.read(vs2, ix, group, e2);
 	  vecRegs_.read(vd, ix, group2x, dest);
 
@@ -16416,7 +16416,6 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
-  WidenedFpScalar e1dw{-e1};
 
   unsigned group2x = group*2;
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group2x);
@@ -16428,6 +16427,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar e1dw{-e1};
 	  vecRegs_.read(vs2, ix, group, e2);
 	  vecRegs_.read(vd, ix, group2x, dest);
 	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
@@ -16562,7 +16562,6 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
-  WidenedFpScalar e1dw{e1};
 
   unsigned group2x = group*2;
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group2x);
@@ -16574,6 +16573,7 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar e1dw{e1};
 	  vecRegs_.read(vs2, ix, group, e2);
 	  vecRegs_.read(vd, ix, group2x, dest);
 	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
@@ -16709,7 +16709,6 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
-  WidenedFpScalar e1dw{-e1};
 
   unsigned group2x = group*2;
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group2x);
@@ -16721,6 +16720,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar e1dw{-e1};
 	  vecRegs_.read(vs2, ix, group, e2);
 	  vecRegs_.read(vd, ix, group2x, dest);
 	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
