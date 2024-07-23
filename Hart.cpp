@@ -1572,6 +1572,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       if (steeEnabled_)
 	a1 = stee_.clearSecureBits(addr1);
       Pma pma = getPma(a1);
+      pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (misal and not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
     }
@@ -1635,6 +1636,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
       ldStFaultAddr_ = va2;
       pma = getPma(next);
+      pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
 	return EC::LOAD_ACC_FAULT;
       if (not pma.isMisalignedOk())
@@ -11237,6 +11239,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       if (steeEnabled_)
 	a1 = stee_.clearSecureBits(addr1);
       Pma pma = getPma(a1);
+      pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (misal and not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
     }
@@ -11299,6 +11302,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       uint64_t aligned = addr1 & ~alignMask;
       uint64_t next = addr1 == addr2? aligned + stSize : addr2;
       pma = getPma(next);
+      pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isWrite())
 	{
 	  ldStFaultAddr_ = va2;
