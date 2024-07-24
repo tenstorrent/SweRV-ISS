@@ -407,7 +407,7 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
       // Use TLB entry.
       if (not entry->user_)
         return stage2PageFaultType(read, write, exec);
-      bool ra = entry->read_ or (execReadable_ and entry->exec_);
+      bool ra = entry->read_ or (execReadable_ and entry->exec_ and not isPteAddr);
       if (not isPteAddr and xForR_)
 	ra = entry->exec_;
       bool wa = entry->write_, xa = entry->exec_;
@@ -791,7 +791,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       if (not pte.user())
         return stage2PageFaultType(read, write, exec);  // All access as though in User mode.
 
-      bool pteRead = pte.read() or (execReadable_ and pte.exec());
+      bool pteRead = pte.read() or (execReadable_ and pte.exec() and not isPteAddr);
       if (not isPteAddr and xForR_) // xForR_ (hlvx) has no effect when translating for a PTE addr
 	pteRead = pte.exec();
       if ((read and not pteRead) or (write and not pte.write()) or
