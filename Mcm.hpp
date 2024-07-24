@@ -69,7 +69,6 @@ namespace WdRiscv
     bool isLoad_    : 1 = false;
     bool isStore_   : 1 = false;
     bool complete_  : 1 = false;
-    bool forwarded_ : 1 = false; // True if all bytes of load were forwarded.
 
     /// Return true if this a load/store instruction.
     bool isMemory() const { return isLoad_ or isStore_; }
@@ -322,7 +321,11 @@ namespace WdRiscv
 
     /// Return the smallest time of the memory operations of the given instruction. Adjust
     /// read-operation times to account for forwarding.
-    uint64_t effectiveReadTime(const McmInstr& instr) const;
+    uint64_t effectiveMinTime(const McmInstr& instr) const;
+
+    /// Return the largest time of the memory operations of the given instruction. Adjust
+    /// read-operation times to account for forwarding.
+    uint64_t effectiveMaxTime(const McmInstr& instr) const;
 
     /// Return true if instruction a is before b in memory time.
     bool isBeforeInMemoryTime(const McmInstr& a, const McmInstr& b) const
