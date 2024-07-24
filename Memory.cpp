@@ -991,6 +991,7 @@ Memory::loadSnapshot(const std::string & filename,
   size_t remainingSize = 0;
   for (const auto& blk: usedBlocks)
     {
+#ifndef MEM_CALLBACKS
       if (blk.first >= size_)
 	{
 	  std::cerr << "Memory::loadSnapshot: Block address (0x" << std::hex << blk.first
@@ -998,7 +999,9 @@ Memory::loadSnapshot(const std::string & filename,
 	  success = false;
 	  break;
 	}
+#endif
       remainingSize = blk.second;
+#ifndef MEM_CALLBACKS
       if (remainingSize > size_ or size_ - remainingSize < blk.first)
 	{
 	  std::cerr << "Memory::loadSnapshot: Block at (0x" << std::hex << blk.first
@@ -1006,6 +1009,7 @@ Memory::loadSnapshot(const std::string & filename,
 	  success = false;
 	  break;
 	}
+#endif
 
       assert((blk.first & 3) == 0);
       assert((remainingSize & 3) == 0);
