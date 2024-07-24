@@ -79,7 +79,7 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   op.hartIx_ = hartIx;
   op.size_ = size;
   op.isRead_ = true;
-  op.canceled_ = true; // To be later marked as used.
+  op.canceled_ = true; // To be later marked as false if used.
 
   // Set whisper load data. This may be updated by forwarding.
   if (size == 1)
@@ -752,12 +752,6 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       return false;
     }
 
-  if (instr->isLoad_ and not di.isVector())
-    {
-      cancelReplayedReads(instr);
-      removeMemOps(*instr);
-    }
-
   if (not di.isValid() or trapped)
     {
       cancelInstr(*instr);  // Instruction took a trap.
@@ -767,6 +761,9 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   instr->retired_ = true;
   instr->retireTime_ = time;
   instr->di_ = di;
+  if (instr->isLoad_)
+    commitReadOps(hart, instr);
+
   if (instr->di_.instId() == InstId::sfence_vma)
     {
       hartData_.at(hartIx).sinvalVmaTime_ = time;
@@ -1598,8 +1595,68 @@ Mcm<URV>::trimMemoryOp(const McmInstr& instr, MemoryOp& op)
 
 template <typename URV>
 void
-Mcm<URV>::cancelReplayedReads(McmInstr* instr)
+Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 {
+  std::vector<uint64_t> va, pa1, pa2, data;
+  std::vector<bool> masked;
+  unsigned elemSize = 0;
+  if (not hart.getLastVectorMemory(va, pa1, pa2, data, masked, elemSize))
+    {
+      std::cerr << "Error: Mcm::commitVecReadOps: hart-id=" << hart.hartId()
+		<< " tag=" << instr->tag_ << " instruction is not a vector load\n";
+      return;
+    }
+
+  // FIX TODO : Handle page crossers: Use pa2.
+
+  // Map a reference address to a flag indicating if address is covered by a read op.
+  std::unordered_map<uint64_t, bool> referenceMap;
+  for (auto addr : pa1)
+    for (unsigned i = 0; i < elemSize; ++i)
+      referenceMap[addr + i] = false;
+
+  // Process read ops in reverse order. Trim each op. Keep ops where at least one address remains.
+  auto& ops = instr->memOps_;
+  for (auto iter = ops.rbegin(); iter != ops.rend(); ++iter)
+    {
+      auto opIx = *iter;
+      auto& op = sysMemOps_.at(opIx);
+      if (not op.isRead_)
+	continue;  // Should not happen.
+      uint64_t low = ~uint64_t(0);
+      uint64_t high = 0;
+      for (unsigned i = 0; i < op.size_; ++i)
+	{
+	  uint64_t addr = op.physAddr_ + i;
+	  if (not referenceMap.contains(addr) or referenceMap.at(addr))
+	    continue;  // No overlap or addr already covered by another op.
+	  referenceMap.at(addr) = true;
+	  low = std::min(low, addr);
+	  high = std::max(high, addr);
+	}
+      if (low <= high)
+	{
+	  unsigned size = high - low + 1;
+	  trimOp(op, low, size);
+	  op.canceled_ = false;
+	}	  
+    }
+
+  // Remove still marked canceled.
+  std::erase_if(ops, [this](MemoryOpIx ix) {
+    return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
+  });
+}  
+
+
+template <typename URV>
+void
+Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr* instr)
+{
+  if (instr->di_.isVector())
+    commitVecReadOps(hart, instr);
+
+  // Mark replayed ops as cancled.
   assert(instr->size_ > 0 and instr->size_ <= 8);
   unsigned expectedMask = (1 << instr->size_) - 1;  // Mask of bytes covered by instruction.
   unsigned readMask = 0;    // Mask of bytes covered by read operations.
@@ -1609,32 +1666,28 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
     trimMemoryOp(*instr, sysMemOps_.at(opIx));
 
   // Process read ops in reverse order so that later reads take precedence.
-  size_t nops = instr->memOps_.size();
-  for (size_t j = 0; j < nops; ++j)
+  for (auto iter = instr->memOps_.rbegin(); iter  != instr->memOps_.rend(); ++iter)
     {
-      auto opIx = ops.at(nops - 1 - j);
-      if (opIx >= sysMemOps_.size())
-	continue;
+      auto opIx = *iter;
       auto& op = sysMemOps_.at(opIx);
       if (not op.isRead_)
 	continue;
-
-      instr->isLoad_ = true;
 
       if (readMask != expectedMask)
 	{
 	  unsigned mask = determineOpMask(*instr, op);
 	  mask &= expectedMask;
-          if (not mask or
-              ((mask & readMask) == mask))
+          if (not mask or ((mask & readMask) == mask))
             continue; // Not matched, or read op already covered by other read ops
-	  else
-            {
-              readMask |= mask;
-              op.used();
-            }
+	  readMask |= mask;
+	  op.canceled_ = false;
 	}
     }
+
+  // Remove canceled ops.
+  std::erase_if(ops, [this](MemoryOpIx ix) {
+    return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
+  });
 }
 
 

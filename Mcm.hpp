@@ -43,7 +43,6 @@ namespace WdRiscv
 
     bool isCanceled() const { return canceled_; }
     void cancel() { canceled_ = true; }
-    void used() { canceled_ = false; }
 
     /// Set value to the model (whisper) byte data for the given physical byte address
     /// returning true on success. Return false if given address is not covered by this
@@ -374,7 +373,12 @@ namespace WdRiscv
 
     using MemoryOpVec = std::vector<MemoryOp>;
 
-    void cancelReplayedReads(McmInstr*);
+    /// Trim read operations to match reference (whisper). Mark replay read ops as
+    /// canceled. Remove cancled ops.
+    void commitReadOps(Hart<URV>& hart, McmInstr*);
+
+    /// Similar to above but for vector instructions.
+    void commitVecReadOps(Hart<URV>& hart, McmInstr*);
 
     /// Compute a mask of the instruction data bytes covered by the
     /// given memory operation. Return 0 if the operation does not
@@ -576,25 +580,6 @@ namespace WdRiscv
       instr.cancel();
       for (auto memIx : instr.memOps_)
 	  sysMemOps_.at(memIx).cancel();
-    }
-
-    void removeMemOps(McmInstr& instr)
-    {
-      // Remove canceled ops.
-      auto& ops = instr.memOps_;
-
-      size_t count = 0;
-      for (size_t i = 0; i < ops.size(); ++i)
-        {
-          auto opIx = ops.at(i);
-          if (opIx < sysMemOps_.size() and not sysMemOps_.at(opIx).isCanceled())
-            {
-              if (count < i)
-                ops.at(count) = opIx;
-              count++;
-            }
-        }
-      ops.resize(count);
     }
 
     void updateDependencies(const Hart<URV>& hart, const McmInstr& instr);
