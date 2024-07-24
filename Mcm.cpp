@@ -2057,8 +2057,10 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isLoad_)
     return true;  // NA: B is not a load.
 
+#if 0
   if (instrB.forwarded_)
     return true;  // NA: B's data obtained entirely from local hart.
+#endif
 
   auto earlyB = earliestOpTime(instrB);
 
@@ -2086,7 +2088,10 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
       if (mask == 0)
 	return true; // All bytes of B written by preceding stores.
 
-      if (not instrA.isLoad_ or isBeforeInMemoryTime(instrA, instrB))
+      if (not instrA.isLoad_)
+	continue;
+
+      if (effectiveReadTime(instrB) > latestOpTime(instrA))
 	continue;
 
       // Is there a remote write between A and B memory time that covers a byte of B.
