@@ -1619,20 +1619,6 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
     cerr << "Error: Read ops do not cover all the bytes of load instruction"
 	 << " tag=" << tag << '\n';
 
-  unsigned forwardCount = 0, readCount = 0;
-  for (auto opIx : instr->memOps_)
-    {
-      auto& op = sysMemOps_.at(opIx);
-      if (op.isRead_)
-	{
-	  readCount++;
-	  if (op.forwardTime_)
-	    forwardCount++;
-	}
-    }
-  if (readCount and forwardCount == readCount)
-    instr->forwarded_ = true;
-
   instr->complete_ = true;  // FIX : Only for non-io
 
   return mergeMask == expectedMask;
@@ -2057,11 +2043,6 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isLoad_)
     return true;  // NA: B is not a load.
 
-#if 0
-  if (instrB.forwarded_)
-    return true;  // NA: B's data obtained entirely from local hart.
-#endif
-
   auto earlyB = earliestOpTime(instrB);
 
   unsigned hartIx = hart.sysHartIndex();
@@ -2091,8 +2072,8 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
       if (not instrA.isLoad_)
 	continue;
 
-      if (effectiveReadTime(instrB) > latestOpTime(instrA))
-	continue;
+      if (effectiveMinTime(instrB) >= effectiveMaxTime(instrA))
+	continue;  // In order.
 
       // Is there a remote write between A and B memory time that covers a byte of B.
       if (instrA.memOps_.empty() or instrB.memOps_.empty())
@@ -2246,7 +2227,7 @@ Mcm<URV>::finalChecks(Hart<URV>& hart)
 
 template <typename URV>
 uint64_t
-Mcm<URV>::effectiveReadTime(const McmInstr& instr) const
+Mcm<URV>::effectiveMinTime(const McmInstr& instr) const
 {
 
   if (not instr.isLoad_)
@@ -2267,6 +2248,32 @@ Mcm<URV>::effectiveReadTime(const McmInstr& instr) const
       }
 
   return mint;
+}
+
+
+template <typename URV>
+uint64_t
+Mcm<URV>::effectiveMaxTime(const McmInstr& instr) const
+{
+
+  if (not instr.isLoad_)
+    return latestOpTime(instr);
+
+  if (not instr.complete_ and instr.memOps_.empty())
+    return time_;
+
+  uint64_t maxt = 0;
+  for (auto opIx : instr.memOps_)
+    if (opIx < sysMemOps_.size())
+      {
+	auto& op = sysMemOps_.at(opIx);
+	uint64_t t = op.time_;
+	if (op.isRead_ and op.forwardTime_ and op.forwardTime_ > t)
+	  t = op.forwardTime_;
+	maxt = std::max(maxt, t);
+      }
+
+  return maxt;
 }
 
 
@@ -2397,7 +2404,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
 	    }
 
 	  auto predTime = latestOpTime(pred);
-	  auto succTime = effectiveReadTime(succ);
+	  auto succTime = effectiveMinTime(succ);
 
 	  if (predTime < succTime)
 	    continue;
@@ -2463,7 +2470,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrA, const McmInstr& inst
     return false; // Incomplete store might finish after B
 
   auto timeA = latestOpTime(instrA);
-  auto timeB = effectiveReadTime(instrB);
+  auto timeB = effectiveMinTime(instrB);
 
   if (timeB > timeA)
     return true;
