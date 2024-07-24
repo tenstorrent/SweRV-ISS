@@ -2982,7 +2982,7 @@ Hart<URV>::initiateNmi(URV cause, URV pcToSave)
       mnf.bits_.NMIE = 0;  // Clear mnstatus.mnie
 
       pokeCsr(CsrNumber::MNEPC, pcToSave);
-      cause |= URV(1) << (sizeof(URV)*8 - 1)
+      cause |= URV(1) << (sizeof(URV)*8 - 1);
       pokeCsr(CsrNumber::MNCAUSE, cause);
 
       mnf.bits_.MNPV = virtMode_;  // Save virtual mode
