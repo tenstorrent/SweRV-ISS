@@ -375,10 +375,10 @@ namespace WdRiscv
 
     /// Trim read operations to match reference (whisper). Mark replay read ops as
     /// canceled. Remove cancled ops.
-    void commitReadOps(Hart<URV>& hart, McmInstr*);
+    bool commitReadOps(Hart<URV>& hart, McmInstr*);
 
     /// Similar to above but for vector instructions.
-    void commitVecReadOps(Hart<URV>& hart, McmInstr*);
+    bool commitVecReadOps(Hart<URV>& hart, McmInstr*);
 
     /// Compute a mask of the instruction data bytes covered by the
     /// given memory operation. Return 0 if the operation does not

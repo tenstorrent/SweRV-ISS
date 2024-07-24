@@ -761,8 +761,10 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   instr->retired_ = true;
   instr->retireTime_ = time;
   instr->di_ = di;
+
+  bool ok = true;
   if (instr->isLoad_)
-    commitReadOps(hart, instr);
+    ok = commitReadOps(hart, instr);
 
   if (instr->di_.instId() == InstId::sfence_vma)
     {
@@ -779,21 +781,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
     return retireCmo(hart, *instr);
 
   // If instruction is a store, save address, size, and written data.
-  bool ok = true;
   if (di.isStore() or di.isAmo() or di.isVectorStore())
-    ok = retireStore(hart, *instr);
-
-  // Check read operations of instruction comparing RTL values to model (whisper) values.
-  for (auto opIx : instr->memOps_)
-    {
-      if (opIx >= sysMemOps_.size())
-	continue;
-      auto& op = sysMemOps_.at(opIx);
-      if (not op.isRead_)
-	continue;
-      if (not checkRtlRead(hart, *instr, op))
-	ok = false;
-    }
+    ok = retireStore(hart, *instr) and ok;
 
   // Amo sanity check: Must have both read and write ops.
   if (di.isAmo() and (not instrHasRead(*instr) or not instrHasWrite(*instr)))
@@ -1594,7 +1583,7 @@ Mcm<URV>::trimMemoryOp(const McmInstr& instr, MemoryOp& op)
 
 
 template <typename URV>
-void
+bool
 Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 {
   std::vector<uint64_t> va, pa1, pa2, data;
@@ -1604,16 +1593,26 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
     {
       std::cerr << "Error: Mcm::commitVecReadOps: hart-id=" << hart.hartId()
 		<< " tag=" << instr->tag_ << " instruction is not a vector load\n";
-      return;
+      return false;
     }
 
   // FIX TODO : Handle page crossers: Use pa2.
 
-  // Map a reference address to a flag indicating if address is covered by a read op.
-  std::unordered_map<uint64_t, bool> referenceMap;
-  for (auto addr : pa1)
-    for (unsigned i = 0; i < elemSize; ++i)
-      referenceMap[addr + i] = false;
+  // Map a reference address to a refernce value and a flag indicating if address is
+  // covered by a read op.
+  struct RefByte
+  {
+    uint8_t value = 0;
+    bool covered = false;
+  };
+  std::unordered_map<uint64_t, RefByte> addrMap;
+
+  for (unsigned i = 0; i < pa1.size(); ++i)
+    {
+      uint64_t elemAddr = pa1.at(i);
+      for (unsigned i = 0; i < elemSize; ++i)
+	addrMap[elemAddr + i] = RefByte{0, false};
+    }
 
   // Process read ops in reverse order. Trim each op. Keep ops where at least one address remains.
   auto& ops = instr->memOps_;
@@ -1628,9 +1627,13 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
       for (unsigned i = 0; i < op.size_; ++i)
 	{
 	  uint64_t addr = op.physAddr_ + i;
-	  if (not referenceMap.contains(addr) or referenceMap.at(addr))
-	    continue;  // No overlap or addr already covered by another op.
-	  referenceMap.at(addr) = true;
+	  auto iter = addrMap.find(addr);
+	  if (iter == addrMap.end())
+	    continue;  // No overlap with instruction.
+	  auto& rb = iter->second;
+	  if (rb.covered)
+	    continue;  // Address already covered by another read op.
+	  rb.covered = true;
 	  low = std::min(low, addr);
 	  high = std::max(high, addr);
 	}
@@ -1639,22 +1642,56 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 	  unsigned size = high - low + 1;
 	  trimOp(op, low, size);
 	  op.canceled_ = false;
+	  for (unsigned i = 0; i < op.size_; ++i)
+	    {
+	      auto iter = addrMap.find(op.physAddr_ + i);
+	      if (iter != addrMap.end())
+		iter->second.value = op.data_ >> (i*8);
+	    }
 	}	  
     }
 
-  // Remove still marked canceled.
+  // Remove ops still marked canceled.
   std::erase_if(ops, [this](MemoryOpIx ix) {
     return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
   });
+
+  // Check read operations of instruction comparing RTL values to model (whisper) values.
+  bool ok = true;
+  for (auto opIx : instr->memOps_)
+    {
+      auto& op = sysMemOps_.at(opIx);
+      if (op.isRead_)
+	{
+	  for (unsigned i = 0; i < op.size_; ++i)
+	    {
+	      uint64_t addr = op.physAddr_ + i;
+	      uint8_t rtlVal = op.rtlData_ >> (i*8);
+	      auto iter = addrMap.find(addr);
+	      if (iter == addrMap.end())
+		continue;
+	      const auto& rb = iter->second;
+	      if (rb.value == rtlVal)
+		continue;
+
+	      cerr << "Error: RTL/whisper read mismatch time=" << op.time_ << " hart-id="
+		   << hart.hartId() << " instr-tag=" << op.instrTag_ << " addr=0x"
+		   << std::hex << addr << " rtl=0x" << unsigned(rtlVal)
+		   << " whisper=0x" << unsigned(rb.value) << std::dec << '\n';
+	      ok = false;
+	    }
+	}
+    }
+  return ok;
 }  
 
 
 template <typename URV>
-void
+bool
 Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr* instr)
 {
   if (instr->di_.isVector())
-    commitVecReadOps(hart, instr);
+    return commitVecReadOps(hart, instr);
 
   // Mark replayed ops as cancled.
   assert(instr->size_ > 0 and instr->size_ <= 8);
@@ -1688,6 +1725,16 @@ Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr* instr)
   std::erase_if(ops, [this](MemoryOpIx ix) {
     return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
   });
+
+  // Check read operations of instruction comparing RTL values to model (whisper) values.
+  bool ok = true;
+  for (auto opIx : instr->memOps_)
+    {
+      auto& op = sysMemOps_.at(opIx);
+      if (op.isRead_)
+	ok = checkRtlRead(hart, *instr, op) and ok;
+    }
+  return ok;
 }
 
 
