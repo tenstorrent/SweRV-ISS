@@ -752,7 +752,11 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       return false;
     }
 
-  removeMemOps(*instr);
+  if (instr->isLoad_ and not di.isVector())
+    {
+      cancelReplayedReads(instr);
+      removeMemOps(*instr);
+    }
 
   if (not di.isValid() or trapped)
     {
@@ -794,7 +798,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	ok = false;
     }
 
-  // Amo sanity check: Must have bot read and write ops.
+  // Amo sanity check: Must have both read and write ops.
   if (di.isAmo() and (not instrHasRead(*instr) or not instrHasWrite(*instr)))
     {
       cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << tag
@@ -1636,8 +1640,8 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 
 template <typename URV>
 bool
-Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr,
-			      uint64_t paddr1, uint64_t paddr2, unsigned size, uint64_t& value)
+Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t va, uint64_t pa1,
+			      uint64_t pa2, unsigned size, uint64_t& value)
 {
   value = 0;
   if (size == 0 or size > 8)
@@ -1663,79 +1667,61 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr,
     }
 
   instr->size_ = size;
-  instr->virtAddr_ = vaddr;
-  instr->physAddr_ = paddr1;
-  if (paddr2 == paddr1 and pageNum(paddr1 + size - 1) != pageNum(paddr1))
-    paddr2 = pageAddress(pageNum(paddr2) + 1);
-  instr->physAddr2_ = paddr2;
+  instr->virtAddr_ = va;
+  instr->physAddr_ = pa1;
+  if (pa2 == pa1 and pageNum(pa1 + size - 1) != pageNum(pa1))
+    pa2 = pageAddress(pageNum(pa2) + 1);
+  instr->physAddr2_ = pa2;
 
-  // Cancel early read ops that are covered by later ones. Trim wide reads.
-  cancelReplayedReads(instr);
-
-  uint64_t mergeMask = 0;  // Mask of bits obtained from read ops.
-  uint64_t merged = 0;     // Value obtained from read ops.
-
-  // Process instruction ops in reverse order.
-  for (auto iter = instr->memOps_.rbegin(); iter  != instr->memOps_.rend(); ++iter)
+  for (auto opIx : instr->memOps_)
     {
-      auto& op = sysMemOps_.at(*iter);
+      auto& op = sysMemOps_.at(opIx);
       if (not op.isRead_)
 	continue;
 
       // Let forwarding override read-op data.
       forwardToRead(hart, op);
-
-      // Recover op data relevant to current load instruction.
-      uint64_t opVal = op.data_;
-      uint64_t mask = ~uint64_t(0);
-      if (pageNum(op.physAddr_) == pageNum(paddr1))
-	{
-	  if (op.physAddr_ <= paddr1)
-	    {
-	      uint64_t offset = paddr1 - op.physAddr_;
-              if (offset >= size)
-                continue;
-	      opVal >>= offset*8;
-	      mask >>= offset*8;
-	    }
-	  else
-	    {
-	      uint64_t offset = op.physAddr_ - paddr1;
-              if (offset >= size)
-                continue;
-	      opVal <<= offset*8;
-	      mask <<= offset*8;
-	    }
-	}
-      else if (pageNum(op.physAddr_) == pageNum(paddr2))
-	{
-	  if (op.physAddr_ == paddr2)
-	    {
-	      uint64_t offset = offsetToNextPage(paddr1);
-              if (offset >= size)
-                continue;
-	      opVal <<= offset*8;
-	      mask <<= offset*8;
-	    }
-	  else
-	    assert(0);
-	}
-      merged |= (opVal & mask);
-      mergeMask |= mask;
     }
 
-  unsigned unused = (8 - size)*8;  // Unused upper bits of value.
-  value = (merged << unused) >> unused;
-  mergeMask = (mergeMask << unused) >> unused;
+  value = 0;
 
-  uint64_t expectedMask = (~uint64_t(0) << unused) >> unused;
-  if (mergeMask != expectedMask)
+  bool covered = true;
+
+  unsigned size1 = size;
+  if (pa1 != pa2)
+    {
+      size1 = offsetToNextPage(pa1);
+      assert(size1 > 0 and size1 <= 8);
+    }
+
+  for (unsigned byteIx = 0; byteIx < size; ++byteIx)
+    {
+      uint64_t byteAddr = pa1 + byteIx;
+      if (pa1 != pa2 and byteIx >= size1)
+	byteAddr = pa2 + byteIx - size1;
+
+      bool byteCovered = false;
+      for (auto iter = instr->memOps_.rbegin(); iter  != instr->memOps_.rend(); ++iter)
+	{
+	  const auto& op = sysMemOps_.at(*iter);
+	  uint8_t byte = 0;
+	  if (op.getModelReadOpByte(byteAddr, byte))
+	    {
+	      value |= uint64_t(byte) << (8*byteIx);
+	      byteCovered = true;
+	      break;
+	    }
+	}
+      covered = covered and byteCovered;
+    }
+
+  if (not covered)
     cerr << "Error: Read ops do not cover all the bytes of load instruction"
 	 << " tag=" << tag << '\n';
 
-  instr->complete_ = true;  // FIX : Only for non-io
+  instr->complete_ = true;  // FIX : Only for non-io.  Fix for vector.
 
-  return mergeMask == expectedMask;
+  return covered;
 }
   
 

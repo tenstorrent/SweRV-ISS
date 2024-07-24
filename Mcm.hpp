@@ -44,6 +44,17 @@ namespace WdRiscv
     bool isCanceled() const { return canceled_; }
     void cancel() { canceled_ = true; }
     void used() { canceled_ = false; }
+
+    /// Set value to the model (whisper) byte data for the given physical byte address
+    /// returning true on success. Return false if given address is not covered by this
+    /// operation or if this is not a read operation.
+    bool getModelReadOpByte(uint64_t pa, uint8_t& byte) const
+    {
+      if (not isRead_ or pa < physAddr_ or pa >= physAddr_ + size_)
+	return false;
+      byte = data_ >> ((pa - physAddr_) * 8);
+      return true;
+    }
   };
 
 
@@ -193,8 +204,8 @@ namespace WdRiscv
     /// loaded data. Pa2 is the same as paddr1 except for page crossing loads where pa2 is
     /// the physical address of the second page. Va is the virtual address of the load
     /// data.
-    bool getCurrentLoadValue(Hart<URV>& hart, uint64_t va,
-			     uint64_t pa1, uint64_t pa2, unsigned size, uint64_t& value);
+    bool getCurrentLoadValue(Hart<URV>& hart, uint64_t va, uint64_t pa1, uint64_t pa2,
+			     unsigned size, uint64_t& value);
 
     /// Return the merge buffer line size in bytes.
     unsigned mergeBufferLineSize() const
