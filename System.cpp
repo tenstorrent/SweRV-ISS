@@ -504,7 +504,14 @@ System<URV>::saveSnapshot(const std::string& dir)
     return false;
 
   Filesystem::path branchPath = dirPath / "branch-trace";
-  return hart0.saveBranchTrace(branchPath);
+  if (not hart0.saveBranchTrace(branchPath))
+    return false;
+
+  Filesystem::path imsicPath = dirPath / "imsic";
+  if (not imsicMgr_.saveSnapshot(imsicPath))
+    return false;
+
+  return true;
 }
 
 
@@ -1375,7 +1382,14 @@ System<URV>::loadSnapshot(const std::string& snapDir)
     }
 
   Filesystem::path fdPath = dirPath / "fd";
-  return syscall.loadFileDescriptors(fdPath.string());
+  if (not syscall.loadFileDescriptors(fdPath.string()))
+    return false;
+
+  Filesystem::path imsicPath = dirPath / "imsic";
+  if (not imsicMgr_.loadSnapshot(imsicPath))
+    return false;
+
+  return true;
 }
 
 
