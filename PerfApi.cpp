@@ -742,6 +742,7 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
 	  uint64_t byteAddr = vaddr + i;
 	  if (byteAddr >= stAddr and byteAddr < stAddr + stSize)
 	    {
+	      data &= ~(0xffull << (i * 8));
 	      uint64_t stByte = (stData >> (byteAddr - stAddr)*8) & 0xff;
 	      data |= stByte << (i*8);
 	      forwarded |= byteMask;
@@ -818,6 +819,7 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
     return false;
 
   auto& packetMap = hartPacketMaps_.at(hartIx);
+  auto& storeMap =  hartStoreMaps_.at(hartIx);
 
   // Flush tag and all older packets. Flush in reverse order to undo register renaming.
   for (auto iter = packetMap.rbegin(); iter != packetMap.rend(); )
@@ -851,6 +853,12 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
 
   // delete input tag and all newer instructions
   std::erase_if(packetMap, [&tag](const auto &packet)
+  {
+    auto const& [_, pacPtr] = packet;
+    return pacPtr->tag_ >= tag;
+  });
+
+  std::erase_if(storeMap, [&tag](const auto &packet)
   {
     auto const& [_, pacPtr] = packet;
     return pacPtr->tag_ >= tag;
