@@ -1087,7 +1087,11 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
 
   while (true)
     {
-      bool progSnapshot = false;
+      struct {
+        bool prog = false;
+        bool stop = false;
+      } snap;
+
       std::atomic<bool> result = true;
 
       if (hartCount() == 1)
@@ -1102,8 +1106,10 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
             }
           catch (const CoreException& ce)
             {
-              if (ce.type() == CoreException::Type::Snapshot)
-                progSnapshot = true;
+              if (ce.type() == CoreException::Type::Snapshot or
+                  ce.type() == CoreException::Type::SnapshotAndStop)
+                snap.prog = true;
+              snap.stop = ce.type() != CoreException::Type::Snapshot;
             }
         }
       else if (not stepWinLo and not stepWinHi)
@@ -1112,7 +1118,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
           std::vector<std::thread> threadVec;
           std::atomic<unsigned> finished = 0;  // Count of finished threads.
 
-          auto threadFunc = [&result, &finished, &progSnapshot] (Hart<URV>* hart, FILE* traceFile) {
+          auto threadFunc = [&result, &finished, &snap] (Hart<URV>* hart, FILE* traceFile) {
                               try
                                 {
                                   bool r = hart->run(traceFile);
@@ -1120,8 +1126,10 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
                                 }
                               catch (const CoreException& ce)
                                 {
-                                  if (ce.type() == CoreException::Type::Snapshot)
-                                    progSnapshot = true;
+                                  if (ce.type() == CoreException::Type::Snapshot or
+                                      ce.type() == CoreException::Type::SnapshotAndStop)
+                                    snap.prog = true;
+                                  snap.stop = ce.type() != CoreException::Type::Snapshot;
                                 }
                               finished++;
                             };
@@ -1142,7 +1150,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
 
           for (auto& t : threadVec)
             {
-              if (progSnapshot)
+              if (snap.prog)
                 forceUserStop(0);
               t.join();
             }
@@ -1176,20 +1184,26 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
                     }
                   catch (const CoreException& ce)
                     {
-                      if (ce.type() == CoreException::Type::Snapshot)
-                        progSnapshot = true;
+                      if (ce.type() == CoreException::Type::Snapshot or
+                          ce.type() == CoreException::Type::SnapshotAndStop)
+                        snap.prog = true;
+                      snap.stop = ce.type() != CoreException::Type::Snapshot;
                     }
                   if (stopped.at(ix))
                     finished++;
                 }
 
-              if (progSnapshot)
+              if (snap.prog)
                 break;
             }
         }
 
-      if (progSnapshot)
-        forceSnapshot();
+      if (snap.prog)
+        {
+          forceSnapshot();
+          if (snap.stop)
+            return result;
+        }
       else
         return result;
     }

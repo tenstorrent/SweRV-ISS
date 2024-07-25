@@ -898,6 +898,12 @@ Hart<URV>::logStop(const CoreException& ce, uint64_t counter, FILE* traceFile)
       isRetired = true;
       success = true;
     }
+  else if (ce.type() == CoreException::SnapshotAndStop)
+    {
+      isRetired = true;
+      success = true;
+      setTargetProgramFinished(true);
+    }
 
   if (isRetired)
     {
@@ -923,6 +929,8 @@ Hart<URV>::logStop(const CoreException& ce, uint64_t counter, FILE* traceFile)
       cerr << "Target program exited with code " << ce.value() << '\n';
     else if (ce.type() == CoreException::Snapshot)
       cerr << "Attempting to snapshot\n";
+    else if (ce.type() == CoreException::SnapshotAndStop)
+      cerr << "Successful stop: Hart " << hartIx_ << ": attempting to snapshot and stop\n";
     else
       cerr << "Stopped -- unexpected exception\n";
   }

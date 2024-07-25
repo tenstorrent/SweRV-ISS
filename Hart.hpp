@@ -68,7 +68,7 @@ namespace WdRiscv
   {
   public:
 
-    enum Type { Stop, Exit, Snapshot };
+    enum Type { Stop, Exit, Snapshot, SnapshotAndStop };
 
     CoreException(Type type, const char* message = "", uint64_t address = 0,
 		  uint64_t value = 0)
