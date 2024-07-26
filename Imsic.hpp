@@ -253,18 +253,18 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
           return false;
         }
 
-      ofs << "pending ";
+      ofs << "p ";
       for (auto p : pending_)
         ofs << p;
       ofs << '\n';
 
-      ofs << "enabled ";
+      ofs << "e ";
       for (auto e : enabled_)
         ofs << e;
       ofs << '\n';
 
-      ofs << "delivery " << delivery_ << '\n';
-      ofs << "threshold " << threshold_ << '\n';
+      ofs << "d " << delivery_ << '\n';
+      ofs << "t " << threshold_ << '\n';
 
       return true;
     }
@@ -299,7 +299,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
               continue;
             }
 
-          if (reg == "pending")
+          if (reg == "p")
             {
               if (val.size() != pending_.size())
                 std::cerr << "Warning: Imsic snapshot loader: Line " << lineNum
@@ -309,7 +309,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
                 pending_.at(i) = val.at(i);
             }
 
-          if (reg == "enabled")
+          if (reg == "e")
             {
               if (val.size() != enabled_.size())
                 std::cerr << "Warning: Imsic snapshot loader: Line " << lineNum
@@ -319,10 +319,10 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
                 enabled_.at(i) = val.at(i);
             }
 
-          if (reg == "threshold")
+          if (reg == "t")
             threshold_ = strtoull(val.c_str(), nullptr, 0);
 
-          if (reg == "delivery")
+          if (reg == "d")
             delivery_ = strtoull(val.c_str(), nullptr, 0);
         }
 
