@@ -2365,7 +2365,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
       for (auto aTag : reordered)
 	{
 	  const auto& pred = instrVec.at(aTag);
-	  if (pred.isCanceled() or not pred.isMemory())
+	  if (pred.isCanceled() or not pred.isMemory() or pred.tag_ > fence.tag_)
 	    continue;
 
 	  // We assume that stores following a fence in program order cannot drain before
