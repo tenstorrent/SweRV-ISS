@@ -2708,7 +2708,7 @@ CsRegs<URV>::defineMachineRegs()
 
   defineCsr("mncause", Csrn::MNCAUSE, !mand, !imp, 0, wam, wam);
 
-  mask = 0b1101010001000;  // Fields MNPP, MNPELP, MNPV, and NMIE writeable.
+  mask = 0b1100010001000;  // Fields MNPP, MNPV, and NMIE writeable.
   defineCsr("mnstatus", Csrn::MNSTATUS, !mand, !imp, 0, mask, pokeMask);
 
   // Define mhpmcounter3/mhpmcounter3h to mhpmcounter31/mhpmcounter31h
