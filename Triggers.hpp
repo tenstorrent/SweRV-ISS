@@ -986,13 +986,13 @@ namespace WdRiscv
     { return ix < triggers_.size()? triggers_[ix].getLocalHit() : false; }
 
     /// Enable/disable firing of triggers in machine mode. This supports MTE bit of the
-    /// TCONTROL CSR.
+    /// TCONTROL CSR. Applicable only if TCONTROL is enabled (see enableTcontrol).
     void enableMachineMode(bool flag)
     { mmodeEnabled_ = flag; }
 
-    /// Enable/disable firing of triggers in machine mode when interrupts are enabled.
-    void enableMmodeWithIe(bool flag)
-    { mmodeWithIe_ = flag; }
+    /// Enable use of TCONTROL to control firing of triggers in machine mode.
+    void enableTcontrol(bool flag)
+    { tcontrolEnabled_ = flag; }
 
     /// Return true if given trigger type is supported.
     bool isSupportedType(TriggerType type) const
@@ -1067,6 +1067,7 @@ namespace WdRiscv
 
     std::vector< Trigger<URV> > triggers_;
     bool mmodeEnabled_ = true;  // Triggers trip in Machine mode when true.
-    bool mmodeWithIe_ = true;  // Triggers trip in Machine mode when interrupt enabled. 
+    bool tcontrolEnabled_ = true;
   };
 }
+

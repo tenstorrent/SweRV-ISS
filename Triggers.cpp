@@ -221,7 +221,9 @@ Triggers<URV>::ldStAddrTriggerHit(URV address, unsigned size, TriggerTiming timi
 {
   // Check if we should skip tripping because we are running in machine mode and
   // interrupts are enabled.
-  bool skip = mode == PrivilegeMode::Machine and interruptEnabled and not mmodeWithIe_;
+  bool skip = mode == PrivilegeMode::Machine and interruptEnabled;
+  if (tcontrolEnabled_)
+    skip = mode == PrivilegeMode::Machine and not mmodeEnabled_;
 
   bool chainHit = false;  // Chain hit.
   for (auto& trigger : triggers_)
@@ -229,8 +231,6 @@ Triggers<URV>::ldStAddrTriggerHit(URV address, unsigned size, TriggerTiming timi
       if (not trigger.isEnterDebugOnHit())
 	{
 	  if (skip)
-	    continue;
-	  if (mode == PrivilegeMode::Machine and not mmodeEnabled_)
 	    continue;  // Cannot fire in machine mode.
 	}
 
@@ -253,7 +253,9 @@ Triggers<URV>::ldStDataTriggerHit(URV value, TriggerTiming timing, bool isLoad,
 {
   // Check if we should skip tripping because we are running in machine mode and
   // interrupts are enabled.
-  bool skip = mode == PrivilegeMode::Machine and interruptEnabled and not mmodeWithIe_;
+  bool skip = mode == PrivilegeMode::Machine and interruptEnabled;
+  if (tcontrolEnabled_)
+    skip = mode == PrivilegeMode::Machine and not mmodeEnabled_;
 
   bool chainHit = false;  // Chain hit.
   for (auto& trigger : triggers_)
@@ -261,8 +263,6 @@ Triggers<URV>::ldStDataTriggerHit(URV value, TriggerTiming timing, bool isLoad,
       if (not trigger.isEnterDebugOnHit())
 	{
 	  if (skip)
-	    continue;
-	  if (mode == PrivilegeMode::Machine and not mmodeEnabled_)
 	    continue;  // Cannot fire in machine mode.
 	}
 
@@ -286,7 +286,9 @@ Triggers<URV>::instAddrTriggerHit(URV address, unsigned size, TriggerTiming timi
 {
   // Check if we should skip tripping because we are running in machine mode and
   // interrupts are enabled.
-  bool skip = mode == PrivilegeMode::Machine and interruptEnabled and not mmodeWithIe_;
+  bool skip = mode == PrivilegeMode::Machine and interruptEnabled;
+  if (tcontrolEnabled_)
+    skip = mode == PrivilegeMode::Machine and not mmodeEnabled_;
 
   bool chainHit = false;  // Chain hit.
   for (auto& trigger : triggers_)
@@ -294,8 +296,6 @@ Triggers<URV>::instAddrTriggerHit(URV address, unsigned size, TriggerTiming timi
       if (not trigger.isEnterDebugOnHit())
 	{
 	  if (skip)
-	    continue;
-	  if (mode == PrivilegeMode::Machine and not mmodeEnabled_)
 	    continue;  // Cannot fire in machine mode.
 	}
 
@@ -320,7 +320,9 @@ Triggers<URV>::instOpcodeTriggerHit(URV opcode, TriggerTiming timing,
 {
   // Check if we should skip tripping because we are running in machine mode and
   // interrupts are enabled.
-  bool skip = mode == PrivilegeMode::Machine and interruptEnabled and not mmodeWithIe_;
+  bool skip = mode == PrivilegeMode::Machine and interruptEnabled;
+  if (tcontrolEnabled_)
+    skip = mode == PrivilegeMode::Machine and not mmodeEnabled_;
 
   bool hit = false;
   for (auto& trigger : triggers_)
@@ -328,8 +330,6 @@ Triggers<URV>::instOpcodeTriggerHit(URV opcode, TriggerTiming timing,
       if (not trigger.isEnterDebugOnHit())
 	{
 	  if (skip)
-	    continue;
-	  if (mode == PrivilegeMode::Machine and not mmodeEnabled_)
 	    continue;  // Cannot fire in machine mode.
 	}
 
@@ -353,7 +353,9 @@ Triggers<URV>::icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode, P
 {
   // Check if we should skip tripping because we are running in machine mode and
   // interrupts are enabled.
-  bool skip = mode == PrivilegeMode::Machine and interruptEnabled and not mmodeWithIe_;
+  bool skip = mode == PrivilegeMode::Machine and interruptEnabled;
+  if (tcontrolEnabled_)
+    skip = mode == PrivilegeMode::Machine and not mmodeEnabled_;
 
   bool hit = false;
 
@@ -368,8 +370,6 @@ Triggers<URV>::icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode, P
       if (not trig.isEnterDebugOnHit())
 	{
 	  if (skip)
-	    continue;
-	  if (mode == PrivilegeMode::Machine and not mmodeEnabled_)
 	    continue;  // Cannot fire in machine mode.
 	}
 
@@ -392,7 +392,9 @@ Triggers<URV>::expTriggerHit(URV cause, PrivilegeMode mode, bool virtMode, bool 
 {
   // Check if we should skip tripping because we are running in machine mode and
   // interrupts are enabled.
-  bool skip = mode == PrivilegeMode::Machine and interruptEnabled and not mmodeWithIe_;
+  bool skip = mode == PrivilegeMode::Machine and interruptEnabled;
+  if (tcontrolEnabled_)
+    skip = mode == PrivilegeMode::Machine and not mmodeEnabled_;
 
   URV mask = URV(1) << cause;
 
@@ -405,9 +407,6 @@ Triggers<URV>::expTriggerHit(URV cause, PrivilegeMode mode, bool virtMode, bool 
       if (not trigger.isEnterDebugOnHit())
 	{
 	  if (skip)
-	    continue;
-
-	  if (mode == PM::Machine and not mmodeEnabled_)
 	    continue;  // Cannot fire in machine mode.
 	}
 	  
@@ -446,7 +445,9 @@ Triggers<URV>::intTriggerHit(URV cause, PrivilegeMode mode, bool virtMode, bool 
 {
   // Check if we should skip tripping because we are running in machine mode and
   // interrupts are enabled.
-  bool skip = mode == PrivilegeMode::Machine and interruptEnabled and not mmodeWithIe_;
+  bool skip = mode == PrivilegeMode::Machine and interruptEnabled;
+  if (tcontrolEnabled_)
+    skip = mode == PrivilegeMode::Machine and not mmodeEnabled_;
 
   cause = (cause << 1) >> 1;  // Clear most sig bit.
 
@@ -461,9 +462,6 @@ Triggers<URV>::intTriggerHit(URV cause, PrivilegeMode mode, bool virtMode, bool 
       if (not trigger.isEnterDebugOnHit())
 	{
 	  if (skip)
-	    continue;
-
-	  if (mode == PM::Machine and not mmodeEnabled_)
 	    continue;  // Cannot fire in machine mode.
 	}
 	  

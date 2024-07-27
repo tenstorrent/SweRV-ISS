@@ -1492,14 +1492,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enableTriggers(flag);
     }
 
-  // Enable firing triggers in machine mode even when interrupts are enabled.
-  tag = "mmode_triggers_ok_with_ie";
-  if (config_ -> contains(tag))
-    {
-      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
-      hart.enableMmodeTriggersWithIe(flag);
-    }
-
   // Enable performance counters.
   tag = "enable_performance_counters";
   if (config_ -> contains(tag))
@@ -1583,6 +1575,14 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
       hart.configAllInstAddrTrigger(flag);
+    }
+
+  // Enable use of TCONTROL CSR to control triggers in Machine mode.
+  tag = "trigger_use_tcontrol";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.configTriggerUseTcontrol(flag);
     }
 
   tag = "trigger_types";

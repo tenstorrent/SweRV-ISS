@@ -345,6 +345,10 @@ namespace WdRiscv
     void configAllInstAddrTrigger(bool flag)
     { csRegs_.configAllInstAddrTrigger(flag); }
 
+    /// Enable use of TCONTROL CSR to control triggers firing in machine mode.
+    void configTriggerUseTcontrol(bool flag)
+    { csRegs_.triggers_.enableTcontrol(flag); }
+
     /// Configure machine mode performance counters returning true on
     /// success and false on failure. N consecutive counters starting
     /// at MHPMCOUNTER3/MHPMCOUNTER3H are made read/write. The
@@ -1120,10 +1124,6 @@ namespace WdRiscv
     /// exceptions.
     void enableTriggers(bool flag)
     { enableTriggers_ = flag; csRegs_.enableTriggers(flag);  }
-
-    /// Enable/disable firing of triggers in machine mode when interrupts are enabled.
-    void enableMmodeTriggersWithIe(bool flag)
-    { csRegs_.enableMmodeTriggersWithIe(flag); }
 
     /// Enable performance counters (count up for some enabled performance counters when
     /// their events do occur).
