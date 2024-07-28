@@ -133,6 +133,12 @@ parseCmdLineVecData(std::string_view option,
       return false;
     }
 
+  if (trimmed.size() == 1 and trimmed.at(0) == '0')
+    {
+      val.push_back(0);
+      return true;
+    }
+
   if ((trimmed.size() & 1) != 0)
     {
       std::cerr << "Value for vector " << option << " must have an even"
@@ -2273,6 +2279,10 @@ Interactive<URV>::mbinsertCommand(Hart<URV>& hart, const std::string& line,
   std::vector<uint8_t> bytes;
   if (not parseCmdLineVecData("data", tokens.at(4), bytes))
     return false;
+
+  // Expand a zero to the required number of bytes. Backward ccompatibility.
+  if (bytes.size() == 1 and bytes.at(0) == 0)
+    bytes.resize(size);
 
   if (bytes.size() != size)
     {
