@@ -991,10 +991,6 @@ namespace WdRiscv
     /// Enable STEE (static trusted execution env)
     void enableStee(bool flag);
 
-    /// Enable/disable firing of triggers in machine mode when interrupts are enabled.
-    void enableMmodeTriggersWithIe(bool flag)
-    { triggers_.enableMmodeWithIe(flag); }
-
     /// Return true if one more debug triggers are enabled.
     bool hasActiveTrigger() const
     { return hasActiveTrigger_; }
