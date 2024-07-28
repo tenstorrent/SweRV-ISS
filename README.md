@@ -784,6 +784,11 @@ handling non-maskable interrupts.
 ###  enable_triggers
 Enable support for debug triggers when set to true.
 
+### trigger_use_tcontrol
+When set to true, the MTE field of the TCONTROL CSR controls the firing of triggers in
+machine mode. When set to false, the triggers fire in machine mode only if MSTATUS.MIE
+is zero.
+
 ###  perf_count_atomic_load_store
 When true, the lr/sc instructions will be counted as load/store 
 by the performance counters.
