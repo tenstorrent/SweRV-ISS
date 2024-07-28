@@ -167,6 +167,22 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
 }
 
 
+/// For csrrs/csrrc the CSR register is read-only if the second integer register is x0
+static
+WdRiscv::OperandMode
+effectiveIthOperandMode(const WdRiscv::DecodedInst& di, unsigned i)
+{
+  auto mode = di.ithOperandMode(i);
+  auto instId = di.instId();
+  if (instId == WdRiscv::InstId::csrrs or instId == WdRiscv::InstId::csrrc)
+    {
+      if (di.ithOperandType(i) == WdRiscv::OperandType::CsReg and di.op1() == 0)
+	return WdRiscv::OperandMode::Read;
+    }
+  return mode;
+}
+
+
 bool
 PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag)
 {
@@ -212,7 +228,7 @@ PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag)
     {
       using OM = WdRiscv::OperandMode;
 
-      auto mode = di.ithOperandMode(i);
+      auto mode = effectiveIthOperandMode(di, i);
       if (mode == OM::Write or mode == OM::ReadWrite)
 	{
 	  unsigned regNum = di.ithOperand(i);
@@ -352,7 +368,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   std::array<uint64_t, 4> prevVal;  // Previous operand values
 
-  // Save prev value of poperands.
+  // Save prev value of operands.
   for (unsigned i = 0; i < packet.di_.operandCount(); ++i)
     {
       auto mode = packet.di_.ithOperandMode(i);
@@ -454,11 +470,11 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   if (di.isBranch()) packet.taken_ = hart.lastBranchTaken();
 
-  // Record the values of the dstination register.
+  // Record the values of the destination register.
   unsigned destIx = 0;
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
-      auto mode = di.ithOperandMode(i);
+      auto mode = effectiveIthOperandMode(di, i);
       if (mode == OM::Write or mode == OM::ReadWrite)
 	{
 	  unsigned regNum = di.ithOperand(i);
@@ -742,6 +758,7 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
 	  uint64_t byteAddr = vaddr + i;
 	  if (byteAddr >= stAddr and byteAddr < stAddr + stSize)
 	    {
+	      data &= ~(0xffull << (i * 8));
 	      uint64_t stByte = (stData >> (byteAddr - stAddr)*8) & 0xff;
 	      data |= stByte << (i*8);
 	      forwarded |= byteMask;
@@ -818,6 +835,7 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
     return false;
 
   auto& packetMap = hartPacketMaps_.at(hartIx);
+  auto& storeMap =  hartStoreMaps_.at(hartIx);
 
   // Flush tag and all older packets. Flush in reverse order to undo register renaming.
   for (auto iter = packetMap.rbegin(); iter != packetMap.rend(); )
@@ -837,8 +855,9 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
       auto& producers = hartRegProducers_.at(hartIx);
       for (size_t i = 0; i < di.operandCount(); ++i)
         {
-          if (di.ithOperandMode(i) == WdRiscv::OperandMode::Write or
-              di.ithOperandMode(i) == WdRiscv::OperandMode::ReadWrite)
+	  auto mode = effectiveIthOperandMode(di, i);
+          if (mode == WdRiscv::OperandMode::Write or
+              mode == WdRiscv::OperandMode::ReadWrite)
             {
               unsigned regNum = di.ithOperand(i);
               unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
@@ -851,6 +870,12 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
 
   // delete input tag and all newer instructions
   std::erase_if(packetMap, [&tag](const auto &packet)
+  {
+    auto const& [_, pacPtr] = packet;
+    return pacPtr->tag_ >= tag;
+  });
+
+  std::erase_if(storeMap, [&tag](const auto &packet)
   {
     auto const& [_, pacPtr] = packet;
     return pacPtr->tag_ >= tag;
@@ -953,7 +978,8 @@ InstrPac::getDestOperands(std::array<Operand, 2>& ops)
 
   for (unsigned i = 0; i < di_.operandCount(); ++i)
     {
-      if (di_.ithOperandMode(i) == OM::Write or di_.ithOperandMode(i) == OM::ReadWrite)
+      auto mode = effectiveIthOperandMode(di_, i);
+      if (mode == OM::Write or mode == OM::ReadWrite)
 	{
 	  auto& op = ops.at(count);
 	  op.type = di_.ithOperandType(i);

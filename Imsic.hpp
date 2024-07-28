@@ -5,6 +5,9 @@
 #include <cassert>
 #include <memory>
 #include <functional>
+#include <iostream>
+#include <fstream>
+#include <sstream>
 
 
 namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Controller.
@@ -239,6 +242,91 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     {
       selects_.clear();
       externalInterrupts_.clear();
+    }
+
+    bool saveSnapshot(const std::string& filename) const
+    {
+      std::ofstream ofs(filename, std::ios::trunc);
+      if (not ofs)
+        {
+          std::cerr << "Imsic::saveSnapshot failed - canot open " << filename << " for write\n";
+          return false;
+        }
+
+      ofs << "p ";
+      for (auto p : pending_)
+        ofs << p;
+      ofs << '\n';
+
+      ofs << "e ";
+      for (auto e : enabled_)
+        ofs << e;
+      ofs << '\n';
+
+      ofs << "d " << delivery_ << '\n';
+      ofs << "t " << threshold_ << '\n';
+
+      return true;
+    }
+
+    bool loadSnapshot(const std::string& filename)
+    {
+      std::ifstream ifs(filename);
+      std::string line;
+      uint64_t errors = 0;
+      unsigned lineNum = 0;
+
+      while (std::getline(ifs, line))
+        {
+          lineNum++;
+          std::istringstream iss(line);
+          std::string reg;
+          std::string val;
+
+          if (not (iss >> reg))
+            {
+              std::cerr << "Error: Imsic snapshot loader: Line " << lineNum
+                        << ": Failed to read register name\n";
+              errors++;
+              continue;
+            }
+
+          if (not (iss >> val))
+            {
+              std::cerr << "Error: Imsic snapshot loader: Line " << lineNum
+                        << ": Failed to read register value\n";
+              errors++;
+              continue;
+            }
+
+          if (reg == "p")
+            {
+              if (val.size() != pending_.size())
+                std::cerr << "Warning: Imsic snapshot loader: Line " << lineNum
+                          << ": Mismatched number of interrupt ids specified\n";
+
+              for (unsigned i = 0; i < val.size(); ++i)
+                pending_.at(i) = val.at(i);
+            }
+
+          if (reg == "e")
+            {
+              if (val.size() != enabled_.size())
+                std::cerr << "Warning: Imsic snapshot loader: Line " << lineNum
+                          << ": Mismatched number of interrupt ids specified\n";
+
+              for (unsigned i = 0; i < val.size(); ++i)
+                enabled_.at(i) = val.at(i);
+            }
+
+          if (reg == "t")
+            threshold_ = strtoull(val.c_str(), nullptr, 0);
+
+          if (reg == "d")
+            delivery_ = strtoull(val.c_str(), nullptr, 0);
+        }
+
+      return errors == 0;
     }
 
   private:
@@ -626,6 +714,24 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       return false;
     }
 
+    bool saveSnapshot(const std::string& filename) const
+    {
+      bool ok = mfile_.saveSnapshot(filename + "m");
+      ok = ok and sfile_.saveSnapshot(filename + "s");
+      for (unsigned i = 1; i < gfiles_.size(); ++i)
+        ok = ok and gfiles_.at(i).saveSnapshot(filename + "g" + std::to_string(i));
+      return ok;
+    }
+
+    bool loadSnapshot(const std::string& filename)
+    {
+      bool ok = mfile_.loadSnapshot(filename + "m");
+      ok = ok and sfile_.loadSnapshot(filename + "s");
+      for (unsigned i = 1; i < gfiles_.size(); ++i)
+        ok = ok and gfiles_.at(i).loadSnapshot(filename + "g" + std::to_string(i));
+      return ok;
+    }
+
   private:
 
     File mfile_;
@@ -784,6 +890,22 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       if (i >= imsics_.size())
 	return std::shared_ptr<Imsic>();
       return imsics_.at(i);
+    }
+
+    bool saveSnapshot(const std::string& filename) const
+    {
+      bool ok = true;
+      for (unsigned i = 0; i < imsics_.size(); ++i)
+        ok = ok and imsics_.at(i)->saveSnapshot(filename + std::to_string(i));
+      return ok;
+    }
+
+    bool loadSnapshot(const std::string& filename) const
+    {
+      bool ok = true;
+      for (unsigned i = 0; i < imsics_.size(); ++i)
+        ok = ok and imsics_.at(i)->loadSnapshot(filename + std::to_string(i));
+      return ok;
     }
 
   protected:

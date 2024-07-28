@@ -1140,6 +1140,8 @@ Hart<URV>::execAddi(const DecodedInst* di)
     throw CoreException(CoreException::Snapshot, "Taking snapshot from HINT.");
   if (di->op0() == 0 and di->op1() == 30)
     throw CoreException(CoreException::Stop, "Stopping run from HINT.");
+  if (di->op0() == 0 and di->op1() == 29)
+    throw CoreException(CoreException::SnapshotAndStop, "Taking snapshot and stopping run from HINT.");
 #endif
 }
 
@@ -2982,6 +2984,7 @@ Hart<URV>::initiateNmi(URV cause, URV pcToSave)
       mnf.bits_.NMIE = 0;  // Clear mnstatus.mnie
 
       pokeCsr(CsrNumber::MNEPC, pcToSave);
+      cause |= URV(1) << (sizeof(URV)*8 - 1);
       pokeCsr(CsrNumber::MNCAUSE, cause);
 
       mnf.bits_.MNPV = virtMode_;  // Save virtual mode
@@ -4804,7 +4807,8 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
       catch (const CoreException& ce)
 	{
 	  bool success = logStop(ce, instCounter_, traceFile);
-          if (ce.type() == CoreException::Type::Snapshot)
+          if (ce.type() == CoreException::Type::Snapshot or
+              ce.type() == CoreException::Type::SnapshotAndStop)
             throw;
           return success;
 	}
@@ -4925,7 +4929,8 @@ Hart<URV>::simpleRun()
   catch (const CoreException& ce)
     {
       success = logStop(ce, 0, nullptr);
-      if (ce.type() == CoreException::Type::Snapshot)
+      if (ce.type() == CoreException::Type::Snapshot or
+          ce.type() == CoreException::Type::SnapshotAndStop)
         throw;
     }
 
@@ -5702,7 +5707,8 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 	enterDebugMode_(DebugModeCause::STEP, pc_);
 
       stepResult_ = logStop(ce, instCounter_, traceFile);
-      if (ce.type() == CoreException::Type::Snapshot)
+      if (ce.type() == CoreException::Type::Snapshot or
+          ce.type() == CoreException::Type::SnapshotAndStop)
         throw;
     }
 }
