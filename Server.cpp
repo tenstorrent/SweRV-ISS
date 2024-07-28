@@ -893,6 +893,62 @@ Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
 }
 
 
+template <typename URV>
+bool
+Server<URV>::mcmInsertCommand(const WhisperMessage& req, WhisperMessage& reply,
+			      Hart<URV>& hart, FILE* cmdLog)
+{
+  bool ok = true;
+  uint32_t hartId = req.hart;
+
+  if (req.size <= 8)
+    {
+      ok = system_.mcmMbInsert(hart, req.time, req.instrTag, req.address, req.size, req.value);
+
+      if (cmdLog)
+	fprintf(cmdLog, "hart=%" PRIu32 " time=%" PRIu64 " mbinsert %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
+		hartId, req.time, req.instrTag, req.address, req.size, req.value);
+    }
+  else
+    {
+      if (req.size > req.buffer.size())
+	{
+	  std::cerr << "Error: Server command: McmInsert data size too large: "
+		    << req.size << '\n';
+	  ok = false;
+	}
+      else
+	{
+	  const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
+	  for (unsigned i = 0; i < req.size and ok; ++i, ++data)
+	    {
+	      uint64_t addr = req.address + i;
+	      uint64_t value = *data;
+	      ok = system_.mcmMbInsert(hart, req.time, req.instrTag, addr, 1, value);
+	    }
+
+	  if (cmdLog)
+	    {
+	      fprintf(cmdLog, "hart=%" PRIu32 " time=%" PRIu64 " mbinsert %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x",
+		      hartId, req.time, req.instrTag, req.address, req.size);
+	      const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
+	      for (unsigned i = req.size; i > 0; --i)
+		{
+		  unsigned val = data[i-1];
+		  fprintf(cmdLog, "%02x", val);
+		}
+	      fprintf(cmdLog, "\n");
+	    }
+	}
+    }
+
+  if (not ok)
+    reply.type = Invalid;
+
+  return ok;
+}
+
+
 /// Dump all registers contents in tracefile.
 template <typename URV>
 static void
@@ -1228,14 +1284,8 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         break;
 
       case McmInsert:
-        if (commandLog)
-          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mbinsert %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
-                  hartId, msg.time, msg.instrTag, msg.address, msg.size,
-                  msg.value);
-        if (not system_.mcmMbInsert(hart, msg.time, msg.instrTag,
-                                    msg.address, msg.size, msg.value))
-          reply.type = Invalid;
-        break;
+	mcmInsertCommand(msg, reply, hart, commandLog);
+	break;
 
       case McmWrite:
         if (msg.size > msg.buffer.size())

@@ -2261,11 +2261,45 @@ Interactive<URV>::mbinsertCommand(Hart<URV>& hart, const std::string& line,
   if (not parseCmdLineNumber("size", tokens.at(3), size))
     return false;
 
-  uint64_t data = 0;
-  if (not parseCmdLineNumber("data", tokens.at(4), data))
+  if (size <= 8)
+    {
+      uint64_t data = 0;
+      if (not parseCmdLineNumber("data", tokens.at(4), data))
+	return false;
+      return system_.mcmMbInsert(hart, this->time_, tag, addr, size, data);
+    }
+
+  // mbinsert for a vector load, expected size is less than that of cache line (64).
+  std::vector<uint8_t> bytes;
+  if (not parseCmdLineVecData("data", tokens.at(4), bytes))
     return false;
 
-  return system_.mcmMbInsert(hart, this->time_, tag, addr, size, data);
+  if (bytes.size() != size)
+    {
+      std::cerr << "Invalid mbinsert command: size (" << size << ") does not match number "
+		<< " of bytes in data (" << bytes.size() << "\n";
+      return false;
+    }
+
+  unsigned clz = hart.cacheLineSize();
+  if (size > clz)
+    {
+      std::cerr << "Invalid size for mbinsert command for vector: " << size << ", must be "
+		<< "less than cache line size (" << clz << ")\n";
+      return false;
+    }
+
+  bool ok = true;
+
+  const uint8_t* vdata = bytes.data();
+  addr = addr + size - 1;
+  for (unsigned i = 0; i < size and ok; ++i, ++vdata, --addr)
+    {
+      uint64_t value = *vdata;
+      ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 1, value);
+    }
+
+  return ok;
 }
 
 

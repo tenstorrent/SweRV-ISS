@@ -1256,13 +1256,13 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
 	{
 	  if (byteAddr >= vstoreOp.addr_ and byteAddr < vstoreOp.addr_ + vstoreOp.size_)
 	    {
-	      uint8_t refByte = vstoreOp.data_ >> (byteAddr - vstoreOp.addr_);
+	      uint8_t refByte = vstoreOp.data_ >> ((byteAddr - vstoreOp.addr_)*8);
 	      match = refByte == byteVal;
 	      if (match)
 		continue;
 	      cerr << "RTL/whiper mismatch for vector store time=" << op.time_ << " hart-id="
 		   << hartId << " instr-tag=" << instr.tag_ << " addr=0x" << std::hex << byteAddr
-		   << op.physAddr_ << " rtl-data=0x" << unsigned(byteVal) << " whisper-data=0x"
+		   << " rtl-data=0x" << unsigned(byteVal) << " whisper-data=0x"
 		   << unsigned(refByte) << std::dec << '\n';
 	      return false;
 	    }
