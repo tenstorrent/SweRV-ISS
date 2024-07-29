@@ -35,6 +35,25 @@ printVersion()
   #undef str
   #undef xstr
 #endif
+  std::cout << "Compile options: \n";
+#ifdef SOFT_FLOAT
+  std::cout << "SOFT_FLOAT\n";
+#endif
+#ifdef MEM_CALLBACKS
+  std::cout << "MEM_CALLBACKS\n";
+#endif
+#ifdef HINT_OPS
+  std::cout << "HINT_OPS\n";
+#endif
+#ifdef PCI
+  std::cout << "PCI\n";
+#endif
+#ifdef FAST_SLOPPY
+  std::cout << "FAST_SLOPPY\n";
+#endif
+#ifdef LZ4_COMPRESS
+  std::cout << "LZ4_COMPRESS\n";
+#endif
 }
 
 
