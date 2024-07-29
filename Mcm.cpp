@@ -616,8 +616,8 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
       return true;
     }
 
-  // For cbo.flush/clean, all preceding (in program order) overlapping stores/amos must
-  // have drained.
+  // For cbo.flush/clean/inval, all preceding (in program order) overlapping stores/amos
+  // must have drained.
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
   const auto& undrained = hartUndrainedStores_.at(hartIx);
