@@ -1122,12 +1122,12 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
               }
             else
 	      {
-		fprintf(commandLog, "hart=%" PRIu32 " poke %c 0x%" PRIxMAX " 0x%" PRIxMAX " # ts=%s tag=%s",
+		fprintf(commandLog, "hart=%" PRIu32 " poke %c 0x%" PRIxMAX " 0x%" PRIxMAX,
 			hartId, msg.resource, uintmax_t(msg.address),
-			uintmax_t(msg.value),
-			timeStamp.c_str(), msg.tag.data());
+			uintmax_t(msg.value));
 		if (msg.resource == 'm' and msg.size != 0)
 		  fprintf(commandLog, " %d", int(msg.size));
+                fprintf(commandLog, " # ts=%s tag=%s", timeStamp.c_str(), msg.tag.data());
 		fprintf(commandLog, "\n");
 	      }
           }

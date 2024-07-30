@@ -932,13 +932,17 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
       csr->setWriteMask(flag ? (mask | bit) : (mask & ~bit));
     }
 
-  // In MIE, bits VSEIE, VSTIE, VSSIE, and SGEIE become read-only zero if no hypervisor.
+  // In MIE, bits VSEIE, VSTIE, VSSIE, and SGEIE become read-only-zero if no hypervisor.
   csr = findCsr(CN::MIE);
   if (csr)
     {
       URV bits = 0x1444;
       auto mask = csr->getReadMask();
       csr->setReadMask(flag ? (mask | bits) : (mask & ~bits));
+      if (not flag)
+	csr->write(csr->read()); // Clear bits in CSR that are now read-only-zero.
+      mask = csr->getWriteMask();
+      csr->setWriteMask(flag ? (mask | bits) : (mask & ~bits));
     }
 
   updateSstc();                // To activate/deactivate VSTIMECMP.
