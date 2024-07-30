@@ -362,7 +362,7 @@ static bool
 pokeHartMemory(Hart<URV>& hart, uint64_t physAddr, uint64_t data, unsigned size)
 {
 #if 0
-  // The test-bench can defer IMISC interrupts and undefer them when they get delivered to
+  // The test-bench can defer IMISC interrupts and un-defer them when they get delivered to
   // the hart on the RTL side. But, the test-bench does not do that. To avoid triggering
   // an interrupt too soon, we skip writing to the IMSIC. Presumably, the test-bench will
   // poke the IMSIC when the RTL delivers the IMSIC interrupt to the hart.
@@ -490,7 +490,7 @@ Mcm<URV>::mergeBufferInsertScalar(Hart<URV>& hart, uint64_t time, uint64_t instr
 	result = false;
     }
 
-  // If corresponding insruction is retired, compare to its data.
+  // If corresponding instruction is retired, compare to its data.
   if (instr->retired_)
     if (not checkRtlWrite(hart.hartId(), *instr, op))
       result = false;
@@ -707,7 +707,7 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
       return true;
     }
 
-  // For cbo.flush/clean, all preceding (in program order) overlapping stores/amos must
+  // For cbo.flush/clean, all preceding (in program order) overlapping stores/AMOs must
   // have drained.
   const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
@@ -784,11 +784,11 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (di.isStore() or di.isAmo() or di.isVectorStore())
     ok = retireStore(hart, *instr) and ok;
 
-  // Amo sanity check: Must have both read and write ops.
+  // AMO sanity check: Must have both read and write ops.
   if (di.isAmo() and (not instrHasRead(*instr) or not instrHasWrite(*instr)))
     {
       cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << tag
-	   << " amo instruction retired before read/write op.\n";
+	   << " AMO instruction retired before read/write op.\n";
       return false;
     }
 
@@ -915,7 +915,7 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
 	    written = true;  // No masking
 	  else
 	    {
-	      // Check if op bytes are all masked or all unmaksed.
+	      // Check if op bytes are all masked or all un-maksed.
 	      unsigned masked = 0;  // Count of masked bytes of op.
 	      for (unsigned opIx = 0; opIx < op.size_; ++opIx)   // Scan op bytes
 		{
@@ -1598,7 +1598,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 
   // FIX TODO : Handle page crossers: Use pa2.
 
-  // Map a reference address to a refernce value and a flag indicating if address is
+  // Map a reference address to a reference value and a flag indicating if address is
   // covered by a read op.
   struct RefByte
   {
@@ -1609,6 +1609,8 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 
   for (unsigned i = 0; i < pa1.size(); ++i)
     {
+      if (i < masked.size() and masked.at(i))
+	continue;
       uint64_t elemAddr = pa1.at(i);
       for (unsigned i = 0; i < elemSize; ++i)
 	addrMap[elemAddr + i] = RefByte{0, false};
@@ -2202,7 +2204,7 @@ Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
   if (not instrA.isMemory() or not overlaps(instrA, instrB))
     return true;
 
-  // Non-scalar (e.g. cbo.zero) are not drained aomically even if aligned.
+  // Non-scalar (e.g. cbo.zero) are not drained atomically even if aligned.
   if (instrA.isAligned() and instrB.isAligned() and instrA.size_ <= 8 and instrB.size_ <= 8)
     return isBeforeInMemoryTime(instrA, instrB);
 
@@ -2312,7 +2314,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   // between a and b in program order, and a and b return values for x written by
   // different memory operations.
  
-  // Instruction B must be a load/amo instruction.
+  // Instruction B must be a load/AMO instruction.
   if (not instrB.isLoad_)
     return true;  // NA: B is not a load.
 
@@ -2400,20 +2402,20 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
   // Rule 3: A is a write resulting from an AMO/SC instructions, A and
   // B have overlapping addresses, B loads data from A.
  
-  // Instruction B must be a load/amo instruction.
+  // Instruction B must be a load/AMO instruction.
   const DecodedInst& bdi = instrB.di_;
   if (bdi.isStore())
     return true;  // NA: store instruction.
 
   if (not bdi.isLoad() and not bdi.isVectorLoad() and not bdi.isAtomic())
-    return true;  // NA: must be load/amo.
+    return true;  // NA: must be load/AMO.
 
   if (not instrB.complete_)
     return true;  // We will try again when B is complete.
 
   auto earlyB = earliestOpTime(instrB);
 
-  // Addrresses of bytes of B written by preceeding non-atomic stores in local hart.
+  // Addresses of bytes of B written by preceding non-atomic stores in local hart.
   std::unordered_set<uint64_t> locallyWritten;
 
   unsigned hartIx = hart.sysHartIndex();
@@ -2548,8 +2550,8 @@ Mcm<URV>::checkFence(Hart<URV>& hart, const McmInstr& instrB) const
 
   const DecodedInst& bdi = instrB.di_;
 
-  // If fence instruction has predecessor write, then check that all preceeding stores
-  // have drained. This is stronger thatn what is required by ppo rule 4 but it makes
+  // If fence instruction has predecessor write, then check that all preceding stores
+  // have drained. This is stronger than what is required by PPO rule 4 but it makes
   // that rule simpler to implement.
   if (not bdi.isFencePredWrite())
     return true;
@@ -2577,7 +2579,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory())
     return true;
 
-  // We assume that stores preceeding a fence are drained before fence retires if fence
+  // We assume that stores preceding a fence are drained before fence retires if fence
   // has predecessor write. This is checked in checkFence.
 
   auto earlyB = earliestOpTime(instrB);
@@ -2727,7 +2729,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrA, const McmInstr& inst
     return true;
 
   if (instrA.di_.isAmo())
-    return instrA.memOps_.size() == 2; // Fail if != 2: Incomplete amo might finish afrer B
+    return instrA.memOps_.size() == 2; // Fail if != 2: Incomplete AMO might finish afrer B
 
   if (not instrA.complete_)
     return false; // Incomplete store might finish after B
@@ -2770,8 +2772,8 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
   const auto& instrVec = hartData_.at(hartIx).instrVec_;
   const auto& undrained = hartData_.at(hartIx).undrainedStores_;
 
-  // If B is a store, make sure that there are no undrained store, with acquire
-  // annotation, preceeding B in program order. This is stricter than what the spec
+  // If B is a store, make sure that there are no un-drained store, with acquire
+  // annotation, preceding B in program order. This is stricter than what the spec
   // mandates.
   if (instrB.isStore_)
     {
@@ -2850,13 +2852,13 @@ Mcm<URV>::ppoRule6(const McmInstr& instrA, const McmInstr& instrB) const
   assert(instrA.isRetired());
 
   if (instrA.di_.isAmo())
-    return instrA.memOps_.size() == 2; // Fail if incomplete amo (finishes afrer B).
+    return instrA.memOps_.size() == 2; // Fail if incomplete AMO (finishes afrer B).
 
   if (not instrA.complete_)
     return false;       // Fail if incomplete store (finishes after B).
 
   if (instrB.memOps_.empty())
-    return true;   // Undrained store.
+    return true;   // Un-drained store.
 
   auto btime = earliestOpTime(instrB);
   return latestOpTime(instrA) < btime;  // A finishes before B.
@@ -2934,10 +2936,10 @@ Mcm<URV>::ppoRule7(const McmInstr& instrA, const McmInstr& instrB) const
 
   bool incomplete = not instrA.complete_ or (instrA.di_.isAmo() and instrA.memOps_.size() != 2);
   if (incomplete)
-    return false;   // Incomplete amo finishes after B.
+    return false;   // Incomplete AMO finishes after B.
 
   if (instrB.memOps_.empty())
-    return true;    // Undrained store will finish later.
+    return true;    // Un-drained store will finish later.
 
   auto btime = earliestOpTime(instrB);
   return latestOpTime(instrA) < btime;  // A finishes before B
@@ -3143,7 +3145,7 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
       return false;
     }
 
-  if (bdi.isVectorStore()) // VL is ctrl dep for vector instructions
+  if (bdi.isVectorStore()) // VL is control dependency for vector instructions
     {
       producerTag = hartData_.at(hartIx).vlProducer_;
       if (hartData_.at(hartIx).vlTime_ and not rule11(producerTag))
@@ -3153,7 +3155,7 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
           return false;
         }
 
-      if (bdi.isMasked()) // vm is ctrl dep for masked vector instructions
+      if (bdi.isMasked()) // VM is control dependency for masked vector instructions
         {
           unsigned vmReg = 0 + vecRegOffset_;
           producerTag = regProducer.at(vmReg);
@@ -3216,7 +3218,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 
   auto earlyB = earliestOpTime(instrB);
 
-  // Check every memory instructions A preceeding B in program order with memroy time
+  // Check every memory instructions A preceding B in program order with memory time
   // larger than that of B.
   for (McmInstrIx aTag = instrB.tag_ - 1; aTag >= minTag; --aTag)
     {
@@ -3225,7 +3227,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	continue;
 
       // Check all instructions between A and B for an instruction M with address
-      // overlapping that of B and with an address dependecy on A.
+      // overlapping that of B and with an address dependency on A.
       for (McmInstrIx mTag = instrB.tag_ - 1; mTag > aTag; --mTag)
 	{
 	  const auto& instrM = instrVec.at(mTag);
@@ -3278,7 +3280,7 @@ Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
 
   auto earlyB = earliestOpTime(instrB);
 
-  // Check every memory instructions A preceeding B in program order with memroy time
+  // Check every memory instructions A preceding B in program order with memory time
   // larger than that of B.
   for (McmInstrIx aTag = instrB.tag_ - 1; aTag >= minTag; --aTag)
     {
@@ -3287,7 +3289,7 @@ Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
 	continue;
 
       // Check all instructions between A and B for an instruction M with address
-      // overlapping that of B and with an address dependecy on A.
+      // overlapping that of B and with an address dependency on A.
       for (McmInstrIx mTag = instrB.tag_ - 1; mTag > aTag; --mTag)
 	{
 	  const auto& instrM = instrVec.at(mTag);
@@ -3363,7 +3365,7 @@ bool
 Mcm<URV>::checkSfenceInvalIr(Hart<URV>& hart, const McmInstr& instr) const
 {
   // This is very crude. We are using retire time of sinval.vma, we should be using
-  // execution time. We are using read/write times of ld/store instructions, we should be
+  // execution time. We are using read/write times of load/store instructions, we should be
   // using translation times. Required times are currently not available. We do not
   // consider instruction address translation.
 
