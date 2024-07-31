@@ -291,6 +291,10 @@ namespace WdRiscv
     void clearDefaultPma()
     { defaultPma_.attrib_ = Pma::Attrib::None; }
 
+    /// Enable given attributes in the default PMA.
+    void enableInDefaultPma(Pma::Attrib a)
+    { defaultPma_.enable(a); }
+
     const std::vector<PmaTrace>& getPmaTrace() const
     { return pmaTrace_; }
 

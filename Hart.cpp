@@ -683,7 +683,10 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 	processPmaChange(CN(ix));
       }
   if (hasPmacfg)
-    memory_.pmaMgr_.clearDefaultPma();
+    {
+      memory_.pmaMgr_.clearDefaultPma();  // No access.
+      memory_.pmaMgr_.enableInDefaultPma(Pma::Attrib::MisalAccFault); // Access fault on misal.
+    }
 }
 
 
@@ -1575,7 +1578,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	a1 = stee_.clearSecureBits(addr1);
       Pma pma = getPma(a1);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
-      if (misal and not pma.isMisalignedOk())
+      if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
     }
 
@@ -11246,7 +11249,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	a1 = stee_.clearSecureBits(addr1);
       Pma pma = getPma(a1);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
-      if (misal and not pma.isMisalignedOk())
+      if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
     }
 
