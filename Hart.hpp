@@ -2028,8 +2028,8 @@ namespace WdRiscv
     { vecRegs_.configVectorTrapVtype(flag); }
 
     /// When flag is true, use binary tree reduction for vfredusum and vfwredusum.
-    void configVectorFpUnorderedSumRed(bool flag)
-    { vecRegs_.configVectorFpUnorderedSumRed(flag); }
+    void configVectorFpUnorderedSumRed(ElementWidth ew, bool flag)
+    { vecRegs_.configVectorFpUnorderedSumRed(ew, flag); }
 
     /// When flag is true, when VL > VLMAX reduce AVL to match VLMAX and write
     /// to VL. This only applies to vsetvl/vsetvli instructions.
