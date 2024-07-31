@@ -1272,7 +1272,7 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
 	{
 	  cerr << "RTL/whiper mismatch for vector store time=" << op.time_ << " hart-id="
 	       << hartId << " instr-tag=" << instr.tag_ << " addr=0x" << std::hex << byteAddr
-	       << op.physAddr_ << " rtl-data=0x" << unsigned(byteVal) << " no whisper data\n"
+	       << " rtl-data=0x" << unsigned(byteVal) << " no whisper data\n"
 	       << std::dec << '\n';
 	  return false;
 	}
