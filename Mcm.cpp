@@ -1595,9 +1595,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 		<< " tag=" << instr->tag_ << " instruction is not a vector load\n";
       return false;
     }
-
-  // FIX TODO : Handle page crossers: Use pa2.
-
+ 
   // Map a reference address to a reference value and a flag indicating if address is
   // covered by a read op.
   struct RefByte
@@ -1607,16 +1605,29 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   };
   std::unordered_map<uint64_t, RefByte> addrMap;
 
+  // Collect reference (Whisper) addresses in addrMap.
   for (unsigned i = 0; i < pa1.size(); ++i)
     {
       if (i < masked.size() and masked.at(i))
 	continue;
-      uint64_t elemAddr = pa1.at(i);
-      for (unsigned i = 0; i < elemSize; ++i)
-	addrMap[elemAddr + i] = RefByte{0, false};
+      unsigned size1 = elemSize, size2 = 0;
+      uint64_t ea1 = pa1.at(i), ea2 = pa2.at(i);
+      if (ea1 != ea2 and pageNum(ea1) != pageNum(ea2))
+	{
+	  size1 = offsetToNextPage(ea1);
+	  size2 = elemSize - size1;
+	  assert(size1 > 0 and size1 < elemSize);
+	  assert(size2 > 0 and size2 < elemSize);
+	}
+      for (unsigned i = 0; i < size1; ++i)
+	addrMap[ea1 + i] = RefByte{0, false};
+      for (unsigned i = 0; i < size2; ++i)
+	addrMap[ea2 + i] = RefByte{0, false};
     }
 
-  // Process read ops in reverse order. Trim each op. Keep ops where at least one address remains.
+  // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
+  // (marking then as not canceled) where at least one address remains. Mark reference
+  // addresses covered by read ops. Set reference (Whisper) values of reference addresses.
   auto& ops = instr->memOps_;
   for (auto iter = ops.rbegin(); iter != ops.rend(); ++iter)
     {
@@ -1624,8 +1635,8 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
       auto& op = sysMemOps_.at(opIx);
       if (not op.isRead_)
 	continue;  // Should not happen.
-      uint64_t low = ~uint64_t(0);
-      uint64_t high = 0;
+
+      uint64_t low = ~uint64_t(0), high = 0; // Range of op addresses overlapping reference.
       for (unsigned i = 0; i < op.size_; ++i)
 	{
 	  uint64_t addr = op.physAddr_ + i;
@@ -1638,6 +1649,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 	  low = std::min(low, addr);
 	  high = std::max(high, addr);
 	}
+
       if (low <= high)
 	{
 	  unsigned size = high - low + 1;
@@ -1662,32 +1674,33 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
     return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
   });
 
-  // Check read operations of instruction comparing RTL values to model (whisper) values.
+  // Check read operations comparing RTL values to reference (whisper) values.
   bool ok = true;
   for (auto opIx : instr->memOps_)
     {
       auto& op = sysMemOps_.at(opIx);
-      if (op.isRead_)
-	{
-	  for (unsigned i = 0; i < op.size_; ++i)
-	    {
-	      uint64_t addr = op.physAddr_ + i;
-	      uint8_t rtlVal = op.rtlData_ >> (i*8);
-	      auto iter = addrMap.find(addr);
-	      if (iter == addrMap.end())
-		continue;
-	      const auto& rb = iter->second;
-	      if (rb.value == rtlVal)
-		continue;
+      if (not op.isRead_)
+	continue;
 
-	      cerr << "Error: RTL/whisper read mismatch time=" << op.time_ << " hart-id="
-		   << hart.hartId() << " instr-tag=" << op.instrTag_ << " addr=0x"
-		   << std::hex << addr << " rtl=0x" << unsigned(rtlVal)
-		   << " whisper=0x" << unsigned(rb.value) << std::dec << '\n';
-	      ok = false;
-	    }
+      for (unsigned i = 0; i < op.size_; ++i)
+	{
+	  uint64_t addr = op.physAddr_ + i;
+	  uint8_t rtlVal = op.rtlData_ >> (i*8);
+	  auto iter = addrMap.find(addr);
+	  if (iter == addrMap.end())
+	    continue;
+	  const auto& rb = iter->second;
+	  if (rb.value == rtlVal)
+	    continue;
+
+	  cerr << "Error: RTL/whisper read mismatch time=" << op.time_ << " hart-id="
+	       << hart.hartId() << " instr-tag=" << op.instrTag_ << " addr=0x"
+	       << std::hex << addr << " rtl=0x" << unsigned(rtlVal)
+	       << " whisper=0x" << unsigned(rb.value) << std::dec << '\n';
+	  ok = false;
 	}
     }
+
   return ok;
 }  
 
