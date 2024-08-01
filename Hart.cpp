@@ -1893,7 +1893,8 @@ Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr
       if (ooo_)
 	{
 	  uint64_t oooVal = 0;
-	  getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), oooVal);
+	  if (getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), oooVal))
+	    uval = oooVal;
 	}
     }
   else
