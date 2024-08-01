@@ -4852,9 +4852,6 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
 
   reportInstsPerSec(numInsts, elapsed, userStop);
 
-  if (bbFile_)
-    dumpBasicBlocks();
-
   return success;
 }
 
@@ -4941,9 +4938,6 @@ Hart<URV>::simpleRun()
   csRegs_.enableRecordWrite(true);
   pmpManager_.enableTrace(true);
   virtMem_.enableTrace(true);
-
-  if (bbFile_)
-    dumpBasicBlocks();
 
   return success;
 }
