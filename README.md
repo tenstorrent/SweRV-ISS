@@ -739,7 +739,7 @@ The vector configuration is an object with the following fields:
 * trap_invalid_vtype: when true, trap on invalid/unsupported vtype configurations, when false set vtype.vill instead.
 * legalize_vsetvl_avl: when true, legalize VL to VLMAX if it would be greater than VLMAX after a vsetvl instruction.
 * legalize_vsetvli_avl: when true, legalize VL to VLMAX if it would be greater than VLMAX after a vsetvli instruction.
-* tt_fp_usum_tree_reduction: when true, enables Tenstorrent tree reduction-style vfredusum/vfwredusum, when false uses ordered version. 
+* tt_fp_usum_tree_reduction: for each SEW, enables Tenstorrent tree reduction-style vfredusum/vfwredusum, default is false.
 
 Example:
 ```
@@ -749,7 +749,8 @@ Example:
        "tail_agnositic_policy" : "undisturb",
        "mask_agnositic_policy" : "ones",
        "min_bytes_per_lmul" : { "m2" : 2, "m4" : 2 },
-       "max_bytes_per_lmul" : { "mf8" : 4 }
+       "max_bytes_per_lmul" : { "mf8" : 4 },
+       "tt_fp_usum_tree_reduction" : [ "e16", "e32", "e64" ]
     }
 ```
 
