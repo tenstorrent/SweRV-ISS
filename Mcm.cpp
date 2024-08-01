@@ -344,6 +344,8 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
     {
       unsigned dataReg = effectiveRegIx(di, 0);
       unsigned srcGroup = hart.vecOpEmul(0);
+      if (di.vecFieldCount())
+        srcGroup *= di.vecFieldCount();
       for (unsigned i = 0; i < srcGroup; ++i)
         {
           uint64_t dataTime = regTime.at(dataReg + i);
@@ -2051,7 +2053,10 @@ Mcm<URV>::identifyRegisters(const Hart<URV>& hart,
 	}
       else if (type == OperandType::VecReg)
         {
-          for (unsigned off = 0; off < hart.vecOpEmul(i); ++off)
+          unsigned touchedRegs = hart.vecOpEmul(i);
+          if (di.vecFieldCount() and (i == 0))
+            touchedRegs *= di.vecFieldCount();
+          for (unsigned off = 0; off < touchedRegs; ++off)
             {
               if (isDest)
                 destRegs.push_back(regIx + off);
