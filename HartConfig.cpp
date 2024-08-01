@@ -959,11 +959,27 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
   tag = "tt_fp_usum_tree_reduction";
   if (vconf.contains(tag))
     {
-      bool flag = false;
-      if (not getJsonBoolean(tag, vconf.at(tag), flag))
-        errors++;
-      else
-        hart.configVectorFpUnorderedSumRed(flag);
+      const auto& items = vconf.at(tag);
+      for (const auto& item : items)
+	{
+          if (not item.is_string())
+            {
+              std::cerr << "Error: Invalid value in config file item " << tag
+		   << " -- expecting string\n";
+              errors++;
+	      continue;
+            }
+
+          std::string_view sew = item.get<std::string_view>();
+          ElementWidth ew;
+          if (not VecRegs::to_sew(sew, ew))
+            {
+              std::cerr << "Error: can't convert to valid SEW: " << tag << '\n';
+              errors++;
+              continue;
+            }
+          hart.configVectorFpUnorderedSumRed(ew, true);
+        }
     }
 
   tag = "legalize_vsetvl_avl";

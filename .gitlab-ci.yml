@@ -40,7 +40,7 @@ stages:
 build-job:
   stage: build
   script:
-    - CC=clang CXX=clang++ make SOFT_FLOAT=1 STATIC_LINK=0 -j32
+    - CC=clang CXX=clang++ make SOFT_FLOAT=1 STATIC_LINK=0 LZ4_COMPRESS=1 -j32
   artifacts:
     paths:
       - build-Linux/whisper

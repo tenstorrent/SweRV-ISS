@@ -41,6 +41,9 @@ VecRegs::VecRegs()
   // At most we have 3 vector operands.
   opsEmul_.resize(3);
   opsEmul_.assign(opsEmul_.size(), 1);
+
+  // Per-SEW controlled unordered fpsum reduction.
+  fpUnorderedSumTreeRed_.resize(unsigned(VecEnums::WidthLimit), false);
 }
 
 
