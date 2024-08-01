@@ -407,19 +407,9 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   if (size <= 8)
     return mergeBufferInsertScalar(hart, time, instrTag, physAddr, size, rtlData);
 
-  assert(size <= lineSize_);
-  assert( (physAddr % (lineSize_/2)) == 0 );
+  assert(0);
 
-  // FIX: This currently supports cbo.zero. For vector write, we would need to make
-  // rtlData a vector of double words.
-  uint64_t addr = physAddr;
-  for (unsigned i = 0; i < size; i += 8, addr += 8)
-    {
-      if (not mergeBufferInsertScalar(hart, time, instrTag, addr, 8, rtlData))
-	return false;
-    }
-
-  return true;
+  return false;
 }
 
 
