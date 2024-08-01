@@ -1693,6 +1693,21 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 	}
     }
 
+  // Check that all reference addresses are covered by the read operations.
+  bool complete = true;
+  for (const auto& [addr, rb] : addrMap)
+    if (not rb.covered)
+      {
+	complete = false;
+	ok = false;
+	break;
+      }
+
+  if (not complete)
+    cerr << "Error: hart-id= " << hart.hartId() << " tag=" << instr->tag_ << " read ops do"
+	 << " not cover all the bytes of vector load instruction\n";
+
+  instr->complete_ = complete;
   return ok;
 }  
 
@@ -1827,10 +1842,12 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t va, uint64_t pa1,
     }
 
   if (not covered)
-    cerr << "Error: Read ops do not cover all the bytes of load instruction"
-	 << " tag=" << tag << '\n';
+    cerr << "Error: hart-id= " << hart.hartId() << " tag=" << tag << " read ops do not"
+	 << " cover all the bytes of load instruction\n";
 
-  instr->complete_ = true;  // FIX : Only for non-io.  Fix for vector.
+  // Vector load completion check is done in commitVecReadOPs.
+  if (not instr->di_.isVector())
+    instr->complete_ = covered;
 
   return covered;
 }
