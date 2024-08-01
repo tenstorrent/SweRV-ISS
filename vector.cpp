@@ -410,6 +410,29 @@ Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
 }
 
 
+template <typename URV>
+inline
+bool
+Hart<URV>::checkIndexedOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op2,
+                                 unsigned groupX8, unsigned offsetGroupX8)
+{
+  unsigned eg0 = groupX8 >= 8 ? groupX8 / 8 : 1;
+  unsigned mask0 = eg0 - 1;   // Assumes eg is 1, 2, 4, or 8
+
+  unsigned eg2 = offsetGroupX8 >= 8 ? offsetGroupX8 / 8 : 1;
+  unsigned mask2 = eg2 - 1;
+
+  if (((op0 & mask0) == 0) and
+      ((op2 & mask2) == 0))
+    {
+      vecRegs_.setOpEmul(eg0, 1, eg2);  // Track operand group for logging
+      return true;
+    }
+  postVecFail(di);
+  return false;
+}
+
+
 /// Return true if destination/source overlap is allowed.
 static
 bool
@@ -12086,7 +12109,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+  if (not checkIndexedOpsVsEmul(di, vd, vi, groupX8, offsetGroupX8))
     return false;
 
   if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8, 1 /* fieldCount */))
@@ -12298,7 +12321,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+  if (not checkIndexedOpsVsEmul(di, vd, vi, groupX8, offsetGroupX8))
     return false;
 
   if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8, 1 /* fieldCount */))
@@ -13058,7 +13081,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+  if (not checkIndexedOpsVsEmul(di, vd, vi, groupX8, offsetGroupX8))
     return false;
 
   if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8, fieldCount))
@@ -13231,7 +13254,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+  if (not checkIndexedOpsVsEmul(di, vd, vi, groupX8, offsetGroupX8))
     return false;
 
   if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8, fieldCount))
