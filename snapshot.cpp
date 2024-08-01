@@ -272,10 +272,17 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
 	      errors++;
 	      continue;
 	    }
-	  auto csr = csRegs_.findCsr(CsrNumber(num));
+          auto csrNum = CsrNumber(num);
+	  auto csr = csRegs_.findCsr(csrNum);
           // Poke to propagate updates to cached values
 	  if (csr and csr->isImplemented())
-            pokeCsr(static_cast<CsrNumber>(num), val);
+            {
+              if ((csrNum >= CsrNumber::MIREG and csrNum <= CsrNumber::MIREG6) or
+                  (csrNum >= CsrNumber::SIREG and csrNum <= CsrNumber::SIREG6) or
+                  (csrNum >= CsrNumber::VSIREG and csrNum <= CsrNumber::VSIREG6))
+                continue;
+              pokeCsr(csrNum, val);
+            }
 	  else
 	    cerr << "Warning: Register snapshot loader: Line " << lineNum
 		 << ": No such CSR: " << line << '\n';
