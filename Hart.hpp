@@ -5252,6 +5252,8 @@ namespace WdRiscv
     uint64_t bbPc_ = 0;                 // Entry PC of current basic block.
     uint64_t bbCacheAccess_ = 0;
     uint64_t bbCacheHit_ = 0;
+    bool bbPrevIsBranch_ = true;
+
     std::unordered_map<uint64_t, BbStat> basicBlocks_; // Map pc to basic-block frequency.
     FILE* bbFile_ = nullptr;            // Basic block file.
 

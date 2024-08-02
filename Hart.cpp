@@ -4659,7 +4659,6 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
   uint64_t limit = instCountLim_;
   bool doStats = instFreq_ or enableCounters_;
   bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
-  bool prevIsBranch = true;  // For basic block tracing.
 
   // Check for gdb break every 1000000 instructions.
   unsigned gdbCount = 0, gdbLimit = 1000000;
@@ -4792,8 +4791,8 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  if (bbFile_)
 	    {
-	      countBasicBlocks(prevIsBranch, physPc);
-	      prevIsBranch = di->isBranch();
+	      countBasicBlocks(bbPrevIsBranch_, physPc);
+	      bbPrevIsBranch_ = di->isBranch();
 	    }
 
 	  if (instrLineTrace_)
@@ -5017,7 +5016,6 @@ Hart<URV>::simpleRunWithLimit()
   std::string instStr;
 
   bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
-  bool prevIsBranch = true;  // For basic block tracing.
 
   while (noUserStop and instCounter_ < limit)
     {
@@ -5068,8 +5066,8 @@ Hart<URV>::simpleRunWithLimit()
 
       if (bbFile_)
 	{
-	  countBasicBlocks(prevIsBranch, physPc);
-	  prevIsBranch = di->isBranch();
+	  countBasicBlocks(bbPrevIsBranch_, physPc);
+	  bbPrevIsBranch_ = di->isBranch();
 	}
 
       if (traceBranchOn and (di->isBranch() or di->isXRet()))
