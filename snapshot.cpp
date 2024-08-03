@@ -62,8 +62,9 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
       auto csr = csRegs_.findCsr(CN(i));
       if (not csr or not csr->isImplemented())
 	continue;
-      if (csr->read() != csr->getResetValue())
-	ofs << "c 0x" << i << " 0x" << csr->read() << "\n";
+      if (csr->read() == 0 and csr->getResetValue() == 0)
+	continue;
+      ofs << "c 0x" << i << " 0x" << csr->read() << "\n";
     }
 
   for (unsigned i = unsigned(CN::MIN_CSR_); i <= unsigned(CN::MAX_CSR_); i++)
