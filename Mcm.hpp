@@ -204,7 +204,7 @@ namespace WdRiscv
     /// the physical address of the second page. Va is the virtual address of the load
     /// data.
     bool getCurrentLoadValue(Hart<URV>& hart, uint64_t va, uint64_t pa1, uint64_t pa2,
-			     unsigned size, uint64_t& value);
+			     unsigned size, bool isVec, uint64_t& value);
 
     /// Return the merge buffer line size in bytes.
     unsigned mergeBufferLineSize() const

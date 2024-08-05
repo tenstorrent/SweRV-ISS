@@ -100,12 +100,18 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 #endif
 
   uint32_t uval = 0;
-  uint64_t mcmVal = 0;
-  bool hasMcm = mcm_ and mcm_->getCurrentLoadValue(*this, virtAddr, addr, addr, ldStSize_, mcmVal);
 
-  if (hasMcm)
-    uval = mcmVal;
-  else
+  bool hasOooVal = false;
+  if (ooo_)   // Out of order execution (mcm or perfApi)
+    {
+      uint64_t oooVal = 0;
+      bool isVec = false;
+      hasOooVal = getOooLoadValue(virtAddr, addr, addr, ldStSize_, isVec, oooVal);
+      if (hasOooVal)
+	uval = oooVal;
+    }
+
+  if (not hasOooVal)
     memRead(addr, addr, uval);
 
   value = SRV(int32_t(uval)); // Sign extend.
@@ -161,9 +167,18 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 #endif
 
   uint64_t uval = 0;
-  bool hasMcm = mcm_ and mcm_->getCurrentLoadValue(*this, virtAddr, addr, addr, ldStSize_, uval);
 
-  if (not hasMcm)
+  bool hasOooVal = false;
+  if (ooo_)   // Out of order execution (mcm or perfApi)
+    {
+      uint64_t oooVal = 0;
+      bool isVec = false;
+      hasOooVal = getOooLoadValue(virtAddr, addr, addr, ldStSize_, isVec, oooVal);
+      if (hasOooVal)
+	uval = oooVal;
+    }
+
+  if (not hasOooVal)
     memRead(addr, addr, uval);
 
   value = uval;
@@ -236,18 +251,18 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
     }
 
   ULT uval = 0;
-  bool hasMcmVal = false;
-  if (mcm_)
+
+  bool hasOooVal = false;
+  if (ooo_)
     {
-      uint64_t mcmVal = 0;
-      if (mcm_->getCurrentLoadValue(*this, virtAddr, addr1, addr1, ldStSize_, mcmVal))
-	{
-	  uval = mcmVal;
-	  hasMcmVal = true;
-	}
+      uint64_t oooVal = 0;
+      bool isVec = false;
+      hasOooVal = getOooLoadValue(virtAddr, addr1, addr1, ldStSize_, isVec, oooVal);
+      if (hasOooVal)
+	uval = oooVal;
     }
 
-  if (not hasMcmVal)
+  if (not hasOooVal)
     memRead(addr1, addr1, uval);
 
   URV value = uval;

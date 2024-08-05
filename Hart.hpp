@@ -2302,8 +2302,8 @@ namespace WdRiscv
     }
 
     /// Get the data value for an out of order read (mcm or perfApi).
-    bool getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2,
-			 unsigned size, uint64_t& value);
+    bool getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
+			 bool isVec, uint64_t& value);
 
     /// Set current privilege mode.
     void setPrivilegeMode(PrivilegeMode m)

@@ -1700,12 +1700,11 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
       {
 	complete = false;
 	ok = false;
+	cerr << "Error: hart-id= " << hart.hartId() << " tag=" << instr->tag_
+	     << " phys-addr=0x" << std::hex << addr << std::dec
+	     << " read ops do not cover all the bytes of vector load instruction\n";
 	break;
       }
-
-  if (not complete)
-    cerr << "Error: hart-id= " << hart.hartId() << " tag=" << instr->tag_ << " read ops do"
-	 << " not cover all the bytes of vector load instruction\n";
 
   instr->complete_ = complete;
   return ok;
@@ -1766,8 +1765,8 @@ Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr* instr)
 
 template <typename URV>
 bool
-Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t va, uint64_t pa1,
-			      uint64_t pa2, unsigned size, uint64_t& value)
+Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t va, uint64_t pa1, uint64_t pa2,
+			      unsigned size, bool isVector, uint64_t& value)
 {
   value = 0;
   if (size == 0 or size > 8)
@@ -1841,12 +1840,13 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t va, uint64_t pa1,
       covered = covered and byteCovered;
     }
 
-  if (not covered)
+  // Vector cover check done in commitVecReadOps.
+  if (not covered and not isVector)
     cerr << "Error: hart-id= " << hart.hartId() << " tag=" << tag << " read ops do not"
 	 << " cover all the bytes of load instruction\n";
 
-  // Vector load completion check is done in commitVecReadOPs.
-  if (not instr->di_.isVector())
+  // Vector completion check done in commitVecReadOps.
+  if (not isVector)
     instr->complete_ = covered;
 
   return covered;
