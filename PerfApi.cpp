@@ -806,7 +806,7 @@ PerfApi::setStoreData(unsigned hartIx, uint64_t tag, uint64_t value)
 
 
 bool
-PerfApi::commitMemoryWrite(Hart64& hart, unsigned addr, unsigned size, uint64_t value)
+PerfApi::commitMemoryWrite(Hart64& hart, uint64_t addr, unsigned size, uint64_t value)
 {
   switch (size)
     {

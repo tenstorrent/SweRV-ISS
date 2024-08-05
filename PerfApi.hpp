@@ -381,7 +381,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
 
   protected:
 
-    bool commitMemoryWrite(Hart64& hart, unsigned addr, unsigned size, uint64_t value);
+    bool commitMemoryWrite(Hart64& hart, uint64_t addr, unsigned size, uint64_t value);
 
     void insertPacket(unsigned hartIx, uint64_t tag, std::shared_ptr<InstrPac> ptr)
     {
