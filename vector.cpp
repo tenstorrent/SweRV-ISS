@@ -19429,7 +19429,7 @@ Hart<URV>::vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
 
   bool anyActive = false;
 
-  if (not vecRegs_.fpUnorderedSumTreeRed_.at(__builtin_ctz(sizeof(ELEM_TYPE))))
+  if (not vecRegs_.fpUnorderedSumTreeRed_.at(__builtin_ctz(sizeof(ELEM_TYPE2X))))
     {
       for (unsigned ix = start; ix < elems; ++ix)
         {
