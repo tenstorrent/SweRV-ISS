@@ -922,13 +922,11 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal, bool vli /* vsetvli i
               URV avl = intRegs_.read(rs1);  // Application vector length.
               if (avl <= vlmax)
                 elems = avl;
-              else if (avl >= 2*vlmax)
-                elems = vlmax; // NOLINT(bugprone-branch-clone)
               else
-		// avl > vlmax and < 2*vlmax, spec allows anything between
+		// For avl >= 2*vlmax, spec mandaltes setting vl to vlmax.
+		// For avl > vlmax and < 2*vlmax, spec allows anything between 
 		// ceil(avl/2) and vlmax inclusive. We choose vlmax.
-                // NOLINTNEXTLINE(bugprone-branch-clone)
-                elems = vlmax;
+		elems = vlmax;
             }
         }
 
