@@ -2157,8 +2157,13 @@ namespace WdRiscv
       resumeTime_ = flag? time_ + timeout : 0;
     }
 
+    /// Return true if hart is suspended.
     bool isSuspended()
     { return suspended_; }
+
+    /// Set value to the value read from the device associated with the given physical
+    /// address. No effect if pa is not a device address.
+    void deviceRead(uint64_t pa, unsigned size, uint64_t& value);
 
   protected:
 

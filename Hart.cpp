@@ -1834,6 +1834,75 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
 }
 
 
+template <typename URV>
+void
+Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
+{
+  val = 0;
+  if (isAclintMtimeAddr(pa))
+    {
+      val = time_;
+      val = val >> (pa - 0xbff8) * 8;
+    }
+  else if (isImsicAddr(pa))
+    {
+      if (imsicRead_)
+        imsicRead_(pa, sizeof(val), val);
+    }
+  else if (isPciAddr(pa))
+    {
+      switch (size)
+	{
+	case 1:
+	  {
+	    uint8_t pciVal = 0;
+	    if (pa >= pciConfigBase_ and pa < pciConfigEnd_)
+	      pci_->config_mmio<uint8_t>(pa, pciVal, false);
+	    else
+	      pci_->mmio<uint8_t>(pa, pciVal, false);
+	    val = pciVal;
+	  }
+	  break;
+
+	case 2:
+	  {
+	    uint16_t pciVal = 0;
+	    if (pa >= pciConfigBase_ and pa < pciConfigEnd_)
+	      pci_->config_mmio<uint16_t>(pa, pciVal, false);
+	    else
+	      pci_->mmio<uint16_t>(pa, pciVal, false);
+	    val = pciVal;
+	  }
+	  break;
+
+	case 4:
+	  {
+	    uint32_t pciVal = 0;
+	    if (pa >= pciConfigBase_ and pa < pciConfigEnd_)
+	      pci_->config_mmio<uint32_t>(pa, pciVal, false);
+	    else
+	      pci_->mmio<uint32_t>(pa, pciVal, false);
+	    val = pciVal;
+	  }
+	  break;
+
+	case 8:
+	  {
+	    uint64_t pciVal = 0;
+	    if (pa >= pciConfigBase_ and pa < pciConfigEnd_)
+	      pci_->config_mmio<uint64_t>(pa, pciVal, false);
+	    else
+	      pci_->mmio<uint64_t>(pa, pciVal, false);
+	    val = pciVal;
+	  }
+	  break;
+
+	default:
+	  assert(0);
+	}
+    }
+}
+
 
 template <typename URV>
 template <typename LOAD_TYPE>
@@ -1863,51 +1932,27 @@ Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr
   using ULT = typename std::make_unsigned<LOAD_TYPE>::type;
 
   ULT uval = 0;   // Unsigned loaded value
-  bool device = false;  // True if loading from a device.
-  if (isAclintMtimeAddr(addr1))
-    {
-      uint64_t tm = time_;
-      tm = tm >> (addr1 - 0xbff8) * 8;
-      uval = tm;
-      device = true;
-    }
-  else if (isImsicAddr(addr1))
+
+  bool isDevice = isAclintMtimeAddr(addr1) or isImsicAddr(addr1) or isPciAddr(addr1);
+
+  bool hasOooVal = false;
+  if (ooo_)
     {
       uint64_t val = 0;
-      if (imsicRead_)
-        imsicRead_(addr1, sizeof(val), val);
-      uval = val;
-      device = true;
-    }
-  else if (isPciAddr(addr1))
-    {
-      if (addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_)
-        pci_->config_mmio<ULT>(addr1, uval, false);
-      else
-        pci_->mmio<ULT>(addr1, uval, false);
-      device = true;
+      hasOooVal = getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), di->isVector(), val);
+      if (hasOooVal)
+	uval = val;
     }
 
-  if (device)
+  if (not hasOooVal)
     {
-      if (ooo_)
+      if (isDevice)
 	{
-	  uint64_t oooVal = 0;
-	  if (getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), di->isVector(), oooVal))
-	    uval = oooVal;
+	  uint64_t dv = 0;
+	  deviceRead(addr1, sizeof(ULT), dv);
+	  uval = dv;
 	}
-    }
-  else
-    {
-      bool hasOooVal = false;
-      if (ooo_)   // Out of order execution (mcm or perfApi)
-	{
-	  uint64_t oooVal = 0;
-	  hasOooVal = getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), di->isVector(), oooVal);
-	  if (hasOooVal)
-	    uval = oooVal;
-	}
-      if (not hasOooVal)
+      else
 	memRead(addr1, addr2, uval);
     }
 

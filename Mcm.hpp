@@ -373,6 +373,8 @@ namespace WdRiscv
 
     using MemoryOpVec = std::vector<MemoryOp>;
 
+    bool referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64_t& val);
+
     /// Trim read operations to match reference (whisper). Mark replay read ops as
     /// canceled. Remove cancled ops.
     bool commitReadOps(Hart<URV>& hart, McmInstr*);

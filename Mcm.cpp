@@ -48,24 +48,86 @@ Mcm<URV>::updateTime(const char* method, uint64_t time)
 }
 
 
+
 template <typename URV>
 bool
-Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-		 uint64_t physAddr, unsigned size, uint64_t rtlData)
+Mcm<URV>::referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64_t& data)
+{
+  data = 0;
+
+  bool isDevice = hart.isAclintMtimeAddr(pa) or hart.isImsicAddr(pa) or hart.isPciAddr(pa);
+  if (isDevice)
+    {
+      hart.deviceRead(pa, size, data);
+      return true;
+    }
+
+  bool ok = true;
+
+  if (size == 1)
+    {
+      uint8_t val = 0;
+      ok = hart.peekMemory(pa, val, true /*usePma*/);
+      data = val;
+    }
+  else if (size == 2)
+    {
+      uint16_t val = 0;
+      ok = hart.peekMemory(pa, val, true /*usePma*/);
+      data = val;
+    }
+  else if (size == 4)
+    {
+      uint32_t val = 0;
+      ok = hart.peekMemory(pa, val, true /*usePma*/);
+      data = val;
+    }
+  else if (size == 8)
+    {
+      uint64_t val = 0;
+      ok = hart.peekMemory(pa, val, true /*usePma*/);
+      data = val;
+    }
+  else if (size < 8)
+    {
+      uint8_t val = 0;
+      for (unsigned i = 0; i < size; ++i)
+	if (not hart.peekMemory(pa + i, val, true))
+	  {
+	    ok = false;
+	    break;
+	  }
+	else
+	  data = data | (uint64_t(val) << (8*i));
+    }
+  else
+    assert(0 && "invalid mcm-read size");
+
+  return ok;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa,
+		 unsigned size, uint64_t rtlData)
 {
   if (not updateTime("Mcm::readOp", time))
     return false;
 
-  unsigned hartIx = hart.sysHartIndex();
-  if (hartIx >= hartData_.size())
+  if (size == 0 or size > 8)
     {
-      cerr << "Mcm::readOp: Error: Hart ix out of bound\n";
+      cerr << "Error: Mcm::readOp: hart-id=" << hart.hartId() << " time=" << time
+	   << " tag=" << tag << " invalid read size: " << size << '\n';
       return false;
     }
 
-  McmInstr* instr = findOrAddInstr(hartIx, instrTag);
+  unsigned hartIx = hart.sysHartIndex();
+
+  McmInstr* instr = findOrAddInstr(hartIx, tag);
   if (instr->isCanceled())
     return true;
+
   bool io = false;  // FIX  get io from PMA of address.
   if (instr->isRetired() and not io)
     cerr << "Warning: Read op time=" << time << " occurs after "
@@ -73,57 +135,18 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 
   MemoryOp op = {};
   op.time_ = time;
-  op.physAddr_ = physAddr;
+  op.physAddr_ = pa;
   op.rtlData_ = rtlData;
-  op.instrTag_ = instrTag;
+  op.instrTag_ = tag;
   op.hartIx_ = hartIx;
   op.size_ = size;
   op.isRead_ = true;
   op.canceled_ = true; // To be later marked as false if used.
 
-  // Set whisper load data. This may be updated by forwarding.
-  if (size == 1)
-    {
-      uint8_t val = 0;
-      op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
-      op.data_ = val;
-    }
-  else if (size == 2)
-    {
-      uint16_t val = 0;
-      op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
-      op.data_ = val;
-    }
-  else if (size == 4)
-    {
-      uint32_t val = 0;
-      op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
-      op.data_ = val;
-    }
-  else if (size == 8)
-    {
-      uint64_t val = 0;
-      op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
-      op.data_ = val;
-    }
-  else if (size < 8)
-    {
-      uint8_t val = 0;
-      for (unsigned i = 0; i < size; ++i)
-	if (not hart.peekMemory(physAddr + i, val, true))
-	  {
-	    op.failRead_ = true;
-	    break;
-	  }
-	else
-	  op.data_ = op.data_ | (uint64_t(val) << (8*i));
-    }
-  else
-    {
-      op.failRead_ = true;
-      cerr << "Error: Mcm::readOp: Invalid read size: " << size << '\n';
-      return false;
-    }
+  // Read Whisper memory and keep it in memory op.
+  uint64_t refVal = 0;
+  op.failRead_ = referenceModelRead(hart, pa, size, refVal);
+  op.data_ = refVal;
 
   instr->addMemOp(sysMemOps_.size());
   sysMemOps_.push_back(op);
