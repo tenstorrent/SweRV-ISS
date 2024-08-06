@@ -1630,7 +1630,9 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   };
   std::unordered_map<uint64_t, RefByte> addrMap;
 
-  // Collect reference (Whisper) addresses in addrMap.
+  // Collect reference (Whisper) addresses in addrMap. Check if there is overlap between
+  // elements.
+  bool hasOverlap = false;
   for (unsigned i = 0; i < pa1.size(); ++i)
     {
       if (i < masked.size() and masked.at(i))
@@ -1645,9 +1647,15 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 	  assert(size2 > 0 and size2 < elemSize);
 	}
       for (unsigned i = 0; i < size1; ++i)
-	addrMap[ea1 + i] = RefByte{0, false};
+	{
+	  hasOverlap = hasOverlap or addrMap.find(ea1 + i) != addrMap.end();
+	  addrMap[ea1 + i] = RefByte{0, false};
+	}
       for (unsigned i = 0; i < size2; ++i)
-	addrMap[ea2 + i] = RefByte{0, false};
+	{
+	  hasOverlap = hasOverlap or addrMap.find(ea2 + i) != addrMap.end();
+	  addrMap[ea2 + i] = RefByte{0, false};
+	}
     }
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
@@ -1700,29 +1708,34 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   });
 
   // Check read operations comparing RTL values to reference (whisper) values.
+  // We currently do not get enough information from the test-bench to do this
+  // correctly for overlapping elements.
   bool ok = true;
-  for (auto opIx : instr->memOps_)
+  if (not hasOverlap)
     {
-      auto& op = sysMemOps_.at(opIx);
-      if (not op.isRead_)
-	continue;
-
-      for (unsigned i = 0; i < op.size_; ++i)
+      for (auto opIx : instr->memOps_)
 	{
-	  uint64_t addr = op.physAddr_ + i;
-	  uint8_t rtlVal = op.rtlData_ >> (i*8);
-	  auto iter = addrMap.find(addr);
-	  if (iter == addrMap.end())
-	    continue;
-	  const auto& rb = iter->second;
-	  if (rb.value == rtlVal)
+	  auto& op = sysMemOps_.at(opIx);
+	  if (not op.isRead_)
 	    continue;
 
-	  cerr << "Error: RTL/whisper read mismatch time=" << op.time_ << " hart-id="
-	       << hart.hartId() << " instr-tag=" << op.instrTag_ << " addr=0x"
-	       << std::hex << addr << " rtl=0x" << unsigned(rtlVal)
-	       << " whisper=0x" << unsigned(rb.value) << std::dec << '\n';
-	  ok = false;
+	  for (unsigned i = 0; i < op.size_; ++i)
+	    {
+	      uint64_t addr = op.physAddr_ + i;
+	      uint8_t rtlVal = op.rtlData_ >> (i*8);
+	      auto iter = addrMap.find(addr);
+	      if (iter == addrMap.end())
+		continue;
+	      const auto& rb = iter->second;
+	      if (rb.value == rtlVal)
+		continue;
+
+	      cerr << "Error: RTL/whisper read mismatch time=" << op.time_ << " hart-id="
+		   << hart.hartId() << " instr-tag=" << op.instrTag_ << " addr=0x"
+		   << std::hex << addr << " rtl=0x" << unsigned(rtlVal)
+		   << " whisper=0x" << unsigned(rb.value) << std::dec << '\n';
+	      ok = false;
+	    }
 	}
     }
 
