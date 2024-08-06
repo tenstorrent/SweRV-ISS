@@ -6,6 +6,7 @@
 #include <cassert>
 #include <iostream>
 #include <set>
+#include <map>
 #include <unordered_set>
 #include "DecodedInst.hpp"
 
@@ -42,6 +43,17 @@ namespace WdRiscv
 
     bool isCanceled() const { return canceled_; }
     void cancel() { canceled_ = true; }
+
+    /// Set value to the model (whisper) byte data for the given physical byte address
+    /// returning true on success. Return false if given address is not covered by this
+    /// operation or if this is not a read operation.
+    bool getModelReadOpByte(uint64_t pa, uint8_t& byte) const
+    {
+      if (not isRead_ or pa < physAddr_ or pa >= physAddr_ + size_)
+	return false;
+      byte = data_ >> ((pa - physAddr_) * 8);
+      return true;
+    }
   };
 
 
@@ -60,6 +72,7 @@ namespace WdRiscv
     McmInstrIx dataProducer_ = 0;
     DecodedInst di_;
     McmInstrIx tag_ = 0;
+    uint8_t hartIx_ : 8  = 0;
     uint8_t size_   : 8 = 0;        // Data size for load/store instructions.
     bool retired_   : 1 = false;
     bool canceled_  : 1 = false;
@@ -98,7 +111,7 @@ namespace WdRiscv
       // A non-successful store conditional (zero size) does not overlap anything.
       if ((di_.isSc() and size_ == 0) or (other.di_.isSc() and other.size_ == 0))
 	return false;
-	  
+
       if (size_ == 0 or other.size_ == 0)
 	std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
 		  << " tag2=" << other.tag_ << " zero data size\n";
@@ -139,7 +152,8 @@ namespace WdRiscv
     /// case where we do not forward).
     bool readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 		uint64_t physAddr, unsigned size, uint64_t rtlData);
-    
+
+
     /// This is a write operation bypassing the merge buffer.
     bool bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 		  uint64_t physAddr, unsigned size, uint64_t rtlData);
@@ -162,7 +176,7 @@ namespace WdRiscv
     bool mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 			   uint64_t physAddr, unsigned size,
 			   uint64_t rtlData);
-    
+
     /// Helper to mergeBufferInster. Insert a write operation for the given instruction
     /// into the merge buffer removing it from the store buffer. Return true on
     /// success. Return false if no such operation is in the store buffer.
@@ -190,7 +204,7 @@ namespace WdRiscv
     /// the physical address of the second page. Va is the virtual address of the load
     /// data.
     bool getCurrentLoadValue(Hart<URV>& hart, uint64_t va, uint64_t pa1, uint64_t pa2,
-			     unsigned size, uint64_t& value);
+			     unsigned size, bool isVec, uint64_t& value);
 
     /// Return the merge buffer line size in bytes.
     unsigned mergeBufferLineSize() const
@@ -359,7 +373,12 @@ namespace WdRiscv
 
     using MemoryOpVec = std::vector<MemoryOp>;
 
-    void cancelReplayedReads(McmInstr*);
+    /// Trim read operations to match reference (whisper). Mark replay read ops as
+    /// canceled. Remove cancled ops.
+    bool commitReadOps(Hart<URV>& hart, McmInstr*);
+
+    /// Similar to above but for vector instructions.
+    bool commitVecReadOps(Hart<URV>& hart, McmInstr*);
 
     /// Compute a mask of the instruction data bytes covered by the
     /// given memory operation. Return 0 if the operation does not
@@ -413,9 +432,45 @@ namespace WdRiscv
 			    uint64_t addr, uint64_t data, unsigned size);
 
     /// Determine the source and destination registers of the given instruction.
-    void identifyRegisters(const DecodedInst& di,
+    void identifyRegisters(const Hart<URV>& hart,
+                           const DecodedInst& di,
 			   std::vector<unsigned>& sourceRegs,
 			   std::vector<unsigned>& destRegs);
+
+    /// Helper for vecOpverlaps.
+    bool vecStoreOverlaps(const McmInstr& instr, const MemoryOp& other) const
+    {
+      if (not instr.di_.isVectorStore())
+        return false;
+
+      const auto& vstoreMap = hartData_.at(instr.hartIx_).vstoreMap_;
+      auto iter = vstoreMap.find(instr.tag_);
+      if (iter == vstoreMap.end())
+        assert(false);
+
+      auto& vstoreOps = iter->second;
+      for (auto& vstoreOp : vstoreOps)
+        if (rangesOverlap(vstoreOp.addr_, vstoreOp.size_, other.physAddr_, other.size_))
+            return true;
+      return false;
+    }
+
+    bool vecOverlaps(const McmInstr& instr, const MemoryOp& other) const
+    {
+      if (not instr.di_.isVector())
+	return false;
+
+      if (instr.di_.isVectorStore())
+        return vecStoreOverlaps(instr, other);
+
+      for (auto ix : instr.memOps_)
+	{
+	  const auto& op = sysMemOps_.at(ix);
+	  if (op.overlaps(other))
+	    return true;
+	}
+      return false;
+    }
 
     /// Return true if the data memory referenced by given instruction overlpas
     /// that of the given memory operation.
@@ -424,6 +479,9 @@ namespace WdRiscv
       if (instr.size_ == 0 or op.size_ == 0)
 	std::cerr << "Mcm::overlaps: Error: tag1=" << instr.tag_
 		  << " tag2=" << op.instrTag_ << " zero data size\n";
+
+      if (instr.di_.isVector())
+	return vecOverlaps(instr, op);
 
       if (instr.physAddr_ == instr.physAddr2_)   // Non-page-crossing
 	return rangesOverlap(instr.physAddr_, instr.size_, op.physAddr_, op.size_);
@@ -444,6 +502,10 @@ namespace WdRiscv
       return addr1 - addr2 < size2;
     }
 
+    /// Return true if any of the physical addresses associated with the given instruction
+    /// overlap the given address.
+    bool vecOverlapsPhysAddr(const McmInstr& instr, uint64_t addr) const;
+
     /// Return true if given instruction data addresses overlap the given address. Return
     /// false if instruction is not a memory instruction. Instruction must be retired.
     bool overlapsPhysAddr(const McmInstr& instr, uint64_t addr) const
@@ -451,6 +513,10 @@ namespace WdRiscv
       if (not instr.isMemory())
 	return false;
       assert(instr.isRetired());
+
+      if (instr.di_.isVector())
+	return vecOverlapsPhysAddr(instr, addr);
+
       if (instr.physAddr_ == instr.physAddr2_)
 	return instr.physAddr_ <= addr and addr - instr.physAddr_ < instr.size_;
 
@@ -461,20 +527,37 @@ namespace WdRiscv
       return instr.physAddr2_ <= addr and addr - instr.physAddr2_ < size2;
     }
 
+    /// Return true if the instruction have overlapping data address ranges.
+    bool overlaps(const McmInstr& i1, const McmInstr& i2) const;
+
     bool instrHasRead(const McmInstr& instr) const;
 
     bool instrHasWrite(const McmInstr& instr) const;
 
-    bool checkStoreComplete(const McmInstr& instr) const;
+    bool checkStoreComplete(unsigned hartIx, const McmInstr& instr) const;
 
     bool checkStoreData(unsigned hartId, const McmInstr& insrt) const;
 
     bool checkLoadComplete(const McmInstr& instr) const;
 
-    /// Clear in the given mask, bits corresponding to the target
-    /// instruction bytes covered by the given store instruction.
-    void clearMaskBitsForWrite(const McmInstr& storeInstr, const McmInstr& target,
-			       unsigned& mask) const;
+    /// Put in the given set the physical addresses of the target instruction that are
+    /// written by the store instruction.
+    void identifyWrittenBytes(const McmInstr& storeInstr, const McmInstr& target,
+			      std::unordered_set<uint64_t>& written) const
+    {
+      if (not storeInstr.isStore_)
+	return;
+      for (auto opIx : target.memOps_)
+	{
+	  const auto& op = sysMemOps_.at(opIx);
+	  for (unsigned i = 0; i < op.size_; ++i)
+	    {
+	      uint64_t addr = op.physAddr_ + i;
+	      if (overlapsPhysAddr(storeInstr, addr))
+		written.insert(addr);
+	    }
+	}
+    }
 
     void cancelNonRetired(Hart<URV>& hart, uint64_t instrTag);
 
@@ -495,7 +578,7 @@ namespace WdRiscv
 
     void updateDependencies(const Hart<URV>& hart, const McmInstr& instr);
 
-    void setProducerTime(unsigned hartIx, McmInstr& instr);
+    void setProducerTime(const Hart<URV>& hart, McmInstr& instr);
 
     /// Map register number of operand opIx to a unique integer by adding an offset:
     /// integer register have 0 offset, fp regs have 32, vector regs have 64, and csr regs
@@ -509,6 +592,8 @@ namespace WdRiscv
 
   private:
 
+
+
     const unsigned intRegOffset_ = 0;
     const unsigned fpRegOffset_ = 32;
     const unsigned vecRegOffset_ = 64;
@@ -518,13 +603,52 @@ namespace WdRiscv
     using McmInstrVec = std::vector<McmInstr>;
 
     using RegTimeVec = std::vector<uint64_t>;    // Map reg index to time.
-    using RegProducer = std::vector<uint64_t>;   // Map reg index to instr tag.
+    using RegProducerVec = std::vector<uint64_t>;   // Map reg index to instr tag.
 
-    MemoryOpVec sysMemOps_;                      // Memory ops of all cores.
-    std::vector<McmInstrVec> hartInstrVecs_;     // One vector per hart.
-    std::vector<MemoryOpVec> hartPendingWrites_; // One vector per hart.
-    std::vector<uint64_t> sinvalVmaTime_;        // One entry per hart.
-    std::vector<uint64_t> sinvalVmaTag_;         // One entry per hart.
+    /// Vector store data produced by whisper.
+    struct VstoreOp
+    {
+      uint64_t addr_ = 0;
+      uint64_t data_ = 0;
+      unsigned size_ = 0;
+      bool skip_ = false;
+    };
+
+    using VstoreOps = std::vector<VstoreOp>;
+
+    // Per hart information related to MCM.
+    struct HartData
+    {
+      McmInstrVec instrVec_;
+      MemoryOpVec pendingWrites_;
+      RegTimeVec regTime_;
+      RegProducerVec regProducer_;
+      std::set<McmInstrIx> pendingFences_;
+
+      // Retired but not yet drained stores. Candidates for forwarding.
+      std::set<McmInstrIx> undrainedStores_;
+
+      // Reference vectore store data produced by whisper.
+      std::map<McmInstrIx, VstoreOps> vstoreMap_;
+
+      // Dependency time of most recent branch in program order or 0 if branch does not
+      // depend on a prior memory instruction.
+      uint64_t branchTime_ = 0;
+      uint64_t branchProducer_;
+
+      // Dependency time of most recent vsetvl or vsetvli in program order or
+      // 0 if vset does not depend on prior memory instruction.
+      uint64_t vlTime_ = 0;
+      uint64_t vlProducer_;
+
+      McmInstrIx currentInstrTag_ = 0;
+      uint64_t sinvalVmaTime_ = 0;
+      uint64_t sinvalVmaTag_ = 0;
+    };
+
+    std::vector<HartData> hartData_;    // One entry per hart.
+
+    MemoryOpVec sysMemOps_;             // Memory ops of all harts ordered by time.
 
     uint64_t time_ = 0;
     unsigned pageSize_ = 4096;
@@ -533,28 +657,16 @@ namespace WdRiscv
 
     bool writeOnInsert_ = false;
 
-    // Check whole merge buffer line if true otherwise check bytes
-    // covered by store instructions.
+    // Check whole merge buffer line if true otherwise check bytes covered by store
+    // instructions.
     bool checkWholeLine_ = false;
 
     bool enablePpo_ = true;  // Skip checking PPO rules when false.
 
     bool isTso_ = false;  // True if total-store-ordering model.
 
-    std::vector<McmInstrIx> currentInstrTag_;
-
-    std::vector<RegTimeVec> hartRegTimes_;  // One vector per hart.
-    std::vector<RegProducer> hartRegProducers_;  // One vector per hart.
-
-    // Retired but not yet darained stores. Candidates for forwarding.
-    std::vector<std::set<McmInstrIx>> hartUndrainedStores_;
-
-    // Dependency time of most recent branch in program order or 0 if
-    // branch does not depend on a prior memory instruction.
-    std::vector<uint64_t> hartBranchTimes_;
-    std::vector<uint64_t> hartBranchProducers_;
-
-    std::unordered_set<uint64_t> skipReadCheck_;
+    bool checkMasked_ = false; // True if we should skip checking masked
+                               // vector elements.
   };
 
 }

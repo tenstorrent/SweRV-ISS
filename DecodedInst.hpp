@@ -148,8 +148,13 @@ namespace WdRiscv
     bool hasRoundingMode() const
     { return entry_ and entry_->hasRoundingMode(); }
 
+    /// Relevant for floating point instructions.
     unsigned roundingMode() const
     { return ((inst_ >> 12) & 7); }
+
+    /// Return true if instruction modifies the FFLAGS CSR.
+    bool modifiesFflags() const
+    { return entry_ and entry_->modifiesFflags(); }
 
     /// Immediate values are to be (left) shifted by this size
     unsigned immediateShiftSize() const
@@ -259,6 +264,20 @@ namespace WdRiscv
       if (not isVector()) return false;
       unsigned f3 = (inst() >> 12) & 7;
       return (inst() & 0x7f) == 0x27 and (f3 == 0 or f3 >= 5);
+    }
+
+    /// Return true if this is a vector indexed load instruction.
+    bool isVectorLoadIndexed() const
+    {
+      unsigned mop = (inst() >> 26) & 3;
+      return isVectorLoad() and (mop == 1 or mop == 3);
+    }
+
+    /// Return true if this is a vector indexed store instruction.
+    bool isVectorStoreIndexed() const
+    {
+      unsigned mop = (inst() >> 26) & 3;
+      return isVectorStore() and (mop == 1 or mop == 3);
     }
 
     /// Return the element size in bytes of a vector load instruction. Return zero for a

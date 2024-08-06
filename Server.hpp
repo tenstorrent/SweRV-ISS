@@ -65,8 +65,15 @@ namespace WdRiscv
 		     FILE* traceFile);
 
     /// Virtual address translation command.
-    bool translateCommand(const WhisperMessage& req,
-			  WhisperMessage& reply);
+    bool translateCommand(const WhisperMessage& req, WhisperMessage& reply);
+
+    /// Memory consistency model read.
+    bool mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<URV>& hart,
+			FILE* commandLog);
+
+    /// Memory consistency model merge buffer insert command..
+    bool mcmInsertCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<URV>& hart,
+			  FILE* commandLog);
 
     /// Server mode loop: Receive command and send reply till a quit
     /// command is received. Return true on successful termination (quit

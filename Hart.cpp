@@ -1779,12 +1779,12 @@ readCharNonBlocking(int fd)
 template <typename URV>
 bool
 Hart<URV>::getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2,
-			   unsigned size, uint64_t& value)
+			   unsigned size, bool isVec, uint64_t& value)
 {
   if (not ooo_)
     return false;
   if (mcm_)
-    return mcm_->getCurrentLoadValue(*this, va, pa1, pa2, size, value);
+    return mcm_->getCurrentLoadValue(*this, va, pa1, pa2, size, isVec, value);
   if (perfApi_)
     return perfApi_->getLoadData(hartIx_, instCounter_, va, size, value);
   assert(0);
@@ -1893,7 +1893,7 @@ Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr
       if (ooo_)
 	{
 	  uint64_t oooVal = 0;
-	  if (getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), oooVal))
+	  if (getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), di->isVector(), oooVal))
 	    uval = oooVal;
 	}
     }
@@ -1903,7 +1903,7 @@ Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr
       if (ooo_)   // Out of order execution (mcm or perfApi)
 	{
 	  uint64_t oooVal = 0;
-	  hasOooVal = getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), oooVal);
+	  hasOooVal = getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), di->isVector(), oooVal);
 	  if (hasOooVal)
 	    uval = oooVal;
 	}

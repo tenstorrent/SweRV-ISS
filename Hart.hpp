@@ -495,6 +495,10 @@ namespace WdRiscv
     GroupMultiplier groupMultiplier() const
     { return vecRegs_.groupMultiplier(); }
 
+     /// Get per-operand EMUL information of last instruction executed.
+     unsigned vecOpEmul(unsigned op) const
+     { return vecRegs_.getOpEmul(op); }
+
     /// Configure the load-reserve reservation size in bytes.
     /// A size smaller than 4/8 in rv32/rv64 has the effect of 4/8.
     void configReservationSize(unsigned size)
@@ -929,10 +933,18 @@ namespace WdRiscv
       return ldStSize_;
     }
 
+    /// Return the cache line size.
+    unsigned cacheLineSize() const
+    { return cacheLineSize_; }
+
     bool getLastVectorMemory(std::vector<uint64_t>& addresses,
+                             std::vector<uint64_t>& paddresses,
+                             std::vector<uint64_t>& paddresses2,
 			     std::vector<uint64_t>& data,
+                             std::vector<bool>& masked,
 			     unsigned& elementSize) const
-    { return vecRegs_.getLastMemory(addresses, data, elementSize); }
+    { return vecRegs_.getLastMemory(addresses, paddresses,
+                                    paddresses2, data, masked, elementSize); }
 
 
     void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const
@@ -2291,7 +2303,7 @@ namespace WdRiscv
 
     /// Get the data value for an out of order read (mcm or perfApi).
     bool getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
-			 uint64_t& value);
+			 bool isVec, uint64_t& value);
 
     /// Set current privilege mode.
     void setPrivilegeMode(PrivilegeMode m)
