@@ -559,7 +559,7 @@ namespace WdRiscv
 	}
     }
 
-    void cancelNonRetired(unsigned hartIx, uint64_t instrTag);
+    void cancelNonRetired(Hart<URV>& hart, uint64_t instrTag);
 
     bool checkRtlWrite(unsigned hartId, const McmInstr& instr,
 		       const MemoryOp& op) const;
@@ -573,14 +573,8 @@ namespace WdRiscv
 
     McmInstr* findOrAddInstr(unsigned hartIx, McmInstrIx tag);
 
-    void cancelInstr(McmInstr& instr)
-    {
-      if (instr.isCanceled())
-	std::cerr << "Instr with tag=" << instr.tag_ << " already canceled\n";
-      instr.cancel();
-      for (auto memIx : instr.memOps_)
-	  sysMemOps_.at(memIx).cancel();
-    }
+    /// Helper to cancelInstruction. 
+    void cancelInstr(Hart<URV>& hart, McmInstr& instr);
 
     void updateDependencies(const Hart<URV>& hart, const McmInstr& instr);
 

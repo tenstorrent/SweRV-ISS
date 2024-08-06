@@ -731,7 +731,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		 const DecodedInst& di, bool trapped)
 {
   unsigned hartIx = hart.sysHartIndex();
-  cancelNonRetired(hartIx, tag);
+  cancelNonRetired(hart, tag);
 
   if (not updateTime("Mcm::retire", time))
     return false;
@@ -746,7 +746,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   if (not di.isValid() or trapped)
     {
-      cancelInstr(*instr);  // Instruction took a trap.
+      cancelInstr(hart, *instr);  // Instruction took a trap.
       return true;
     }
 
@@ -1112,18 +1112,50 @@ Mcm<URV>::writeToReadForward(const MemoryOp& writeOp, MemoryOp& readOp, uint64_t
 
 template <typename URV>
 void
-Mcm<URV>::cancelNonRetired(unsigned hartIx, uint64_t instrTag)
+Mcm<URV>::cancelInstr(Hart<URV>& hart, McmInstr& instr)
 {
+  if (instr.isCanceled())
+    return;
+
+  auto& undrained = hartData_.at(hart.sysHartIndex()).undrainedStores_;
+
+  auto iter = undrained.find(instr.tag_);
+
+  if (iter != undrained.end())
+    {
+      std::cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << instr.tag_ <<
+	" canceled or trapped instruction associated write operations.\n";
+      undrained.erase(iter);
+    }
+
+  for (auto memIx : instr.memOps_)
+    {
+      auto& op = sysMemOps_.at(memIx);
+      op.cancel();
+    }
+
+  instr.cancel();
+}
+
+
+template <typename URV>
+void
+Mcm<URV>::cancelNonRetired(Hart<URV>& hart, uint64_t instrTag)
+{
+  unsigned hartIx = hart.sysHartIndex();
   auto& vec = hartData_.at(hartIx).instrVec_;
 
-  if (instrTag > vec.size())
-    vec.resize(instrTag);
+  if (vec.empty())
+    return;
+
+  if (instrTag >= vec.size())
+    instrTag = vec.size();
 
   while (instrTag)
     {
       if (vec.at(instrTag-1).retired_ or vec.at(instrTag-1).canceled_)
 	break;
-      cancelInstr(vec.at(--instrTag));
+      cancelInstr(hart, vec.at(--instrTag));
     }
 }
 
@@ -1132,10 +1164,11 @@ template <typename URV>
 void
 Mcm<URV>::cancelInstruction(Hart<URV>& hart, uint64_t instrTag)
 {
-  McmInstr* instr = findInstr(hart.sysHartIndex(), instrTag);
+  unsigned hartIx = hart.sysHartIndex();
+  McmInstr* instr = findInstr(hartIx, instrTag);
   if (not instr or instr->isCanceled())
     return;
-  cancelInstr(*instr);
+  cancelInstr(hart, *instr);
 }
   
 
