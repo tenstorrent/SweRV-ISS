@@ -1651,7 +1651,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
     }
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
-  // (marking then as not canceled) where at least one address remains. Mark reference
+  // (marking them as not canceled) where at least one address remains. Mark reference
   // addresses covered by read ops. Set reference (Whisper) values of reference addresses.
   auto& ops = instr->memOps_;
   for (auto iter = ops.rbegin(); iter != ops.rend(); ++iter)
