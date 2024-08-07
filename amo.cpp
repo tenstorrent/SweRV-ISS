@@ -374,30 +374,8 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   ldStData_ = storeVal;
   ldStWrite_ = true;
 
-  // If we write to special location, end the simulation.
-  if (toHostValid_ and addr1 == toHost_ and storeVal != 0)
-    {
-      memWrite(addr1, addr1, storeVal);
-      throw CoreException(CoreException::Stop, "write to to-host", storeVal);
-    }
-
   if (mcm_)
     return true;  // Memory updated when merge buffer is written.
-
-  if (isAclintAddr(addr1))
-    {
-      assert(addr1 == addr2);
-      URV val = storeVal;
-      processClintWrite(addr1, ldStSize_, val);
-      storeVal = val;
-    }
-  else if (isInterruptorAddr(addr1, ldStSize_))
-    processInterruptorWrite(storeVal);
-  else if (isImsicAddr(addr1))
-    {
-      imsicWrite_(addr1, sizeof(storeVal), storeVal);
-      storeVal = 0;  // Reads from IMSIC space will yield zero.
-    }
 
   memWrite(addr1, addr1, storeVal);
 
