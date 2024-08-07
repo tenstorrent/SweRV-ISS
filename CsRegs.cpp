@@ -3685,8 +3685,7 @@ CsRegs<URV>::writeTrigger(CsrNumber number, PrivilegeMode mode, URV value)
   if (not read(CsrNumber::TSELECT, mode, trigger))
     return false;
 
-  // The CSR instructions never execute in debug mode.
-  bool dMode = false;
+  bool dMode = inDebugMode();
   if (number == CsrNumber::TDATA1)
     {
       bool ok = triggers_.writeData1(trigger, dMode, value);
