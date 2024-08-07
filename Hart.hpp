@@ -70,9 +70,8 @@ namespace WdRiscv
 
     enum Type { Stop, Exit, Snapshot, SnapshotAndStop };
 
-    CoreException(Type type, const char* message = "", uint64_t address = 0,
-		  uint64_t value = 0)
-      : type_(type), msg_(message), addr_(address), val_(value)
+    CoreException(Type type, const char* message = "", uint64_t value = 0)
+      : type_(type), msg_(message), val_(value)
     { }
 
     const char* what() const noexcept override
@@ -81,16 +80,13 @@ namespace WdRiscv
     Type type() const
     { return type_; }
 
-    uint64_t address() const
-    { return addr_; }
-
     uint64_t value() const
     { return val_; }
 
   private:
+
     Type type_ = Stop;
     const char* msg_ = "";
-    uint64_t addr_ = 0;
     uint64_t val_ = 0;
   };
 

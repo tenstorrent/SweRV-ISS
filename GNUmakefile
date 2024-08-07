@@ -126,11 +126,12 @@ $(BUILD_DIR)/$(PY_PROJECT): $(BUILD_DIR)/py-bindings.cpp.o \
 			    $(pci_lib)
 	$(CXX) -shared -o $@ $(OFLAGS) $^ $(LINK_DIRS) $(LINK_LIBS)
 
-# Rule to make whisper.cpp.o
-$(BUILD_DIR)/whisper.cpp.o:  .FORCE
+# Rule to make whisper.cpp.o. Always recompile to get latest GIT SHA into the help
+# message.
+$(BUILD_DIR)/Args.cpp.o:  .FORCE
 	@if [ ! -d "$(dir $@)" ]; then $(MKDIR_P) $(dir $@); fi
 	sha=`git rev-parse --verify HEAD || echo unknown`; \
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DGIT_SHA="$$sha" -c -o $@ whisper.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DGIT_SHA="$$sha" -c -o $@ Args.cpp
 
 # Rule to make PY_PROJECT .so
 $(BUILD_DIR)/py-bindings.cpp.o: .FORCE

@@ -378,8 +378,7 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   if (toHostValid_ and addr1 == toHost_ and storeVal != 0)
     {
       memWrite(addr1, addr1, storeVal);
-      throw CoreException(CoreException::Stop, "write to to-host",
-			  toHost_, storeVal);
+      throw CoreException(CoreException::Stop, "write to to-host", storeVal);
     }
 
   if (mcm_)

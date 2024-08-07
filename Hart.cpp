@@ -1759,7 +1759,7 @@ readCharNonBlocking(int fd)
 
 	  // Force a stop if control-a x is seen.
 	  if (prev == 1 and c == 'x')
-	    throw CoreException(CoreException::Stop, "Keyboard stop", 0, 3);
+	    throw CoreException(CoreException::Stop, "Keyboard stop", 3);
 	  prev = c;
 	}
 
@@ -2029,8 +2029,7 @@ Hart<URV>::fastStore(const DecodedInst* di, URV addr, STORE_TYPE storeVal)
 
       if (toHostValid_ and addr == toHost_ and storeVal != 0)
 	{
-	  throw CoreException(CoreException::Stop, "write to to-host",
-			      toHost_, storeVal);
+	  throw CoreException(CoreException::Stop, "write to to-host", storeVal);
 	}
 
       if (dataLineTrace_)
@@ -2081,7 +2080,7 @@ Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
 	}
     }
   else if (dev == 0 and cmd == 0 and (storeVal & 1))
-    throw CoreException(CoreException::Stop, "write to to-host", toHost_, val);
+    throw CoreException(CoreException::Stop, "write to to-host", val);
 }
 
 
@@ -2646,7 +2645,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
     consecutiveIllegalCount_ = 0;
 
   if (consecutiveIllegalCount_ > 16)  // FIX: Make a parameter
-    throw CoreException(CoreException::Stop, "16 consecutive illegal instructions", 0, 3);
+    throw CoreException(CoreException::Stop, "16 consecutive illegal instructions", 3);
 
   counterAtLastIllegal_ = instCounter_;
 #endif
