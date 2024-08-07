@@ -912,14 +912,9 @@ Hart<URV>::pokeMemory(uint64_t addr, uint8_t val, bool usePma)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
+  invalidateDecodeCache(addr, sizeof(val));
 
-  if (memory_.poke(addr, val, usePma))
-    {
-      invalidateDecodeCache(addr, sizeof(val));
-      return true;
-    }
-
-  return false;
+  return memory_.poke(addr, val, usePma);
 }
 
 
@@ -930,14 +925,9 @@ Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
+  invalidateDecodeCache(addr, sizeof(val));
 
-  if (memory_.poke(addr, val, usePma))
-    {
-      invalidateDecodeCache(addr, sizeof(val));
-      return true;
-    }
-
-  return false;
+  return memory_.poke(addr, val, usePma);
 }
 
 
@@ -952,11 +942,12 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
+  invalidateDecodeCache(addr, sizeof(val));
 
-  URV adjusted = val;
   if (hasAclint() and ((addr >= aclintSwStart_ and addr < aclintSwEnd_) or
       (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_)))
     {
+      URV adjusted = val;
       processClintWrite(addr, sizeof(val), adjusted);
       val = adjusted;
     }
@@ -965,6 +956,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
     {
       if (imsicWrite_)
         imsicWrite_(addr, sizeof(val), val);
+      return true;
     }
   else if (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
                     (addr >= pciMmioBase_ and addr < pciMmioEnd_)))
@@ -973,15 +965,10 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
         pci_->config_mmio<uint32_t>(addr, val, true);
       else
         pci_->mmio<uint32_t>(addr, val, true);
-    }
-
-  if (memory_.poke(addr, val, usePma))
-    {
-      invalidateDecodeCache(addr, sizeof(val));
       return true;
     }
 
-  return false;
+  return memory_.poke(addr, val, usePma);
 }
 
 
@@ -992,11 +979,12 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
+  invalidateDecodeCache(addr, sizeof(val));
 
-  URV adjusted = val;
   if (hasAclint() and ((addr >= aclintSwStart_ and addr < aclintSwEnd_) or
       (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_)))
     {
+      URV adjusted = val;
       processClintWrite(addr, sizeof(val), adjusted);
       val = adjusted;
     }
@@ -1005,6 +993,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
     {
       if (imsicWrite_)
         imsicWrite_(addr, sizeof(val), val);
+      return true;
     }
   else if (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
                     (addr >= pciMmioBase_ and addr < pciMmioEnd_)))
@@ -1013,15 +1002,10 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
         pci_->config_mmio<uint64_t>(addr, val, true);
       else
         pci_->mmio<uint64_t>(addr, val, true);
-    }
-
-  if (memory_.poke(addr, val, usePma))
-    {
-      invalidateDecodeCache(addr, sizeof(val));
       return true;
     }
 
-  return false;
+  return memory_.poke(addr, val, usePma);
 }
 
 
@@ -2194,13 +2178,11 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
   else if (isInterruptorAddr(pa1, ldStSize_))
     {
       processInterruptorWrite(storeVal);
-      memWrite(pa1, pa2, storeVal);
       return true;
     }
   else if (isImsicAddr(pa1))
     {
       imsicWrite_(pa1, sizeof(storeVal), storeVal);
-      memWrite(pa1, pa2, storeVal);
       return true;
     }
   else if (isPciAddr(pa1))
@@ -2209,7 +2191,6 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
         pci_->config_mmio<STORE_TYPE>(pa1, storeVal, true);
       else
         pci_->mmio<STORE_TYPE>(pa1, storeVal, true);
-      memWrite(pa1, pa2, storeVal);
       return true;
     }
 

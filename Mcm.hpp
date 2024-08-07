@@ -433,6 +433,8 @@ namespace WdRiscv
     bool storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask,
 			    uint64_t addr, uint64_t data, unsigned size);
 
+    bool vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask);
+
     /// Determine the source and destination registers of the given instruction.
     void identifyRegisters(const Hart<URV>& hart,
                            const DecodedInst& di,
@@ -610,6 +612,9 @@ namespace WdRiscv
     /// Vector store data produced by whisper.
     struct VstoreOp
     {
+      bool overlaps(uint64_t addr) const
+      { return addr >= addr_ && addr < addr_ + size_; }
+
       uint64_t addr_ = 0;
       uint64_t data_ = 0;
       unsigned size_ = 0;

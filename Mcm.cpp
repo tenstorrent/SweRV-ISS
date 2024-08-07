@@ -1924,6 +1924,75 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t va, uint64_t pa1, uint64
 
 template <typename URV>
 bool
+Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask)
+{
+  const auto& vstoreMap = hartData_.at(store.hartIx_).vstoreMap_;
+  auto iter = vstoreMap.find(store.tag_);
+  if (iter == vstoreMap.end())
+    return false;
+
+  unsigned count = 0;  // Count of forwarded bytes.
+
+  auto& vstoreOps = iter->second;
+
+  for (auto& vstoreOp : vstoreOps)
+    {
+      if (not rangesOverlap(vstoreOp.addr_, vstoreOp.size_, readOp.physAddr_, readOp.size_))
+	continue;
+	      
+      for (unsigned rix = 0; rix < readOp.size_; ++rix)
+	{
+	  uint64_t byteAddr = readOp.physAddr_ + rix;
+	  if (not vstoreOp.overlaps(byteAddr))
+	    continue;
+
+	  uint64_t byteMask = uint64_t(0xff) << (rix * 8);
+	  if ((byteMask & mask) == 0)
+	    continue;  // Byte forwarded by another instruction.
+
+	  // Check if read-op byte overlaps drained write-op of instruction
+	  bool drained = false;
+	  for (const auto wopIx : store.memOps_)
+	    {
+	      if (wopIx >= sysMemOps_.size())
+		continue;
+
+	      const auto& wop = sysMemOps_.at(wopIx);
+	      if (wop.isRead_)
+		continue;  // May happen for AMO.
+
+	      if (not wop.overlaps(byteAddr))
+		continue;  // Write op does overlap read.
+
+	      if (wop.time_ < readOp.time_)
+		{
+		  drained = true; // Write op cannot forward.
+		  break;
+		}
+	    }
+
+	  if (drained)
+	    continue;   // Cannot forward from a drained write.
+
+	  uint8_t byteVal = vstoreOp.data_ >> (byteAddr - vstoreOp.addr_)*8;
+	  uint64_t aligned = uint64_t(byteVal) << 8*rix;
+
+	  readOp.data_ = (readOp.data_ & ~byteMask) | aligned;
+
+	  count++;
+	  mask = mask & ~byteMask;
+	  if (mask == 0)
+	    return count > 0;
+	}
+    }
+
+  return count > 0;
+}
+
+
+
+template <typename URV>
+bool
 Mcm<URV>::storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask,
 			     uint64_t addr, uint64_t data, unsigned size)
 {
@@ -2026,7 +2095,12 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, MemoryOp& readOp)
 
       uint64_t prev = mask;
 
-      if (not storeToReadForward(store, readOp, mask, store.physAddr_, store.storeData_, store.size_))
+      if (store.di_.isVector())
+	{
+	  if (not vecStoreToReadForward(store, readOp, mask))
+	    continue;
+	}
+      else if (not storeToReadForward(store, readOp, mask, store.physAddr_, store.storeData_, store.size_))
 	{
 	  if (store.physAddr_ == store.physAddr2_)
 	    continue;
