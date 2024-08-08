@@ -1956,14 +1956,9 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 	    {
 	      if (wopIx >= sysMemOps_.size())
 		continue;
-
 	      const auto& wop = sysMemOps_.at(wopIx);
-	      if (wop.isRead_)
-		continue;  // May happen for AMO.
-
-	      if (not wop.overlaps(byteAddr))
-		continue;  // Write op does overlap read.
-
+	      if (wop.isRead_ or not wop.overlaps(byteAddr))
+		continue;  // No a write op (may happen for AMO), or does not overlap byte addr.
 	      if (wop.time_ < readOp.time_)
 		{
 		  drained = true; // Write op cannot forward.
@@ -2025,12 +2020,13 @@ Mcm<URV>::storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& 
 	  if (wopIx >= sysMemOps_.size())
 	    continue;
 	  const auto& wop = sysMemOps_.at(wopIx);
-	  if (wop.isRead_)
-	    continue;  // May happen for AMO.
-	  if (byteAddr < wop.physAddr_ or byteAddr >= wop.physAddr_ + wop.size_)
-	    continue;  // Write op does overlap read.
+	  if (wop.isRead_ or not wop.overlaps(byteAddr))
+	    continue;  // No a write op (may happen for AMO), or does not overlap byte addr.
 	  if (wop.time_ < readOp.time_)
-	    drained = true; // Write op cannot forward.
+	    {
+	      drained = true; // Write op cannot forward.
+	      break;
+	    }
 	}
       
       if (drained)

@@ -596,8 +596,6 @@ namespace WdRiscv
 
   private:
 
-
-
     const unsigned intRegOffset_ = 0;
     const unsigned fpRegOffset_ = 32;
     const unsigned vecRegOffset_ = 64;
