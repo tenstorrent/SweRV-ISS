@@ -1978,8 +1978,8 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 	  uint64_t aligned = uint64_t(byteVal) << 8*rix;
 
 	  readOp.data_ = (readOp.data_ & ~byteMask) | aligned;
-
 	  count++;
+
 	  mask = mask & ~byteMask;
 	  if (mask == 0)
 	    return count > 0;
@@ -2033,14 +2033,14 @@ Mcm<URV>::storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& 
 	    drained = true; // Write op cannot forward.
 	}
       
+      if (drained)
+	continue;  // Cannot forward from a drained write.
+
       uint8_t byteVal = data >> (byteAddr - il)*8;
       uint64_t aligned = uint64_t(byteVal) << 8*rix;
 	
-      if (not drained)
-	{
-	  readOp.data_ = (readOp.data_ & ~byteMask) | aligned;
-	  count++;
-	}
+      readOp.data_ = (readOp.data_ & ~byteMask) | aligned;
+      count++;
 
       mask = mask & ~byteMask;
       if (mask == 0)
