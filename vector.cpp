@@ -11152,9 +11152,10 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
                   vecRegs_.elemCount(ix);  // Update cached value of VL.
 
 		  // Fill tail elements with all-ones if so configured.
+		  ELEM_TYPE ones = ~ ELEM_TYPE{0};
 		  if (vecRegs_.isTailAgnostic() and vecRegs_.isTailAgnosticOnes())
 		    for (unsigned ti = vecRegs_.elemCount(); ti < elemMax; ti++)
-		      vecRegs_.write(vd, ti, destGroup, ~ ELEM_TYPE{0});
+		      vecRegs_.write(vd, ti, destGroup, ones);
                 }
 	    }
 	  else
@@ -12639,11 +12640,12 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	      else if (vecRegs_.isTailAgnostic() and vecRegs_.isTailAgnosticOnes())
 		{
 		  // Fill tail elements with all-ones if so configured.
+		  ELEM_TYPE ones = ~ ELEM_TYPE{0};
 		  for (unsigned ti = vecRegs_.elemCount(); ti < elemMax; ti++)
 		    for (unsigned fi = 0; fi < fieldCount; ++fi)
 		      {
 			unsigned dvg = vd + fi*eg;   // Destination vector gorup.
-			vecRegs_.write(dvg, ti, destGroup, ~ ELEM_TYPE{0});
+			vecRegs_.write(dvg, ti, destGroup, ones);
 		      }
 		}
 	      return false;
