@@ -11093,7 +11093,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  unsigned elemCount = vecRegs_.elemMax(eew);
+  unsigned elemMax = vecRegs_.elemMax(eew); // Includes tail elems.
   uint64_t addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
 
   if (start >= vecRegs_.elemCount())
@@ -11103,7 +11103,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
 
-  for (unsigned ix = start; ix < elemCount; ++ix, addr += sizeof(ELEM_TYPE))
+  for (unsigned ix = start; ix < elemMax; ++ix, addr += sizeof(ELEM_TYPE))
     {
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
@@ -11150,6 +11150,11 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
                   pokeCsr(CsrNumber::VL, ix);
                   recordCsrWrite(CsrNumber::VL);
                   vecRegs_.elemCount(ix);  // Update cached value of VL.
+
+		  // Fill tail elements with all-ones if so configured.
+		  if (vecRegs_.isTailAgnostic() and vecRegs_.isTailAgnosticOnes())
+		    for (unsigned ti = vecRegs_.elemCount(); ti < elemMax; ti++)
+		      vecRegs_.write(vd, ti, destGroup, ~ ELEM_TYPE{0});
                 }
 	    }
 	  else
@@ -11803,7 +11808,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
   uint64_t stride = intRegs_.read(rs2);
   unsigned start = csRegs_.peekVstart();
-  unsigned elemCount = vecRegs_.elemMax(eew);
+  unsigned elemMax = vecRegs_.elemMax(eew);   // Includes tail elements.
   uint64_t addr = intRegs_.read(rs1) + start*stride;
 
   if (start >= vecRegs_.elemCount())
@@ -11813,7 +11818,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
 
-  for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
+  for (unsigned ix = start; ix < elemMax; ++ix, addr += stride)
     {
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
@@ -12116,7 +12121,8 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   uint64_t addr = intRegs_.read(rs1);
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elemCount = vecRegs_.elemMax(), elemSize = elemWidth / 8;
+  unsigned elemMax = vecRegs_.elemMax();  // Includes tail elements.
+  unsigned elemSize = elemWidth / 8;
 
   if (start >= vecRegs_.elemCount())
     return true;
@@ -12125,7 +12131,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
 
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned ix = start; ix < elemMax; ++ix)
     {
       uint64_t vaddr;
       ELEM_TYPE elem = 0;
@@ -12566,7 +12572,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
   unsigned start = csRegs_.peekVstart();
   uint64_t addr = intRegs_.read(rs1) + start*stride;
-  unsigned elemCount = vecRegs_.elemMax(eew);
+  unsigned elemMax = vecRegs_.elemMax(eew);  // Includes tail elements.
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
   // Used registers must not exceed 32.
@@ -12584,7 +12590,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
   unsigned destGroup = 8*eg;
 
-  for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
+  for (unsigned ix = start; ix < elemMax; ++ix, addr += stride)
     {
       uint64_t faddr = addr;  // Field address
 
@@ -12630,6 +12636,16 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      if (ix == 0 or not faultFirst)
 		initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
+	      else if (vecRegs_.isTailAgnostic() and vecRegs_.isTailAgnosticOnes())
+		{
+		  // Fill tail elements with all-ones if so configured.
+		  for (unsigned ti = vecRegs_.elemCount(); ti < elemMax; ti++)
+		    for (unsigned fi = 0; fi < fieldCount; ++fi)
+		      {
+			unsigned dvg = vd + fi*eg;   // Destination vector gorup.
+			vecRegs_.write(dvg, ti, destGroup, ~ ELEM_TYPE{0});
+		      }
+		}
 	      return false;
 	    }
 
@@ -13087,7 +13103,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
   uint64_t addr = intRegs_.read(rs1);
   unsigned start = csRegs_.peekVstart(), elemSize = elemWidth / 8;
-  unsigned elemCount = vecRegs_.elemMax();
+  unsigned elemMax = vecRegs_.elemMax();  // Includes tail elements.
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
   // Used registers must not exceed 32.
@@ -13104,7 +13120,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
   unsigned destGroup = 8*eg;
 
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned ix = start; ix < elemMax; ++ix)
     {
       for (unsigned field = 0; field < fieldCount; ++field)
 	{
