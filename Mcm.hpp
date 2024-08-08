@@ -72,7 +72,7 @@ namespace WdRiscv
     McmInstrIx dataProducer_ = 0;
     DecodedInst di_;
     McmInstrIx tag_ = 0;
-    uint8_t hartIx_ : 8  = 0;
+    uint8_t hartIx_ : 8 = 0;
     uint8_t size_   : 8 = 0;        // Data size for load/store instructions.
     bool retired_   : 1 = false;
     bool canceled_  : 1 = false;
@@ -441,38 +441,23 @@ namespace WdRiscv
 			   std::vector<unsigned>& sourceRegs,
 			   std::vector<unsigned>& destRegs);
 
-    /// Helper for vecOpverlaps.
-    bool vecStoreOverlaps(const McmInstr& instr, const MemoryOp& other) const
-    {
-      if (not instr.di_.isVectorStore())
-        return false;
-
-      const auto& vstoreMap = hartData_.at(instr.hartIx_).vstoreMap_;
-      auto iter = vstoreMap.find(instr.tag_);
-      if (iter == vstoreMap.end())
-        assert(false);
-
-      auto& vstoreOps = iter->second;
-      for (auto& vstoreOp : vstoreOps)
-        if (rangesOverlap(vstoreOp.addr_, vstoreOp.size_, other.physAddr_, other.size_))
-            return true;
-      return false;
-    }
-
+    /// Return true if any of the physical data addresses of the given vector instruction
+    /// overlap the physical address range of the given memory operation.
     bool vecOverlaps(const McmInstr& instr, const MemoryOp& other) const
     {
       if (not instr.di_.isVector())
 	return false;
 
-      if (instr.di_.isVectorStore())
-        return vecStoreOverlaps(instr, other);
+      const auto& vecRefMap = hartData_.at(instr.hartIx_).vecRefMap_;
+      auto iter = vecRefMap.find(instr.tag_);
+      if (iter == vecRefMap.end())
+        assert(false);
 
-      for (auto ix : instr.memOps_)
-	{
-	  const auto& op = sysMemOps_.at(ix);
-	  if (op.overlaps(other))
-	    return true;
-	}
+      auto& vecRefs = iter->second;
+      for (auto& vecRef : vecRefs)
+        if (rangesOverlap(vecRef.addr_, vecRef.size_, other.physAddr_, other.size_))
+	  return true;
+
       return false;
     }
 
@@ -508,18 +493,31 @@ namespace WdRiscv
 
     /// Return true if any of the physical addresses associated with the given instruction
     /// overlap the given address.
-    bool vecOverlapsPhysAddr(const McmInstr& instr, uint64_t addr) const;
+    bool vecOverlapsRefPhysAddr(const McmInstr& instr, uint64_t addr) const;
+
+    /// Return true if any of the RTL physical addresses associated with the given
+    /// instruction overlap the given address.
+    bool vecOverlapsRtlPhysAddr(const McmInstr& instr, uint64_t addr) const
+    {
+      for (auto opIx : instr.memOps_)
+	{
+	  auto& op = sysMemOps_.at(opIx);
+	  if (op.overlaps(addr))
+	    return true;
+	}
+      return false;
+    }
 
     /// Return true if given instruction data addresses overlap the given address. Return
     /// false if instruction is not a memory instruction. Instruction must be retired.
-    bool overlapsPhysAddr(const McmInstr& instr, uint64_t addr) const
+    bool overlapsRefPhysAddr(const McmInstr& instr, uint64_t addr) const
     {
       if (not instr.isMemory())
 	return false;
       assert(instr.isRetired());
 
       if (instr.di_.isVector())
-	return vecOverlapsPhysAddr(instr, addr);
+	return vecOverlapsRefPhysAddr(instr, addr);
 
       if (instr.physAddr_ == instr.physAddr2_)
 	return instr.physAddr_ <= addr and addr - instr.physAddr_ < instr.size_;
@@ -557,7 +555,7 @@ namespace WdRiscv
 	  for (unsigned i = 0; i < op.size_; ++i)
 	    {
 	      uint64_t addr = op.physAddr_ + i;
-	      if (overlapsPhysAddr(storeInstr, addr))
+	      if (overlapsRefPhysAddr(storeInstr, addr))
 		written.insert(addr);
 	    }
 	}
@@ -607,9 +605,13 @@ namespace WdRiscv
     using RegTimeVec = std::vector<uint64_t>;    // Map reg index to time.
     using RegProducerVec = std::vector<uint64_t>;   // Map reg index to instr tag.
 
-    /// Vector store data produced by whisper.
-    struct VstoreOp
+    /// Vector reference (produced by Whisper) load/store physical addresses.
+    struct VecRef
     {
+      VecRef(uint64_t addr = 0, uint64_t data = 0, unsigned size = 0, bool skip = false)
+	: addr_(addr), data_(data), size_(size), skip_(skip)
+      { }
+
       bool overlaps(uint64_t addr) const
       { return addr >= addr_ && addr < addr_ + size_; }
 
@@ -619,7 +621,7 @@ namespace WdRiscv
       bool skip_ = false;
     };
 
-    using VstoreOps = std::vector<VstoreOp>;
+    using VecRefs = std::vector<VecRef>;
 
     // Per hart information related to MCM.
     struct HartData
@@ -633,8 +635,8 @@ namespace WdRiscv
       // Retired but not yet drained stores. Candidates for forwarding.
       std::set<McmInstrIx> undrainedStores_;
 
-      // Reference vectore store data produced by whisper.
-      std::map<McmInstrIx, VstoreOps> vstoreMap_;
+      // Reference vec ld/st store data produced by whisper.
+      std::map<McmInstrIx, VecRefs> vecRefMap_;
 
       // Dependency time of most recent branch in program order or 0 if branch does not
       // depend on a prior memory instruction.

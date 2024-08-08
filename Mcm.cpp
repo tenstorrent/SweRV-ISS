@@ -200,6 +200,7 @@ Mcm<URV>::findOrAddInstr(unsigned hartIx, uint32_t tag)
     }
 
   vec.at(tag).tag_ = tag;
+  vec.at(tag).hartIx_ = hartIx;
   return &vec.at(tag);
 }
 
@@ -480,7 +481,10 @@ Mcm<URV>::mergeBufferInsertScalar(Hart<URV>& hart, uint64_t time, uint64_t instr
       sysMemOps_.push_back(op);
       instr->complete_ = checkStoreComplete(hartIx, *instr);
       if (instr->complete_)
-	undrained.erase(instrTag);
+	{
+	  undrained.erase(instrTag);
+	  checkStoreData(hart.hartId(), *instr);
+	}
 
       if (not instr->retired_)
 	{
@@ -498,17 +502,12 @@ Mcm<URV>::mergeBufferInsertScalar(Hart<URV>& hart, uint64_t time, uint64_t instr
 	      result = false;
 	}
 
-      // We commit the RTL data to memory but we check them against whisper data
-      // (checkRtlWrite below). This is simpler than committing part of whisper
-      // instruction data.
+      // We commit the RTL data to memory but we check them against whisper data (in
+      // checkStoreData). This is simpler than committing part of whisper instruction
+      // data.
       if (not pokeHartMemory(hart, physAddr, rtlData, op.size_))
 	result = false;
     }
-
-  // If corresponding instruction is retired, compare to its data.
-  if (instr->retired_)
-    if (not checkRtlWrite(hart.hartId(), *instr, op))
-      result = false;
 
   return result;
 }
@@ -607,7 +606,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 	    {
 	      auto& op = sysMemOps_.at(opIx);
 	      if (not op.isCanceled() and not op.isRead_)
-		result = checkRtlWrite(hart.hartId(), *instr, op) and result;
+		result = checkStoreData(hart.hartId(), *instr) and result;
 	    }
 	  if (enablePpo_)
 	    {
@@ -641,14 +640,14 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
       instr.size_ = elemSize;
       instr.isStore_ = true;
 
-      auto& vstoreOps = hartData_.at(hartIx).vstoreMap_[instr.tag_];
+      auto& vecRefOps = hartData_.at(hartIx).vecRefMap_[instr.tag_];
 
       for (unsigned i = 0; i < addr.size(); ++i)
         {
 	  uint64_t pa1 = paddr.at(i), pa2 = paddr2.at(i), value = data.at(i);
           bool skip = masked.at(i);
 	  if (pa1 == pa2)
-	    vstoreOps.push_back(VstoreOp{ pa1, value, elemSize, skip });
+	    vecRefOps.push_back(VecRef{ pa1, value, elemSize, skip });
 	  else
 	    {
 	      unsigned size1 = offsetToNextPage(pa1);
@@ -656,8 +655,8 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	      unsigned size2 = elemSize - size1;
 	      uint64_t val1 = (value <<  ((8 - size1)*8)) >> ((8 - size1)*8);
 	      uint64_t val2 = (value >> (size1*8));
-	      vstoreOps.push_back(VstoreOp { pa1, val1, size1, skip } );
-	      vstoreOps.push_back(VstoreOp { pa2, val2, size2, skip } );
+	      vecRefOps.push_back(VecRef { pa1, val1, size1, skip } );
+	      vecRefOps.push_back(VecRef { pa2, val2, size2, skip } );
 	    }
         }
 
@@ -1040,7 +1039,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	  break;
 	default:
 	  for (unsigned i = 0; i < write.size_; ++i)
-	    hart.pokeMemory(write.physAddr_ + i, uint8_t(write.rtlData_ >> 8*i), true);
+	    hart.pokeMemory(write.physAddr_ + i, uint8_t(write.rtlData_ >> (8*i)), true);
 	  break;
 	}
 
@@ -1079,6 +1078,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	{
 	  instr->complete_ = true;
 	  undrained.erase(instr->tag_);
+	  checkStoreData(hart.hartId(), *instr);
 	  if (enablePpo_)
 	    if (not ppoRule1(hart, *instr))
 	      result = false;
@@ -1247,112 +1247,115 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
       return false;
     }
 
-  if (not instr.di_.isVector())
+  assert(not instr.di_.isVector());
+
+  if (op.size_ > instr.size_)
     {
-      if (op.size_ > instr.size_)
-	{
-	  cerr << "Error: Write size exceeds store instruction size: "
-	       << "Hart-id=" << hartId << " time=" << time_ << " tag=" << instr.tag_
-	       << " write-size=" << unsigned(op.size_) << " store-size=" << unsigned(instr.size_) << '\n';
-	  return false;
-	}
-
-      uint64_t data = instr.storeData_;
-
-      if (op.size_ < instr.size_)
-	{
-	  uint64_t shift = (op.physAddr_ - instr.physAddr_) * 8;
-	  data = data >> shift;
-	  shift = 64 - op.size_*8;
-	  data = (data << shift) >> shift;
-	}
-
-      if (data == op.rtlData_)
-	return true;
-
-      const char* tag = instr.di_.isAmo()? " AMO " : " ";
-
-      cerr << "Error: RTL/whisper" << tag << "write mismatch time=" << op.time_
-	   << " hart-id=" << hartId << " instr-tag="
-	   << instr.tag_ << " addr=0x" << std::hex << op.physAddr_
-	   << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
-	   << " whisper=0x" << data << std::dec << '\n';
+      cerr << "Error: Write size exceeds store instruction size: " << "Hart-id="
+	   << hartId << " time=" << time_ << " tag=" << instr.tag_ << " write-size="
+	   << unsigned(op.size_) << " store-size=" << unsigned(instr.size_) << '\n';
       return false;
+    }
+
+  uint64_t data = instr.storeData_;
+
+  if (op.size_ < instr.size_)
+    {
+      uint64_t shift = (op.physAddr_ - instr.physAddr_) * 8;
+      data = data >> shift;
+      shift = 64 - op.size_*8;
+      data = (data << shift) >> shift;
+    }
+
+  if (data == op.rtlData_)
+    return true;
+
+  const char* tag = instr.di_.isAmo()? " AMO " : " ";
+
+  cerr << "Error: RTL/whisper" << tag << "write mismatch time=" << op.time_
+       << " hart-id=" << hartId << " instr-tag="
+       << instr.tag_ << " addr=0x" << std::hex << op.physAddr_
+       << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
+       << " whisper=0x" << data << std::dec << '\n';
+
+  return false;
+}
+  
+
+template <typename URV>
+bool
+Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
+{
+  if (not store.complete_)
+    return false;
+
+  if (not store.di_.isVector())
+    {
+      for (auto opIx : store.memOps_)
+	{
+	  if (opIx >= sysMemOps_.size())
+	    continue;
+
+	  const auto& op = sysMemOps_.at(opIx);
+	  if (op.isRead_)
+	    continue;
+
+	  if (not checkRtlWrite(hartId, store, op))
+	    return false;
+	}
+
+      return true;
+    }
+
+  // Vector store.
+
+  // Collect RTL write ops byte values. We use a map to account for overlap. Later writes
+  // over-write earlier ones.
+  std::unordered_map<uint64_t, uint8_t> rtlValues;  // Map byte address to value.
+  for (auto opIx : store.memOps_)
+    {
+      auto& op = sysMemOps_.at(opIx);
+      for (unsigned i = 0; i < op.size_; ++i)
+	rtlValues[op.physAddr_ + i] = op.rtlData_ >> (i*8);
     }
   
-  unsigned hartIx = op.hartIx_;
-  const auto& vstoreMap = hartData_.at(hartIx).vstoreMap_;  
-  auto iter = vstoreMap.find(instr.tag_);
-  if (iter == vstoreMap.end())
+  // Collect refence byte values.
+  std::unordered_map<uint64_t, uint8_t> refValues;  // Map byte address to value.
+
+  auto& vecRefMap = hartData_.at(store.hartIx_).vecRefMap_;
+  auto iter = vecRefMap.find(store.tag_);
+  assert(iter != vecRefMap.end());
+  auto& vecRefs = iter->second;
+  for (auto& vecRef : vecRefs)
     {
-      cerr << "RTL/whiper mismatch for vector store time=" << op.time_ << " hart-id="
-	   << hartId << " instr-tag=" << instr.tag_ << " addr=0x" << std::hex
-	   << op.physAddr_ << std::dec << " no whisper data\n";
-      return false;
+      for (unsigned i = 0; i < vecRef.size_; ++i)
+	refValues[vecRef.addr_ + i] = vecRef.data_ >> (i*8);
     }
 
-  auto& vstoreOps = iter->second;
-
-  for (unsigned i = 0; i < op.size_; ++i)
+  // Compare RTL to reference.
+  for (auto [addr, refVal] : refValues)
     {
-      uint64_t byteAddr = op.physAddr_ + i;
-      uint8_t byteVal = op.rtlData_ >> (i*8);
-      bool match = false;
-      
-      for (auto& vstoreOp : vstoreOps)
+      auto iter = rtlValues.find(addr);
+      if (iter == rtlValues.end())
 	{
-	  if (byteAddr >= vstoreOp.addr_ and byteAddr < vstoreOp.addr_ + vstoreOp.size_)
-	    {
-	      uint8_t refByte = vstoreOp.data_ >> ((byteAddr - vstoreOp.addr_)*8);
-	      match = refByte == byteVal;
-	      if (match)
-		continue;
-	      cerr << "RTL/whiper mismatch for vector store time=" << op.time_ << " hart-id="
-		   << hartId << " instr-tag=" << instr.tag_ << " addr=0x" << std::hex << byteAddr
-		   << " rtl-data=0x" << unsigned(byteVal) << " whisper-data=0x"
-		   << unsigned(refByte) << std::dec << '\n';
-	      return false;
-	    }
-	}
-
-      if (not match)
-	{
-	  cerr << "RTL/whiper mismatch for vector store time=" << op.time_ << " hart-id="
-	       << hartId << " instr-tag=" << instr.tag_ << " addr=0x" << std::hex << byteAddr
-	       << " rtl-data=0x" << unsigned(byteVal) << " no whisper data\n"
-	       << std::dec << '\n';
+	  cerr << "RTL/whiper mismatch for vector store hart-id=" << hartId << " tag="
+	       << store.tag_ << " addr=0x" << std::hex << addr << " no RTL data\n";
 	  return false;
 	}
+
+      auto rtlVal = iter->second;
+      if (rtlVal == refVal)
+	continue;
+
+      cerr << "RTL/whiper mismatch for vector store hart-id=" << hartId << " tag="
+	   << store.tag_ << " addr=0x" << std::hex << addr << " RTL=0x"
+	   << unsigned(rtlVal) << " whisper=0x" << unsigned(refVal) << std::dec << '\n';
+      return false;
     }
 
   return true;
 }
-
-
-template <typename URV>
-bool
-Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& storeInstr) const
-{
-  if (not storeInstr.complete_)
-    return false;
-
-  bool ok = true;
-
-  for (auto opIx : storeInstr.memOps_)
-    {
-      if (opIx >= sysMemOps_.size())
-	continue;
-
-      const auto& op = sysMemOps_.at(opIx);
-      if (op.isRead_)
-	continue;
-
-      if (not checkRtlWrite(hartId, storeInstr, op))
-	ok = false;
-    }
-
-  return ok;
-}
+  
 
 
 /// Return a mask where the ith bit is set if addr + i is in the range
@@ -1409,19 +1412,19 @@ Mcm<URV>::checkStoreComplete(unsigned hartIx, const McmInstr& instr) const
 
   if (instr.di_.isVector())
     {
-      const auto& vstoreMap = hartData_.at(hartIx).vstoreMap_;
-      auto iter = vstoreMap.find(instr.tag_);
-      if (iter == vstoreMap.end())
+      const auto& vecRefMap = hartData_.at(hartIx).vecRefMap_;
+      auto iter = vecRefMap.find(instr.tag_);
+      if (iter == vecRefMap.end())
 	return false;
-      auto& vstoreOps = iter->second;
-      for (const auto& vstoreOp : vstoreOps)
+      auto& vecRefs = iter->second;
+      for (const auto& vecRef : vecRefs)
 	{
-          if (not checkMasked_ and vstoreOp.skip_)
+          if (not checkMasked_ and vecRef.skip_)
             continue;
-	  for (unsigned i = 0; i < vstoreOp.size_; ++i)
+	  for (unsigned i = 0; i < vecRef.size_; ++i)
 	    {
-	      uint64_t byteAddr = vstoreOp.addr_ + i;
-	      if (not vecOverlapsPhysAddr(instr, byteAddr))
+	      uint64_t byteAddr = vecRef.addr_ + i;
+	      if (not vecOverlapsRtlPhysAddr(instr, byteAddr))
 		return false;
 	    }
 	}
@@ -1598,8 +1601,8 @@ trimOp(MemoryOp& op, uint64_t addr, unsigned size)
     }
 
   unsigned n = sizeof(op.data_) - op.size_;  // Unused most sig bytes.
-  op.data_ = ((op.data_) << n*8) >> n*8;
-  op.rtlData_ = ((op.rtlData_) << n*8) >> n*8;
+  op.data_ = ((op.data_) << n*8) >> (n*8);
+  op.rtlData_ = ((op.rtlData_) << (n*8)) >> (n*8);
 }
 
 
@@ -1653,7 +1656,8 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   std::unordered_map<uint64_t, RefByte> addrMap;
 
   // Collect reference (Whisper) addresses in addrMap. Check if there is overlap between
-  // elements.
+  // elements. Associated reference addresses with instruction.
+  auto& vecRefOps = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr->tag_];
   bool hasOverlap = false;
   for (unsigned i = 0; i < pa1.size(); ++i)
     {
@@ -1661,18 +1665,25 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 	continue;
       unsigned size1 = elemSize, size2 = 0;
       uint64_t ea1 = pa1.at(i), ea2 = pa2.at(i);
+      bool skip = masked.at(i);
       if (ea1 != ea2 and pageNum(ea1) != pageNum(ea2))
 	{
 	  size1 = offsetToNextPage(ea1);
 	  size2 = elemSize - size1;
 	  assert(size1 > 0 and size1 < elemSize);
 	  assert(size2 > 0 and size2 < elemSize);
+	  vecRefOps.push_back(VecRef(ea1, 0, size1, skip));
+	  vecRefOps.push_back(VecRef(ea2, 0, size2, skip));
 	}
+      else
+	vecRefOps.push_back(VecRef(ea1, 0, size1, skip));
+
       for (unsigned i = 0; i < size1; ++i)
 	{
 	  hasOverlap = hasOverlap or addrMap.find(ea1 + i) != addrMap.end();
 	  addrMap[ea1 + i] = RefByte{0, false};
 	}
+
       for (unsigned i = 0; i < size2; ++i)
 	{
 	  hasOverlap = hasOverlap or addrMap.find(ea2 + i) != addrMap.end();
@@ -1925,24 +1936,24 @@ template <typename URV>
 bool
 Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask)
 {
-  const auto& vstoreMap = hartData_.at(store.hartIx_).vstoreMap_;
-  auto iter = vstoreMap.find(store.tag_);
-  if (iter == vstoreMap.end())
+  const auto& vecRefMap = hartData_.at(store.hartIx_).vecRefMap_;
+  auto iter = vecRefMap.find(store.tag_);
+  if (iter == vecRefMap.end())
     return false;
 
   unsigned count = 0;  // Count of forwarded bytes.
 
-  auto& vstoreOps = iter->second;
+  auto& vecRefs = iter->second;
 
-  for (auto& vstoreOp : vstoreOps)
+  for (auto& vecRef : vecRefs)
     {
-      if (not rangesOverlap(vstoreOp.addr_, vstoreOp.size_, readOp.physAddr_, readOp.size_))
+      if (not rangesOverlap(vecRef.addr_, vecRef.size_, readOp.physAddr_, readOp.size_))
 	continue;
 	      
       for (unsigned rix = 0; rix < readOp.size_; ++rix)
 	{
 	  uint64_t byteAddr = readOp.physAddr_ + rix;
-	  if (not vstoreOp.overlaps(byteAddr))
+	  if (not vecRef.overlaps(byteAddr))
 	    continue;
 
 	  uint64_t byteMask = uint64_t(0xff) << (rix * 8);
@@ -1968,7 +1979,7 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 	  if (drained)
 	    continue;   // Cannot forward from a drained write.
 
-	  uint8_t byteVal = vstoreOp.data_ >> (byteAddr - vstoreOp.addr_)*8;
+	  uint8_t byteVal = vecRef.data_ >> ((byteAddr - vecRef.addr_)*8);
 	  uint64_t aligned = uint64_t(byteVal) << 8*rix;
 
 	  readOp.data_ = (readOp.data_ & ~byteMask) | aligned;
@@ -2237,45 +2248,59 @@ Mcm<URV>::overlaps(const McmInstr& i1, const McmInstr& i2) const
   if (not i1.di_.isVector() and not i2.di_.isVector())
     return i1.overlaps(i2);   // Both scalar.
 
-  // Both vector stores.
-  if (i1.di_.isVectorStore() and i2.di_.isVectorStore())
+  if (i1.di_.isVector() and i2.di_.isVector())    // Both vector.
     {
-      const auto& vstoreMap1 = hartData_.at(i1.hartIx_).vstoreMap_;
-      const auto& vstoreMap2 = hartData_.at(i2.hartIx_).vstoreMap_;
-      auto iter1 = vstoreMap1.find(i1.tag_);
-      auto iter2 = vstoreMap2.find(i2.tag_);
-      if (iter1 == vstoreMap1.end() or
-          iter2 == vstoreMap2.end())
-        assert(false);
+      const auto& vecRefMap1 = hartData_.at(i1.hartIx_).vecRefMap_;
+      const auto& vecRefMap2 = hartData_.at(i2.hartIx_).vecRefMap_;
+      auto iter1 = vecRefMap1.find(i1.tag_);
+      auto iter2 = vecRefMap2.find(i2.tag_);
+      if (iter1 == vecRefMap1.end() or
+	  iter2 == vecRefMap2.end())
+	assert(false);
 
-      auto& vstoreOps1 = iter1->second;
-      auto& vstoreOps2 = iter2->second;
-      for (auto& vstoreOp1 : vstoreOps1)
-        for (auto& vstoreOp2 : vstoreOps2)
-          if (rangesOverlap(vstoreOp1.addr_, vstoreOp1.size_,
-                            vstoreOp2.addr_, vstoreOp2.size_))
-              return true;
+      auto& vecRefs1 = iter1->second;
+      auto& vecRefs2 = iter2->second;
+      for (auto& vecRef1 : vecRefs1)
+	for (auto& vecRef2 : vecRefs2)
+	  if (rangesOverlap(vecRef1.addr_, vecRef1.size_,
+			    vecRef2.addr_, vecRef2.size_))
+	    return true;
+
+      return false;
     }
 
-  // One of is vector store.
-  if (i1.di_.isVectorStore() ^ i2.di_.isVectorStore())
-    if (i1.di_.isVectorStore())
-      for (auto ix : i2.memOps_)
-        {
-          const auto& op = sysMemOps_.at(ix);
-          if (overlaps(i1, op))
-            return true;
-        }
+  // One is scalar.
+  const McmInstr& scalar = i1.di_.isVector() ? i2 : i1;
+  const McmInstr& vec = i1.di_.isVector() ? i1 : i2;
 
-  // Both vector loads or i2 is vector store.
-  for (auto ix : i1.memOps_)
+  unsigned size1 = scalar.size_, size2 = 0;
+  uint64_t pa1 = scalar.physAddr_, pa2 = scalar.physAddr2_;
+
+  if (pa1 != pa2 and pageNum(pa1) != pageNum(pa2))
     {
-      const auto& op = sysMemOps_.at(ix);
-      if (overlaps(i2, op))
-        return true;
+      size1 = offsetToNextPage(pa1);
+      size2 = scalar.size_ - size1;
+      assert(size1 > 0 and size1 < scalar.size_);
+      assert(size2 > 0 and size2 < scalar.size_);
     }
+
+  for (unsigned i = 0; i < size1; ++i)
+    {
+      uint64_t pa = pa1 + i;
+      if (vecOverlapsRefPhysAddr(vec, pa))
+	return true;
+    }
+
+  for (unsigned i = 0; i < size2; ++i)
+    {
+      uint64_t pa = pa2 + i;
+      if (vecOverlapsRefPhysAddr(vec, pa))
+	return true;
+    }
+
   return false;
 }
+  
 
 
 template <typename URV>
@@ -2344,16 +2369,20 @@ Mcm<URV>::latestByteTime(const McmInstr& instr, uint64_t addr) const
 
 template <typename URV>
 bool
-Mcm<URV>::vecOverlapsPhysAddr(const McmInstr& instr, uint64_t addr) const
+Mcm<URV>::vecOverlapsRefPhysAddr(const McmInstr& instr, uint64_t addr) const
 {
   assert(instr.di_.isVector());
 
-  for (auto opIx : instr.memOps_)
-    {
-      auto& op = sysMemOps_.at(opIx);
-      if (op.overlaps(addr))
-	return true;
-    }
+  auto& vecRefMap = hartData_.at(instr.hartIx_).vecRefMap_;
+  auto iter = vecRefMap.find(instr.tag_);
+  if (iter == vecRefMap.end())
+    return false;
+
+  auto& vecRefs = iter->second;
+
+  for (auto& vecRef : vecRefs)
+    if (vecRef.overlaps(addr))
+      return true;
 
   return false;
 }
@@ -2371,48 +2400,21 @@ Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
   if (not instrA.isMemory() or not overlaps(instrA, instrB))
     return true;
 
-  // Non-scalar (e.g. cbo.zero) are not drained atomically even if aligned.
-  if (instrA.isAligned() and instrB.isAligned() and instrA.size_ <= 8 and instrB.size_ <= 8)
-    return isBeforeInMemoryTime(instrA, instrB);
-
   // Check overlapped bytes.
   bool ok = true;
-  if (instrB.physAddr_ == instrB.physAddr2_)
-    {    // Non-page crossing.
-      for (unsigned i = 0; i < instrB.size_ and ok; ++i)
+  for (unsigned i = 0; i < instrB.memOps_.size() and ok; ++i)
+    {
+      auto opIx = instrB.memOps_.at(i);
+      auto& op = sysMemOps_.at(opIx);
+
+      for (unsigned byteIx = 0; byteIx < op.size_ and ok; ++byteIx)
 	{
-	  uint64_t byteAddr = instrB.physAddr_ + i;
-	  if (overlapsPhysAddr(instrA, byteAddr))
-	    {
-	      uint64_t ta = latestByteTime(instrA, byteAddr);
-	      uint64_t tb = earliestByteTime(instrB, byteAddr);
-	      ok = ta < tb or (ta == tb and instrA.isStore_);
-	    }
-	}
-    }
-  else
-    {    // Page crossing.
-      unsigned size1 = offsetToNextPage(instrB.physAddr_);
-      unsigned size2 = instrB.size_ - size1;
-      for (unsigned i = 0; i < size1 and ok; ++i)
-	{
-	  uint64_t byteAddr = instrB.physAddr_ + i;
-	  if (overlapsPhysAddr(instrA, byteAddr))
-	    {
-	      uint64_t ta = latestByteTime(instrA, byteAddr);
-	      uint64_t tb = earliestByteTime(instrB, byteAddr);
-	      ok = ta < tb or (ta == tb and instrA.isStore_);
-	    }
-	}
-      for (unsigned i = 0; i < size2 and ok; ++i)
-	{
-	  uint64_t byteAddr = instrB.physAddr2_ + i;
-	  if (overlapsPhysAddr(instrA, byteAddr))
-	    {
-	      uint64_t ta = latestByteTime(instrA, byteAddr);
-	      uint64_t tb = earliestByteTime(instrB, byteAddr);
-	      ok = ta < tb or (ta == tb and instrA.isStore_);
-	    }
+	  uint64_t addr = op.physAddr_ + byteIx;
+	  if (not overlapsRefPhysAddr(instrA, addr))
+	    continue;
+	  uint64_t ta = latestByteTime(instrA, addr);
+	  uint64_t tb = earliestByteTime(instrB, addr);
+	  ok = ta < tb or (ta == tb and instrA.isStore_);
 	}
     }
 
@@ -2535,7 +2537,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	    {
 	      uint64_t addr = remoteOp.physAddr_ + byteIx;
 
-	      if (not overlapsPhysAddr(instrA, addr) or not overlapsPhysAddr(instrB, addr))
+	      if (not overlapsRefPhysAddr(instrA, addr) or not overlapsRefPhysAddr(instrB, addr))
 		continue;
 
 	      if (locallyWritten.contains(addr))
