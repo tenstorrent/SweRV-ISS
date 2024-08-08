@@ -2175,11 +2175,6 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
       memWrite(pa1, pa2, storeVal);
       return true;
     }
-  else if (isInterruptorAddr(pa1, ldStSize_))
-    {
-      processInterruptorWrite(storeVal);
-      return true;
-    }
   else if (isImsicAddr(pa1))
     {
       imsicWrite_(pa1, sizeof(storeVal), storeVal);
@@ -2302,31 +2297,6 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 
   // Address did not match any hart entry in clint.
   storeVal = 0;
-}
-
-
-template <typename URV>
-void
-Hart<URV>::processInterruptorWrite(uint32_t storeVal)
-{
-  if (not indexToHart_)
-    return;
-
-  unsigned hartIx = storeVal & 0xfff;
-  unsigned interruptId = (storeVal >> 12) & 0xff;
-  unsigned val = (storeVal >> 20) == 0 ? 0 : 1;
-  auto hart = indexToHart_(hartIx);
-  if (not hart)
-    return;
-
-  URV mipVal = csRegs_.peekMip();
-  if (val)
-    mipVal = mipVal | (URV(1) << interruptId);
-  else
-    mipVal = mipVal & ~(URV(1) << interruptId);
-
-  hart->pokeCsr(CsrNumber::MIP, mipVal);
-  recordCsrWrite(CsrNumber::MIP);
 }
 
 
@@ -5278,7 +5248,7 @@ Hart<URV>::run(FILE* file)
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
   bool complex = (stopAddrValid_ or instFreq_ or enableTriggers_ or enableGdb_
                   or enableCounters_ or alarmInterval_ or file
-		  or __tracerExtension or hasInterruptor_ or initStateFile_);
+		  or __tracerExtension or initStateFile_);
   if (complex)
     return runUntilAddress(stopAddr, file);
 

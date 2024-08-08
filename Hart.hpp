@@ -638,15 +638,6 @@ namespace WdRiscv
       indexToHart_ = indexToHart;
     }
 
-    /// Define a memory mapped locations for interruptor agent.
-    void configInterruptor(uint64_t addr,
-			   std::function<Hart<URV>*(unsigned ix)> indexToHart)
-    {
-      interruptor_ = addr;
-      hasInterruptor_ = true;
-      indexToHart_ = indexToHart;
-    }
-
     /// Set the output file in which to dump the state of accessed
     /// memory lines. Return true on success and false if file cannot
     /// be opened.
@@ -2119,9 +2110,6 @@ namespace WdRiscv
     bool isAclintMtimeAddr(uint64_t addr) const
     { return addr >= aclintMtimeStart_ and addr < aclintMtimeEnd_; }
 
-    bool isInterruptorAddr(uint64_t addr, unsigned size) const
-    { return hasInterruptor_ and addr == interruptor_ and size == 4; }
-
     bool isImsicAddr(uint64_t addr) const
     {
       return (imsic_ and ((addr >= imsicMbase_ and addr < imsicMend_) or
@@ -2939,10 +2927,6 @@ namespace WdRiscv
     /// in the software interrupt range then keep it least sig bit and zero
     /// the rest.
     void processClintWrite(uint64_t addr, unsigned stSize, URV& stVal);
-
-    /// Called if interruptor address is written. Unpack written value
-    /// and set MIP bit in target hart.
-    void processInterruptorWrite(uint32_t stVal);
 
     /// Mask to extract shift amount from a integer register value to use
     /// in shift instructions. This returns 0x1f in 32-bit more and 0x3f
@@ -5061,9 +5045,6 @@ namespace WdRiscv
 
     // True if we want to defer an interrupt for later. By default, take immediately.
     URV deferredInterrupts_ = 0;
-
-    bool  hasInterruptor_ = false;
-    uint64_t interruptor_ = 0;
 
     URV nmiPc_ = 0;             // Non-maskable interrupt handler.
     URV nmiExceptionPc_ = 0;    // Handler for exceptions during non-maskable interrupts.

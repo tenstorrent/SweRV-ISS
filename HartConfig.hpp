@@ -82,9 +82,6 @@ namespace WdRiscv
 		      bool siOnReset = false, bool deliverInterrupts = true) const;
 
     template<typename URV>
-    bool configInterruptor(System<URV>&, Hart<URV>&, uint64_t addr) const;
-
-    template<typename URV>
     bool applyImsicConfig(System<URV>&) const;
 
     template<typename URV>

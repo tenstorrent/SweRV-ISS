@@ -179,18 +179,6 @@ Args::collectCommandLineValues(const boost::program_options::variables_map& varM
         }
     }
 
-  if (varMap.count("interruptor"))
-    {
-      auto numStr = varMap["interruptor"].as<std::string>();
-      if (not parseCmdLineNumber("interruptor", numStr, this->interruptor))
-        ok = false;
-      else if (this->interruptor.has_value() and (*this->interruptor & 7) != 0)
-        {
-          std::cerr << "Error: interruptor address must be a multiple of 8\n";
-          ok = false;
-        }
-    }
-
   if (varMap.count("syscallslam"))
     {
       auto numStr = varMap["syscallslam"].as<std::string>();
@@ -477,12 +465,6 @@ Args::parseCmdLineArgs(std::span<char*> argv)
          "of these double words sets the timer-limit of the corresponding hart. "
          "A timer interrupt in such a hart becomes pending when the timer value "
          "equals or exceeds the timer limit.")
-        ("interruptor", po::value<std::string>(),
-         "Define address, z, of a memory mapped interrupt agent. Storing a word in z,"
-	 "using a sw instruction, will set/clear a bit in the MIP CSR of a hart"
-	 "in the system. The stored word should have the hart index in bits 0 to 11,"
-	 "the interrupt id (bit number of MIP) in bits 12 to 19, and the interrupt"
-	 "value in bits 20 to 31 (0 to clear, non-zero to set).")
         ("syscallslam", po::value<std::string>(),
          "Define address, a, of a non-cached memory area in which the "
          "memory changes of an emulated system call will be slammed. This "

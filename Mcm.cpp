@@ -1208,8 +1208,7 @@ Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
     }
 
   uint64_t addr = op.physAddr_;
-  bool skip = ( hart.isAclintAddr(addr) or hart.isInterruptorAddr(addr, op.size_) or
-		hart.isImsicAddr(addr) or hart.isPciAddr(addr) or
+  bool skip = ( hart.isAclintAddr(addr) or hart.isImsicAddr(addr) or hart.isPciAddr(addr) or
 		hart.isMemMappedReg(addr) or hart.isHtifAddr(addr) );
 
   // Major hack (temporary until RTL removes CLINT device).

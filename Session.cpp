@@ -796,12 +796,6 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
 
   hart.enableConsoleInput(! args.noConInput);
 
-  if (args.interruptor)
-    {
-      uint64_t addr = *args.interruptor;
-      config.configInterruptor(system, hart, addr);
-    }
-
   if (args.syscallSlam)
     hart.defineSyscallSlam(*args.syscallSlam);
 

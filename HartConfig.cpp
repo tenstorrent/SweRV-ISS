@@ -1397,21 +1397,6 @@ HartConfig::configAclint(System<URV>& system, Hart<URV>& hart, uint64_t clintSta
 
 template<typename URV>
 bool
-HartConfig::configInterruptor(System<URV>& system, Hart<URV>& hart, uint64_t addr) const
-{
-  // Define callback to recover a hart from a hart index. We do
-  // this to avoid having the Hart class depend on the System class.
-  auto indexToHart = [&system](unsigned ix) -> Hart<URV>* {
-    return system.ithHart(ix).get();
-  };
-
-  hart.configInterruptor(addr, indexToHart);
-  return true;
-}
-
-
-template<typename URV>
-bool
 HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 {
   using std::cerr;
@@ -2702,14 +2687,6 @@ HartConfig::configAclint<uint64_t>(System<uint64_t>&, Hart<uint64_t>&, uint64_t 
                                    uint64_t size, uint64_t mswiOffset, bool hasMswi,
                                    uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
 		                   bool siOnReset = false, bool deliverInterrupts = true) const;
-
-template bool
-HartConfig::configInterruptor<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,
-					uint64_t addr) const;
-
-template bool
-HartConfig::configInterruptor<uint64_t>(System<uint64_t>& system, Hart<uint64_t>& hart,
-					uint64_t addr) const;
 
 template bool
 HartConfig::applyImsicConfig(System<uint32_t>&) const;
