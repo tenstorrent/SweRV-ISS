@@ -387,15 +387,6 @@ template <typename URV>
 static bool
 pokeHartMemory(Hart<URV>& hart, uint64_t physAddr, uint64_t data, unsigned size)
 {
-#if 0
-  // The test-bench can defer IMISC interrupts and un-defer them when they get delivered to
-  // the hart on the RTL side. But, the test-bench does not do that. To avoid triggering
-  // an interrupt too soon, we skip writing to the IMSIC. Presumably, the test-bench will
-  // poke the IMSIC when the RTL delivers the IMSIC interrupt to the hart.
-  if (hart.isImsicAddr(physAddr))
-    return true;   // IMSIC memory poked explicitly by the test bench.
-#endif
-
   if (size == 1)
     return hart.pokeMemory(physAddr, uint8_t(data), true);
 
