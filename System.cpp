@@ -567,8 +567,8 @@ template <typename URV>
 bool
 System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
 			 uint64_t sbase, uint64_t sstride,
-			 unsigned guests, unsigned ids,
-                         unsigned thresholdMask,
+			 unsigned guests, const std::vector<unsigned>& idsVec,
+                         const std::vector<unsigned>& tmVec, // Threshold masks
                          bool trace)
 {
   using std::cerr;
@@ -631,28 +631,48 @@ System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
 	}
     }
 
-  if ((ids % 64) != 0)
+  if (idsVec.size() != 3)
     {
-      cerr << "Error: IMSIC interrupt id limit (" << ids << ") is not a multiple of 64.\n";
+      cerr << "Error: IMSIC interrupt-ids array size (" << idsVec.size() << ") is "
+	   << "invalid -- Expecting 3.\n";
       return false;
     }
 
-  if (ids > 2048)
+  for (auto ids : idsVec)
     {
-      cerr << "Error: IMSIC interrupt id limit (" << ids << ") is larger than 2048.\n";
+      if ((ids % 64) != 0)
+	{
+	  cerr << "Error: IMSIC interrupt id limit (" << ids << ") is not a multiple of 64.\n";
+	  return false;
+	}
+
+      if (ids > 2048)
+	{
+	  cerr << "Error: IMSIC interrupt id limit (" << ids << ") is larger than 2048.\n";
+	  return false;
+	}
+    }
+
+  if (idsVec.size() != tmVec.size())
+    {
+      cerr << "Error: IMSIC interrupt ids count (" << idsVec.size() << ") is different "
+	   << " thant the threshold-mask count (" << tmVec.size() << ")\n";
       return false;
     }
 
-  if (thresholdMask < (ids - 1))
+  for (size_t i = 0; i < idsVec.size(); ++i)
     {
-      cerr << thresholdMask << " " << ids << "\n";
-      cerr << "Error: Threshold mask cannot be less than the max interrupt id.\n";
-      return false;
+      if (tmVec.at(i) < idsVec.at(i) - 1)
+	{
+	  cerr << "Error: Threshold mask (" << tmVec.at(0) << ") cannot be less than the "
+	       << "max interrupt id (" << (idsVec.at(i) - 1) << ").\n";
+	  return false;
+	}
     }
 
-  bool ok = imsicMgr_.configureMachine(mbase, mstride, ids, thresholdMask);
-  ok = imsicMgr_.configureSupervisor(sbase, sstride, ids, thresholdMask) and ok;
-  ok = imsicMgr_.configureGuests(guests, ids, thresholdMask) and ok;
+  bool ok = imsicMgr_.configureMachine(mbase, mstride, idsVec.at(0), tmVec.at(0));
+  ok = imsicMgr_.configureSupervisor(sbase, sstride, idsVec.at(1), tmVec.at(1)) and ok;
+  ok = imsicMgr_.configureGuests(guests, idsVec.at(2), tmVec.at(2)) and ok;
   if (not ok)
     {
       cerr << "Error: Failed to configure IMSIC.\n";

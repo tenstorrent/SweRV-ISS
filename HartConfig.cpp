@@ -2217,17 +2217,54 @@ HartConfig::applyImsicConfig(System<URV>& system) const
     if (not getJsonUnsigned("imsic.guests", imsic.at(tag), guests))
       return false;
 
-  unsigned ids = 64;
+
+  std::vector<unsigned> idVec = { 64, 64, 64}; // For M, S, and VS privs.
   tag = "ids";
   if (imsic.contains(tag))
-    if (not getJsonUnsigned("imsic.ids", imsic.at(tag), ids))
-      return false;
+    {
+      if (imsic.at(tag).is_array())
+	{
+	  if (not getJsonUnsignedVec("imsic.ids", imsic.at(tag), idVec))
+	    return false;
+	  if (idVec.size() != 3)
+	    {
+	      std::cerr << "Config file imsic.ids array must have 3 values\n";
+	      return false;
+	    }
+	}
+      else
+	{
+	  unsigned ids = 0;
+	  if (not getJsonUnsigned("imsic.ids", imsic.at(tag), ids))
+	    return false;
+	  std::fill(idVec.begin(), idVec.end(), ids);
+	}
+    }
 
-  uint64_t thresholdMask = std::bit_ceil(ids) - 1;
+  // Threshold mask is the smallest all-ones bit-mask that covers all the bits
+  // necessary to represent an id.
+  std::vector<unsigned> tmVec(idVec.size());   // Threshold masks.
+  for (unsigned i = 0; i < idVec.size(); ++i)
+    tmVec.at(i) = std::bit_ceil(idVec.at(i)) - 1;
+
   tag = "eithreshold_mask";
   if (imsic.contains(tag))
-    if (not getJsonUnsigned("imsic.eithreshold_mask", imsic.at(tag), thresholdMask))
-      return false;
+    {
+      if (imsic.at(tag).is_array())
+	{
+	  if (not getJsonUnsignedVec("imsic.threshold_mask", imsic.at(tag), tmVec))
+	    return false;
+	  if (tmVec.size() != 3)
+	    {
+	      std::cerr << "Config file imsic.threshold array must have 3 values\n";
+	      return false;
+	    }
+	}
+      unsigned tm = 0;
+      if (not getJsonUnsigned("imsic.eithreshold_mask", imsic.at(tag), tm))
+	return false;
+      std::fill(tmVec.begin(), tmVec.end(), tm);
+    }
 
   bool trace = false;
   tag = "trace";
@@ -2235,7 +2272,7 @@ HartConfig::applyImsicConfig(System<URV>& system) const
     if (not getJsonBoolean("imsic.trace", imsic.at(tag), trace))
       return false;
 
-  return system.configImsic(mbase, mstride, sbase, sstride, guests, ids, thresholdMask, trace);
+  return system.configImsic(mbase, mstride, sbase, sstride, guests, idVec, tmVec, trace);
 }
 
 

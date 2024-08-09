@@ -272,8 +272,8 @@ namespace WdRiscv
     /// id plus 1 and must be a multiple of 64.
     bool configImsic(uint64_t mbase, uint64_t mstride,
 		     uint64_t sbase, uint64_t sstride,
-		     unsigned guests, unsigned ids,
-                     unsigned thresholdMask,
+		     unsigned guests, const std::vector<unsigned>& ids,
+                     const std::vector<unsigned>& thresholdMasks,
                      bool trace);
 
     /// Enable memory consistency model. This is relevant in server/interactive where RTL
