@@ -440,7 +440,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// Read from this IMSIC. Return false doing nothing if address is
     /// not valid. Return true and perform a read if address is valid.
     /// Read from an IMSIC always returns a zero.
-    bool read(uint64_t addr, unsigned size, uint64_t& data)
+    bool read(uint64_t addr, unsigned size, uint64_t& data) const
     {
       if (size != 4)
 	return false;
