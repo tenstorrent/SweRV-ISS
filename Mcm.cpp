@@ -1319,8 +1319,9 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
   auto& vecRefs = iter->second;
   for (auto& vecRef : vecRefs)
     {
-      for (unsigned i = 0; i < vecRef.size_; ++i)
-	refValues[vecRef.addr_ + i] = vecRef.data_ >> (i*8);
+      if (not vecRef.skip_)
+	for (unsigned i = 0; i < vecRef.size_; ++i)
+	  refValues[vecRef.addr_ + i] = vecRef.data_ >> (i*8);
     }
 
   // Compare RTL to reference.
@@ -1329,7 +1330,7 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
       auto iter = rtlValues.find(addr);
       if (iter == rtlValues.end())
 	{
-	  cerr << "RTL/whiper mismatch for vector store hart-id=" << hartId << " tag="
+	  cerr << "Error: RTL/whisper mismatch for vector store hart-id=" << hartId << " tag="
 	       << store.tag_ << " addr=0x" << std::hex << addr << " no RTL data\n";
 	  return false;
 	}
@@ -1338,7 +1339,7 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
       if (rtlVal == refVal)
 	continue;
 
-      cerr << "RTL/whiper mismatch for vector store hart-id=" << hartId << " tag="
+      cerr << "Error: RTL/whisper mismatch for vector store hart-id=" << hartId << " tag="
 	   << store.tag_ << " addr=0x" << std::hex << addr << " RTL=0x"
 	   << unsigned(rtlVal) << " whisper=0x" << unsigned(refVal) << std::dec << '\n';
       return false;
