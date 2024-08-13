@@ -944,9 +944,6 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
 
       if (written)
 	{
-	  op.time_ = time;
-	  instr->addMemOp(sysMemOps_.size());
-	  sysMemOps_.push_back(op);
 	  coveredWrites.push_back(op);
 	}
       else
@@ -959,10 +956,43 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
     }
   pendingWrites.resize(pendingSize);
 
+  // Check that the collected writes are in instruction order and in time order.
+  if (coveredWrites.empty())
+    return true;
+  for (size_t i = 1; i < coveredWrites.size(); ++i)
+    {
+      const auto& prev = coveredWrites.at(i-1);
+      const auto& op = coveredWrites.at(i);
+      if (op.instrTag_ < prev.instrTag_)
+	{
+	  std::cerr << "Merge buffer has ops with out of order instruction tags.\n";
+	  return false;
+	}
+      if (op.time_ < prev.time_)
+	{
+	  std::cerr << "Merge buffer has ops with out of order insertion time.\n";
+	  return false;
+	}
+    }
+
+  // Change the times of the collected writes to the current time. This is the global
+  // memory time of those operations. Commit collected writes to their instructions and to
+  // the global memory operations vector.
+  for (auto& op : coveredWrites)
+    {
+      op.time_ = time;
+      McmInstr* instr = findOrAddInstr(hartIx, op.instrTag_);
+      instr->addMemOp(sysMemOps_.size());
+      sysMemOps_.push_back(op);
+    }
+
+#if 0
   std::sort(coveredWrites.begin(), coveredWrites.end(),
 	    [](const MemoryOp& a, const MemoryOp& b) {
 	      return a.instrTag_ < b.instrTag_;
 	    });
+#endif
+
   return true;
 }
 
@@ -1310,19 +1340,29 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
 	rtlValues[op.physAddr_ + i] = op.rtlData_ >> (i*8);
     }
   
-  // Collect refence byte values.
-  std::unordered_map<uint64_t, uint8_t> refValues;  // Map byte address to value.
-
   auto& vecRefMap = hartData_.at(store.hartIx_).vecRefMap_;
   auto iter = vecRefMap.find(store.tag_);
   assert(iter != vecRefMap.end());
   auto& vecRefs = iter->second;
+
+  // Collect refence byte values in an address to value map. Check for overlap
+  std::unordered_map<uint64_t, uint8_t> refValues;  // Map byte address to value.
+  bool overlap = false;
   for (auto& vecRef : vecRefs)
     {
       if (not vecRef.skip_)
 	for (unsigned i = 0; i < vecRef.size_; ++i)
-	  refValues[vecRef.addr_ + i] = vecRef.data_ >> (i*8);
+	  {
+	    uint64_t addr = vecRef.addr_ + i;
+	    overlap = overlap or refValues.contains(addr);
+	    refValues[addr] = vecRef.data_ >> (i*8);
+	  }
     }
+
+  // Overlap can happen for indexed/strided vector stores. We don't have enough
+  // information to handle that case.
+  if (overlap)
+    return true;
 
   // Compare RTL to reference.
   for (auto [addr, refVal] : refValues)
