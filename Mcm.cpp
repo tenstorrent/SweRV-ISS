@@ -965,14 +965,13 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
       const auto& op = coveredWrites.at(i);
       if (op.instrTag_ < prev.instrTag_)
 	{
-	  std::cerr << "Merge buffer has ops with out of order instruction tags.\n";
+	  cerr << "Error: hart-id=" << hart.hartId() << " time=" << time
+	       << " tag1=" << prev.instrTag_ << " tag2=" << op.instrTag_
+	       << " time1=" << prev.time_ << " time2=" << op.time_
+	       << " merge buffer has instructions not in program order.\n";
 	  return false;
 	}
-      if (op.time_ < prev.time_)
-	{
-	  std::cerr << "Merge buffer has ops with out of order insertion time.\n";
-	  return false;
-	}
+      assert(op.time_ >= prev.time_);
     }
 
   // Change the times of the collected writes to the current time. This is the global
