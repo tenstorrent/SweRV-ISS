@@ -132,6 +132,19 @@ namespace WdRiscv
     OperandMode ithOperandMode(unsigned i) const
     { return entry_? entry_->ithOperandMode(i) : OperandMode::None; }
 
+    /// For csrrs/csrrc the CSR register is read-only if the second integer register is x0
+    OperandMode effectiveIthOperandMode(unsigned i) const
+    {
+      auto mode = this->ithOperandMode(i);
+      auto instId = this->instId();
+      if (instId == WdRiscv::InstId::csrrs or instId == WdRiscv::InstId::csrrc)
+	{
+	  if (this->ithOperandType(i) == WdRiscv::OperandType::CsReg and this->op1() == 0)
+	    return WdRiscv::OperandMode::Read;
+	}
+      return mode;
+    }
+
     /// Return true if this object is valid.
     bool isValid() const
     { return valid_; }

@@ -240,7 +240,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
   if (instEntry->isIthOperandIntRegDest(0) and di.ithOperand(0) == 0 and not updatesVl)
     return; // Destination is x0.
 
-  uint64_t time = 0, tag = 0;
+  uint64_t time = 0, tag = 0, csrTime = 0, csrTag = 0;
 
   bool hasDep = true;
   if (instEntry->isSc())
@@ -281,11 +281,20 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
   bool first = true; // first branch source
   for (auto regIx : sourceRegs)
     {
+      bool isCsr = regIx >= csRegOffset_;
+      if (isCsr)
+	{
+	  csrTime = regTimeVec.at(regIx);
+	  csrTag = regProducer.at(regIx);
+	  continue;
+	}
+
       if (hasDep and regTimeVec.at(regIx) > time)
 	{
 	  time = regTimeVec.at(regIx);
 	  tag = regProducer.at(regIx);
 	}
+
       if (di.isBranch())
 	if (first or regTimeVec.at(regIx) > branchTime)
 	  {
@@ -293,6 +302,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	    branchTime = regTimeVec.at(regIx);
 	    branchProducer = regProducer.at(regIx);
 	  }
+
       if (updatesVl)
         if (regTimeVec.at(regIx) > vlTime)
           {
@@ -307,8 +317,17 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
   for (auto regIx : destRegs)
     {
-      regTimeVec.at(regIx) = time;
-      regProducer.at(regIx) = tag;
+      if (not instr.di_.isCsr() or regIx >= csRegOffset_)
+	{
+	  regTimeVec.at(regIx) = time;
+	  regProducer.at(regIx) = tag;
+	}
+      else
+	{
+	  // Integer destination register of a CSR instruction.
+	  regTimeVec.at(regIx) = csrTime;
+	  regProducer.at(regIx) = csrTag;
+	}
     }
 }
 
@@ -2212,26 +2231,17 @@ Mcm<URV>::identifyRegisters(const Hart<URV>& hart,
   if (di.modifiesFflags())
     destRegs.push_back(unsigned(CsrNumber::FFLAGS) + csRegOffset_);
 
-  auto id = di.instId();
-
-  bool skipCsr = ((id == InstId::csrrs or id == InstId::csrrc or
-		   id == InstId::csrrsi or id == InstId::csrrci)
-		  and di.op1() == 0);
-
-  const auto* entry = di.instEntry();
-
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
-      bool isDest = entry->isIthOperandWrite(i);
-      bool isSource = entry->isIthOperandRead(i);
+      OperandMode opMode = di.effectiveIthOperandMode(i);
+      bool isDest = opMode == OperandMode::Write or opMode == OperandMode::ReadWrite;
+      bool isSource = opMode == OperandMode::Read or opMode == OperandMode::ReadWrite;
       if (not isDest and not isSource)
 	continue;
 
       auto type = di.ithOperandType(i);
 
       if (type == OperandType::Imm or type == OperandType::None)
-	continue;
-      if (isSource and type == OperandType::CsReg and skipCsr)
 	continue;
 
       size_t regIx = effectiveRegIx(di, i);

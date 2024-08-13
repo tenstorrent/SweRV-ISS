@@ -167,22 +167,6 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
 }
 
 
-/// For csrrs/csrrc the CSR register is read-only if the second integer register is x0
-static
-WdRiscv::OperandMode
-effectiveIthOperandMode(const WdRiscv::DecodedInst& di, unsigned i)
-{
-  auto mode = di.ithOperandMode(i);
-  auto instId = di.instId();
-  if (instId == WdRiscv::InstId::csrrs or instId == WdRiscv::InstId::csrrc)
-    {
-      if (di.ithOperandType(i) == WdRiscv::OperandType::CsReg and di.op1() == 0)
-	return WdRiscv::OperandMode::Read;
-    }
-  return mode;
-}
-
-
 bool
 PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag)
 {
@@ -228,7 +212,7 @@ PerfApi::decode(unsigned hartIx, uint64_t time, uint64_t tag)
     {
       using OM = WdRiscv::OperandMode;
 
-      auto mode = effectiveIthOperandMode(di, i);
+      auto mode = di.effectiveIthOperandMode(i);
       if (mode == OM::Write or mode == OM::ReadWrite)
 	{
 	  unsigned regNum = di.ithOperand(i);
@@ -474,7 +458,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   unsigned destIx = 0;
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
-      auto mode = effectiveIthOperandMode(di, i);
+      auto mode = di.effectiveIthOperandMode(i);
       if (mode == OM::Write or mode == OM::ReadWrite)
 	{
 	  unsigned regNum = di.ithOperand(i);
@@ -855,7 +839,7 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
       auto& producers = hartRegProducers_.at(hartIx);
       for (size_t i = 0; i < di.operandCount(); ++i)
         {
-	  auto mode = effectiveIthOperandMode(di, i);
+	  auto mode = di.effectiveIthOperandMode(i);
           if (mode == WdRiscv::OperandMode::Write or
               mode == WdRiscv::OperandMode::ReadWrite)
             {
@@ -978,7 +962,7 @@ InstrPac::getDestOperands(std::array<Operand, 2>& ops)
 
   for (unsigned i = 0; i < di_.operandCount(); ++i)
     {
-      auto mode = effectiveIthOperandMode(di_, i);
+      auto mode = di_.effectiveIthOperandMode(i);
       if (mode == OM::Write or mode == OM::ReadWrite)
 	{
 	  auto& op = ops.at(count);

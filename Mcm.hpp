@@ -646,7 +646,7 @@ namespace WdRiscv
       // Dependency time of most recent vsetvl or vsetvli in program order or
       // 0 if vset does not depend on prior memory instruction.
       uint64_t vlTime_ = 0;
-      uint64_t vlProducer_;
+      uint64_t vlProducer_ = 0;
 
       McmInstrIx currentInstrTag_ = 0;
       uint64_t sinvalVmaTime_ = 0;
