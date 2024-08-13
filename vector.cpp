@@ -11148,15 +11148,17 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
                 initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
 	      else
                 {
+		  // Until we get clarification on the spec we reduce VL before procesing
+		  // tail elements.
+                  pokeCsr(CsrNumber::VL, ix);
+                  recordCsrWrite(CsrNumber::VL);
+                  vecRegs_.elemCount(ix);  // Update cached value of VL.
+
 		  // Fill tail elements with all-ones if so configured.
 		  ELEM_TYPE ones = ~ ELEM_TYPE{0};
 		  if (vecRegs_.isTailAgnostic() and vecRegs_.isTailAgnosticOnes())
 		    for (unsigned ti = vecRegs_.elemCount(); ti < elemMax; ti++)
 		      vecRegs_.write(vd, ti, destGroup, ones);
-
-                  pokeCsr(CsrNumber::VL, ix);
-                  recordCsrWrite(CsrNumber::VL);
-                  vecRegs_.elemCount(ix);  // Update cached value of VL.
                 }
 	    }
 	  else
@@ -12640,6 +12642,12 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 		initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
 	      else if (vecRegs_.isTailAgnostic() and vecRegs_.isTailAgnosticOnes())
 		{
+		  // Until we get clarification on the spec we reduce VL before procesing
+		  // tail elements.
+                  pokeCsr(CsrNumber::VL, ix);
+                  recordCsrWrite(CsrNumber::VL);
+                  vecRegs_.elemCount(ix);  // Update cached value of VL.
+
 		  // Fill tail elements with all-ones if so configured.
 		  ELEM_TYPE ones = ~ ELEM_TYPE{0};
 		  for (unsigned ti = vecRegs_.elemCount(); ti < elemMax; ti++)
@@ -12648,10 +12656,6 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 			unsigned dvg = vd + fi*eg;   // Destination vector gorup.
 			vecRegs_.write(dvg, ti, destGroup, ones);
 		      }
-
-                  pokeCsr(CsrNumber::VL, ix);
-                  recordCsrWrite(CsrNumber::VL);
-                  vecRegs_.elemCount(ix);  // Update cached value of VL.
 		}
 	      return false;
 	    }
