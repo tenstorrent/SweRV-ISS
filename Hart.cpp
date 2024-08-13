@@ -2590,15 +2590,18 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
   // Check if stuck because of lack of exception handler. Disable if
   // you do want the stuck behavior.
 #if 1
-  if (instCounter_ == counterAtLastIllegal_ + 1)
-    consecutiveIllegalCount_++;
-  else
-    consecutiveIllegalCount_ = 0;
+  if (di and di->instId() == InstId::illegal)
+    {
+      if (instCounter_ == counterAtLastIllegal_ + 1)
+	consecutiveIllegalCount_++;
+      else
+	consecutiveIllegalCount_ = 0;
 
-  if (consecutiveIllegalCount_ > 16)  // FIX: Make a parameter
-    throw CoreException(CoreException::Stop, "16 consecutive illegal instructions", 3);
-
-  counterAtLastIllegal_ = instCounter_;
+      if (consecutiveIllegalCount_ > 16)  // FIX: Make a parameter
+	throw CoreException(CoreException::Stop, "16 consecutive illegal instructions", 3);
+  
+      counterAtLastIllegal_ = instCounter_;
+    }
 #endif
 
   // In debug mode no exception is taken. If an ebreak exception and
