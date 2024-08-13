@@ -11097,10 +11097,10 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   unsigned elemMax = vecRegs_.elemMax(eew); // Includes tail elems.
   uint64_t addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
 
+  vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
+
   if (start >= vecRegs_.elemCount())
     return true;
-
-  vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
 
@@ -11816,10 +11816,10 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   unsigned elemMax = vecRegs_.elemMax(eew);   // Includes tail elements.
   uint64_t addr = intRegs_.read(rs1) + start*stride;
 
+  vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
+
   if (start >= vecRegs_.elemCount())
     return true;
-
-  vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
 
@@ -12129,10 +12129,10 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   unsigned elemMax = vecRegs_.elemMax();  // Includes tail elements.
   unsigned elemSize = elemWidth / 8;
 
+  vecRegs_.ldStSize_ = elemSize;
+
   if (start >= vecRegs_.elemCount())
     return true;
-
-  vecRegs_.ldStSize_ = elemSize;
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
 
@@ -12587,11 +12587,11 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
       return false;
     }
 
-  if (start >= vecRegs_.elemCount())
-    return true;
-
   unsigned elemSize = sizeof(ELEM_TYPE);
   vecRegs_.ldStSize_ = elemSize;
+
+  if (start >= vecRegs_.elemCount())
+    return true;
 
   unsigned destGroup = 8*eg;
 
@@ -13126,10 +13126,10 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
       return false;
     }
 
+  vecRegs_.ldStSize_ = elemSize;
+
   if (start >= vecRegs_.elemCount())
     return true;
-
-  vecRegs_.ldStSize_ = elemSize;
 
   unsigned destGroup = 8*eg;
 
