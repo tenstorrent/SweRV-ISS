@@ -11148,8 +11148,9 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
                 initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
 	      else
                 {
-		  // Until we get clarification on the spec we reduce VL before procesing
-		  // tail elements.
+		  // We reduce VL before processing tail elements. This is allowed
+		  // by the spec (items between old VL and new VL can be updated
+		  // with arbitrary values according to the spec).
                   pokeCsr(CsrNumber::VL, ix);
                   recordCsrWrite(CsrNumber::VL);
                   vecRegs_.elemCount(ix);  // Update cached value of VL.
@@ -12642,8 +12643,9 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 		initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
 	      else if (vecRegs_.isTailAgnostic() and vecRegs_.isTailAgnosticOnes())
 		{
-		  // Until we get clarification on the spec we reduce VL before procesing
-		  // tail elements.
+		  // We reduce VL before processing tail elements. This is allowed
+		  // by the spec (items between old VL and new VL can be updated
+		  // with arbitrary values according to the spec).
                   pokeCsr(CsrNumber::VL, ix);
                   recordCsrWrite(CsrNumber::VL);
                   vecRegs_.elemCount(ix);  // Update cached value of VL.
