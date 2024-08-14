@@ -857,17 +857,6 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 }
 
 
-static void
-reportMismatch(uint64_t hartId, uint64_t time, std::string_view tag, uint64_t addr,
-	       uint64_t rtlData, uint64_t whisperData)
-{
-  cerr << "Error: Mismatch on " << tag << " time=" << time
-	    << " hart-id=" << hartId << " addr=0x" << std::hex
-	    << addr << " rtl=0x" << rtlData
-	    << " whisper=0x" << whisperData << std::dec << '\n';
-}
-
-
 static bool
 checkBufferWriteParams(unsigned hartId, uint64_t time, unsigned lineSize,
 		       uint64_t& rtlLineSize, uint64_t physAddr)
@@ -1053,7 +1042,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       line.push_back(byte);
     }
 
-  // Apply pending writes to our line and to memory.
+  // Apply pending writes (from mbinsert operations) to our line and to memory.
   for (const auto& write : coveredWrites)
     {
       if ((write.physAddr_ < physAddr) or (write.physAddr_ + write.size_ > lineEnd))
@@ -1087,14 +1076,17 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	line.at(ix+i) = ((uint8_t*) &(write.rtlData_))[i];
     }
 
-  // Compare covered writes.
+  // Compare inserted data to written (drained) data.
   bool result = true;
   size_t count = std::min(line.size(), rtlData.size());
   for (unsigned i = 0; i < count; ++i)
     if ((rtlMask.empty() or rtlMask.at(i)) and (line.at(i) != rtlData.at(i)))
       {
-	reportMismatch(hart.hartId(), time, "merge buffer write", physAddr + i,
-		       rtlData.at(i), line.at(i));
+	uint64_t addr = physAddr + i;
+	cerr << "Error: Mismatch on merge buffer write time=" << time
+	     << " hart-id=" << hart.hartId() << " addr=0x" << std::hex
+	     << addr << " write-data=0x" << rtlData.at(i)
+	     << " insert-data=0x" << line.at(i) << std::dec << '\n';
 	result = false;
 	break;
       }
