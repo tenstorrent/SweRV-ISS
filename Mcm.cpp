@@ -655,9 +655,12 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
       for (unsigned i = 0; i < addr.size(); ++i)
         {
 	  uint64_t pa1 = paddr.at(i), pa2 = paddr2.at(i), value = data.at(i);
-          bool skip = masked.at(i);
+          bool skip = i < masked.size() and masked.at(i);
+	  if (skip)
+	    continue;
+
 	  if (pa1 == pa2)
-	    vecRefOps.push_back(VecRef{ pa1, value, elemSize, skip });
+	    vecRefOps.push_back(VecRef{ pa1, value, elemSize });
 	  else
 	    {
 	      unsigned size1 = offsetToNextPage(pa1);
@@ -665,8 +668,8 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	      unsigned size2 = elemSize - size1;
 	      uint64_t val1 = (value <<  ((8 - size1)*8)) >> ((8 - size1)*8);
 	      uint64_t val2 = (value >> (size1*8));
-	      vecRefOps.push_back(VecRef { pa1, val1, size1, skip } );
-	      vecRefOps.push_back(VecRef { pa2, val2, size2, skip } );
+	      vecRefOps.push_back(VecRef { pa1, val1, size1 } );
+	      vecRefOps.push_back(VecRef { pa2, val2, size2 } );
 	    }
         }
 
@@ -1360,13 +1363,12 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
   bool overlap = false;
   for (auto& vecRef : vecRefs)
     {
-      if (not vecRef.skip_)
-	for (unsigned i = 0; i < vecRef.size_; ++i)
-	  {
-	    uint64_t addr = vecRef.addr_ + i;
-	    overlap = overlap or refValues.contains(addr);
-	    refValues[addr] = vecRef.data_ >> (i*8);
-	  }
+      for (unsigned i = 0; i < vecRef.size_; ++i)
+	{
+	  uint64_t addr = vecRef.addr_ + i;
+	  overlap = overlap or refValues.contains(addr);
+	  refValues[addr] = vecRef.data_ >> (i*8);
+	}
     }
 
   // Overlap can happen for indexed/strided vector stores. We don't have enough
@@ -1461,8 +1463,6 @@ Mcm<URV>::checkStoreComplete(unsigned hartIx, const McmInstr& instr) const
       auto& vecRefs = iter->second;
       for (const auto& vecRef : vecRefs)
 	{
-          if (not checkMasked_ and vecRef.skip_)
-            continue;
 	  for (unsigned i = 0; i < vecRef.size_; ++i)
 	    {
 	      uint64_t byteAddr = vecRef.addr_ + i;
@@ -1707,18 +1707,22 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 	continue;
       unsigned size1 = elemSize, size2 = 0;
       uint64_t ea1 = pa1.at(i), ea2 = pa2.at(i);
-      bool skip = masked.at(i);
+
+      bool skip = i < masked.size() and masked.at(i);
+      if (skip)
+	continue;
+
       if (ea1 != ea2 and pageNum(ea1) != pageNum(ea2))
 	{
 	  size1 = offsetToNextPage(ea1);
 	  size2 = elemSize - size1;
 	  assert(size1 > 0 and size1 < elemSize);
 	  assert(size2 > 0 and size2 < elemSize);
-	  vecRefOps.push_back(VecRef(ea1, 0, size1, skip));
-	  vecRefOps.push_back(VecRef(ea2, 0, size2, skip));
+	  vecRefOps.push_back(VecRef(ea1, 0, size1));
+	  vecRefOps.push_back(VecRef(ea2, 0, size2));
 	}
       else
-	vecRefOps.push_back(VecRef(ea1, 0, size1, skip));
+	vecRefOps.push_back(VecRef(ea1, 0, size1));
 
       for (unsigned i = 0; i < size1; ++i)
 	{
@@ -2414,7 +2418,7 @@ Mcm<URV>::vecOverlapsRefPhysAddr(const McmInstr& instr, uint64_t addr) const
   auto& vecRefs = iter->second;
 
   for (auto& vecRef : vecRefs)
-    if (vecRef.overlaps(addr) and not vecRef.skip_)
+    if (vecRef.overlaps(addr))
       return true;
 
   return false;
@@ -3335,7 +3339,7 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
     if (not producer.di_.isValid())
       return true;
 
-    return producer.complete_ and not isBeforeInMemoryTime(instrB, producer);
+    return producer.complete_ and isBeforeInMemoryTime(producer, instrB);
   };
 
   auto producerTag = hartData_.at(hartIx).branchProducer_;

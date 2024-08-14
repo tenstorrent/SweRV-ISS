@@ -608,8 +608,8 @@ namespace WdRiscv
     /// Vector reference (produced by Whisper) load/store physical addresses.
     struct VecRef
     {
-      VecRef(uint64_t addr = 0, uint64_t data = 0, unsigned size = 0, bool skip = false)
-	: addr_(addr), data_(data), size_(size), skip_(skip)
+      VecRef(uint64_t addr = 0, uint64_t data = 0, unsigned size = 0)
+	: addr_(addr), data_(data), size_(size)
       { }
 
       bool overlaps(uint64_t addr) const
@@ -618,7 +618,6 @@ namespace WdRiscv
       uint64_t addr_ = 0;
       uint64_t data_ = 0;
       unsigned size_ = 0;
-      bool skip_ = false;
     };
 
     using VecRefs = std::vector<VecRef>;
@@ -671,9 +670,6 @@ namespace WdRiscv
     bool enablePpo_ = true;  // Skip checking PPO rules when false.
 
     bool isTso_ = false;  // True if total-store-ordering model.
-
-    bool checkMasked_ = false; // True if we should skip checking masked
-                               // vector elements.
   };
 
 }
