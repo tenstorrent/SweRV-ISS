@@ -2414,7 +2414,7 @@ Mcm<URV>::vecOverlapsRefPhysAddr(const McmInstr& instr, uint64_t addr) const
   auto& vecRefs = iter->second;
 
   for (auto& vecRef : vecRefs)
-    if (vecRef.overlaps(addr))
+    if (vecRef.overlaps(addr) and not vecRef.skip_)
       return true;
 
   return false;
