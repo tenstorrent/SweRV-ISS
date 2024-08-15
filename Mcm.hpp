@@ -461,8 +461,8 @@ namespace WdRiscv
       return false;
     }
 
-    /// Return true if the data memory referenced by given instruction overlpas
-    /// that of the given memory operation.
+    /// Return true if the physical data address range referenced by given instruction
+    /// overlaps that of the given memory operation.
     bool overlaps(const McmInstr& instr, const MemoryOp& op) const
     {
       if (instr.size_ == 0 or op.size_ == 0)
@@ -489,6 +489,22 @@ namespace WdRiscv
       if (addr1 <= addr2)
 	return addr2 - addr1 < size1;
       return addr1 - addr2 < size2;
+    }
+
+    /// Return true if the given vector instruction has one or more reference (Whisper)
+    /// physical address. Reference addresses may be missing if all the elements are
+    /// masked off, or if VL is 0.
+    bool vecHasRefPhysAddr(const McmInstr& instr) const
+    {
+      assert(instr.di_.isVector());
+
+      auto& vecRefMap = hartData_.at(instr.hartIx_).vecRefMap_;
+      auto iter = vecRefMap.find(instr.tag_);
+      if (iter == vecRefMap.end())
+	return false;
+
+      auto& vecRefs = iter->second;
+      return not vecRefs.empty();
     }
 
     /// Return true if any of the physical addresses associated with the given instruction

@@ -1704,13 +1704,10 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   for (unsigned i = 0; i < pa1.size(); ++i)
     {
       if (i < masked.size() and masked.at(i))
-	continue;
+	continue;  // Masked off element.
+
       unsigned size1 = elemSize, size2 = 0;
       uint64_t ea1 = pa1.at(i), ea2 = pa2.at(i);
-
-      bool skip = i < masked.size() and masked.at(i);
-      if (skip)
-	continue;
 
       if (ea1 != ea2 and pageNum(ea1) != pageNum(ea2))
 	{
@@ -1785,6 +1782,12 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   std::erase_if(ops, [this](MemoryOpIx ix) {
     return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
   });
+
+  // We cannot distinguish read-ops for active elements from those of inactive ones.  The
+  // inactive element reads are all-ones and will corrupt those of the active elements if
+  // they overlap them and follow them in temporal order.  Either the test-bench filters
+  // out read-ops of inactive elements or it sends us the element index.
+  hasOverlap = true;  // FIX remove once we can distinguish active from inactive.
 
   // Check read operations comparing RTL values to reference (whisper) values.
   // We currently do not get enough information from the test-bench to do this
@@ -3333,7 +3336,7 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   auto rule11 = [this, &instrVec, &instrB] (auto producerTag) -> bool {
-    if (producerTag >= instrVec.size())
+    if (producerTag >= instrVec.size() or producerTag == 0)
       return true;
     const auto& producer = instrVec.at(producerTag);
     if (not producer.di_.isValid())
@@ -3351,7 +3354,8 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
       return false;
     }
 
-  if (bdi.isVectorStore()) // VL is control dependency for vector instructions
+  // VL is control dependency for vector instructions
+  if (bdi.isVectorStore())
     {
       producerTag = hartData_.at(hartIx).vlProducer_;
       if (hartData_.at(hartIx).vlTime_ and not rule11(producerTag))
