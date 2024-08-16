@@ -2012,6 +2012,8 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 
   auto& vecRefs = iter->second;
 
+  uint64_t forwardMask = 0;  // Mask of bits forwarded by vector store instruction
+
   for (auto& vecRef : vecRefs)
     {
       if (not rangesOverlap(vecRef.addr_, vecRef.size_, readOp.physAddr_, readOp.size_))
@@ -2052,11 +2054,11 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 	  readOp.data_ = (readOp.data_ & ~byteMask) | aligned;
 	  count++;
 
-	  mask = mask & ~byteMask;
-	  if (mask == 0)
-	    return count > 0;
+	  forwardMask = forwardMask | byteMask;
 	}
     }
+
+  mask = mask & ~forwardMask;
 
   return count > 0;
 }
