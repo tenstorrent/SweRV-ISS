@@ -193,7 +193,7 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     bool isSc() const
     { return di_.isSc(); }
 
-    /// Return true if this is a privileged instruction (ebreak/ecall)
+    /// Return true if this is a privileged instruction (ebreak/ecall/mret)
     bool isPrivileged() const
     {
       if (di_.instEntry())
@@ -202,6 +202,8 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
           if (instId == WdRiscv::InstId::ebreak)
             return true;
           else if (instId == WdRiscv::InstId::ecall)
+            return true;
+          else if (instId == WdRiscv::InstId::mret)
             return true;
         }
       return false;
