@@ -386,9 +386,24 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
   if (di.isVectorStore())
     {
       unsigned dataReg = effectiveRegIx(di, 0);
-      unsigned srcGroup = hart.vecOpEmul(0);
-      if (di.vecFieldCount())
-        srcGroup *= di.vecFieldCount();
+      unsigned srcGroup;
+
+      // whole register loads and stores do not depend upon vtype
+      auto iid = di.instEntry()->instId();
+      bool wrs = false;
+      wrs = wrs or iid == InstId::vs1r_v;
+      wrs = wrs or iid == InstId::vs2r_v;
+      wrs = wrs or iid == InstId::vs4r_v;
+      wrs = wrs or iid == InstId::vs8r_v;
+      if (wrs)
+        srcGroup = di.vecFieldCount();
+      else
+        {
+          srcGroup = hart.vecOpEmul(0);
+          if (di.vecFieldCount())
+            srcGroup *= di.vecFieldCount();
+        }
+
       for (unsigned i = 0; i < srcGroup; ++i)
         {
           uint64_t dataTime = regTime.at(dataReg + i);
@@ -2259,9 +2274,22 @@ Mcm<URV>::identifyRegisters(const Hart<URV>& hart,
 	}
       else if (type == OperandType::VecReg)
         {
-          unsigned touchedRegs = hart.vecOpEmul(i);
-          if (di.vecFieldCount() and (i == 0))
-            touchedRegs *= di.vecFieldCount();
+          unsigned touchedRegs;
+          // whole register loads and stores do not depend upon vtype
+          auto iid = di.instEntry()->instId();
+          bool wrl = false;
+          wrl = wrl or iid == InstId::vlre8_v;
+          wrl = wrl or iid == InstId::vlre16_v;
+          wrl = wrl or iid == InstId::vlre32_v;
+          wrl = wrl or iid == InstId::vlre64_v;
+          if (wrl)
+            touchedRegs = di.vecFieldCount();
+          else
+            {
+              touchedRegs = hart.vecOpEmul(i);
+              if (di.vecFieldCount() and (i == 0))
+                touchedRegs *= di.vecFieldCount();
+            }
           for (unsigned off = 0; off < touchedRegs; ++off)
             {
               if (isDest)
