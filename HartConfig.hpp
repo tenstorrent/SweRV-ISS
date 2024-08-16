@@ -131,6 +131,10 @@ namespace WdRiscv
     /// in the JSON config file. Example: "isa" : "rv32im"
     bool getIsa(std::string& isa) const;
 
+    /// Recover value(s) of "enable_ppo" tag. If missing or set to true then all rules are
+    /// enabled. Return true on success and false on failure.
+    bool getEnabledPpos(std::vector<unsigned>& enabledPpos) const;
+
     /// Return true if the reset value of the MISA CSR has the user
     /// extension enabled. Return false if MISA CSR is not present in
     /// this configuration or if user extension is not enabled.

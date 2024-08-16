@@ -868,8 +868,20 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
       config.getMcmCheckAll(checkAll);
       if (args.mcmca)
 	checkAll = true;
-      if (not system.enableMcm(mcmLineSize, checkAll, not args.noPpo))
-	errors++;
+
+      if (args.noPpo)
+	{
+	  if (not system.enableMcm(mcmLineSize, checkAll, false /*enablePpos*/))
+	    errors++;
+	}
+      else
+	{
+	  std::vector<unsigned> enabledPpos;
+	  if (not config.getEnabledPpos(enabledPpos))
+	    errors++;
+	  else if (not system.enableMcm(mcmLineSize, checkAll, enabledPpos))
+	    errors++;
+	}
     }
 
   if (args.steesr.size() == 2)

@@ -140,8 +140,13 @@ namespace WdRiscv
   {
   public:
 
+    enum PpoRule { R1 = 1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12,
+		   R13, Limit };
+
+    /// Constructor.
     Mcm(unsigned hartCount, unsigned pageSize, unsigned mergeBufferSize);
 
+    /// Destructor.
     ~Mcm();
 
     /// Initiate an out of order read for a load instruction. If a
@@ -223,9 +228,17 @@ namespace WdRiscv
     /// instruction.
     uint64_t latestByteTime(const McmInstr& instr, uint64_t addr) const;
 
-    /// Skip checking preserve program order (PPO) rules if flag is true.
+    /// Skip checking preserve program order (PPO) rules if flag is false.
     void enablePpo(bool flag)
-    { enablePpo_ = flag; }
+    { std::fill(ppoEnabled_.begin(), ppoEnabled_.end(), flag); }
+
+    /// Skip checking given preserve program order (PPO) rule if flag is false.
+    void enablePpo(PpoRule rule, bool flag)
+    { ppoEnabled_.at(rule) = flag; }
+
+    /// Return true if given rule is enabled.
+    bool isEnabled(PpoRule rule) const
+    { return ppoEnabled_.at(unsigned(rule)); }
 
     /// Check PPO rule1 for the given instruction as instruction B, all relevant
     /// preceding instructions (in program order) are considered as instruction A.
@@ -683,7 +696,7 @@ namespace WdRiscv
     // instructions.
     bool checkWholeLine_ = false;
 
-    bool enablePpo_ = true;  // Skip checking PPO rules when false.
+    std::vector<bool> ppoEnabled_;
 
     bool isTso_ = false;  // True if total-store-ordering model.
   };

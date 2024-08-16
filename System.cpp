@@ -777,7 +777,8 @@ System<URV>::addPciDevices(const std::vector<std::string>& devs)
 
 template <typename URV>
 bool
-System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll, bool enablePpo)
+System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll,
+		       const std::vector<unsigned>& enabledPpos)
 {
   if (mbLineSize != 0)
     if (not isPowerOf2(mbLineSize) or mbLineSize > 512)
@@ -790,7 +791,47 @@ System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll, bool enablePpo)
   mcm_ = std::make_shared<Mcm<URV>>(this->hartCount(), pageSize(), mbLineSize);
   mbSize_ = mbLineSize;
   mcm_->setCheckWholeMbLine(mbLineCheckAll);
-  mcm_->enablePpo(enablePpo);
+
+  mcm_->enablePpo(false);
+
+  for (auto ppoIx : enabledPpos)
+    if (ppoIx < Mcm<URV>::PpoRule::Limit)
+      {
+	typedef typename Mcm<URV>::PpoRule Rule;
+	Rule rule = Rule(ppoIx);
+	mcm_->enablePpo(rule, true);
+      }
+
+  for (auto& hart :  sysHarts_)
+    hart->setMcm(mcm_);
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll, bool enablePpos)
+{
+  if (mbLineSize != 0)
+    if (not isPowerOf2(mbLineSize) or mbLineSize > 512)
+      {
+	std::cerr << "Error: Invalid merge buffer line size: "
+		  << mbLineSize << '\n';
+	return false;
+      }
+
+  mcm_ = std::make_shared<Mcm<URV>>(this->hartCount(), pageSize(), mbLineSize);
+  mbSize_ = mbLineSize;
+  mcm_->setCheckWholeMbLine(mbLineCheckAll);
+
+  typedef typename Mcm<URV>::PpoRule Rule;
+
+  for (unsigned ix = 0; ix < Rule::Limit; ++ix)
+    {
+      Rule rule = Rule(ix);
+      mcm_->enablePpo(rule, enablePpos);
+    }
 
   for (auto& hart :  sysHarts_)
     hart->setMcm(mcm_);

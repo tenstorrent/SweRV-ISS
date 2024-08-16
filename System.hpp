@@ -276,12 +276,17 @@ namespace WdRiscv
                      const std::vector<unsigned>& thresholdMasks,
                      bool trace);
 
-    /// Enable memory consistency model. This is relevant in server/interactive where RTL
-    /// monitor or interactive command may initiate out of order memory
-    /// transactions. Behavior is undefined if used in non-server/non-interactive mode or
-    /// if used after execution has started. The mergeBuffserSize is the merge buffer line
-    /// size in bytes.
-    bool enableMcm(unsigned mergeBufferSize, bool mbLineCheckAll, bool enablePpo = true);
+    /// Enable memory consistency model with given merge buffer size. This is relevant in
+    /// server/interactive where RTL monitor or interactive command may initiate out of
+    /// order memory transactions. Behavior is undefined if used in
+    /// non-server/non-interactive mode or if used after execution has started. The
+    /// mergeBuffserSize is the merge buffer line size in bytes. Only the PPO rules with
+    /// numbers in the enabledPpos vector are enabled.
+    bool enableMcm(unsigned mbSize, bool mbLineCheckAll,
+		   const std::vector<unsigned>& enabledPpos);
+
+    /// Similar to preceding method but with all PPO rules enabled/disabled.
+    bool enableMcm(unsigned mbSize, bool mbLineCheckAll, bool enablePpos);
 
     /// Enable the performance mode API.
     bool enablePerfApi(std::vector<FILE*>& traceFiles);

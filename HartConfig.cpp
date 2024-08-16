@@ -23,6 +23,7 @@
 #include "System.hpp"
 #include "Core.hpp"
 #include "Hart.hpp"
+#include "Mcm.hpp"
 
 
 using namespace WdRiscv;
@@ -2342,13 +2343,12 @@ HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
     if (not getJsonBoolean(tag, config_ -> at(tag), enableMcm))
       return false;
 
-  tag = "enable_ppo";
-  bool enablePpo = true;
-  if (config_ -> contains(tag))
-    if (not getJsonBoolean(tag, config_ -> at(tag), enablePpo))
-      return false;
+  // Parse enable_ppo, it it is missing all PPO rules are enabled.
+  std::vector<unsigned> enabledPpos;
+  if (not getEnabledPpos(enabledPpos))
+    return false;
 
-  if (enableMcm and not system.enableMcm(mbLineSize, checkAll, enablePpo))
+  if (enableMcm and not system.enableMcm(mbLineSize, checkAll, enabledPpos))
     return false;
 
   tag = "enable_tso";
@@ -2493,6 +2493,51 @@ HartConfig::getIsa(std::string& isa) const
       return true;
     }
   return false;
+}
+
+
+bool
+HartConfig::getEnabledPpos(std::vector<unsigned>& enabledPpos) const
+{
+  std::string tag = "enable_ppo";
+
+  if (config_ -> contains(tag))
+    {
+      auto& ep = config_ -> at(tag);
+      if (ep.is_boolean())
+	{
+	  bool flag = false;
+	  if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+	    return false;
+	  if (flag)
+	    for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Limit; ++i)
+	      enabledPpos.push_back(i);
+	}
+      else if (ep.is_array())
+	{
+	  std::vector<unsigned> temp;
+
+	  if (not getJsonUnsignedVec(tag, ep, temp))
+	    return false;
+
+	  // Keep valid rule numbers
+	  for (auto ix : temp)
+	    {
+	      if (ix < Mcm<uint64_t>::PpoRule::Limit)
+		enabledPpos.push_back(ix);
+	      else
+		std::cerr << "Invalid PPO rule number in config file enable_ppo tag: " << ix << '\n';
+	    }
+	}
+    }
+  else
+    {
+      // Tag is missing: all rules enabled.
+      for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Limit; ++i)
+	enabledPpos.push_back(i);
+    }
+
+  return true;
 }
 
 

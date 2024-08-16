@@ -25,6 +25,9 @@ Mcm<URV>::Mcm(unsigned hartCount, unsigned pageSize, unsigned mergeBufferSize)
 
   // If no merge buffer, then memory is updated on insert messages.
   writeOnInsert_ = (lineSize_ == 0);
+
+  // Enable all rules.
+  ppoEnabled_.resize(PpoRule::Limit, true);
 }
 
 
@@ -517,15 +520,11 @@ Mcm<URV>::mergeBufferInsertScalar(Hart<URV>& hart, uint64_t time, uint64_t instr
 	  return false;
 	}
 
-      if (enablePpo_)
-	{
-	  if (not ppoRule1(hart, *instr))
-	    result = false;
+      if (isEnabled(PpoRule::R1))
+	result = ppoRule1(hart, *instr) and result;
 
-	  if (instr->di_.isAmo())
-	    if (not ppoRule3(hart, *instr))
-	      result = false;
-	}
+      if (instr->di_.isAmo() and isEnabled(PpoRule::R3))
+	result = ppoRule3(hart, *instr) and result;
 
       // We commit the RTL data to memory but we check them against whisper data (in
       // checkStoreData). This is simpler than committing part of whisper instruction
@@ -633,11 +632,12 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 	      if (not op.isCanceled() and not op.isRead_)
 		result = checkStoreData(hart.hartId(), *instr) and result;
 	    }
-	  if (enablePpo_)
-	    {
-	      result = ppoRule1(hart, *instr) and result;
-	      result = ppoRule3(hart, *instr) and result;
-	    }
+
+	  if (isEnabled(PpoRule::R1))
+	    result = ppoRule1(hart, *instr) and result;
+
+	  if (isEnabled(PpoRule::R3))
+	    result = ppoRule3(hart, *instr) and result;
 	}
     }
 
@@ -740,7 +740,7 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
       if (instrB.complete_)
 	{
 	  undrained.erase(instrB.tag_);
-	  if (enablePpo_)
+	  if (isEnabled(PpoRule::R1))
 	    return ppoRule1(hart, instrB);
 	}
       else
@@ -843,7 +843,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (instr->isStore_ and instr->complete_)
     {
       ok = checkStoreData(hartIx, *instr) and ok;
-      if (enablePpo_)
+      if (isEnabled(PpoRule::R1))
 	ok = ppoRule1(hart, *instr) and ok;
     }
 
@@ -852,24 +852,41 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   assert(di.isValid());
 
-  if (enablePpo_)
-    {
-      if (di.isFence())
-	ok = checkFence(hart, *instr) and ok;
+  if (isEnabled(PpoRule::R2))
+    ok = ppoRule2(hart, *instr) and ok;
 
-      ok = ppoRule2(hart, *instr) and ok;
-      ok = ppoRule3(hart, *instr) and ok;
-      ok = ppoRule4(hart, *instr) and ok;
-      ok = ppoRule5(hart, *instr) and ok;
-      ok = ppoRule6(hart, *instr) and ok;
-      ok = ppoRule7(hart, *instr) and ok;
-      ok = ppoRule8(hart, *instr) and ok;
-      ok = ppoRule9(hart, *instr) and ok;
-      ok = ppoRule10(hart, *instr) and ok;
-      ok = ppoRule11(hart, *instr) and ok;
-      ok = ppoRule12(hart, *instr) and ok;
-      ok = ppoRule13(hart, *instr) and ok;
-    }
+  if (isEnabled(PpoRule::R3))
+    ok = ppoRule3(hart, *instr) and ok;
+
+  if (isEnabled(PpoRule::R4))
+    ok = ppoRule4(hart, *instr) and ok;
+
+  if (isEnabled(PpoRule::R5))
+    ok = ppoRule5(hart, *instr) and ok;
+
+  if (isEnabled(PpoRule::R6))
+    ok = ppoRule6(hart, *instr) and ok;
+
+  if (isEnabled(PpoRule::R7))
+    ok = ppoRule7(hart, *instr) and ok;
+
+  if (isEnabled(PpoRule::R8))
+    ok = ppoRule8(hart, *instr) and ok;
+
+  if (isEnabled(PpoRule::R9))
+    ok = ppoRule9(hart, *instr) and ok;
+
+  if (isEnabled(PpoRule::R10))
+    ok = ppoRule10(hart, *instr) and ok;
+
+  if (isEnabled(PpoRule::R11))
+    ok = ppoRule11(hart, *instr) and ok;
+
+  if (isEnabled(PpoRule::R12))
+    ok = ppoRule12(hart, *instr) and ok;
+
+  if (isEnabled(PpoRule::R13))
+    ok = ppoRule13(hart, *instr) and ok;
 
   return ok;
 }
@@ -1128,7 +1145,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	  instr->complete_ = true;
 	  undrained.erase(instr->tag_);
 	  checkStoreData(hart.hartId(), *instr);
-	  if (enablePpo_)
+	  if (isEnabled(PpoRule::R1))
 	    if (not ppoRule1(hart, *instr))
 	      result = false;
 	}
@@ -2817,7 +2834,9 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   // We assume that stores preceding a fence are drained before fence retires if fence
-  // has predecessor write. This is checked in checkFence.
+  // has predecessor write. This assumption is checked in checkFence.
+  if (not checkFence(hart, instrB))
+    return false;
 
   auto earlyB = earliestOpTime(instrB);
   if (earlyB > instrB.retireTime_)
