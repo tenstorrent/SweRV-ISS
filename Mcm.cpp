@@ -389,23 +389,9 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
   if (di.isVectorStore())
     {
       unsigned dataReg = effectiveRegIx(di, 0);
-      unsigned srcGroup;
-
-      // whole register loads and stores do not depend upon vtype
-      auto iid = di.instEntry()->instId();
-      bool wrs = false;
-      wrs = wrs or iid == InstId::vs1r_v;
-      wrs = wrs or iid == InstId::vs2r_v;
-      wrs = wrs or iid == InstId::vs4r_v;
-      wrs = wrs or iid == InstId::vs8r_v;
-      if (wrs)
-        srcGroup = di.vecFieldCount();
-      else
-        {
-          srcGroup = hart.vecOpEmul(0);
-          if (di.vecFieldCount())
-            srcGroup *= di.vecFieldCount();
-        }
+      unsigned srcGroup = hart.vecOpEmul(0);
+      if (di.vecFieldCount())
+	srcGroup *= di.vecFieldCount();
 
       for (unsigned i = 0; i < srcGroup; ++i)
         {

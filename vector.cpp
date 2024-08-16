@@ -11616,12 +11616,23 @@ Hart<URV>::execVlre1024_v(const DecodedInst* di)
 
 template <typename URV>
 bool
-Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
+Hart<URV>::vectorStoreWholeReg(const DecodedInst* di)
 {
   unsigned start = csRegs_.peekVstart();
-  unsigned groupX8 = VecRegs::groupMultiplierX8(gm);
-  ElementWidth eew = ElementWidth::Byte;
-  if (not preVecExec()  or  not vecRegs_.legalConfig(eew, gm)  or  di->isMasked())
+  unsigned fieldCount = di->vecFieldCount();
+  unsigned group = 1, groupX8 = 8, effGroupX8 = fieldCount*8;
+
+  // Field count must be a multiple of 8.
+  bool ok = (fieldCount & (fieldCount - 1)) == 0;
+  if (ok)
+    {
+      GroupMultiplier egm = GroupMultiplier::One;
+      ElementWidth eew = ElementWidth::Byte;
+      ok = VecRegs::groupNumberX8ToSymbol(effGroupX8, egm);
+      ok = ok and preVecExec() and vecRegs_.legalConfig(eew, egm) and not di->isMasked();
+    }
+
+  if (not ok)
     {
       postVecFail(di);
       return false;
@@ -11629,11 +11640,12 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
 
   unsigned vd = di->op0(), rs1 = di->op1();
 
+  // This should never fail, we call it to record the operand (vd) group.
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  unsigned elemSize = 1;
-  unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemSize / 8;
+  const unsigned elemSize = 1;
+  unsigned elemCount = (group*vecRegs_.bytesPerRegister()*fieldCount) / elemSize;
   URV addr = intRegs_.read(rs1) + start*elemSize;
 
   vecRegs_.ldStSize_ = sizeof(uint8_t);
@@ -11641,7 +11653,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
   for (unsigned ix = start; ix < elemCount; ++ix, addr += elemSize)
     {
       uint8_t elem = 0;
-      vecRegs_.read(vd, ix, groupX8, elem);
+      vecRegs_.read(vd, ix, effGroupX8, elem);
 
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
       uint64_t gpa1 = addr, gpa2 = addr;
@@ -11673,7 +11685,7 @@ template <typename URV>
 void
 Hart<URV>::execVs1r_v(const DecodedInst* di)
 {
-  if (not vectorStoreWholeReg(di, GroupMultiplier::One))
+  if (not vectorStoreWholeReg(di))
     return;
   postVecSuccess();
 }
@@ -11683,7 +11695,7 @@ template <typename URV>
 void
 Hart<URV>::execVs2r_v(const DecodedInst* di)
 {
-  if (not vectorStoreWholeReg(di, GroupMultiplier::Two))
+  if (not vectorStoreWholeReg(di))
     return;
   postVecSuccess();
 }
@@ -11693,7 +11705,7 @@ template <typename URV>
 void
 Hart<URV>::execVs4r_v(const DecodedInst* di)
 {
-  if (not vectorStoreWholeReg(di, GroupMultiplier::Four))
+  if (not vectorStoreWholeReg(di))
     return;
   postVecSuccess();
 }
@@ -11703,7 +11715,7 @@ template <typename URV>
 void
 Hart<URV>::execVs8r_v(const DecodedInst* di)
 {
-  if (not vectorStoreWholeReg(di, GroupMultiplier::Eight))
+  if (not vectorStoreWholeReg(di))
     return;
   postVecSuccess();
 }

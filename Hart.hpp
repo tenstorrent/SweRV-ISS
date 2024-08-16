@@ -4099,7 +4099,7 @@ namespace WdRiscv
     void execVlre1024_v(const DecodedInst*);
 
     [[nodiscard]]
-    bool vectorStoreWholeReg(const DecodedInst*, GroupMultiplier);
+    bool vectorStoreWholeReg(const DecodedInst*);
 
     void execVs1r_v(const DecodedInst*);
     void execVs2r_v(const DecodedInst*);
