@@ -286,7 +286,7 @@ namespace WdRiscv
 		   const std::vector<unsigned>& enabledPpos);
 
     /// Similar to preceding method but with all PPO rules enabled/disabled.
-    bool enableMcm(unsigned mbSize, bool mbLineCheckAll, bool enablePpos);
+    bool enableMcm(unsigned mbSize, bool mbLineCheckAll, bool enablePpos = true);
 
     /// Enable the performance mode API.
     bool enablePerfApi(std::vector<FILE*>& traceFiles);
