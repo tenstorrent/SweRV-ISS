@@ -2818,13 +2818,14 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
   // Rule 4: There is a fence that orders A before B.
 
   assert(instrB.isRetired());
-  if (not instrB.isMemory())
-    return true;
 
   // We assume that stores preceding a fence are drained before fence retires if fence
   // has predecessor write. This assumption is checked in checkFence.
   if (not checkFence(hart, instrB))
     return false;
+
+  if (not instrB.isMemory())
+    return true;
 
   auto earlyB = earliestOpTime(instrB);
   if (earlyB > instrB.retireTime_)
@@ -2839,7 +2840,11 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
     {
       McmInstrIx tag = ix - 1;
       const auto& instr = instrVec.at(tag);
-      if (not instr.isCanceled() and instr.di_.isFence() and instr.retireTime_ >= earlyB)
+      if (instr.isCanceled())
+	continue;
+      if (instr.retireTime_ < earlyB)
+	break;
+      if (instr.di_.isFence())
 	fences.push_back(tag);
     }
   if (fences.empty())

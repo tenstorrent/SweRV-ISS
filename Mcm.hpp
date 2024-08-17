@@ -332,7 +332,7 @@ namespace WdRiscv
     /// Return the smallest time of the memory operations of given instruction.
     uint64_t earliestOpTime(const McmInstr& instr) const
     {
-      if (not instr.complete_ and instr.memOps_.empty())
+      if (instr.memOps_.empty())
 	return time_;
 
       uint64_t mt = ~uint64_t(0);
