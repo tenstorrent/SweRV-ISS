@@ -224,51 +224,43 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
   const DecodedInst& di = instr.di_;
   assert(di.isValid());
-
   if (di.operandCount() == 0)
     return;
 
-  const auto* instEntry = di.instEntry();
-
-  bool updatesVl = false;
-  if (
-      // id == InstId::vsetivli or
-      di.instId() == InstId::vsetvl or
-      di.instId() == InstId::vsetvli)
-    {
-      if (di.op0() != 0 or di.op1() != 0)
-        updatesVl = true;
-    }
-
-  if (instEntry->isIthOperandIntRegDest(0) and di.ithOperand(0) == 0 and not updatesVl)
-    return; // Destination is x0.
+  bool updatesVl = false;   // FIX vec ld/st may update VL
+  if (di.instId() == InstId::vsetvl or di.instId() == InstId::vsetvli)
+    updatesVl = di.op0() != 0 or di.op1() != 0;
 
   uint64_t time = 0, tag = 0, csrTime = 0, csrTag = 0;
 
-  bool hasDep = true;
-  if (instEntry->isSc())
+  if (di.isSc())
     {
       URV val = 0;
-      hart.peekIntReg(di.op0(), val);
-      if (val == 1)
+      if (hart.peekIntReg(di.op0(), val) and val == 1)
 	return;  // store-conditional failed.
+
       if (instr.memOps_.empty())
 	{
 	  tag = instr.tag_;
 	  time = ~uint64_t(0); // Will be updated when SC drains to memory.
 	}
     }
-  else if (instEntry->isStore() or di.isVectorStore())
-    return;   // No destination register.
-  else if (di.isLoad() or di.isAmo() or di.isBranch() or di.isVectorLoad())
-    hasDep = false;
+  else if (di.isStore() or (di.isVectorStore() and not updatesVl))
+    return;  // No destination register.
 
-  for (const auto& opIx : instr.memOps_)
-    if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ > time)
-      {
-	time = sysMemOps_.at(opIx).time_;
-	tag = instr.tag_;
-      }
+  // Load/amo/sc/branch do not carry depenencies to their destination registers.
+  bool hasDep = not (di.isLoad() or di.isAmo() or di.isSc() or di.isBranch() or di.isVectorLoad());
+
+  if (not instr.memOps_.empty())
+    {
+      // At this point only load/amo/sc instructions should have memory ops.
+      assert(di.isLoad() or di.isAmo() or di.isVectorLoad() or di.isSc());
+      tag = instr.tag_;
+
+      for (const auto& opIx : instr.memOps_)
+	if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ > time)
+	  time = sysMemOps_.at(opIx).time_;
+    }
 
   auto& branchTime = hartData_.at(hartIx).branchTime_;
   auto& branchProducer = hartData_.at(hartIx).branchProducer_;
@@ -320,6 +312,9 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
   for (auto regIx : destRegs)
     {
+      if (regIx == 0)
+	continue;  // Destination is X0
+
       if (not instr.di_.isCsr() or regIx >= csRegOffset_)
 	{
 	  regTimeVec.at(regIx) = time;
@@ -823,8 +818,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (di.isAmo())
     instr->isStore_ = true;  // AMO is both load and store.
 
+  // Set data/address producer times (if any) for current instructions.
   setProducerTime(hart, *instr);
-  updateDependencies(hart, *instr);
 
   if (instr->isStore_ and instr->complete_)
     {
@@ -835,8 +830,6 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   if (instr->isLoad_)
     ok = checkLoadVsPriorCmo(hart, *instr);
-
-  assert(di.isValid());
 
   if (isEnabled(PpoRule::R2))
     ok = ppoRule2(hart, *instr) and ok;
@@ -873,6 +866,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   if (isEnabled(PpoRule::R13))
     ok = ppoRule13(hart, *instr) and ok;
+
+  updateDependencies(hart, *instr);
 
   return ok;
 }
@@ -1135,14 +1130,14 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	    if (not ppoRule1(hart, *instr))
 	      result = false;
 	}
-      if (instr->retired_ and instr->di_.instEntry()->isSc())
+      if (instr->retired_ and instr->di_.isSc())
 	{
 	  if (not instr->complete_)
 	    {
 	      cerr << "Mcm::mergeBufferWrite: sc instruction written before complete\n";
 	      return false;
 	    }
-	  for (uint64_t tag = instr->tag_ + 1; tag < instrVec.size(); ++tag)
+	  for (uint64_t tag = instr->tag_; tag < instrVec.size(); ++tag)
 	    if (instrVec.at(tag).retired_)
 	      updateDependencies(hart, instrVec.at(tag));
 	}
@@ -2283,7 +2278,7 @@ Mcm<URV>::identifyRegisters(const Hart<URV>& hart,
         {
           unsigned touchedRegs;
           // whole register loads and stores do not depend upon vtype
-          auto iid = di.instEntry()->instId();
+          auto iid = di.instId();
           bool wrl = false;
           wrl = wrl or iid == InstId::vlre8_v;
           wrl = wrl or iid == InstId::vlre16_v;
