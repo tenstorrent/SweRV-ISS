@@ -196,6 +196,18 @@ Args::collectCommandLineValues(const boost::program_options::variables_map& varM
   if (varMap.count("noppo"))
     this->noPpo = true;
 
+  if (varMap.count("triggers"))
+    this->triggers = true;
+
+  if (varMap.count("notriggers"))
+    this->triggers = false;
+
+  if (varMap.count("triggers") and varMap.count("notriggers"))
+    {
+      std::cerr << "Error: Cannot specify both --triggers and --notriggers.\n";
+      ok = false;
+    }
+
   if (varMap.count("steesr"))
     {
       auto rangeStr = varMap["steesr"].as<std::string>();
@@ -382,8 +394,10 @@ Args::parseCmdLineArgs(std::span<char*> argv)
 	 "Enable tracing of load/store instruction data address (deprecated -- now always on).")
 	("traceptw", po::bool_switch(&this->tracePtw),
 	 "Enable printing of page table walk information in log.")
-	("triggers", po::bool_switch(&this->triggers),
+	("triggers",
 	 "Enable debug triggers (triggers are on in interactive and server modes)")
+	("notriggers",
+	 "Disable debug triggers (triggers are on in interactive and server modes)")
 	("counters", po::bool_switch(&this->counters),
 	 "Enable performance counters")
 	("gdb", po::bool_switch(&this->gdb),

@@ -134,7 +134,8 @@ namespace WdRiscv
     bool version = false;
     bool traceLdSt = false;  // Trace ld/st data address if true.
     bool csv = false;        // Log files in CSV format when true.
-    bool triggers = false;   // Enable debug triggers when true.
+    std::optional<bool> triggers;   // Enable debug triggers when true.
+    std::optional<bool> notriggers;   // Disable debug triggers when true.
     bool counters = false;   // Enable performance counters when true.
     bool gdb = false;        // Enable gdb mode when true.
     std::vector<unsigned> gdbTcpPort;   // Enable gdb mode over TCP when port is positive.
