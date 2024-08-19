@@ -24,6 +24,15 @@ template <typename URV>
 void
 Hart<URV>::execVqdot_vv(const DecodedInst* di)
 {
+  if (not checkVecIntInst(di))
+    return;
+
+  if (not extensionIsEnabled(RvExtension::Zvqdot))
+    {
+      postVecFail(di);
+      return;
+    }
+
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned start = csRegs_.peekVstart();

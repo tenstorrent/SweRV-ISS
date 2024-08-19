@@ -1706,6 +1706,8 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
       return false;
     }
  
+  assert(instr->size_ == elemSize);
+
   // Map a reference address to a reference value and a flag indicating if address is
   // covered by a read op.
   struct RefByte
