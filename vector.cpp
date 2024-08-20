@@ -11483,11 +11483,19 @@ bool
 Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 {
   unsigned start = csRegs_.peekVstart();
-  unsigned groupX8 = di->vecFieldCount() * 8;
-  GroupMultiplier gm = GroupMultiplier::One;
-  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, gm);
-  badConfig = badConfig or not vecRegs_.legalConfig(eew, gm);
-  if ((not preVecExec()) or badConfig or di->isMasked())
+  unsigned fieldCount = di->vecFieldCount();
+  unsigned group = 1, groupX8 = 8, effGroupX8 = fieldCount*8;
+
+  // Field count must be a multiple of 8.
+  bool ok = (fieldCount & (fieldCount - 1)) == 0;
+  if (ok)
+    {
+      GroupMultiplier egm = GroupMultiplier::One;
+      ok = VecRegs::groupNumberX8ToSymbol(effGroupX8, egm);
+      ok = ok and preVecExec() and vecRegs_.legalConfig(eew, egm) and not di->isMasked();
+    }
+
+  if (not ok)
     {
       postVecFail(di);
       return false;
@@ -11495,16 +11503,21 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
   unsigned vd = di->op0(), rs1 = di->op1();
 
+  // This should never fail, we call it to record the operand (vd) group.
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
   unsigned elemBytes = VecRegs::elemWidthInBytes(eew);
-  unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
-  URV addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
+  assert(elemBytes == sizeof(ELEM_TYPE));
+  unsigned elemCount = (group*vecRegs_.bytesPerRegister()*fieldCount) / elemBytes;
+  URV addr = intRegs_.read(rs1) + start*elemBytes;
 
-  vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
+  vecRegs_.ldStSize_ = elemBytes;
 
-  for (unsigned ix = start; ix < elemCount; ++ix, addr += sizeof(ELEM_TYPE))
+  if (start >= elemCount)
+    return true;
+
+  for (unsigned ix = start; ix < elemCount; ++ix, addr += elemBytes)
     {
       auto cause = ExceptionCause::NONE;
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
@@ -11530,13 +11543,15 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
           return false;
         }
 
-      vecRegs_.write(vd, ix, groupX8, elem);
+      vecRegs_.write(vd, ix, effGroupX8, elem);
 
       vecRegs_.ldStVa_.push_back(addr);
       vecRegs_.ldStPa_.push_back(pa1);
       vecRegs_.ldStPa2_.push_back(pa1);
       vecRegs_.maskedAddr_.push_back(false);
     }
+
+  vecRegs_.touchReg(vd, groupX8);  // We want the group and not the effective group.
 
   return true;
 }
@@ -11644,13 +11659,13 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  const unsigned elemSize = 1;
-  unsigned elemCount = (group*vecRegs_.bytesPerRegister()*fieldCount) / elemSize;
-  URV addr = intRegs_.read(rs1) + start*elemSize;
+  const unsigned elemBytes = 1;
+  unsigned elemCount = (group*vecRegs_.bytesPerRegister()*fieldCount) / elemBytes;
+  URV addr = intRegs_.read(rs1) + start*elemBytes;
 
-  vecRegs_.ldStSize_ = sizeof(uint8_t);
+  vecRegs_.ldStSize_ = elemBytes;
 
-  for (unsigned ix = start; ix < elemCount; ++ix, addr += elemSize)
+  for (unsigned ix = start; ix < elemCount; ++ix, addr += elemBytes)
     {
       uint8_t elem = 0;
       vecRegs_.read(vd, ix, effGroupX8, elem);

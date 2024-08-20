@@ -4478,16 +4478,12 @@ Hart<URV>::lastVecReg(const DecodedInst& di, unsigned& group) const
       return vecReg;
     }
 
-  InstId instId = di.instEntry()->instId();
-
   // We want to report all the registers in the group.
   group  = (groupX8 >= 8) ? groupX8/8 : 1;
   vecReg = static_cast<int>(di.op0());  // Make sure we have 1st reg in group.
-  if ((instId >= InstId::vlsege8_v and instId <= InstId::vssege1024_v) or
-      (instId >= InstId::vlsege8ff_v and instId <= InstId::vlsege1024ff_v) or
-      (instId >= InstId::vlssege8_v and instId <= InstId::vsssege1024_v) or
-      (instId >= InstId::vluxsegei8_v and instId <= InstId::vsoxsegei1024_v))
-    group = group*di.vecFieldCount();  // Scale by field count
+  unsigned fc = di.vecFieldCount();
+  if (fc > 0)
+    group = group * fc;;  // Scale by field count
 
   return vecReg;
 }
