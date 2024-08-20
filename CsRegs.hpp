@@ -1697,6 +1697,9 @@ namespace WdRiscv
     /// Enable/disable access to certain CSRs from non-machine mode.
     void enableSmstateen(bool flag);
 
+    /// Enable/disable Ssqosid extension.
+    void enableSsqosid(bool flag);
+
     /// Enable/disable resubale non maskable interrupt extension.
     void enableSmrnmi(bool flag);
 
@@ -2115,6 +2118,7 @@ namespace WdRiscv
     bool cofEnabled_ = false;     // Counter overflow
     bool stateenOn_ = false;      // Mstateen extension.
     bool triggersOn_ = false;     // Stdtrig (debug triggers) extension.
+    bool ssqosidOn_ = false;      // Ssqosid extension.
     bool pmpTor_ = true;          // Top-of-range PMP mode enabled
     bool pmpNa4_ = true;          // Na4 PMP mode enabled
     bool aiaEnabled_ = false;     // Aia extension.

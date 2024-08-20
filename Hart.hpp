@@ -1062,6 +1062,13 @@ namespace WdRiscv
       csRegs_.enableSmstateen(flag);
     }
 
+    /// Enable/disbale ssqosid extension.
+    void enableSsqosid(bool flag)
+    {
+      enableExtension(RvExtension::Ssqosid, flag);
+      csRegs_.enableSsqosid(flag);
+    }
+
     /// Enable/disable the resumable non maskable interrupt (Smrnmi) extension.
     void enableSmrnmi(bool flag)
     { enableExtension(RvExtension::Smrnmi, flag); csRegs_.enableSmrnmi(flag); }

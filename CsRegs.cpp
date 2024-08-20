@@ -736,6 +736,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
   enableSscofpmf(cofEnabled_);  // To activate/deactivate SCOUNTOVF.
   enableSmstateen(stateenOn_);  // To activate/deactivate STATEEN CSRs.
   enableTriggers(triggersOn_);  // To activate/deactivate SCONTEXT.
+  enableSsqosid(ssqosidOn_);  // To activate/deactivate SRMCFG.
 }
 
 
@@ -949,6 +950,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
   enableSmstateen(stateenOn_); // To activate/deactivate STATEEN CSRs.
   enableAia(aiaEnabled_);      // To activate/deactivate AIA hypervisor CSRs.
   enableTriggers(triggersOn_); // To activate/deactivate HCONTEXT.
+  enableSsqosid(ssqosidOn_);   // To activate/deactivate SRMCFG.
 }
 
 
@@ -1187,6 +1189,17 @@ CsRegs<URV>::enableSmstateen(bool flag)
   if (rv32_)
     for (auto csrn : { CN::HSTATEEN0H, CN::HSTATEEN1H, CN::HSTATEEN2H, CN::HSTATEEN3H } )
       enableCsr(csrn, flag);
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableSsqosid(bool flag)
+{
+  ssqosidOn_ = flag;
+  auto csr = findCsr(CsrNumber::SRMCFG);
+  if (csr)
+    csr->setImplemented(flag);
 }
 
 

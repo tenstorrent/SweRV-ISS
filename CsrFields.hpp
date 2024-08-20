@@ -367,10 +367,12 @@ namespace WdRiscv
       unsigned CBZE      : 1;   // Bit  7
       uint64_t reserved1 : 24;  // Bits 31:8
       unsigned PMM       : 2;   // Bits 33:32
-      uint64_t reserved2 : 27;  // Bits 60:34
-      unsigned ADUE      : 1;   // Bit 61
-      unsigned PBMTE     : 1;   // Bit 62
-      unsigned STCE      : 1;   // Bit 63
+      unsigned reserved2 : 21;  // Bits 54:34
+      unsigned SRMCFG    : 1;   // Bit  55
+      uint64_t reserved3 : 5;   // Bits 60:56
+      unsigned ADUE      : 1;   // Bit  61
+      unsigned PBMTE     : 1;   // Bit  62
+      unsigned STCE      : 1;   // Bit  63
     } bits_;
   };
 

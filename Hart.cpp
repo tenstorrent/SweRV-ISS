@@ -393,6 +393,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableZkr(true);
   if (isa_.isEnabled(RvExtension::Smstateen))
     enableSmstateen(true);
+  if (isa_.isEnabled(RvExtension::Ssqosid))
+    enableSsqosid(true);
 
   if (isa_.isEnabled(RvExtension::Zvknha) and
       isa_.isEnabled(RvExtension::Zvknhb))
