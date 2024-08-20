@@ -210,6 +210,42 @@ Mcm<URV>::findOrAddInstr(unsigned hartIx, uint32_t tag)
 
 template <typename URV>
 void
+Mcm<URV>::setBranchMemTime(const Hart<URV>& hart, const McmInstr& instr)
+{
+  const DecodedInst& di = instr.di_;
+  if (not di.isBranch())
+    return;
+
+  unsigned hartIx = hart.sysHartIndex();
+
+  auto& regTimeVec = hartData_.at(hartIx).regTime_;
+  auto& branchTime = hartData_.at(hartIx).branchTime_;
+
+  auto& branchProducer = hartData_.at(hartIx).branchProducer_;
+  auto& regProducer = hartData_.at(hartIx).regProducer_;
+
+  std::vector<unsigned> sourceRegs, destRegs;
+  identifyRegisters(hart, di, sourceRegs, destRegs);
+
+  branchTime = 0;
+  branchProducer = 0;
+
+  if (sourceRegs.empty())
+    return;
+
+  for (auto regIx : sourceRegs)
+    {
+      if (regTimeVec.at(regIx) > branchTime)
+	{
+	  branchTime = regTimeVec.at(regIx);
+	  branchProducer = regProducer.at(regIx);
+	}
+    }
+}
+
+
+template <typename URV>
+void
 Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 {
   if (not instr.retired_)
@@ -225,7 +261,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
   const DecodedInst& di = instr.di_;
   assert(di.isValid());
   if (di.operandCount() == 0)
-    return;
+    return;  // Branch time handled in setBranchTime.
 
   bool updatesVl = false;   // FIX vec ld/st may update VL
   if (di.instId() == InstId::vsetvl or di.instId() == InstId::vsetvli)
@@ -256,24 +292,17 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
       // At this point only load/amo/sc instructions should have memory ops.
       assert(di.isLoad() or di.isAmo() or di.isVectorLoad() or di.isSc());
       tag = instr.tag_;
-
       for (const auto& opIx : instr.memOps_)
 	if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ > time)
 	  time = sysMemOps_.at(opIx).time_;
     }
 
-  auto& branchTime = hartData_.at(hartIx).branchTime_;
-  auto& branchProducer = hartData_.at(hartIx).branchProducer_;
   auto& vlTime = hartData_.at(hartIx).vlTime_;
   auto& vlProducer = hartData_.at(hartIx).vlProducer_;
-
-  if (di.isBranch())
-    branchTime = 0;
 
   std::vector<unsigned> sourceRegs, destRegs;
   identifyRegisters(hart, di, sourceRegs, destRegs);
 
-  bool first = true; // first branch source
   for (auto regIx : sourceRegs)
     {
       bool isCsr = regIx >= csRegOffset_;
@@ -290,20 +319,11 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	  tag = regProducer.at(regIx);
 	}
 
-      if (di.isBranch())
-	if (first or regTimeVec.at(regIx) > branchTime)
-	  {
-	    first = false;
-	    branchTime = regTimeVec.at(regIx);
-	    branchProducer = regProducer.at(regIx);
-	  }
-
-      if (updatesVl)
-        if (regTimeVec.at(regIx) > vlTime)
-          {
-            vlTime = regTimeVec.at(regIx);
-            vlProducer = regProducer.at(regIx);
-          }
+      if (updatesVl and regTimeVec.at(regIx) > vlTime)
+	{
+	  vlTime = regTimeVec.at(regIx);
+	  vlProducer = regProducer.at(regIx);
+	}
     }
 
   bool noSource = sourceRegs.empty();
@@ -316,13 +336,12 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	continue;  // Destination is X0
 
       if (not instr.di_.isCsr() or regIx >= csRegOffset_)
-	{
+	{  // Non-CSR instruction or destination is a CSR register.
 	  regTimeVec.at(regIx) = time;
 	  regProducer.at(regIx) = tag;
 	}
       else
-	{
-	  // Integer destination register of a CSR instruction.
+	{  // Integer destination register of a CSR instruction.
 	  regTimeVec.at(regIx) = csrTime;
 	  regProducer.at(regIx) = csrTag;
 	}
@@ -868,6 +887,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
     ok = ppoRule13(hart, *instr) and ok;
 
   updateDependencies(hart, *instr);
+  setBranchMemTime(hart, *instr);
 
   return ok;
 }

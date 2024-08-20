@@ -607,8 +607,18 @@ namespace WdRiscv
     /// Helper to cancelInstruction. 
     void cancelInstr(Hart<URV>& hart, McmInstr& instr);
 
+    /// Propagate depenencies from source to dest registers. Set the time data of dest
+    /// regs was produced.
     void updateDependencies(const Hart<URV>& hart, const McmInstr& instr);
 
+    /// Set the memory time of the given branch instruction to the latest time (data was
+    /// produced) of its registers. This branch memory time is used for checking
+    /// the control dependency rule (rule 11). No-op if instr is not a branch.
+    void setBranchMemTime(const Hart<URV>& hart, const McmInstr& instr);
+
+    /// Set the tag of the instruction producing the data/address used by the given
+    /// instruction (data for store/amo instrs, address for load/amo instrs). Set the
+    /// corresponding time. No-op if instruction is not a memory instruction.
     void setProducerTime(const Hart<URV>& hart, McmInstr& instr);
 
     /// Map register number of operand opIx to a unique integer by adding an offset:
