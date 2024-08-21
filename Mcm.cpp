@@ -334,16 +334,12 @@ template <typename URV>
 void
 Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 {
-  if (not instr.retired_)
-    {
-      cerr << "Mcm::updateDependencies: Error: Instruction is not retired\n";
-      assert(0 && "Mcm::updateDependencies: Instruction is not retired");
-    }
+  assert(instr.retired_);
 
   const DecodedInst& di = instr.di_;
   assert(di.isValid());
   if (di.operandCount() == 0)
-    return;  // Branch time handled in setBranchTime.
+    return;  // No registers.
 
   if (di.isVectorLoad())
     {
@@ -351,9 +347,8 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
       return;
     }
 
-  unsigned hartIx = hart.sysHartIndex();
-  auto& regTimeVec = hartData_.at(hartIx).regTime_;
-  auto& regProducer = hartData_.at(hartIx).regProducer_;
+  if ((di.isStore() and not di.isSc()) or di.isVectorStore())
+    return; // No destination register.
 
   bool updatesVl = false;   // FIX vec ld/st may update VL
   if (di.instId() == InstId::vsetvl or di.instId() == InstId::vsetvli)
@@ -363,18 +358,14 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
   if (di.isSc())
     {
-      URV val = 0;
-      if (hart.peekIntReg(di.op0(), val) and val == 1)
+      if (URV val = 0; hart.peekIntReg(di.op0(), val) and val == 1)
 	return;  // store-conditional failed.
-
       if (instr.memOps_.empty())
 	{
 	  tag = instr.tag_;
 	  time = ~uint64_t(0); // Will be updated when SC drains to memory.
 	}
     }
-  else if (di.isStore() or (di.isVectorStore() and not updatesVl))
-    return;  // No destination register.
 
   // Load/amo/sc/branch do not carry depenencies to their destination registers.
   bool hasDep = not (di.isLoad() or di.isAmo() or di.isSc() or di.isBranch());
@@ -389,6 +380,9 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	  time = sysMemOps_.at(opIx).time_;
     }
 
+  unsigned hartIx = hart.sysHartIndex();
+  auto& regTimeVec = hartData_.at(hartIx).regTime_;
+  auto& regProducer = hartData_.at(hartIx).regProducer_;
   auto& vlTime = hartData_.at(hartIx).vlTime_;
   auto& vlProducer = hartData_.at(hartIx).vlProducer_;
 
