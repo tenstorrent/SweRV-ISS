@@ -616,6 +616,12 @@ namespace WdRiscv
     /// the control dependency rule (rule 11). No-op if instr is not a branch.
     void setBranchMemTime(const Hart<URV>& hart, const McmInstr& instr);
 
+    /// Get the latest read time for each vector register that is in the destination
+    /// register group of the given load instruction. Return the overall latest time.
+    /// The times vector will be resized to the number of registers in the group and
+    /// will have one value for each register.
+    void updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr);
+
     /// Set the tag of the instruction producing the data/address used by the given
     /// instruction (data for store/amo instrs, address for load/amo instrs). Set the
     /// corresponding time. No-op if instruction is not a memory instruction.

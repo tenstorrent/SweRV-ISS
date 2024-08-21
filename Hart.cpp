@@ -4483,7 +4483,7 @@ Hart<URV>::lastVecReg(const DecodedInst& di, unsigned& group) const
   vecReg = static_cast<int>(di.op0());  // Make sure we have 1st reg in group.
   unsigned fc = di.vecFieldCount();
   if (fc > 0)
-    group = group * fc;;  // Scale by field count
+    group = group * fc;  // Scale by field count
 
   return vecReg;
 }

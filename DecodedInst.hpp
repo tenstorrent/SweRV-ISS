@@ -294,7 +294,8 @@ namespace WdRiscv
     }
 
     /// Return the element size in bytes of a vector load instruction. Return zero for a
-    /// non-vector-load instruction.
+    /// non-vector-load instruction. For load-indexed and load-segment-indexed, this
+    /// returns the index element size.
     unsigned vecLoadElemSize() const
     {
       if (not isVectorLoad()) return 0;
@@ -307,7 +308,8 @@ namespace WdRiscv
     }
 
     /// Return the element size in bytes of a vector store instruction. Return zero for a
-    /// non-vector-store instruction.
+    /// non-vector-store instruction. For store-indexed and store-segment-indexed, this
+    /// returns the index element size.
     unsigned vecStoreElemSize() const
     {
       if (not isVectorStore()) return 0;

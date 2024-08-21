@@ -246,6 +246,92 @@ Mcm<URV>::setBranchMemTime(const Hart<URV>& hart, const McmInstr& instr)
 
 template <typename URV>
 void
+Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr)
+{
+  const DecodedInst& di = instr.di_;
+  assert(di.isVectorLoad());
+
+  uint64_t time = 0;
+
+  unsigned group = 1;
+  int baseVecReg = hart.lastVecReg(di, group);
+  if (baseVecReg < 0)
+    return;  // No register was written by vector load.
+
+  unsigned hartIx = hart.sysHartIndex();
+  auto& regProducer = hartData_.at(hartIx).regProducer_;
+  auto& regTimeVec = hartData_.at(hartIx).regTime_;
+
+  // In case no vec register was written.
+  for (unsigned ix = 0; ix < group; ++ix)
+    {
+      unsigned regIx = baseVecReg + ix + vecRegOffset_;
+      regTimeVec.at(regIx) = 0;
+      regProducer.at(regIx) = instr.tag_;
+    }
+
+  if (group == 1)
+    {
+      for (const auto& opIx : instr.memOps_)
+	if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ > time)
+	  time = sysMemOps_.at(opIx).time_;
+
+      unsigned regIx = baseVecReg + vecRegOffset_;
+      regTimeVec.at(regIx) = time;
+      return;
+    }
+
+  std::vector<uint64_t> addr, paddr, paddr2, data;
+  std::vector<bool> masked;
+  unsigned elemSize = 0;
+  if (not hart.getLastVectorMemory(addr, paddr, paddr2, data, masked, elemSize))
+    return;  // Should not happen.
+
+  unsigned elemsPerVec = hart.vecRegSize() / elemSize;
+
+  for (unsigned ix = 0; ix < group; ++ix)
+    {
+      uint64_t regTime = 0;  // Vector register time
+
+      unsigned offset = ix * elemsPerVec;
+      for (unsigned elemIx = 0; elemIx < elemsPerVec; ++elemIx)
+	{
+	  unsigned ixInGroup = offset + elemIx;
+	  if (ixInGroup >= addr.size())
+	    continue;  // Should not happen
+
+	  uint64_t pa1 = paddr.at(ixInGroup), pa2 = paddr2.at(ixInGroup);
+	  unsigned size1 = elemSize, size2 = 0;
+	  if (pa1 != pa2)
+	    {
+	      size1 = offsetToNextPage(pa1);
+	      assert(size1 > 0 and size1 < 8);
+	      size2 = elemSize - size1;
+	    }
+
+	  for (unsigned i = 0; i < size1; ++i)
+	    {
+	      uint64_t addr = pa1 + i;
+	      uint64_t byteTime = latestByteTime(instr, addr);
+	      regTime = std::max(byteTime, regTime);
+	    }
+
+	  for (unsigned i = 0; i < size2; ++i)
+	    {
+	      uint64_t addr = pa2 + i;
+	      uint64_t byteTime = latestByteTime(instr, addr);
+	      regTime = std::max(byteTime, regTime);
+	    }
+	}
+
+      unsigned regIx = baseVecReg + ix + vecRegOffset_;
+      regTimeVec.at(regIx) = regTime;
+    }
+}
+
+
+template <typename URV>
+void
 Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 {
   if (not instr.retired_)
@@ -254,14 +340,20 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
       assert(0 && "Mcm::updateDependencies: Instruction is not retired");
     }
 
-  unsigned hartIx = hart.sysHartIndex();
-  auto& regTimeVec = hartData_.at(hartIx).regTime_;
-  auto& regProducer = hartData_.at(hartIx).regProducer_;
-
   const DecodedInst& di = instr.di_;
   assert(di.isValid());
   if (di.operandCount() == 0)
     return;  // Branch time handled in setBranchTime.
+
+  if (di.isVectorLoad())
+    {
+      updateVecLoadDependencies(hart, instr);
+      return;
+    }
+
+  unsigned hartIx = hart.sysHartIndex();
+  auto& regTimeVec = hartData_.at(hartIx).regTime_;
+  auto& regProducer = hartData_.at(hartIx).regProducer_;
 
   bool updatesVl = false;   // FIX vec ld/st may update VL
   if (di.instId() == InstId::vsetvl or di.instId() == InstId::vsetvli)
@@ -285,12 +377,12 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
     return;  // No destination register.
 
   // Load/amo/sc/branch do not carry depenencies to their destination registers.
-  bool hasDep = not (di.isLoad() or di.isAmo() or di.isSc() or di.isBranch() or di.isVectorLoad());
+  bool hasDep = not (di.isLoad() or di.isAmo() or di.isSc() or di.isBranch());
 
   if (not instr.memOps_.empty())
     {
       // At this point only load/amo/sc instructions should have memory ops.
-      assert(di.isLoad() or di.isAmo() or di.isVectorLoad() or di.isSc());
+      assert(di.isLoad() or di.isAmo() or di.isSc());
       tag = instr.tag_;
       for (const auto& opIx : instr.memOps_)
 	if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ > time)
