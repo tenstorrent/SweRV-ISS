@@ -2382,22 +2382,10 @@ Mcm<URV>::identifyRegisters(const Hart<URV>& hart,
 	}
       else if (type == OperandType::VecReg)
         {
-          unsigned touchedRegs;
-          // whole register loads and stores do not depend upon vtype
-          auto iid = di.instId();
-          bool wrl = false;
-          wrl = wrl or iid == InstId::vlre8_v;
-          wrl = wrl or iid == InstId::vlre16_v;
-          wrl = wrl or iid == InstId::vlre32_v;
-          wrl = wrl or iid == InstId::vlre64_v;
-          if (wrl)
-            touchedRegs = di.vecFieldCount();
-          else
-            {
-              touchedRegs = hart.vecOpEmul(i);
-              if (di.vecFieldCount() and (i == 0))
-                touchedRegs *= di.vecFieldCount();
-            }
+          unsigned touchedRegs = hart.vecOpEmul(i);
+	  if (di.vecFieldCount() and (i == 0))
+	    touchedRegs *= di.vecFieldCount();
+
           for (unsigned off = 0; off < touchedRegs; ++off)
             {
               if (isDest)
