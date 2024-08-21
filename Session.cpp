@@ -941,6 +941,12 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
 	hart.setTlbSize(size);
     }
 
+  if (args.nmiVec)
+    hart.defineNmiPc(*args.nmiVec);
+
+  if (args.nmeVec)
+    hart.defineNmiExceptionPc(*args.nmeVec);
+
   return errors == 0;
 }
 

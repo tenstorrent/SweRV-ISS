@@ -133,6 +133,20 @@ Args::collectCommandLineValues(const boost::program_options::variables_map& varM
         ok = false;
     }
 
+  if (varMap.count("nmivec"))
+    {
+      auto numStr = varMap["nmivec"].as<std::string>();
+      if (not parseCmdLineNumber("nmivec", numStr, this->nmiVec))
+        ok = false;
+    }
+
+  if (varMap.count("nmevec"))
+    {
+      auto numStr = varMap["nmevec"].as<std::string>();
+      if (not parseCmdLineNumber("nmevec", numStr, this->nmeVec))
+        ok = false;
+    }
+
   if (varMap.count("tohostsym"))
     this->toHostSym = varMap["tohostsym"].as<std::string>();
 
@@ -388,6 +402,10 @@ Args::parseCmdLineArgs(std::span<char*> argv)
 	 "Memory size (must be a multiple of 4096).")
 	("tlbsize", po::value<std::string>(),
 	 "Memory size (must be a power of 2).")
+	("nmivec", po::value<std::string>(),
+	 "PC value after a non-maskable interrupt.")
+	("nmevec", po::value<std::string>(),
+	 "PC value after an exception in the non-maskable interrupt handler.")
 	("interactive,i", po::bool_switch(&this->interactive),
 	 "Enable interactive mode.")
 	("traceload", po::bool_switch(&this->traceLdSt),

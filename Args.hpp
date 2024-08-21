@@ -106,6 +106,8 @@ namespace WdRiscv
     std::optional<uint64_t> instCountLim;
     std::optional<uint64_t> memorySize;
     std::optional<uint64_t> tlbSize;
+    std::optional<uint64_t> nmiVec;
+    std::optional<uint64_t> nmeVec;
     Uint64Vec snapshotPeriods;
     Uint64Vec steesr;
     std::optional<uint64_t> alarmInterval;
