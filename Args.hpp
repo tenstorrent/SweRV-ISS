@@ -158,5 +158,6 @@ namespace WdRiscv
     bool tracePtw = false;   // Enable printing of page table walk info in log.
     bool shm = false;        // Enable shared memory IPC for server mode (default is socket).
     bool logPerHart = false; // Enable separate log files for each hart.
+    bool loadFromTrace = false;    // Enable loading trace information from snapshot.
   };
 }

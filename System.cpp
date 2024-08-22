@@ -1362,7 +1362,7 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::vector<uint6
 
 template <typename URV>
 bool
-System<URV>::loadSnapshot(const std::string& snapDir)
+System<URV>::loadSnapshot(const std::string& snapDir, bool restoreTrace)
 {
   using std::cerr;
 
@@ -1424,6 +1424,17 @@ System<URV>::loadSnapshot(const std::string& snapDir)
   Filesystem::path mmapPath = dirPath / "mmap";
   if (not syscall.loadMmap(mmapPath.string()))
     return false;
+
+  if (restoreTrace)
+    {
+      Filesystem::path dtracePath = dirPath / "data-lines";
+      if (not memory_->loadDataAddressTrace(dtracePath))
+        return false;
+
+      Filesystem::path itracePath = dirPath / "instr-lines";
+      if (not memory_->loadInstructionAddressTrace(itracePath))
+        return false;
+    }
 
   Filesystem::path memPath = dirPath / "memory";
   if (not memory_->loadSnapshot(memPath.string(), usedBlocks))

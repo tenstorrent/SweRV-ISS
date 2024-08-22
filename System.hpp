@@ -225,9 +225,10 @@ namespace WdRiscv
     bool saveSnapshot(const std::string& dirPath);
 
     /// Load register and memory state from snapshot previously saved
-    /// in the given directory. Return true on success and false on
-    /// failure.
-    bool loadSnapshot(const std::string& snapshotDirectory);
+    /// in the given directory. If restoreTrace is true, also restore
+    /// branch/inst/data address traces. Return true on success and
+    /// false on failure.
+    bool loadSnapshot(const std::string& snapshotDirectory, bool restoreTrace);
 
     /// Write contents of memory accessed by current run in verilog
     /// hex format to the file at the given path. Return true on

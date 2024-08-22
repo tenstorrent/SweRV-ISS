@@ -455,6 +455,9 @@ Args::parseCmdLineArgs(std::span<char*> argv)
          "Specifying multiple periods will only save a snapshot on first instance (not periodic).")
 	("loadfrom", po::value(&this->loadFrom),
 	 "Snapshot directory from which to restore a previously saved (snapshot) state.")
+        ("loadfromtrace", po::bool_switch(&this->loadFromTrace),
+         "If true, also restore data-lines/instr-lines/branch-trace from a snapshot "
+         "directory. This needs to be used in conjunction with --loadfrom.")
 	("stdout", po::value(&this->stdoutFile),
 	 "Redirect standard output of newlib/Linux target program to this.")
 	("stderr", po::value(&this->stderrFile),

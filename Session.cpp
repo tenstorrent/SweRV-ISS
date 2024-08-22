@@ -172,7 +172,7 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
 	return false;
 
   if (not args.loadFrom.empty())
-    if (not system.loadSnapshot(args.loadFrom))
+    if (not system.loadSnapshot(args.loadFrom, args.loadFromTrace))
       return false;
 
 

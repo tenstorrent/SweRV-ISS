@@ -489,6 +489,14 @@ namespace WdRiscv
     /// addresses into the given file.
     bool saveInstructionAddressTrace(const std::string& path) const;
 
+    /// If address tracing enabled, then load the accumulated data
+    /// addresses from the given file.
+    bool loadDataAddressTrace(const std::string& path);
+
+    /// If instruction tracing enabled, then load the accumulated
+    /// instruction addresses into the given file.
+    bool loadInstructionAddressTrace(const std::string& path);
+
     /// Return the line number corresponding to the given address.
     uint64_t getLineNumber(uint64_t addr) const
     { return addr >> lineShift_; }
@@ -720,13 +728,17 @@ namespace WdRiscv
                                  const LineMap& lineMap,
                                  const std::string& path);
 
+    static bool loadAddressTrace(LineMap& lineMap,
+                                 uint64_t& refCount,
+                                 const std::string& path);
+
     /// Add line of given address to the data line address trace.
     void traceDataLine(uint64_t vaddr, uint64_t paddr)
-    { dataLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, memRefCount_++}; }
+    { dataLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, dataMemRefCount_++}; }
 
     /// Add line of given address to the instruction line address trace.
     void traceInstructionLine(uint64_t vaddr, uint64_t paddr)
-    { instrLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, memRefCount_++}; }
+    { instrLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, instrMemRefCount_++}; }
 
   private:
 
@@ -765,7 +777,8 @@ namespace WdRiscv
     std::string dataLineFile_;
     std::string instrLineFile_;
     unsigned lineShift_ = 6;   // log2 of line size.
-    uint64_t memRefCount_ = 0;
+    uint64_t dataMemRefCount_ = 0;
+    uint64_t instrMemRefCount_ = 0;
     LineMap dataLineMap_;   // Map virt data line addr to phys line and order.
     LineMap instrLineMap_;  // Map virt instr line line addr to phys line and order.
 
