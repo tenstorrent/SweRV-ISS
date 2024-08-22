@@ -1155,7 +1155,7 @@ Memory::loadDataAddressTrace(const std::string& path)
 {
   if (not dataLineTrace_)
     return true;
-  return loadAddressTrace(dataLineMap_, dataMemRefCount_, path);
+  return loadAddressTrace(dataLineMap_, memRefCount_, path);
 }
 
 
@@ -1164,7 +1164,7 @@ Memory::loadInstructionAddressTrace(const std::string& path)
 {
   if (not dataLineTrace_)
     return true;
-  return loadAddressTrace(instrLineMap_, instrMemRefCount_, path);
+  return loadAddressTrace(instrLineMap_, memRefCount_, path);
 }
 
 

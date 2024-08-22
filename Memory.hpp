@@ -734,11 +734,11 @@ namespace WdRiscv
 
     /// Add line of given address to the data line address trace.
     void traceDataLine(uint64_t vaddr, uint64_t paddr)
-    { dataLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, dataMemRefCount_++}; }
+    { dataLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, memRefCount_++}; }
 
     /// Add line of given address to the instruction line address trace.
     void traceInstructionLine(uint64_t vaddr, uint64_t paddr)
-    { instrLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, instrMemRefCount_++}; }
+    { instrLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, memRefCount_++}; }
 
   private:
 
@@ -777,8 +777,7 @@ namespace WdRiscv
     std::string dataLineFile_;
     std::string instrLineFile_;
     unsigned lineShift_ = 6;   // log2 of line size.
-    uint64_t dataMemRefCount_ = 0;
-    uint64_t instrMemRefCount_ = 0;
+    uint64_t memRefCount_ = 0;
     LineMap dataLineMap_;   // Map virt data line addr to phys line and order.
     LineMap instrLineMap_;  // Map virt instr line line addr to phys line and order.
 
