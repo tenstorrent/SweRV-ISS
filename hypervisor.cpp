@@ -305,6 +305,8 @@ Hart<URV>::hyperStore(const DecodedInst* di)
   uint32_t rs1 = di->op1();
   URV virtAddr = intRegs_.read(rs1);
   STORE_TYPE value = STORE_TYPE(intRegs_.read(di->op0()));
+  auto savedPrivMode = privMode_;
+  auto savedVirtMode = virtMode_;
   store<STORE_TYPE>(di, virtAddr, true /*hyper*/, value);
 
   hyperLs_ = false;
@@ -313,7 +315,7 @@ Hart<URV>::hyperStore(const DecodedInst* di)
   virtMem_.setVsSum(prevVsSum);
 
   if constexpr (isRv64())
-    if (privMode_ == PrivilegeMode::User and not virtMode_)
+    if (savedPrivMode == PrivilegeMode::User and not savedVirtMode)
       virtMem_.enablePointerMasking(prevPmm, PrivilegeMode::User, true);
 }
 
