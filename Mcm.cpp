@@ -354,27 +354,20 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
   if (di.instId() == InstId::vsetvl or di.instId() == InstId::vsetvli)
     updatesVl = di.op0() != 0 or di.op1() != 0;
 
-  uint64_t time = 0, tag = 0, csrTime = 0, csrTag = 0;
+  uint64_t time = 0, tag = instr.tag_, csrTime = 0, csrTag = 0;
 
   if (di.isSc())
     {
       if (URV val = 0; hart.peekIntReg(di.op0(), val) and val == 1)
 	return;  // store-conditional failed.
       if (instr.memOps_.empty())
-	{
-	  tag = instr.tag_;
-	  time = ~uint64_t(0); // Will be updated when SC drains to memory.
-	}
+	time = ~uint64_t(0); // Will be updated when SC drains to memory.
     }
-
-  // Load/amo/sc/branch do not carry depenencies to their destination registers.
-  bool hasDep = not (di.isLoad() or di.isAmo() or di.isSc() or di.isBranch());
 
   if (not instr.memOps_.empty())
     {
       // At this point only load/amo/sc instructions should have memory ops.
       assert(di.isLoad() or di.isAmo() or di.isSc());
-      tag = instr.tag_;
       for (const auto& opIx : instr.memOps_)
 	if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ > time)
 	  time = sysMemOps_.at(opIx).time_;
@@ -383,6 +376,21 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
   unsigned hartIx = hart.sysHartIndex();
   auto& regTimeVec = hartData_.at(hartIx).regTime_;
   auto& regProducer = hartData_.at(hartIx).regProducer_;
+
+  // Load/amo/sc/branch do not carry depenencies to dest register: Update time of dest.
+  if (di.isLoad() or di.isAmo() or di.isSc() or di.isBranch())
+    {
+      auto regIx = effectiveRegIx(di, 0);
+      if (di.ithOperandMode(0) == OperandMode::Write and regIx != 0)
+	{
+	  regProducer.at(regIx) = tag;
+	  regTimeVec.at(regIx) = time;
+	}
+      return;
+    }
+
+  // Propagate times from source to destination registers.
+
   auto& vlTime = hartData_.at(hartIx).vlTime_;
   auto& vlProducer = hartData_.at(hartIx).vlProducer_;
 
@@ -399,7 +407,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	  continue;
 	}
 
-      if (hasDep and regTimeVec.at(regIx) > time)
+      if (regTimeVec.at(regIx) > time)
 	{
 	  time = regTimeVec.at(regIx);
 	  tag = regProducer.at(regIx);
@@ -411,10 +419,6 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	  vlProducer = regProducer.at(regIx);
 	}
     }
-
-  bool noSource = sourceRegs.empty();
-  if (noSource)
-    assert(tag == 0 and time == 0);
 
   for (auto regIx : destRegs)
     {
