@@ -499,8 +499,7 @@ Mcm<URV>::updateVecRegTimes(const Hart<URV>& hart, const McmInstr& instr)
       return;
     }
 
-
-  auto destEmul = hart.vecOpEmul(0);  // FIX TODO  handle reduction
+  auto destEmul = hart.vecOpEmul(0);
 
   unsigned baseDestIx = effectiveRegIx(di, 0);
 

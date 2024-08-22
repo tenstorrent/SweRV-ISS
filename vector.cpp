@@ -385,28 +385,33 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op, unsigned groupX
 template <typename URV>
 inline
 bool
-Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
-			    unsigned groupX8, unsigned vstart)
+Hart<URV>::checkRedOpVsEmul(const DecodedInst* di)
 {
   // Reduction ops must have zero vstart.
-  if (vstart > 0)
+  unsigned start = csRegs_.peekVstart();
+  if (start > 0)
     {
       postVecFail(di);
       return false;
     }
 
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
+  unsigned groupX8 = vecRegs_.groupMultiplierX8();
+  unsigned vs1 = di->op1();
 
-  if ((op1 & mask) == 0)
+  // Vector register (vs1) must be a multiple of lmul.
+
+  unsigned lmul = groupX8 >= 8 ? groupX8 / 8 : 1;
+  unsigned mask = lmul - 1;   // Assumes lmul is 1, 2, 4, or 8
+
+  if ((vs1 & mask) != 0)
     {
-      vecRegs_.setOpEmul(1, eg, 1);  // Track operand group for logging (1 for mask).
-      return true;
+      postVecFail(di);
+      return false;
     }
 
-  // Vector operand not a multiple of emul or non-zero vstart: illegal.
-  postVecFail(di);
-  return false;
+  // Track operand group for logging (vd and vs2 have an lmul of 1).
+  vecRegs_.setOpEmul(1, lmul, 1);
+  return true;
 }
 
 
@@ -4042,7 +4047,7 @@ Hart<URV>::execVredop_vs(const DecodedInst* di, OP op)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   if (elems == 0)
@@ -4090,7 +4095,7 @@ Hart<URV>::execVredopu_vs(const DecodedInst* di, OP op)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   if (elems == 0)
@@ -4244,7 +4249,7 @@ Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   using EW = ElementWidth;
@@ -4279,7 +4284,7 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   using EW = ElementWidth;
@@ -11635,7 +11640,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di)
 {
   unsigned start = csRegs_.peekVstart();
   unsigned fieldCount = di->vecFieldCount();
-  unsigned group = 1, groupX8 = 8, effGroupX8 = fieldCount*8;
+  unsigned group = 1, effGroupX8 = fieldCount*8;
 
   // Field count must be a multiple of 8.
   bool ok = (fieldCount & (fieldCount - 1)) == 0;
@@ -19203,7 +19208,7 @@ Hart<URV>::execVfredusum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   if (elems == 0)
@@ -19282,7 +19287,7 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   if (elems == 0)
@@ -19362,7 +19367,7 @@ Hart<URV>::execVfredmin_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   if (elems == 0)
@@ -19441,7 +19446,7 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   if (elems == 0)
@@ -19591,7 +19596,7 @@ Hart<URV>::execVfwredusum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   using EW = ElementWidth;
@@ -19678,7 +19683,7 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   using EW = ElementWidth;

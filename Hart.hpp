@@ -3022,11 +3022,9 @@ namespace WdRiscv
                                   unsigned offsetWidth, unsigned offsetGroupX8,
                                   unsigned fieldCount);
 
-    /// Check reduction vector operand against the group multiplier. Return true
-    /// if operand is a multiple of multiplier and false otherwise. Record group
-    /// multiplier for tracing.
-    bool checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
-			  unsigned groupX8, unsigned vstart);
+    /// Check reduction vector operand against the group multiplier. Record operands
+    /// group multiplier for tracing.
+    bool checkRedOpVsEmul(const DecodedInst* di);
 
     /// Check destination and index operands against the group multipliers. Return
     /// true if operand is a multiple of multiplier and false otherwise. Record
