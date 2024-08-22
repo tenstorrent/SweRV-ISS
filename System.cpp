@@ -1434,6 +1434,10 @@ System<URV>::loadSnapshot(const std::string& snapDir, bool restoreTrace)
       Filesystem::path itracePath = dirPath / "instr-lines";
       if (not memory_->loadInstructionAddressTrace(itracePath))
         return false;
+
+      Filesystem::path branchPath = dirPath / "branch-trace";
+      if (not hart0.loadBranchTrace(branchPath))
+        return false;
     }
 
   Filesystem::path memPath = dirPath / "memory";

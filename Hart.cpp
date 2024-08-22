@@ -39,6 +39,8 @@
 #include <thread>
 #include <chrono>
 
+#include <boost/algorithm/string.hpp>
+
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
@@ -5136,6 +5138,44 @@ Hart<URV>::saveBranchTrace(const std::string& path)
 		uintmax_t(rec.nextPc_), rec.size_);
     }
   fclose(file);
+  return true;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::loadBranchTrace(const std::string& path)
+{
+  if (not branchBuffer_.max_size())
+    return true;
+
+  std::ifstream ifs(path);
+
+  if (not ifs.good())
+    {
+      std::cerr << "Failed to open branch trace file " << path << "' for input.\n";
+      return false;
+    }
+
+  std::string line;
+  while (std::getline(ifs, line))
+    {
+      std::vector<std::string> tokens;
+      boost::split(tokens, line, boost::is_any_of("\t "), boost::token_compress_on);
+
+      if (tokens.size() != 4)
+        {
+          std::cerr << "Error: Failed to load branch record from line.\n";
+          return false;
+        }
+
+      char type = tokens.at(0).at(0);
+      uint64_t pc = strtoull(tokens.at(1).c_str(), nullptr, 0);
+      uint64_t nextPc = strtoull(tokens.at(2).c_str(), nullptr, 0);
+      uint8_t size = strtoull(tokens.at(3).c_str(), nullptr, 0);
+
+      branchBuffer_.push_back(BranchRecord(type, pc, nextPc, size));
+    }
   return true;
 }
 

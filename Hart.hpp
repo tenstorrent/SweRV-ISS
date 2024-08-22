@@ -1636,6 +1636,9 @@ namespace WdRiscv
     /// Write the collected branch traces to the file at the given path.
     bool saveBranchTrace(const std::string& path);
 
+    /// Restore the collected branch traces at the given path.
+    bool loadBranchTrace(const std::string& path);
+
     /// Set behavior of first access to a virtual memory page: Either
     /// we take a page fault (flag is true) or we update the A/D bits
     /// of the PTE. When V is on, this applies to the first stage (VS)
