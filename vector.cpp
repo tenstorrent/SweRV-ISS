@@ -11503,8 +11503,8 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
   unsigned vd = di->op0(), rs1 = di->op1();
 
-  // This should never fail, we call it to record the operand (vd) group.
-  if (not checkVecOpsVsEmul(di, vd, groupX8))
+  // This should never fail, we call it to record the operand (vd) effective group.
+  if (not checkVecOpsVsEmul(di, vd, effGroupX8))
     return false;
 
   unsigned elemBytes = VecRegs::elemWidthInBytes(eew);
@@ -11656,7 +11656,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di)
   unsigned vd = di->op0(), rs1 = di->op1();
 
   // This should never fail, we call it to record the operand (vd) group.
-  if (not checkVecOpsVsEmul(di, vd, groupX8))
+  if (not checkVecOpsVsEmul(di, vd, effGroupX8))
     return false;
 
   const unsigned elemBytes = 1;

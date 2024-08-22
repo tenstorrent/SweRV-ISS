@@ -350,10 +350,6 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
   if ((di.isStore() and not di.isSc()) or di.isVectorStore())
     return; // No destination register.
 
-  bool updatesVl = false;   // FIX vec ld/st may update VL
-  if (di.instId() == InstId::vsetvl or di.instId() == InstId::vsetvli)
-    updatesVl = di.op0() != 0 or di.op1() != 0;
-
   uint64_t time = 0, tag = instr.tag_, csrTime = 0, csrTag = 0;
 
   if (di.isSc())
@@ -391,6 +387,15 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
   // Propagate times from source to destination registers.
 
+  auto id = di.instId();
+  bool isVset = (id == InstId::vsetvl or id == InstId::vsetvli or id == InstId::vsetivli);
+  if (di.isVector() and not isVset)
+    {
+      updateVecRegTimes(hart, instr);
+      return;
+    }
+
+  bool updatesVl = (id == InstId::vsetvl or id == InstId::vsetvli) and (di.op0() or di.op1());
   auto& vlTime = hartData_.at(hartIx).vlTime_;
   auto& vlProducer = hartData_.at(hartIx).vlProducer_;
 
@@ -435,6 +440,144 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	  regTimeVec.at(regIx) = csrTime;
 	  regProducer.at(regIx) = csrTag;
 	}
+    }
+}
+
+
+template <typename URV>
+void
+Mcm<URV>::updateVecRegTimes(const Hart<URV>& hart, const McmInstr& instr)
+{
+  auto& di = instr.di_;
+  auto opCount = di.operandCount();
+  if (opCount == 0)
+    return;
+
+  auto id = di.instId();
+  bool isVset = (id == InstId::vsetvl or id == InstId::vsetvli or id == InstId::vsetivli);
+  assert(not isVset);
+
+  auto hartIx = instr.hartIx_;
+  auto& regProducer = hartData_.at(hartIx).regProducer_;
+  auto& regTimeVec = hartData_.at(hartIx).regTime_;
+
+  uint64_t time = 0, tag = instr.tag_;
+
+  assert(di.ithOperandMode(0) == OperandMode::Write);  // 1st operand must be the destination
+
+  if (di.ithOperandType(0) != OperandType::VecReg)
+    {
+      // Destination register is scalar: vcpop.m, vfirst.m, vmv.x.s, or vmv.f.s
+      assert(id == InstId::vcpop_m or id == InstId::vfirst_m or id == InstId::vmv_x_s or
+	     id == InstId::vfmv_f_s);
+      assert(opCount == 2);
+      assert(di.ithOperandType(1) == OperandType::VecReg);  // 2nd operand must be vec
+
+      auto destIx = effectiveRegIx(di, 0);
+      if (destIx == 0)
+	return;  // Destination is X0
+
+      // Get group multiplier of vector register.
+      unsigned lmul = 1;  // vmv instructions ignore LMUL
+      if (id == InstId::vcpop_m or id == InstId::vfirst_m)
+	lmul = hart.vecOpEmul(1);
+
+      unsigned baseRegIx = effectiveRegIx(di, 1);
+      for (unsigned i = 0; i < lmul; ++i)
+	{
+	  unsigned srcIx = baseRegIx + i;
+	  auto srcTime = regTimeVec.at(srcIx);
+	  if (srcTime > time)
+	    {
+	      time = srcTime;
+	      tag = regProducer.at(srcIx);
+	    }
+	}
+
+      regProducer.at(destIx) = tag;
+      regTimeVec.at(destIx) = time;
+      return;
+    }
+
+
+  auto destEmul = hart.vecOpEmul(0);  // FIX TODO  handle reduction
+
+  unsigned baseDestIx = effectiveRegIx(di, 0);
+
+  for (unsigned ii = 0; ii < destEmul; ++ii)
+    {
+      time = 0;
+      tag = instr.tag_;
+
+      auto destIx = baseDestIx + ii;
+
+      // Process all source operands.
+      for (unsigned so = 1; so < opCount; ++so)
+	{
+	  if (di.ithOperandType(so) == OperandType::Imm)
+	    continue;
+
+	  assert(di.ithOperandMode(so) == OperandMode::Read);
+
+	  if (di.ithOperandType(so) != OperandType::VecReg)
+	    {
+	      // Scalar source operand. Affects all vec regs in dest group.
+	      auto srcIx = effectiveRegIx(di, so);
+	      auto srcTime = regTimeVec.at(srcIx);
+	      if (srcTime > time)
+		{
+		  time = srcTime;
+		  tag = regProducer.at(srcIx);
+		}
+	    }
+	  else
+	    {
+	      // Vector source operand.
+	      // We propagate times at the vector register level. In the future we will do
+	      // this at the element or at the byte elve.
+
+	      auto baseSrcIx = effectiveRegIx(di, so);
+	      auto srcEmul = hart.vecOpEmul(so);
+	      if (srcEmul <= destEmul)
+		{
+		  assert((destEmul % srcEmul) == 0);
+
+		  // Determine number of dest vec regs per source reg
+		  unsigned ndest = destEmul / srcEmul;
+
+		  auto jj = ii / ndest; // jj is the index of the source vec reg in its group.
+		  auto srcIx = baseSrcIx + jj; // Source vec reg corresponding to dest.
+		  auto srcTime = regTimeVec.at(srcIx);
+		  if (srcTime > time)
+		    {
+		      time = srcTime;
+		      tag = regProducer.at(srcIx);
+		    }
+		}
+	      else
+		{
+		  assert((srcEmul % destEmul) == 0);
+
+		  // Determine number of src vec regs per dest reg.
+		  unsigned nsrc = srcEmul / destEmul;
+
+		  unsigned jj = ii*nsrc;  // jj is the index of a source vec reg in its group
+		  for (unsigned i = 0; i < nsrc; ++i)
+		    {
+		      auto srcIx = baseSrcIx + jj + i;
+		      auto srcTime = regTimeVec.at(srcIx);
+		      if (srcTime > time)
+			{
+			  time = srcTime;
+			  tag = regProducer.at(srcIx);
+			}
+		    }
+		}
+	    }
+	}
+
+      regProducer.at(destIx) = tag;
+      regTimeVec.at(destIx) = time;
     }
 }
 

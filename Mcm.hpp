@@ -611,6 +611,10 @@ namespace WdRiscv
     /// regs was produced.
     void updateDependencies(const Hart<URV>& hart, const McmInstr& instr);
 
+    /// Propagate data times from source to dest register for vector instructions.
+    /// This is a helper to updateDependencies.
+    void updateVecRegTimes(const Hart<URV>& hart, const McmInstr& instr);
+
     /// Set the memory time of the given branch instruction to the latest time (data was
     /// produced) of its registers. This branch memory time is used for checking
     /// the control dependency rule (rule 11). No-op if instr is not a branch.

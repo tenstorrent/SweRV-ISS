@@ -601,6 +601,7 @@ namespace WdRiscv
       steps = steps_;
     }
 
+    /// Ruturn the effective group multiplier of the given operand.
     unsigned getOpEmul(unsigned op) const
     { return op < 3? opsEmul_.at(op) : 0; }
 
