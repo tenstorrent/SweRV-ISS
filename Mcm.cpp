@@ -455,7 +455,11 @@ Mcm<URV>::updateVecRegTimes(const Hart<URV>& hart, const McmInstr& instr)
 
   auto id = di.instId();
   bool isVset = (id == InstId::vsetvl or id == InstId::vsetvli or id == InstId::vsetivli);
-  assert(not isVset);
+  if (isVset)
+    {
+      assert(0);
+      return;
+    }
 
   auto hartIx = instr.hartIx_;
   auto& regProducer = hartData_.at(hartIx).regProducer_;
