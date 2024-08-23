@@ -3709,6 +3709,14 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 
   auto earlyB = earliestOpTime(instrB);
 
+  std::unordered_set<uint64_t> addrs;  // Addresses of bytes of B
+  for (auto ix : instrB.memOps_)
+    {
+      auto& op = sysMemOps_.at(ix);
+      for (unsigned i = 0; i < op.size_; ++i)
+	addrs.insert(op.physAddr_ + i);
+    }
+
   // Check every memory instructions A preceding B in program order with memory time
   // larger than that of B.
   for (McmInstrIx aTag = instrB.tag_ - 1; aTag >= minTag; --aTag)
@@ -3716,6 +3724,8 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
       const auto& instrA = instrVec.at(aTag);
       if (instrA.isCanceled() or not instrA.di_.isValid() or not instrA.isMemory())
 	continue;
+
+      auto remaining = addrs;   // Bytes not covered by a store.
 
       // Check all instructions between A and B for an instruction M with address
       // overlapping that of B and with an address dependency on A.
@@ -3733,16 +3743,22 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	  auto mapt = instrM.addrProducer_;  // M address producer tag.
 	  auto mdpt = instrM.dataProducer_;  // M data producer tag.
 
-	  if (mapt != aTag and mdpt != aTag)
-	    continue;
-
-	  if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
+	  if (mapt == aTag or mdpt == aTag)
 	    {
-	      cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
-		   << aTag << " tag2=" << instrB.tag_ << " mtag=" << mTag
-		   << " time1=" << latestOpTime(instrA) << " time2=" << earlyB << '\n';
-		return false;
+	      if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
+		{
+		  cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
+		       << aTag << " tag2=" << instrB.tag_ << " mtag=" << mTag
+		       << " time1=" << latestOpTime(instrA) << " time2=" << earlyB << '\n';
+		  return false;
+		}
 	    }
+
+	  for (auto addr : addrs)
+	    if (overlapsRefPhysAddr(instrM, addr))
+	      remaining.erase(addr);
+	  if (remaining.empty())
+	    break;
 	}
     }
 
