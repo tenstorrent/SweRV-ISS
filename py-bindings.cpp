@@ -4,6 +4,7 @@
 #include <string_view>
 #include <filesystem>
 
+#include "Interactive.hpp"
 #include "System.hpp"
 #include "Hart.hpp"
 #include "Memory.hpp"
@@ -399,6 +400,17 @@ static void defineHart(M m)
 };
 
 
+template <typename T>
+struct Uapi
+{
+  std::shared_ptr<System<T>> system_;
+  Interactive<T> interactive_;
+
+  Uapi(std::shared_ptr<System<T>>& system)
+    : system_(system), interactive_(*system) {};
+};
+
+
 template <typename T, typename M>
 static void defineSystem(M m)
 {
@@ -413,12 +425,12 @@ static void defineSystem(M m)
     return stringified;
   };
 
-  py::class_<System<T>>(m_system, systemName.data())
+  py::class_<Uapi<T>>(m_system, systemName.data())
     .def(py::init([](const std::filesystem::path& configFile, unsigned coreCount, unsigned hartsPerCore, uint64_t memorySize, uint64_t pageSize) {
           std::string isa;
           HartConfig config;
 
-          auto system = std::unique_ptr<System<T>>(new System<T>(coreCount, hartsPerCore, hartsPerCore, memorySize, pageSize));
+          auto system = std::shared_ptr<System<T>>(new System<T>(coreCount, hartsPerCore, hartsPerCore, memorySize, pageSize));
 
           if (configFile.empty()
               or not config.loadConfigFile(configFile.string())
@@ -438,28 +450,30 @@ static void defineSystem(M m)
                   throw std::invalid_argument("System::System: failed isa configuration");
               hart.reset();
             }
-          return system;
+          return std::unique_ptr<Uapi<T>>(new Uapi<T>(system));
         }),
         py::arg("config_file"), py::arg("core_count") = 1, py::arg("harts_per_core") = 1, py::arg("memory_size") = (uint64_t(1) << 32), py::arg("page_size") = 4096)
-    .def("load_hex_files", [stringify](System<T>& self, const std::vector<std::filesystem::path>& files, bool verbose) {
+    .def("load_hex_files", [stringify](Uapi<T>& self, const std::vector<std::filesystem::path>& files, bool verbose) {
           std::vector<std::string> stringified = stringify(files);
-          return self.loadHexFiles(stringified, verbose);
+          return self.system_->loadHexFiles(stringified, verbose);
         }, py::arg("files"), py::arg("verbose") = false, py::doc("Hex files to load. Returns true on success."))
-    .def("load_bin_files", [stringify](System<T>& self, const std::vector<std::filesystem::path>& files, uint64_t offset, bool verbose) {
+    .def("load_bin_files", [stringify](Uapi<T>& self, const std::vector<std::filesystem::path>& files, uint64_t offset, bool verbose) {
           std::vector<std::string> stringified = stringify(files);
-          return self.loadBinaryFiles(stringified, offset, verbose);
+          return self.system_->loadBinaryFiles(stringified, offset, verbose);
         }, py::arg("files"), py::arg("offset"), py::arg("verbose") = false, py::doc("Binary files to load. Returns true on success."))
-    .def("load_elf_files", [stringify](System<T>& self, const std::vector<std::filesystem::path>& files, bool verbose) {
+    .def("load_elf_files", [stringify](Uapi<T>& self, const std::vector<std::filesystem::path>& files, bool verbose) {
           std::vector<std::string> stringified = stringify(files);
-          return self.loadElfFiles(stringified, false, verbose);
+          return self.system_->loadElfFiles(stringified, false, verbose);
         }, py::arg("files"), py::arg("verbose") = false, py::doc("ELF files to load. Returns true on success."))
-    .def("harts", [](System<T>& self) {
+    .def("harts", [](Uapi<T>& self) {
           std::vector<std::shared_ptr<Hart<T>>> harts;
-          for (unsigned i = 0; i < self.hartCount(); ++i)
-            harts.push_back(self.ithHart(i));
+          for (unsigned i = 0; i < self.system_->hartCount(); ++i)
+            harts.push_back(self.system_->ithHart(i));
           return harts;
         }, py::doc("Get all of the harts in the system in a list."))
-    .def("memory", &System<T>::memory, py::doc("Get memory instance from system."));
+    .def("memory", [](Uapi<T>& self) {
+          return self.system_->memory();
+        }, py::doc("Get memory instance from system."));
 }
 
 
