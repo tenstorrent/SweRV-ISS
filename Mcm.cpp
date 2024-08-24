@@ -3709,57 +3709,64 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 
   auto earlyB = earliestOpTime(instrB);
 
-  std::unordered_set<uint64_t> addrs;  // Addresses of bytes of B
+  std::unordered_set<uint64_t> bAddrs;  // Addresses of bytes loaded by B
   for (auto ix : instrB.memOps_)
     {
       auto& op = sysMemOps_.at(ix);
       for (unsigned i = 0; i < op.size_; ++i)
-	addrs.insert(op.physAddr_ + i);
+	bAddrs.insert(op.physAddr_ + i);
     }
 
-  // Check every memory instructions A preceding B in program order with memory time
-  // larger than that of B.
-  for (McmInstrIx aTag = instrB.tag_ - 1; aTag >= minTag; --aTag)
+  // Look for a store/amo instruction M with data addresses overlapping those of B.
+  for (McmInstrIx mTag = instrB.tag_ - 1; mTag >= minTag; --mTag)
     {
-      const auto& instrA = instrVec.at(aTag);
-      if (instrA.isCanceled() or not instrA.di_.isValid() or not instrA.isMemory())
+      const auto& instrM = instrVec.at(mTag);
+      if (instrM.isCanceled() or not instrM.di_.isValid())
 	continue;
 
-      auto remaining = addrs;   // Bytes not covered by a store.
+      const auto& mdi = instrM.di_;
+      if ((not mdi.isStore() and not mdi.isAmo() and not mdi.isVectorStore()))
+	continue;
 
-      // Check all instructions between A and B for an instruction M with address
-      // overlapping that of B and with an address dependency on A.
-      for (McmInstrIx mTag = instrB.tag_ - 1; mTag > aTag; --mTag)
+      if (not overlaps(instrM, instrB))
+	continue;
+
+      auto mapt = instrM.addrProducer_;  // M address producer tag.
+      auto mdpt = instrM.dataProducer_;  // M data producer tag.
+
+      const auto& ap = instrVec.at(mapt);  // Address producer.
+
+      if (ap.isMemory())
+	if (not ap.complete_ or isBeforeInMemoryTime(instrB, ap))
+	  {
+	    cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
+		 << mapt << " tag2=" << instrB.tag_ << " mtag=" << mTag
+		 << " time1=" << latestOpTime(ap) << " time2=" << earlyB << '\n';
+	    return false;
+	  }
+
+      const auto& dp = instrVec.at(mdpt);  // Data producer.
+
+      if (mapt != mdpt and dp.isMemory())
+	if (not dp.complete_ or isBeforeInMemoryTime(instrB, dp))
+	  {
+	    cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
+		 << mdpt << " tag2=" << instrB.tag_ << " mtag=" << mTag
+		 << " time1=" << latestOpTime(dp) << " time2=" << earlyB << '\n';
+	    return false;
+	  }
+
+      // Remove instruction B data addresses covered by instruction M.
+      for (auto iter = bAddrs.begin(); iter != bAddrs.end(); )
 	{
-	  const auto& instrM = instrVec.at(mTag);
-	  if (instrM.isCanceled() or not instrM.di_.isValid())
-	    continue;
-
-	  const auto& mdi = instrM.di_;
-	  if ((not mdi.isStore() and not mdi.isAmo() and not mdi.isVectorStore()) or
-	      not overlaps(instrM, instrB))
-	    continue;
-
-	  auto mapt = instrM.addrProducer_;  // M address producer tag.
-	  auto mdpt = instrM.dataProducer_;  // M data producer tag.
-
-	  if (mapt == aTag or mdpt == aTag)
-	    {
-	      if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
-		{
-		  cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
-		       << aTag << " tag2=" << instrB.tag_ << " mtag=" << mTag
-		       << " time1=" << latestOpTime(instrA) << " time2=" << earlyB << '\n';
-		  return false;
-		}
-	    }
-
-	  for (auto addr : addrs)
-	    if (overlapsRefPhysAddr(instrM, addr))
-	      remaining.erase(addr);
-	  if (remaining.empty())
-	    break;
+	  auto currentIter = iter;
+	  auto addr = *iter++;
+	  if (overlapsRefPhysAddr(instrM, addr))
+	    bAddrs.erase(currentIter);
 	}
+
+      if (bAddrs.empty())
+	break;   // All of B data addresses.
     }
 
   return true;
