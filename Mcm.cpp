@@ -887,10 +887,7 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 {
   auto hartIx = hart.sysHartIndex();
 
-  uint64_t vaddr = 0, paddr = 0, paddr2 = 0, value = 0;
-  unsigned stSize = hart.lastStore(vaddr, paddr, paddr2, value);
-
-  if (not stSize)
+  if (instr.di_.isVectorStore())
     {
       std::vector<uint64_t> addr, paddr, paddr2, data;
       std::vector<bool> masked;
@@ -928,6 +925,9 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
     }
   else
     {
+      uint64_t vaddr = 0, paddr = 0, paddr2 = 0, value = 0;
+      unsigned stSize = hart.lastStore(vaddr, paddr, paddr2, value);
+
       instr.size_ = stSize;
       instr.virtAddr_ = vaddr;
       instr.physAddr_ = paddr;
@@ -3780,12 +3780,8 @@ Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
   // Rule 13: B is a store, there is a instruction M between A and B such that
   // M has an address dependency on A.
 
-  if (not instrB.isStore_)
-    return true;  // NA: B is not a store.
-
-  // A cannot be a store, if B has not drained yet, it will never drain ahead of A.
-  if (instrB.memOps_.empty())
-    return true;
+  if (not instrB.isStore_ and not instrB.di_.isAmo())
+    return true;  // NA: B is not a store/amo.
 
   unsigned hartIx = hart.sysHartIndex();
 
@@ -3794,34 +3790,24 @@ Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
 
   auto earlyB = earliestOpTime(instrB);
 
-  // Check every memory instructions A preceding B in program order with memory time
-  // larger than that of B.
-  for (McmInstrIx aTag = instrB.tag_ - 1; aTag >= minTag; --aTag)
+  // Look for a memory instruction M ahead between B and instruction with minTag.
+  for (McmInstrIx mTag = instrB.tag_ - 1; mTag >= minTag; --mTag)
     {
-      const auto& instrA = instrVec.at(aTag);
-      if (instrA.isCanceled() or not instrA.di_.isValid() or not instrA.isMemory())
+      const auto& instrM = instrVec.at(mTag);
+      if (instrM.isCanceled() or not instrM.di_.isValid() or not instrM.isMemory())
 	continue;
 
-      // Check all instructions between A and B for an instruction M with address
-      // overlapping that of B and with an address dependency on A.
-      for (McmInstrIx mTag = instrB.tag_ - 1; mTag > aTag; --mTag)
-	{
-	  const auto& instrM = instrVec.at(mTag);
-	  if (instrM.isCanceled() or not instrM.di_.isValid() or not instrM.isMemory())
-	    continue;
+      auto mapt = instrM.addrProducer_;  // M address producer tag.
+      const auto& ap = instrVec.at(mapt);  // Address producer.
 
-	  auto mapt = instrM.addrProducer_;  // M address producer tag.
-	  if (mapt != aTag)
-	    continue;
-
-	  if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
-	    {
-	      cerr << "Error: PPO rule 13 failed: hart-id=" << hart.hartId() << " tag1="
-		   << aTag << " tag2=" << instrB.tag_ << " mtag=" << mTag
-		   << " time1=" << latestOpTime(instrA) << " time2=" << earlyB << '\n';
-		return false;
-	    }
-	}
+      if (ap.isMemory())
+	if (not ap.complete_ or isBeforeInMemoryTime(instrB, ap))
+	  {
+	    cerr << "Error: PPO rule 13 failed: hart-id=" << hart.hartId() << " tag1="
+		 << mapt << " tag2=" << instrB.tag_ << " mtag=" << mTag
+		 << " time1=" << latestOpTime(ap) << " time2=" << earlyB << '\n';
+	    return false;
+	  }
     }
 
   return true;
