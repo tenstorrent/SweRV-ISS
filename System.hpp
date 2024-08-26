@@ -354,8 +354,6 @@ namespace WdRiscv
     bool mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		   const DecodedInst& di, bool trapped);
 
-    bool mcmSetCurrentInstruction(Hart<URV>& hart, uint64_t tag);
-
 
     /// Perf model APIs.
     void perfApiCommandLog(FILE* log);

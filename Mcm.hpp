@@ -201,15 +201,12 @@ namespace WdRiscv
     /// Perform PPO checks (e.g. rule 4) on pending instructions.
     bool finalChecks(Hart<URV>& hart);
 
-    bool setCurrentInstruction(Hart<URV>& hart, uint64_t instrTag);
-
     /// Return the load value of the current target instruction which must be a load
-    /// instruction (set with setCurrentInstruction).  Pa1 is the physical address of the
-    /// loaded data. Pa2 is the same as paddr1 except for page crossing loads where pa2 is
-    /// the physical address of the second page. Va is the virtual address of the load
-    /// data.
-    bool getCurrentLoadValue(Hart<URV>& hart, uint64_t va, uint64_t pa1, uint64_t pa2,
-			     unsigned size, bool isVec, uint64_t& value);
+    /// instruction. Pa1 is the physical address of the loaded data. Pa2 is the same as
+    /// paddr1 except for page crossing loads where pa2 is the physical address of the
+    /// second page. Va is the virtual address of the load data.
+    bool getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64_t pa1,
+			     uint64_t pa2, unsigned size, bool isVec, uint64_t& value);
 
     /// Return the merge buffer line size in bytes.
     unsigned mergeBufferLineSize() const

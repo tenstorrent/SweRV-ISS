@@ -270,7 +270,6 @@ Interactive<URV>::stepCommand(Hart<URV>& hart, const std::string& /*line*/,
     {
       if (hasTag)
 	{
-	  system_.mcmSetCurrentInstruction(hart, tag);
 	  DecodedInst di;
 	  hart.setInstructionCount(tag-1);
 	  hart.singleStep(di, traceFile);

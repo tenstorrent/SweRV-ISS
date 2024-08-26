@@ -1812,15 +1812,6 @@ Mcm<URV>::checkLoadComplete(const McmInstr& instr) const
 }
 
 
-template <typename URV>
-bool
-Mcm<URV>::setCurrentInstruction(Hart<URV>& hart, uint64_t tag)
-{
-  hartData_.at(hart.sysHartIndex()).currentInstrTag_ = tag;
-  return true;
-}
-
-
 /// Return a mask of the bytes of the given address range that are
 /// covered by the given memory operation. Bit i of the returned mask
 /// will be set if byte at addr+i is covered by op.
@@ -2157,20 +2148,17 @@ Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr* instr)
 
 template <typename URV>
 bool
-Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t va, uint64_t pa1, uint64_t pa2,
-			      unsigned size, bool isVector, uint64_t& value)
+Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64_t pa1,
+			      uint64_t pa2, unsigned size, bool isVector, uint64_t& value)
 {
   value = 0;
   if (size == 0 or size > 8)
     {
       cerr << "Mcm::getCurrentLoadValue: Invalid size: " << size << '\n';
-      assert(0 && "Mcm::getCurrentLoadValue: Invalid size");
       return false;
     }
 
   unsigned hartIx = hart.sysHartIndex();
-  uint64_t tag = hartData_.at(hartIx).currentInstrTag_;
-
   McmInstr* instr = findInstr(hartIx, tag);
   if (not instr or instr->isCanceled())
     return false;
@@ -2179,9 +2167,12 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t va, uint64_t pa1, uint64
   if (instr->isRetired())
     {
       cerr << "Mcm::getCurrentLoadValue: Instruction already retired\n";
-      assert(0 && "Mcm::getCurrentLoadValue: Instruction already retired");
       return false;
     }
+
+  for (auto opIx : instr->memOps_)
+    if (auto& op = sysMemOps_.at(opIx); op.isRead_)
+      forwardToRead(hart, op);   // Let forwarding override read-op ref data.
 
   instr->size_ = size;
   instr->virtAddr_ = va;
@@ -2190,18 +2181,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t va, uint64_t pa1, uint64
     pa2 = pageAddress(pageNum(pa2) + 1);
   instr->physAddr2_ = pa2;
 
-  for (auto opIx : instr->memOps_)
-    {
-      auto& op = sysMemOps_.at(opIx);
-      if (not op.isRead_)
-	continue;
-
-      // Let forwarding override read-op data.
-      forwardToRead(hart, op);
-    }
-
   value = 0;
-
   bool covered = true;
 
   unsigned size1 = size;
