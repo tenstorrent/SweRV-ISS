@@ -2025,6 +2025,9 @@ namespace WdRiscv
     bool mcmIEvict(uint64_t addr)
     { fetchCache_.removeLine(addr); return true; }
 
+    std::shared_ptr<Mcm<URV>> mcm() 
+    { return mcm_; }
+
     /// Config vector engine for updating whole mask register for mask-producing
     /// instructions (if flag is false, we only update body and tail elements; otherwise,
     /// we update body, tail, and elements within VLEN beyond tail).
