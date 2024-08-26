@@ -294,11 +294,17 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
       uint64_t regTime = 0;  // Vector register time
 
       unsigned offset = ix * elemsPerVec;
-      for (unsigned elemIx = 0; elemIx < elemsPerVec; ++elemIx)
+      for (unsigned elemIx = 0; elemIx < elemsPerVec; ++elemIx)  // Elem ix in vec reg.
 	{
-	  unsigned ixInGroup = offset + elemIx;
+	  unsigned ixInGroup = offset + elemIx;    // Elem ix in vec-reg-group
 	  if (ixInGroup >= addr.size())
 	    continue;  // Should not happen
+
+	  if (ixInGroup < masked.size() and masked.at(ixInGroup))
+	    {
+	      regTime = time_;  // What if mask-policy is preserve?
+	      continue;
+	    }
 
 	  uint64_t pa1 = paddr.at(ixInGroup), pa2 = paddr2.at(ixInGroup);
 	  unsigned size1 = elemSize, size2 = 0;
