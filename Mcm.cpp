@@ -633,15 +633,6 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
       instr.dataTime_ = regTime.at(dataReg);
     }
 
-#if 0
-  if (di.isVectorLoad() or di.isVectorStore())
-    {
-      unsigned vtypeReg = unsigned(CsrNumber::VTYPE) + csRegOffset_;
-      instr.dataProducer_ = hartRegProducers_.at(hartIx).at(vtypeReg);
-      instr.dataTime_ = hartRegTimes_.at(hartIx).at(vtypeReg);
-    }
-#endif
-
   if (di.isVectorStore())
     {
       unsigned dataReg = effectiveRegIx(di, 0);
@@ -1273,13 +1264,6 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
       instr->addMemOp(sysMemOps_.size());
       sysMemOps_.push_back(op);
     }
-
-#if 0
-  std::sort(coveredWrites.begin(), coveredWrites.end(),
-	    [](const MemoryOp& a, const MemoryOp& b) {
-	      return a.instrTag_ < b.instrTag_;
-	    });
-#endif
 
   return true;
 }
@@ -2362,7 +2346,7 @@ Mcm<URV>::storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& 
 	    continue;
 	  const auto& wop = sysMemOps_.at(wopIx);
 	  if (wop.isRead_ or not wop.overlaps(byteAddr))
-	    continue;  // No a write op (may happen for AMO), or does not overlap byte addr.
+	    continue;  // Not a write op (may happen for AMO), or does not overlap byte addr.
 	  if (wop.time_ < readOp.time_)
 	    {
 	      drained = true; // Write op cannot forward.
@@ -2403,7 +2387,7 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, MemoryOp& readOp)
     {
       auto storeTag = *iter;
       const auto& store = instrVec.at(storeTag);
-      if (store.isCanceled() or store.tag_ > readOp.instrTag_)
+      if (store.isCanceled() or store.tag_ >= readOp.instrTag_)
 	continue;
       if (overlaps(store, readOp))
 	stores.insert(store.tag_);
