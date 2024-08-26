@@ -1363,8 +1363,8 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	uint64_t addr = physAddr + i;
 	cerr << "Error: Mismatch on merge buffer write time=" << time
 	     << " hart-id=" << hart.hartId() << " addr=0x" << std::hex
-	     << addr << " write-data=0x" << rtlData.at(i)
-	     << " insert-data=0x" << line.at(i) << std::dec << '\n';
+	     << addr << " write-data=0x" << unsigned(rtlData.at(i))
+	     << " insert-data=0x" << unsigned(line.at(i)) << std::dec << '\n';
 	result = false;
 	break;
       }
