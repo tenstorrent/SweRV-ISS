@@ -1181,10 +1181,13 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
   for (size_t i = 0; i < pendingWrites.size(); ++i)
     {
       auto& op = pendingWrites.at(i);  // Write op
+
       McmInstr* instr = findOrAddInstr(hartIx, op.instrTag_);
 
       bool written = false;  // True if op is actually written
-      if (op.physAddr_ >= rtlAddr and op.physAddr_ < lineEnd)
+
+      // We don't write if mbinsert happens as the same time as mbwrite.
+      if (op.physAddr_ >= rtlAddr and op.physAddr_ < lineEnd and op.time_ != time)
 	{
 	  if (op.physAddr_ + op.size_  > lineEnd)
 	    {
