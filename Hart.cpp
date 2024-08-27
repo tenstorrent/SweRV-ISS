@@ -1911,12 +1911,6 @@ Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr
       return true;
     }
 
-  if (toHostValid_ and addr1 == toHost_)
-    {
-      data = 0;
-      return true;
-    }
-
   // Unsigned version of LOAD_TYPE
   using ULT = typename std::make_unsigned<LOAD_TYPE>::type;
 
@@ -1935,6 +1929,11 @@ Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr
 
   if (not hasOooVal)
     {
+      if (toHostValid_ and addr1 == toHost_)
+	{
+	  data = 0;
+	  return true;
+	}
       if (isDevice)
 	{
 	  uint64_t dv = 0;

@@ -65,6 +65,9 @@ Mcm<URV>::referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64
       return true;
     }
 
+  if (uint64_t toHost = 0; hart.getToHostAddress(toHost) && toHost == pa)
+    return true;  // Reading from toHost yields 0.
+
   bool ok = true;
 
   if (size == 1)
