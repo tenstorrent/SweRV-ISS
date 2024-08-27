@@ -3592,19 +3592,28 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
   if (not bdi.isStore() and not bdi.isAmo() and not bdi.isVectorStore())
     return true;
 
-  auto rule11 = [this, &instrVec, &instrB] (auto producerTag) -> bool {
+  auto rule11 = [this, &instrVec] (uint64_t earlyB, auto producerTag) -> bool {
     if (producerTag >= instrVec.size() or producerTag == 0)
       return true;
     const auto& producer = instrVec.at(producerTag);
     if (not producer.di_.isValid())
       return true;
 
-    return producer.complete_ and isBeforeInMemoryTime(producer, instrB);
+    auto producerTime = producer.retireTime_;
+    if (producer.isMemory())
+      {
+	if (not producer.complete_)
+	  return false;
+	producerTime = latestOpTime(producer);
+      }
+
+    return earlyB > producerTime;
   };
 
+  auto earlyB = earliestOpTime(instrB);
   auto producerTag = hartData_.at(hartIx).branchProducer_;
 
-  if (hartData_.at(hartIx).branchTime_ and not rule11(producerTag))
+  if (hartData_.at(hartIx).branchTime_ and not rule11(earlyB, producerTag))
     {
       cerr << "Error: PPO rule 11 failed (branch): hart-id=" << hart.hartId() << " tag1="
            << producerTag << " tag2=" << instrB.tag_ << '\n';
@@ -3614,8 +3623,13 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
   // VL is control dependency for vector instructions
   if (bdi.isVectorStore())
     {
+      auto& refMap = hartData_.at(hartIx).vecRefMap_;
+      auto iter = refMap.find(instrB.tag_);
+      if (iter == refMap.end() or iter->second.empty())
+	return true;  // Nothing written by instruction.
+
       producerTag = hartData_.at(hartIx).vlProducer_;
-      if (hartData_.at(hartIx).vlTime_ and not rule11(producerTag))
+      if (hartData_.at(hartIx).vlTime_ and not rule11(earlyB, producerTag))
         {
           cerr << "Error: PPO rule 11 failed (vl): hart-id=" << hart.hartId() << " tag1="
                << producerTag << " tag2=" << instrB.tag_ << '\n';
@@ -3626,7 +3640,7 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
         {
           unsigned vmReg = 0 + vecRegOffset_;
           producerTag = regProducer.at(vmReg);
-          if (not rule11(producerTag))
+          if (not rule11(earlyB, producerTag))
             {
               cerr << "Error: PPO rule 11 failed (vm): hart-id=" << hart.hartId() << " tag1="
                    << producerTag << " tag2=" << instrB.tag_ << '\n';
