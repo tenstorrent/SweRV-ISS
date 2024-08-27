@@ -3669,6 +3669,55 @@ Mcm<URV>::getMinReadTagWithLargerTime(unsigned hartIx, const McmInstr& instr) co
 
 template <typename URV>
 bool
+Mcm<URV>::overlaps(const McmInstr& instr, const std::unordered_set<uint64_t>& addrSet) const
+{
+  assert(not instr.isCanceled() and instr.isRetired());
+  if (instr.isCanceled() or not instr.isRetired() or not instr.isMemory())
+    return false;
+
+  if (not instr.di_.isVector())
+    {
+      uint64_t pa1 = instr.physAddr_, pa2 = instr.physAddr2_;
+      uint64_t size1 = instr.size_, size2 = 0;
+      if (pa1 != pa2 and pageNum(pa1) != pageNum(pa2))
+	{
+	  size1 = offsetToNextPage(pa1);
+	  size2 = instr.size_ - size1;
+	  assert(size1 > 0 and size1 < instr.size_);
+	  assert(size2 > 0 and size2 < instr.size_);
+	}
+
+      for (unsigned i = 0; i < size1; ++i)
+	if (addrSet.contains(pa1 + i))
+	  return true;
+
+      for (unsigned i = 0; i < size2; ++i)
+	if (addrSet.contains(pa2 + i))
+	  return true;
+
+      return false;
+    }
+
+  auto hartIx = instr.hartIx_;
+
+  auto& refMap = hartData_.at(hartIx).vecRefMap_;
+  auto iter = refMap.find(instr.tag_);
+  if (iter == refMap.end())
+    return false;
+
+  auto& refOps = refMap.at(instr.tag_);
+
+  for (auto refOp : refOps)
+    for (unsigned i = 0; i < refOp.size_; ++i)
+      if (addrSet.contains(refOp.addr_ + i))
+	return true;
+
+  return false;
+}
+
+
+template <typename URV>
+bool
 Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 12: B is a load, there is a store M between A and B such that
@@ -3685,12 +3734,12 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 
   auto earlyB = earliestOpTime(instrB);
 
-  std::unordered_set<uint64_t> bAddrs;  // Addresses of bytes loaded by B
+  std::unordered_set<uint64_t> addrSet;  // Addresses of bytes loaded by B
   for (auto ix : instrB.memOps_)
     {
       auto& op = sysMemOps_.at(ix);
       for (unsigned i = 0; i < op.size_; ++i)
-	bAddrs.insert(op.physAddr_ + i);
+	addrSet.insert(op.physAddr_ + i);
     }
 
   // Look for a store/amo instruction M with data addresses overlapping those of B.
@@ -3704,7 +3753,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
       if ((not mdi.isStore() and not mdi.isAmo() and not mdi.isVectorStore()))
 	continue;
 
-      if (not overlaps(instrM, instrB))
+      if (not overlaps(instrM, addrSet))
 	continue;
 
       auto mapt = instrM.addrProducer_;  // M address producer tag.
@@ -3733,16 +3782,16 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	  }
 
       // Remove instruction B data addresses covered by instruction M.
-      for (auto iter = bAddrs.begin(); iter != bAddrs.end(); )
+      for (auto iter = addrSet.begin(); iter != addrSet.end(); )
 	{
 	  auto currentIter = iter;
 	  auto addr = *iter++;
 	  if (overlapsRefPhysAddr(instrM, addr))
-	    bAddrs.erase(currentIter);
+	    addrSet.erase(currentIter);
 	}
 
-      if (bAddrs.empty())
-	break;   // All of B data addresses.
+      if (addrSet.empty())
+	break;   // All of B data addresses covered.
     }
 
   return true;

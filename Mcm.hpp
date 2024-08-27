@@ -472,6 +472,10 @@ namespace WdRiscv
     }
 
     /// Return true if the physical data address range referenced by given instruction
+    /// overlaps any of the addresses in the given set.
+    bool overlaps(const McmInstr& instr, const std::unordered_set<uint64_t>& addrSet) const;
+
+    /// Return true if the physical data address range referenced by given instruction
     /// overlaps that of the given memory operation.
     bool overlaps(const McmInstr& instr, const MemoryOp& op) const
     {
