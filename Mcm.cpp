@@ -1211,16 +1211,14 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
 		  if (lineIx < rtlMask.size() and rtlMask.at(lineIx))
 		    masked++;
 		}
-	      if (masked != 0)
+	      written = masked != 0;
+	      if (written and masked != op.size_)
 		{
-		  if (masked != op.size_)
-		    {
-		      cerr << "Error: Write op partially masked time=" << time
-			   << " hart-id=" << hart.hartId() << "tag=" << op.instrTag_
-			   << "addr=0x" << std::hex << op.physAddr_ << std::dec << "\n";
-		      return false;
-		    }
-		  written = true;
+		  cerr << "Error: time=" << time << " hart-id=" << hart.hartId()
+		       << " tag=" << op.instrTag_ << " addr=0x" << std::hex
+		       << op.physAddr_ << std::dec << " Merge buffer insert operation"
+		       << " is only partially covered by a merge buffer write.\n";
+		  return false;
 		}
 	    }
 	}
