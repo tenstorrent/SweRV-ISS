@@ -1284,6 +1284,22 @@ CsRegs<URV>::enableAia(bool flag)
 
 template <typename URV>
 void
+CsRegs<URV>::enableSmmpm(bool flag)
+{
+  using CN = CsrNumber;
+
+  if constexpr (sizeof(URV) == 8)
+    {
+      uint8_t mask = flag? 0x3 : 0;
+      MseccfgFields<URV> m{regs_.at(size_t(CN::MSECCFG)).getReadMask()};
+      m.bits_.PMM = mask;
+      regs_.at(size_t(CN::MSECCFG)).setReadMask(m.value_);
+    }
+}
+
+
+template <typename URV>
+void
 CsRegs<URV>::enableSsnpm(bool flag)
 {
   using CN = CsrNumber;

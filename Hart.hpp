@@ -1073,6 +1073,10 @@ namespace WdRiscv
     void enableSmrnmi(bool flag)
     { enableExtension(RvExtension::Smrnmi, flag); csRegs_.enableSmrnmi(flag); }
 
+    /// Enable/disable smmpm extension.
+    void enableSmmpm(bool flag)
+    { enableExtension(RvExtension::Smmpm, flag); csRegs_.enableSmmpm(flag); }
+
     /// Enable/disable ssnpm extension.
     void enableSsnpm(bool flag)
     { enableExtension(RvExtension::Ssnpm, flag); csRegs_.enableSsnpm(flag); }
