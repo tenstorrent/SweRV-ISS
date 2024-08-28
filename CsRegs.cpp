@@ -1292,9 +1292,13 @@ CsRegs<URV>::enableSmmpm(bool flag)
   if constexpr (sizeof(URV) == 8)
     {
       uint8_t mask = flag? 0x3 : 0;
-      MseccfgFields<URV> m{regs_.at(size_t(CN::MSECCFG)).getReadMask()};
-      m.bits_.PMM = mask;
-      regs_.at(size_t(CN::MSECCFG)).setReadMask(m.value_);
+      MseccfgFields<URV> rm{regs_.at(size_t(CN::MSECCFG)).getReadMask()};
+      rm.bits_.PMM = mask;
+      regs_.at(size_t(CN::MSECCFG)).setReadMask(rm.value_);
+
+      MseccfgFields<URV> wm{regs_.at(size_t(CN::MSECCFG)).getWriteMask()};
+      wm.bits_.PMM = mask;
+      regs_.at(size_t(CN::MSECCFG)).setWriteMask(wm.value_);
     }
 }
 
