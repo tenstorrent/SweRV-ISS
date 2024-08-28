@@ -1934,6 +1934,23 @@ namespace WdRiscv
       return fields.bits_.ADUE;
     }
 
+    /// Return the PMM bits of MSECCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t mseccfgPmm()
+    {
+      if constexpr (sizeof(URV) == 4)
+        return 0;
+      else
+        {
+          auto csr = getImplementedCsr(CsrNumber::MSECCFG);
+          if (not csr)
+            return 0;
+          URV value = csr->read();
+          MseccfgFields<uint64_t> fields(value);
+          return fields.bits_.PMM;
+        }
+    }
+
     /// Return the PMM bits of MENVCFG CSR. Returns 0
     /// if not implemented.
     uint8_t menvcfgPmm()
