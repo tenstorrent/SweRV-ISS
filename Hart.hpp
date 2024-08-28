@@ -429,6 +429,12 @@ namespace WdRiscv
     {
       using PM = PrivilegeMode;
 
+      if (isRvSmmpm())
+        {
+          uint8_t pmm = csRegs_.mseccfgPmm();
+          mPmBits_ = VirtMem::pointerMaskBits(VirtMem::Pmm(pmm));
+        }
+
       if (isRvSsnpm())
         {
           uint8_t pmm = csRegs_.senvcfgPmm();
@@ -1415,6 +1421,9 @@ namespace WdRiscv
 
     bool isRvzcmop() const
     { return extensionIsEnabled(RvExtension::Zcmop); }
+
+    bool isRvSmmpm() const
+    { return extensionIsEnabled(RvExtension::Smmpm); }
 
     bool isRvSsnpm() const
     { return extensionIsEnabled(RvExtension::Ssnpm); }
@@ -5217,6 +5226,9 @@ namespace WdRiscv
     TT_STEE::Stee stee_;
     bool steeInsec1_ = false;  // True if insecure access to a secure region.
     bool steeInsec2_ = false;  // True if insecure access to a secure region.
+
+    // Pointer masking
+    unsigned mPmBits_ = 0;
 
     VirtMem virtMem_;
     Isa isa_;

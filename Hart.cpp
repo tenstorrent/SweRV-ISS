@@ -1567,6 +1567,11 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	      return cause;
 	    }
         }
+      else
+        {
+          addr1 = VirtMem::applyPointerMaskPa(addr1, mPmBits_);
+          addr2 = VirtMem::applyPointerMaskPa(addr2, mPmBits_);
+        }
     }
 
   // Check misaligned exception.
@@ -3434,6 +3439,8 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       stimecmpActive_ = csRegs_.menvcfgStce();
       vstimecmpActive_ = csRegs_.henvcfgStce();
     }
+  else if (csr == CN::MSECCFG)
+    updateTranslationPmm();
 
   if (csr == CN::STIMECMP)
     {
@@ -10796,7 +10803,7 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
 	return;  // Unsupported mode: Write has no effect.
     }
   else if (csr == CsrNumber::MENVCFG or csr == CsrNumber::SENVCFG or
-            csr == CsrNumber::HENVCFG)
+            csr == CsrNumber::HENVCFG or csr == CsrNumber::MSECCFG)
     {
       if constexpr (sizeof(URV) == 8)
         {
@@ -11277,6 +11284,11 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	      ldStFaultAddr_ = addr1;
 	      return cause;
 	    }
+        }
+      else
+        {
+          addr1 = VirtMem::applyPointerMaskPa(addr1, mPmBits_);
+          addr2 = VirtMem::applyPointerMaskPa(addr2, mPmBits_);
         }
     }
 
