@@ -359,7 +359,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
   if ((di.isStore() and not di.isSc()) or di.isVectorStore())
     return; // No destination register.
 
-  uint64_t time = 0, tag = instr.tag_, csrTime = 0, csrTag = 0;
+  uint64_t time = 0, tag = 0, csrTime = 0, csrTag = 0;
 
   if (di.isSc())
     {
@@ -388,7 +388,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
       auto regIx = effectiveRegIx(di, 0);
       if (di.ithOperandMode(0) == OperandMode::Write and regIx != 0)
 	{
-	  regProducer.at(regIx) = tag;
+	  regProducer.at(regIx) = instr.tag_;
 	  regTimeVec.at(regIx) = time;
 	}
       return;
@@ -434,6 +434,8 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	}
     }
 
+  unsigned vlIx = csRegOffset_ + unsigned(CsrNumber::VL);
+
   for (auto regIx : destRegs)
     {
       if (regIx == 0)
@@ -443,6 +445,12 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	{  // Non-CSR instruction or destination is a CSR register.
 	  regTimeVec.at(regIx) = time;
 	  regProducer.at(regIx) = tag;
+
+	  if (regIx == vlIx and time > vlTime)
+	    {
+	      vlTime = time;
+	      vlProducer = tag;
+	    }
 	}
       else
 	{  // Integer destination register of a CSR instruction.
