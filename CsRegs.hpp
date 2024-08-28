@@ -1715,6 +1715,10 @@ namespace WdRiscv
     /// Enable/disable advanced interrupt artchitecture extension.
     void enableAia(bool flag);
 
+    /// Enable/disable smmpm extension. Sets mseccfg.PMM
+    /// to read-only zero if false.
+    void enableSmmpm(bool flag);
+
     /// Enable/disable ssnpm extension. Sets senvcfg.PMM/henvcfg.PMM
     /// to read-only zero if false.
     void enableSsnpm(bool flag);

@@ -401,10 +401,20 @@ Hart<URV>::processExtensions(bool verbose)
   if (isa_.isEnabled(RvExtension::Zvknha) and
       isa_.isEnabled(RvExtension::Zvknhb))
     {
-      std::cerr << "Warning: Both Zvknha/b enabled. Using Zvknhb.\n";
-      enableExtension(RvExtension::Zvknha, false);
+      std::cerr << "Warning: Both Zvknha/b enabled.";
+      if (rv64_)
+        {
+          std::cerr << " Using Zvknhb.\n";
+          enableExtension(RvExtension::Zvknha, false);
+        }
+      else
+        {
+          std::cerr << " Using Zvknha.\n";
+          enableExtension(RvExtension::Zvknhb, false);
+        }
     }
 
+  enableSmmpm(isa_.isEnabled(RvExtension::Smmpm));
   enableSsnpm(isa_.isEnabled(RvExtension::Ssnpm));
   enableSmnpm(isa_.isEnabled(RvExtension::Smnpm));
   enableAiaExtension(isa_.isEnabled(RvExtension::Smaia));
