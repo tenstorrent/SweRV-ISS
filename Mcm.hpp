@@ -426,14 +426,20 @@ namespace WdRiscv
 			      uint64_t lineSize, const std::vector<bool>& rtlMask,
 			      MemoryOpVec& coveredWrites);
 
-    /// Forward to the given read op from the stores of the retired instructions ahead of
-    /// the instruction (in program order) of the read op.
-    bool forwardToRead(Hart<URV>& hart, MemoryOp& op);
+    /// Forward to the given read op from the stores ahead of the instruction of the read
+    /// op in program order.
+    bool forwardToRead(Hart<URV>& hart, const std::set<McmInstrIx>& stores, MemoryOp& op) const;
 
     /// Forward from a write to a read op. Return true on success.  Mask is the mask of
     /// bits of op to be updated by the forward operation and is updated (bits cleared)
     /// if some parts of op are successfully updated. This a helper to forwardToRead.
     bool writeToReadForward(const MemoryOp& writOp, MemoryOp& readOp, uint64_t& mask);
+
+    /// Helper to getCurrentLoadValue. Collect overlapping stores preceding instr in
+    /// program order and with write times after those of instr reads (write times before
+    /// instr reads imply a drained write that can no longer forward to instr).
+    void collectForwardingStores(Hart<URV>& hart, const McmInstr& instr,
+				 std::set<McmInstrIx>& stores) const;
 
     /// Forward from a store instruction to a read-operation. Mask is the mast of bits of
     /// op to be updated by the forward operation and is updated (bits cleared) if some
@@ -441,9 +447,9 @@ namespace WdRiscv
     /// Addr/data/size are the physical-address/data-value/data-size of the store
     /// instruction.
     bool storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask,
-			    uint64_t addr, uint64_t data, unsigned size);
+			    uint64_t addr, uint64_t data, unsigned size) const;
 
-    bool vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask);
+    bool vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask) const;
 
     /// Determine the source and destination registers of the given instruction.
     void identifyRegisters(const Hart<URV>& hart,
@@ -683,6 +689,12 @@ namespace WdRiscv
 
       // Retired but not yet drained stores. Candidates for forwarding.
       std::set<McmInstrIx> undrainedStores_;
+
+      // Set of stores that may affect (through forwarding) the currently executing load
+      // instruction.
+      std::set<McmInstrIx> forwardingStores_;
+
+      McmInstrIx currentLoadTag_ = 0;  // Currently executing load instruction.
 
       // Reference vec ld/st store data produced by whisper.
       std::map<McmInstrIx, VecRefs> vecRefMap_;

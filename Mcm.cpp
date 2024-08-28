@@ -2179,9 +2179,19 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
       return false;
     }
 
+  auto& hartData = hartData_.at(hartIx);
+  auto& stores = hartData.forwardingStores_;
+
+  if (tag != hartData.currentLoadTag_)
+    {
+      stores.clear();
+      collectForwardingStores(hart, *instr, stores);
+      hartData.currentLoadTag_ = tag;
+    }
+
   for (auto opIx : instr->memOps_)
     if (auto& op = sysMemOps_.at(opIx); op.isRead_)
-      forwardToRead(hart, op);   // Let forwarding override read-op ref data.
+      forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
 
   instr->size_ = size;
   instr->virtAddr_ = va;
@@ -2236,7 +2246,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
 
 template <typename URV>
 bool
-Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask)
+Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask) const
 {
   const auto& vecRefMap = hartData_.at(store.hartIx_).vecRefMap_;
   auto iter = vecRefMap.find(store.tag_);
@@ -2268,11 +2278,9 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 	  bool drained = false;
 	  for (const auto wopIx : store.memOps_)
 	    {
-	      if (wopIx >= sysMemOps_.size())
-		continue;
 	      const auto& wop = sysMemOps_.at(wopIx);
 	      if (wop.isRead_ or not wop.overlaps(byteAddr))
-		continue;  // No a write op (may happen for AMO), or does not overlap byte addr.
+		continue;  // Not a write op (may happen for AMO), or does not overlap byte addr.
 	      if (wop.time_ < readOp.time_)
 		{
 		  drained = true; // Write op cannot forward.
@@ -2303,7 +2311,7 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 template <typename URV>
 bool
 Mcm<URV>::storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask,
-			     uint64_t addr, uint64_t data, unsigned size)
+			     uint64_t addr, uint64_t data, unsigned size) const
 {
   if (mask == 0)
     return true;  // No bytes left to forward.
@@ -2362,39 +2370,66 @@ Mcm<URV>::storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& 
 
 
 template <typename URV>
-bool
-Mcm<URV>::forwardToRead(Hart<URV>& hart, MemoryOp& readOp)
+void
+Mcm<URV>::collectForwardingStores(Hart<URV>& hart, const McmInstr& instr,
+				  std::set<McmInstrIx>& stores) const
 {
   auto hartIx = hart.sysHartIndex();
 
   const auto& instrVec = hartData_.at(hartIx).instrVec_;
   const auto& undrained = hartData_.at(hartIx).undrainedStores_;
 
-  std::set<McmInstrIx> stores;
-
-  for (auto iter = undrained.rbegin(); iter != undrained.rend(); ++iter)
+  // Collect undrained overlapping stores preceding instr in program order.
+  for (auto opIx : instr.memOps_)
     {
-      auto storeTag = *iter;
-      const auto& store = instrVec.at(storeTag);
-      if (store.isCanceled() or store.tag_ >= readOp.instrTag_)
-	continue;
-      if (overlaps(store, readOp))
-	stores.insert(store.tag_);
-    }
-
-  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
-    {
-      const auto& writeOp = *iter;
-      if (writeOp.time_ < readOp.time_)
-	break;
-
-      if (writeOp.isCanceled()  or  writeOp.isRead_  or writeOp.hartIx_ != readOp.hartIx_  or
-	  writeOp.instrTag_ >= readOp.instrTag_)
+      auto& rop = sysMemOps_.at(opIx);  // Read op.
+      if (not rop.isRead_)
 	continue;
 
-      if (readOp.overlaps(writeOp))
-	stores.insert(writeOp.instrTag_);
+      for (auto iter = undrained.rbegin(); iter != undrained.rend(); ++iter)
+	{
+	  auto storeTag = *iter;
+	  const auto& store = instrVec.at(storeTag);
+	  if (store.isCanceled() or store.tag_ >= instr.tag_)
+	    continue;
+	  if (overlaps(store, rop))
+	    stores.insert(store.tag_);
+	}
     }
+
+  // Collect overlapping stores preceding instr in program order and with write times
+  // after those of instr reads (write times before instr reads imply a drained write that
+  // can no longer forward to instr).
+  for (auto opIx : instr.memOps_)
+    {
+      auto& rop = sysMemOps_.at(opIx);  // Read op.
+      if (not rop.isRead_)
+	continue;
+
+      for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+	{
+	  const auto& wop = *iter;
+	  if (wop.time_ < rop.time_)
+	    break;
+
+	  if (wop.isCanceled()  or  wop.isRead_  or  wop.hartIx_ != rop.hartIx_  or
+	      wop.instrTag_ >= instr.tag_)
+	    continue;
+
+	  if (rop.overlaps(wop))
+	    stores.insert(wop.instrTag_);
+	}
+    }
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::forwardToRead(Hart<URV>& hart, const std::set<McmInstrIx>& stores, MemoryOp& readOp) const
+{
+  auto hartIx = hart.sysHartIndex();
+
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   uint64_t mask = (~uint64_t(0)) >> (8 - readOp.size_)*8;
 
