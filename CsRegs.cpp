@@ -915,11 +915,12 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
 	vsie->setReadMask(mask);
     }
 
-  // Enable/disable hypervisor related exceptions (bits 23:20 in MEDELEG).
+  // If hypervisor is off, related bits in MEDELEG are read-only-zero (bits 23:20 and 10).
   csr = findCsr(CN::MEDELEG);
   if (csr)
     {
       URV bits = URV(0xf) << 20;  // Bits 23:20
+      bits |= URV(1) << 10;       // Bit 10
       auto mask = csr->getReadMask();
       csr->setReadMask(flag ? (mask | bits) : (mask & ~bits));
     }
