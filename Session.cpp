@@ -698,20 +698,21 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
       for (const auto& target : args.expandedTargets)
 	paths.push_back(target.at(0));
 
+      uint64_t offset = 0;
+
+#ifdef LZ4_COMPRESS
+      if (not system.loadLz4Files(args.lz4Files, offset, args.verbose))
+	errors++;
+#endif
+
       if (not system.loadElfFiles(paths, args.raw, args.verbose))
 	errors++;
 
       if (not system.loadHexFiles(args.hexFiles, args.verbose))
 	errors++;
 
-      uint64_t offset = 0;
       if (not system.loadBinaryFiles(args.binaryFiles, offset, args.verbose))
 	errors++;
-
-#ifdef LZ4_COMPRESS
-      if (not system.loadLz4Files(args.lz4Files, offset, args.verbose))
-	errors++;
-#endif
 
       if (not args.kernelFile.empty())
 	{
