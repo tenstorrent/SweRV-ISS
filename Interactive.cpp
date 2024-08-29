@@ -2131,12 +2131,26 @@ Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
 
   bool ok = true;
 
-  const uint8_t* vdata = bytes.data();
-  addr = addr + size - 1;
-  for (unsigned i = 0; i < size and ok; ++i, ++vdata, --addr)
+  std::reverse(bytes.begin(), bytes.end());
+
+  // For speed, use double-word mread when possible, else word, else byte.
+  if ((size & 0x7) == 0 and (addr & 0x7) == 0)
     {
-      uint64_t value = *vdata;
-      ok = system_.mcmRead(hart, this->time_, tag, addr, 1, value);
+      const uint64_t* vdata = reinterpret_cast<const uint64_t*> (bytes.data());
+      for (unsigned i = 0; i < size and ok; i += 8, ++vdata, addr += 8)
+	ok = system_.mcmRead(hart, this->time_, tag, addr, 8, *vdata);
+    }
+  else if ((size & 0x3) == 0 and (addr & 0x3) == 0)
+    {
+      const uint32_t* vdata = reinterpret_cast<const uint32_t*> (bytes.data());
+      for (unsigned i = 0; i < size and ok; i += 4, ++vdata, addr += 4)
+	ok = system_.mcmRead(hart, this->time_, tag, addr, 4, *vdata);
+    }
+  else
+    {
+      const uint8_t* vdata = bytes.data();
+      for (unsigned i = 0; i < size and ok; ++i, ++vdata, ++addr)
+	ok = system_.mcmRead(hart, this->time_, tag, addr, 1, *vdata);
     }
 
   return ok;
@@ -2307,28 +2321,19 @@ Interactive<URV>::mbinsertCommand(Hart<URV>& hart, const std::string& line,
     {
       const uint64_t* vdata = reinterpret_cast<const uint64_t*> (bytes.data());
       for (unsigned i = 0; i < size and ok; i += 8, ++vdata, addr += 8)
-	{
-	  uint64_t value = *vdata;
-	  ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 8, value);
-	}
+	ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 8, *vdata);
     }
   else if ((size & 0x3) == 0 and (addr & 0x3) == 0)
     {
       const uint32_t* vdata = reinterpret_cast<const uint32_t*> (bytes.data());
       for (unsigned i = 0; i < size and ok; i += 4, ++vdata, addr += 4)
-	{
-	  uint32_t value = *vdata;
-	  ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 4, value);
-	}
+	ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 4, *vdata);
     }
   else
     {
       const uint8_t* vdata = bytes.data();
       for (unsigned i = 0; i < size and ok; ++i, ++vdata, ++addr)
-	{
-	  uint64_t value = *vdata;
-	  ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 1, value);
-	}
+	ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 1, *vdata);
     }
 
   return ok;

@@ -862,12 +862,25 @@ Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
 	}
       else
 	{
-	  const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
-	  for (unsigned i = 0; i < req.size and ok; ++i, ++data)
+	  // For speed, use double-word insert when possible, else word, else byte.
+	  uint64_t size = req.size, time = req.time, tag = req.instrTag, addr = req.address;
+	  if ((size & 0x7) == 0 and (addr & 0x7) == 0)
 	    {
-	      uint64_t addr = req.address + i;
-	      uint64_t value = *data;
-	      ok = system_.mcmRead(hart, req.time, req.instrTag, addr, 1, value);
+	      const uint64_t* data = reinterpret_cast<const uint64_t*>(req.buffer.data());
+	      for (unsigned i = 0; i < size and ok; i += 8, ++data)
+		ok = system_.mcmRead(hart, time, tag, addr + i, 8, *data);
+	    }
+	  else if ((size & 0x3) == 0 and (addr & 0x3) == 0)
+	    {
+	      const uint32_t* data = reinterpret_cast<const uint32_t*>(req.buffer.data());
+	      for (unsigned i = 0; i < size and ok; i += 4, ++data)
+		ok = system_.mcmRead(hart, time, tag, addr + i, 4, *data);
+	    }
+	  else
+	    {
+	      const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
+	      for (unsigned i = 0; i < size and ok; ++i, ++data)
+		ok = system_.mcmRead(hart, time, tag, addr + i, 1, *data);
 	    }
 
 	  if (cmdLog)
@@ -919,35 +932,24 @@ Server<URV>::mcmInsertCommand(const WhisperMessage& req, WhisperMessage& reply,
       else
 	{
 	  // For speed, use double-word insert when possible, else word, else byte.
-	  if ((req.size & 0x7) == 0 and (req.address & 0x7) == 0)
+	  uint64_t size = req.size, time = req.time, tag = req.instrTag, addr = req.address;
+	  if ((size & 0x7) == 0 and (addr & 0x7) == 0)
 	    {
 	      const uint64_t* data = reinterpret_cast<const uint64_t*>(req.buffer.data());
-	      for (unsigned i = 0; i < req.size and ok; i += 8, ++data)
-		{
-		  uint64_t addr = req.address + i;
-		  uint64_t value = *data;
-		  ok = system_.mcmMbInsert(hart, req.time, req.instrTag, addr, 8, value);
-		}
+	      for (unsigned i = 0; i < size and ok; i += 8, ++data)
+		ok = system_.mcmMbInsert(hart, time, tag, addr + i, 8, *data);
 	    }
-	  else if ((req.size & 0x3) == 0 and (req.address & 0x3) == 0)
+	  else if ((size & 0x3) == 0 and (addr & 0x3) == 0)
 	    {
 	      const uint32_t* data = reinterpret_cast<const uint32_t*>(req.buffer.data());
-	      for (unsigned i = 0; i < req.size and ok; i += 4, ++data)
-		{
-		  uint64_t addr = req.address + i;
-		  uint64_t value = *data;
-		  ok = system_.mcmMbInsert(hart, req.time, req.instrTag, addr, 4, value);
-		}
+	      for (unsigned i = 0; i < size and ok; i += 4, ++data)
+		ok = system_.mcmMbInsert(hart, time, tag, addr + i, 4, *data);
 	    }
 	  else
 	    {
 	      const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
-	      for (unsigned i = 0; i < req.size and ok; ++i, ++data)
-		{
-		  uint64_t addr = req.address + i;
-		  uint64_t value = *data;
-		  ok = system_.mcmMbInsert(hart, req.time, req.instrTag, addr, 1, value);
-		}
+	      for (unsigned i = 0; i < size and ok; ++i, ++data)
+		ok = system_.mcmMbInsert(hart, time, tag, addr + i, 1, *data);
 	    }
 
 	  if (cmdLog)
