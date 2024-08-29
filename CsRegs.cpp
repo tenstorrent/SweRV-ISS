@@ -920,7 +920,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
   if (csr)
     {
       URV bits = URV(0xf) << 20;  // Bits 23:20
-      bits |= URV(1) << 10;       // Bit 10
+      // bits |= URV(1) << 10;       // Bit 10
       auto mask = csr->getReadMask();
       csr->setReadMask(flag ? (mask | bits) : (mask & ~bits));
     }
