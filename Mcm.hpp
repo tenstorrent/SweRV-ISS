@@ -685,7 +685,6 @@ namespace WdRiscv
       MemoryOpVec pendingWrites_;
       RegTimeVec regTime_;
       RegProducerVec regProducer_;
-      std::set<McmInstrIx> pendingFences_;
 
       // Retired but not yet drained stores. Candidates for forwarding.
       std::set<McmInstrIx> undrainedStores_;
