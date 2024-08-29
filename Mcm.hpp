@@ -470,7 +470,10 @@ namespace WdRiscv
         assert(false);
 
       auto& vecRefs = iter->second;
-      for (auto& vecRef : vecRefs)
+      if (vecRefs.isOutOfBounds(other))
+	return false;
+
+      for (auto& vecRef : vecRefs.refs_)
         if (rangesOverlap(vecRef.addr_, vecRef.size_, other.physAddr_, other.size_))
 	  return true;
 
@@ -661,7 +664,8 @@ namespace WdRiscv
     using RegTimeVec = std::vector<uint64_t>;    // Map reg index to time.
     using RegProducerVec = std::vector<uint64_t>;   // Map reg index to instr tag.
 
-    /// Vector reference (produced by Whisper) load/store physical addresses.
+    /// Vector reference (produced by Whisper) load/store physical addresses and
+    /// corresponding data for store.
     struct VecRef
     {
       VecRef(uint64_t addr = 0, uint64_t data = 0, unsigned size = 0)
@@ -676,7 +680,66 @@ namespace WdRiscv
       unsigned size_ = 0;
     };
 
-    using VecRefs = std::vector<VecRef>;
+    /// Collection of vector load/store reference (Whisper) addresses for a single
+    /// instruction and the associated address bounds. The bounds are there to avoid
+    /// the cost of searching for an address that is not in the refs.
+    struct VecRefs
+    {
+      bool empty() const
+      { return refs_.empty(); }
+
+      bool isOutOfBounds(uint64_t addr) const
+      {
+	if (empty())
+	  return true;
+	return addr < low_ or addr > high_;
+      }
+
+      bool isOutOfBounds(uint64_t low, uint64_t high) const
+      {
+	if (empty())
+	  return true;
+	return low > high_ or high < low_;
+      }
+
+      bool isOutOfBounds(const MemoryOp& op) const
+      {
+	if (empty())
+	  return true;
+	assert(op.size_ > 0);
+	return isOutOfBounds(op.physAddr_, op.physAddr_ + op.size_ - 1);
+      }
+
+      bool isOutOfBounds(const VecRef& ref) const
+      {
+	if (empty())
+	  return true;
+	assert(ref.size_ > 0);
+	return isOutOfBounds(ref.addr_, ref.addr_ + ref.size_ - 1);
+      }
+
+      void add(uint64_t addr, uint64_t data, unsigned size)
+      {
+	assert(size > 0);
+
+	uint64_t l = addr, h = addr + size - 1;
+	if (empty())
+	  {
+	    low_ = l;
+	    high_ = h;
+	  }
+	else
+	  {
+	    low_ = std::min(low_, l);
+	    high_ = std::max(high_, h);
+	  }
+	refs_.push_back(VecRef(addr, data, size));
+      }
+
+      std::vector<VecRef> refs_;
+      uint64_t low_  = 0;   // Low address in refs
+      uint64_t high_ = 0;   // High address in refs
+    };
 
     // Per hart information related to MCM.
     struct HartData

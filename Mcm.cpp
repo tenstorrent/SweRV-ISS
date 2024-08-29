@@ -906,7 +906,7 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
       instr.size_ = elemSize;
       instr.isStore_ = true;
 
-      auto& vecRefOps = hartData_.at(hartIx).vecRefMap_[instr.tag_];
+      auto& vecRefs = hartData_.at(hartIx).vecRefMap_[instr.tag_];
 
       for (unsigned i = 0; i < addr.size(); ++i)
         {
@@ -916,7 +916,7 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	    continue;
 
 	  if (pa1 == pa2)
-	    vecRefOps.push_back(VecRef{ pa1, value, elemSize });
+	    vecRefs.add(pa1, value, elemSize);
 	  else
 	    {
 	      unsigned size1 = offsetToNextPage(pa1);
@@ -924,8 +924,8 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	      unsigned size2 = elemSize - size1;
 	      uint64_t val1 = (value <<  ((8 - size1)*8)) >> ((8 - size1)*8);
 	      uint64_t val2 = (value >> (size1*8));
-	      vecRefOps.push_back(VecRef { pa1, val1, size1 } );
-	      vecRefOps.push_back(VecRef { pa2, val2, size2 } );
+	      vecRefs.add(pa1, val1, size1);
+	      vecRefs.add(pa2, val2, size2);
 	    }
         }
 
@@ -1632,13 +1632,13 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
   // Collect refence byte values in an address to value map. Check for overlap
   std::unordered_map<uint64_t, uint8_t> refValues;  // Map byte address to value.
   bool overlap = false;
-  for (auto& vecRef : vecRefs)
+  for (auto& ref : vecRefs.refs_)
     {
-      for (unsigned i = 0; i < vecRef.size_; ++i)
+      for (unsigned i = 0; i < ref.size_; ++i)
 	{
-	  uint64_t addr = vecRef.addr_ + i;
+	  uint64_t addr = ref.addr_ + i;
 	  overlap = overlap or refValues.contains(addr);
-	  refValues[addr] = vecRef.data_ >> (i*8);
+	  refValues[addr] = ref.data_ >> (i*8);
 	}
     }
 
@@ -1732,11 +1732,11 @@ Mcm<URV>::checkStoreComplete(unsigned hartIx, const McmInstr& instr) const
       if (iter == vecRefMap.end())
 	return false;
       auto& vecRefs = iter->second;
-      for (const auto& vecRef : vecRefs)
+      for (const auto& ref : vecRefs.refs_)
 	{
-	  for (unsigned i = 0; i < vecRef.size_; ++i)
+	  for (unsigned i = 0; i < ref.size_; ++i)
 	    {
-	      uint64_t byteAddr = vecRef.addr_ + i;
+	      uint64_t byteAddr = ref.addr_ + i;
 	      if (not vecOverlapsRtlPhysAddr(instr, byteAddr))
 		return false;
 	    }
@@ -1963,7 +1963,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 
   // Collect reference (Whisper) addresses in addrMap. Check if there is overlap between
   // elements. Associated reference addresses with instruction.
-  auto& vecRefOps = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr->tag_];
+  auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr->tag_];
   bool hasOverlap = false;
   for (unsigned i = 0; i < pa1.size(); ++i)
     {
@@ -1979,11 +1979,11 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 	  size2 = elemSize - size1;
 	  assert(size1 > 0 and size1 < elemSize);
 	  assert(size2 > 0 and size2 < elemSize);
-	  vecRefOps.push_back(VecRef(ea1, 0, size1));
-	  vecRefOps.push_back(VecRef(ea2, 0, size2));
+	  vecRefs.add(ea1, 0, size1);
+	  vecRefs.add(ea2, 0, size2);
 	}
       else
-	vecRefOps.push_back(VecRef(ea1, 0, size1));
+	vecRefs.add(ea1, 0, size1);
 
       for (unsigned i = 0; i < size1; ++i)
 	{
@@ -2259,7 +2259,10 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 
   uint64_t forwardMask = 0;  // Mask of bits forwarded by vector store instruction
 
-  for (auto& vecRef : vecRefs)
+  if (vecRefs.isOutOfBounds(readOp))
+    return false;
+
+  for (auto& vecRef : vecRefs.refs_)
     {
       if (not rangesOverlap(vecRef.addr_, vecRef.size_, readOp.physAddr_, readOp.size_))
 	continue;
@@ -2591,11 +2594,17 @@ Mcm<URV>::overlaps(const McmInstr& i1, const McmInstr& i2) const
 
       auto& vecRefs1 = iter1->second;
       auto& vecRefs2 = iter2->second;
-      for (auto& vecRef1 : vecRefs1)
-	for (auto& vecRef2 : vecRefs2)
-	  if (rangesOverlap(vecRef1.addr_, vecRef1.size_,
-			    vecRef2.addr_, vecRef2.size_))
-	    return true;
+
+      if (vecRefs1.empty() or vecRefs2.empty())
+	return false;
+
+      for (auto& ref1 : vecRefs1.refs_)
+	{
+	  if (not vecRefs2.isOutOfBounds(ref1))
+	    for (auto& ref2 : vecRefs2.refs_)
+	      if (rangesOverlap(ref1.addr_, ref1.size_, ref2.addr_, ref2.size_))
+		return true;
+	}
 
       return false;
     }
@@ -2711,7 +2720,10 @@ Mcm<URV>::vecOverlapsRefPhysAddr(const McmInstr& instr, uint64_t addr) const
 
   auto& vecRefs = iter->second;
 
-  for (auto& vecRef : vecRefs)
+  if (vecRefs.isOutOfBounds(addr))
+    return false;
+
+  for (auto& vecRef : vecRefs.refs_)
     if (vecRef.overlaps(addr))
       return true;
 
@@ -3760,9 +3772,9 @@ Mcm<URV>::overlaps(const McmInstr& instr, const std::unordered_set<uint64_t>& ad
   if (iter == refMap.end())
     return false;
 
-  auto& refOps = refMap.at(instr.tag_);
+  auto& vecRefs = refMap.at(instr.tag_);
 
-  for (auto refOp : refOps)
+  for (auto refOp : vecRefs.refs_)
     for (unsigned i = 0; i < refOp.size_; ++i)
       if (addrSet.contains(refOp.addr_ + i))
 	return true;
