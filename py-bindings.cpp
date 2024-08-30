@@ -482,10 +482,12 @@ static void defineSystem(M m)
           std::vector<std::string> stringified = stringify(files);
           return self.loadElfFiles(stringified, false, verbose);
         }, py::arg("files"), py::arg("verbose") = false, py::doc("ELF files to load. Returns true on success."))
+#ifdef LZ4_COMPRESS
     .def("load_lz4_files", [stringify](System<T>& self, const std::vector<std::filesystem::path>& files, uint64_t offset, bool verbose) {
           std::vector<std::string> stringified = stringify(files);
           return self.loadLz4Files(stringified, offset, verbose);
         })
+#endif
     .def("harts", [](System<T>& self) {
           std::vector<std::shared_ptr<Hart<T>>> harts;
           for (unsigned i = 0; i < self.hartCount(); ++i)
