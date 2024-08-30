@@ -382,8 +382,8 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
   auto& regTimeVec = hartData_.at(hartIx).regTime_;
   auto& regProducer = hartData_.at(hartIx).regProducer_;
 
-  // Load/amo/sc/branch do not carry depenencies to dest register: Update time of dest.
-  if (di.isLoad() or di.isAmo() or di.isSc() or di.isBranch())
+  // Load/amo/sc/branch/mop do not carry depenencies to dest register: Update time of dest.
+  if (di.isLoad() or di.isAmo() or di.isSc() or di.isBranch() or di.isMop())
     {
       auto regIx = effectiveRegIx(di, 0);
       if (di.ithOperandMode(0) == OperandMode::Write and regIx != 0)

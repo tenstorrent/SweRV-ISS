@@ -293,6 +293,13 @@ namespace WdRiscv
       return isVectorStore() and (mop == 1 or mop == 3);
     }
 
+    /// Return true if this an mop (maybe-operation) instruction.
+    bool isMop() const
+    {
+      auto id = instId();
+      return id == InstId::mop_rr or id == InstId::mop_r or id == InstId::c_mop;
+    }
+
     /// Return the element size in bytes of a vector load instruction. Return zero for a
     /// non-vector-load instruction. For load-indexed and load-segment-indexed, this
     /// returns the index element size.
