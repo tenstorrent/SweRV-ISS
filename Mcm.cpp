@@ -270,7 +270,7 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
     {
       unsigned regIx = baseVecReg + ix + vecRegOffset_;
       regTimeVec.at(regIx) = 0;
-      regProducer.at(regIx) = instr.tag_;
+      regProducer.at(regIx) = 0;
     }
 
   if (group == 1)
@@ -280,6 +280,7 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 	  time = sysMemOps_.at(opIx).time_;
 
       unsigned regIx = baseVecReg + vecRegOffset_;
+      regProducer.at(regIx) = instr.tag_;
       regTimeVec.at(regIx) = time;
       return;
     }
@@ -292,7 +293,14 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 
   unsigned elemsPerVec = hart.vecRegSize() / elemSize;
 
-  for (unsigned ix = 0; ix < group; ++ix)
+  // A subset of vector registers in the group may have been loaded because
+  // the load is limited by VL.
+  unsigned vecRegCount = group;
+  unsigned elemCount = addr.size();
+  if (elemCount < elemsPerVec*group)
+    vecRegCount = (elemCount + elemsPerVec - 1) / elemsPerVec;
+
+  for (unsigned ix = 0; ix < vecRegCount; ++ix)
     {
       uint64_t regTime = 0;  // Vector register time
 
