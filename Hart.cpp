@@ -664,6 +664,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 
   // Update cached values of MSTATUS.
   updateCachedMstatus();
+  updateCachedHstatus();
 
   updateAddressTranslation();
 
