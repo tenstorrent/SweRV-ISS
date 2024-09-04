@@ -2009,7 +2009,7 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
 
   if (num == CN::MSTATUS or num == CN::SSTATUS or num == CN::VSSTATUS)
     {
-      value &= csr->getWriteMask();
+      value &= csr->getWriteMask() & csr->getReadMask();
       value = legalizeMstatusValue(value);
       csr->poke(value);   // Write cannot modify SD bit of status: poke it.
       recordWrite(num);
@@ -3609,7 +3609,7 @@ CsRegs<URV>::poke(CsrNumber num, URV value, bool virtMode)
     }
   else if (num == CN::MSTATUS or num == CN::SSTATUS or num == CN::VSSTATUS)
     {
-      value &= csr->getPokeMask();
+      value &= csr->getPokeMask() & csr->getReadMask();
       value = legalizeMstatusValue(value);
     }
   else if (num == CN::TSELECT)
