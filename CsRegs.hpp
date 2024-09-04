@@ -729,12 +729,10 @@ namespace WdRiscv
     void setReadMask(URV mask)
     { readMask_ = mask; }
 
-    /// Set the value of this register to the given value x honoring
-    /// the write mask (defined at construction): Set the ith bit of
-    /// this register to the ith bit of the given value x if the ith
-    /// bit of the write mask is 1; otherwise, leave the ith bit
-    /// unmodified. This is the interface used by the CSR
-    /// instructions.
+    /// Set the value of this register to the given value x honoring the write and poke
+    /// masks (defined at construction): Set the ith bit of this register to the ith bit
+    /// of the given value x if the ith bit of the write and poke masks is 1; otherwise,
+    /// leave the ith bit unmodified. This is the interface used by the CSR instructions.
     void write(URV x)
     {
       if (not hasPrev_)
@@ -753,10 +751,9 @@ namespace WdRiscv
         func(*this, newVal);
     }
 
-    /// Similar to the write method but using the poke mask instead of
-    /// the write mask. This is the interface used by non-csr
-    /// instructions to change modifiable (but not writable through
-    /// CSR instructions) bits of this register.
+    /// Similar to the write method but honoring only the poke mask. This is the interface
+    /// used by non-csr instructions to change modifiable (but not writable through CSR
+    /// instructions) bits of this register.
     void poke(URV x)
     {
       for (auto func : prePoke_)
