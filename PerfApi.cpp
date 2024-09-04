@@ -426,6 +426,8 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   bool trap = hart.lastInstructionTrapped();
   packet.trap_ = packet.trap_ or trap;
 
+  packet.nextIva_ = hart.peekPc();
+
   if (not trap)
     {
       auto& di = packet.decodedInst();
@@ -454,8 +456,6 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
       if (hart.hasTargetProgramFinished())
 	packet.nextIva_ = haltPc;
-      else
-	packet.nextIva_ = hart.peekPc();
 
       if (di.isBranch()) packet.taken_ = hart.lastBranchTaken();
 
