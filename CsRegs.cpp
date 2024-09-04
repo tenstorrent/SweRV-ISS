@@ -2011,8 +2011,9 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
     {
       value &= csr->getWriteMask() & csr->getReadMask();
       value = legalizeMstatusValue(value);
+      csr->write(value);  // Record write. Save previous value.
       csr->poke(value);   // Write cannot modify SD bit of status: poke it.
-      recordWrite(num);
+      recordWrite(csrn);
 
       // Cache interrupt enable from mstatus.mie.
       if (num == CN::MSTATUS)

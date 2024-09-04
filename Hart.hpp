@@ -2175,6 +2175,20 @@ namespace WdRiscv
     /// address. No effect if pa is not a device address.
     void deviceRead(uint64_t pa, unsigned size, uint64_t& value);
 
+    /// Set current privilege mode.
+    void setPrivilegeMode(PrivilegeMode m)
+    { privMode_ = m; }
+
+    /// Enable/disable virtual (V) mode.
+    void setVirtualMode(bool mode)
+    {
+      virtMode_ = mode;
+      csRegs_.setVirtualMode(mode);
+      if (mode)
+	updateCachedVsstatus();
+      updateAddressTranslation();
+    }
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
@@ -2320,10 +2334,6 @@ namespace WdRiscv
     bool getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
 			 bool isVec, uint64_t& value);
 
-    /// Set current privilege mode.
-    void setPrivilegeMode(PrivilegeMode m)
-    { privMode_ = m; }
-
     /// Helper to reset: reset floating point related structures.
     /// No-op if no  floating point extension is enabled.
     void resetFloat();
@@ -2417,16 +2427,6 @@ namespace WdRiscv
 #ifndef FAST_SLOPPY
       setVecStatus(VecStatus::Dirty);
 #endif
-    }
-
-    // Enable/disable virtual (V) mode.
-    void setVirtualMode(bool mode)
-    {
-      virtMode_ = mode;
-      csRegs_.setVirtualMode(mode);
-      if (mode)
-	updateCachedVsstatus();
-      updateAddressTranslation();
     }
 
     // Return true if it is legal to execute a vector instruction: V

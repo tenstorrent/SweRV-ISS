@@ -479,8 +479,10 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
       // Memory should not have changed.
     }
 
+  hart.setVirtualMode(hart.lastVirtMode());
+  hart.setPrivilegeMode(hart.lastPrivMode());
 
-  if (trap)
+  if (trap or packet.di_.isXRet())
     {
       // Restore CSRs modified by the trap. TODO: For vector ld/st we have to restore
       // partially modified vectors.
@@ -532,6 +534,8 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   hart.setTargetProgramFinished(false);
   hart.pokePc(prevPc);
   hart.setInstructionCount(prevInstrCount);
+
+  hart.clearTraceData();
 
   return true;
 }
