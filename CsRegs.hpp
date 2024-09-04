@@ -745,7 +745,8 @@ namespace WdRiscv
       for (auto func : preWrite_)
         func(*this, x);
 
-      URV newVal = (x & writeMask_) | (*valuePtr_ & ~writeMask_);
+      URV mask = pokeMask_ & writeMask_;
+      URV newVal = (x & mask) | (*valuePtr_ & ~mask);
       *valuePtr_ = newVal;
 
       for (auto func : postWrite_)

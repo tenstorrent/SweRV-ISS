@@ -3251,14 +3251,15 @@ CsRegs<URV>::defineVectorRegs()
   bool mand = true;  // Mndatory
   bool imp = true;   // Implemented
 
-  defineCsr("vstart", CsrNumber::VSTART, !mand, !imp, 0, 0, 0);
+  uint64_t mask = ~URV(0);
+  defineCsr("vstart", CsrNumber::VSTART, !mand, !imp, 0, mask, mask);  // All bits pokable.
   defineCsr("vxsat",  CsrNumber::VXSAT,  !mand, !imp, 0, 1, 1);  // 1 bit
   defineCsr("vxrm",   CsrNumber::VXRM,   !mand, !imp, 0, 3, 3);  // 2 bits
   defineCsr("vcsr",   CsrNumber::VCSR,   !mand, !imp, 0, 7, 7);  // 3 bits
   URV pokeMask = ~URV(0);
   defineCsr("vl",     CsrNumber::VL,     !mand, !imp, 0, 0, pokeMask);
 
-  uint64_t mask = 0x800000ff;
+  mask = 0x800000ff;
   if (not rv32_)
     mask = 0x80000000000000ffL;
   defineCsr("vtype",  CsrNumber::VTYPE,  !mand, !imp, mask & ~URV(0xff), mask, mask);
