@@ -385,26 +385,54 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op, unsigned groupX
 template <typename URV>
 inline
 bool
-Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
-			    unsigned groupX8, unsigned vstart)
+Hart<URV>::checkRedOpVsEmul(const DecodedInst* di)
 {
   // Reduction ops must have zero vstart.
-  if (vstart > 0)
+  unsigned start = csRegs_.peekVstart();
+  if (start > 0)
     {
       postVecFail(di);
       return false;
     }
 
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
+  unsigned groupX8 = vecRegs_.groupMultiplierX8();
+  unsigned vs1 = di->op1();
 
-  if ((op1 & mask) == 0)
+  // Vector register (vs1) must be a multiple of lmul.
+
+  unsigned lmul = groupX8 >= 8 ? groupX8 / 8 : 1;
+  unsigned mask = lmul - 1;   // Assumes lmul is 1, 2, 4, or 8
+
+  if ((vs1 & mask) != 0)
     {
-      vecRegs_.setOpEmul(1, eg, 1);  // Track operand group for logging (1 for mask).
-      return true;
+      postVecFail(di);
+      return false;
     }
 
-  // Vector operand not a multiple of emul or non-zero vstart: illegal.
+  // Track operand group for logging (vd and vs2 have an lmul of 1).
+  vecRegs_.setOpEmul(1, lmul, 1);
+  return true;
+}
+
+
+template <typename URV>
+inline
+bool
+Hart<URV>::checkIndexedOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op2,
+                                 unsigned groupX8, unsigned offsetGroupX8)
+{
+  unsigned eg0 = groupX8 >= 8 ? groupX8 / 8 : 1;
+  unsigned mask0 = eg0 - 1;   // Assumes eg is 1, 2, 4, or 8
+
+  unsigned eg2 = offsetGroupX8 >= 8 ? offsetGroupX8 / 8 : 1;
+  unsigned mask2 = eg2 - 1;
+
+  if (((op0 & mask0) == 0) and
+      ((op2 & mask2) == 0))
+    {
+      vecRegs_.setOpEmul(eg0, 1, eg2);  // Track operand group for logging
+      return true;
+    }
   postVecFail(di);
   return false;
 }
@@ -437,7 +465,7 @@ checkDestSourceOverlap(unsigned dest, unsigned destWidth, unsigned destGroupX8,
 
 
 /// Return true if source/source overlap is allowed. No overlap is allowed
-/// if element widths are different. Source vetor numbers are s1 and s2.
+/// if element widths are different. Source vector numbers are s1 and s2.
 static
 bool
 checkSourceOverlap(unsigned s1, unsigned eew1, unsigned group1X8,
@@ -832,9 +860,10 @@ Hart<URV>::checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned 
       if (fieldCount > 1)
         {
           unsigned offsetGroup = offsetGroupX8 >= 8 ? offsetGroupX8/8 : 1;
-          unsigned group = (groupX8*fieldCount) >= 8 ? (groupX8*fieldCount)/8 : 1;
+	  unsigned group = groupX8 >= 8 ? groupX8 / 8 : 1;
+	  unsigned segGroup = group * fieldCount;
 
-          ok = (vi >= vd + group or vd >= vi + offsetGroup);
+          ok = (vi >= vd + segGroup or vd >= vi + offsetGroup);
         }
       else
         ok = checkDestSourceOverlap(vd, sew, groupX8, vi, offsetWidth, offsetGroupX8);
@@ -899,13 +928,11 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal, bool vli /* vsetvli i
               URV avl = intRegs_.read(rs1);  // Application vector length.
               if (avl <= vlmax)
                 elems = avl;
-              else if (avl >= 2*vlmax)
-                elems = vlmax; // NOLINT(bugprone-branch-clone)
               else
-		// avl > vlmax and < 2*vlmax, spec allows anything between
+		// For avl >= 2*vlmax, spec mandates setting vl to vlmax.
+		// For avl > vlmax and < 2*vlmax, spec allows anything between 
 		// ceil(avl/2) and vlmax inclusive. We choose vlmax.
-                // NOLINTNEXTLINE(bugprone-branch-clone)
-                elems = vlmax;
+		elems = vlmax;
             }
         }
 
@@ -1751,7 +1778,7 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
     case EW::Byte:  vwsub_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked); break;
     case EW::Half:  vwsub_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vwsub_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word2: // Fallthrough to invalid case
+    case EW::Word2: // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -1789,7 +1816,7 @@ Hart<URV>::execVwsub_vx(const DecodedInst* di)
     case EW::Byte:  vwsub_vx<int8_t> (vd, vs1, e2, group, start, elems, masked); break;
     case EW::Half:  vwsub_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vwsub_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word2: // Fallthrough to invalid case
+    case EW::Word2: // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -2115,7 +2142,7 @@ Hart<URV>::execVwsubu_wx(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
 
-  URV e2 = intRegs_.read(di->op2()); // FIX: Spec says sign extended. We differ.
+  URV e2 = intRegs_.read(di->op2());
 
   using EW = ElementWidth;
   switch (sew)
@@ -2803,7 +2830,7 @@ Hart<URV>::execVmsleu_vi(const DecodedInst* di)
   if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
-  // Immediate is sign exended and then treated as unsigned.
+  // Immediate is sign etxended and then treated as unsigned.
   int64_t imm = di->op2As<int32_t>();
 
   using EW = ElementWidth;
@@ -2993,7 +3020,7 @@ Hart<URV>::execVmsgtu_vi(const DecodedInst* di)
   if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
-  // Immediate is sign exended and then treated as unsigned.
+  // Immediate is sign extended and then treated as unsigned.
   int64_t imm = di->op2As<int32_t>();
 
   using EW = ElementWidth;
@@ -4020,7 +4047,7 @@ Hart<URV>::execVredop_vs(const DecodedInst* di, OP op)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   if (elems == 0)
@@ -4068,7 +4095,7 @@ Hart<URV>::execVredopu_vs(const DecodedInst* di, OP op)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   if (elems == 0)
@@ -4222,7 +4249,7 @@ Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   using EW = ElementWidth;
@@ -4257,7 +4284,7 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   using EW = ElementWidth;
@@ -4300,7 +4327,7 @@ Hart<URV>::execVmop_mm(const DecodedInst* di, OP op)
 	  vecRegs_.writeMaskRegister(vd, ix, flag);
 	}
 
-      // If not update-whole-mask and mask-anostic-ones, fill tail with ones.
+      // If not update-whole-mask and mask-agnostic-ones, fill tail with ones.
       if (vecRegs_.isTailAgnosticOnes())
 	for (unsigned ix = count; ix < bitsPerReg; ++ix)
 	  vecRegs_.writeMaskRegister(vd, ix, true);
@@ -7496,7 +7523,7 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
     case EW::Half:  vsext<int16_t,int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word:  vsext<int32_t, int16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vsext<int64_t, int32_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -7552,7 +7579,7 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
   EW eew = sew;  // Effective elem width of source.
   switch (sew)
     {
-    case EW::Byte: // Fallthrough to invalid case
+    case EW::Byte: // Fall-through to invalid case
     case EW::Half: postVecFail(di); return;
     case EW::Word: eew = EW::Byte; break;
     case EW::Word2: eew = EW::Half; break;
@@ -7574,8 +7601,8 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
     {
     case EW::Word:  vsext<int32_t, int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vsext<int64_t, int16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Half:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Half:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -7631,8 +7658,8 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
   EW eew = sew;  // Effective elem width of source.
   switch (sew)
     {
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Half:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Half:  // Fall-through to invalid case
     case EW::Word: postVecFail(di); return;
     case EW::Word2: eew = EW::Byte; break;
     case EW::Word4: eew = EW::Half; break;
@@ -7652,9 +7679,9 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
   switch (sew)
     {
     case EW::Word2: vsext<int64_t, int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Half:  // Fallthrough to invalid case
-    case EW::Word:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Half:  // Fall-through to invalid case
+    case EW::Word:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -7759,7 +7786,7 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
     case EW::Half:  vzext<uint16_t,uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word:  vzext<uint32_t, uint16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vzext<uint64_t, uint32_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -7815,7 +7842,7 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
   EW eew = sew;  // Effective elem width of source.
   switch (sew)
     {
-    case EW::Byte: // Fallthrough to invalid case
+    case EW::Byte: // Fall-through to invalid case
     case EW::Half: postVecFail(di); return;
     case EW::Word: eew = EW::Byte; break;
     case EW::Word2: eew = EW::Half; break;
@@ -7837,8 +7864,8 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
     {
     case EW::Word:  vzext<uint32_t, uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vzext<uint64_t, uint16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Half:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Half:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -7894,8 +7921,8 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
   EW eew = sew;  // Effective elem width of source.
   switch (sew)
     {
-    case EW::Byte: // Fallthrough to invalid case
-    case EW::Half: // Fallthrough to invalid case
+    case EW::Byte: // Fall-through to invalid case
+    case EW::Half: // Fall-through to invalid case
     case EW::Word: postVecFail(di); return;
     case EW::Word2: eew = EW::Byte; break;
     case EW::Word4: eew = EW::Half; break;
@@ -7915,9 +7942,9 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
   switch (sew)
     {
     case EW::Word2: vzext<uint64_t, uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Half:  // Fallthrough to invalid case
-    case EW::Word:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Half:  // Fall-through to invalid case
+    case EW::Word:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -8251,7 +8278,7 @@ Hart<URV>::execVadc_vim(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vcin = 0;
 
-  // cannot overlap vcin, unmasked verion reserved
+  // cannot overlap vcin, unmasked version reserved
   if (vd == vcin or vs1 == vcin or not masked)
     {
       postVecFail(di);
@@ -8290,7 +8317,7 @@ Hart<URV>::execVsbc_vvm(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vbin = 0;
 
-  // cannot overlap borrow-in, unmasked verion reserved
+  // cannot overlap borrow-in, unmasked version reserved
   if (vd == vbin or vs1 == vbin or vs2 == vbin or not masked)
     {
       postVecFail(di);
@@ -8327,7 +8354,7 @@ Hart<URV>::execVsbc_vxm(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vbin = 0;
 
-// cannot overlap borrow-in, unmasked verion reserved
+  // cannot overlap borrow-in, unmasked version reserved
   if (vd == vbin or vs1 == vbin or not masked)
     {
       postVecFail(di);
@@ -11072,14 +11099,17 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  unsigned elemCount = vecRegs_.elemMax(eew);
+  unsigned elemMax = vecRegs_.elemMax(eew); // Includes tail elems.
   uint64_t addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
 
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
 
+  if (start >= vecRegs_.elemCount())
+    return true;
+
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
 
-  for (unsigned ix = start; ix < elemCount; ++ix, addr += sizeof(ELEM_TYPE))
+  for (unsigned ix = start; ix < elemMax; ++ix, addr += sizeof(ELEM_TYPE))
     {
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
@@ -11092,7 +11122,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
         }
       if (skip)
 	{
-	  vecRegs_.write(vd, ix, destGroup, elem);
+          vecRegs_.write(vd, ix, destGroup, elem);
 	  continue;
 	}
 
@@ -11123,9 +11153,18 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
                 initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
 	      else
                 {
+		  // We reduce VL before processing tail elements. This is allowed
+		  // by the spec (items between old VL and new VL can be updated
+		  // with arbitrary values according to the spec).
                   pokeCsr(CsrNumber::VL, ix);
                   recordCsrWrite(CsrNumber::VL);
                   vecRegs_.elemCount(ix);  // Update cached value of VL.
+
+		  // Fill tail elements with all-ones if so configured.
+		  ELEM_TYPE ones = ~ ELEM_TYPE{0};
+		  if (vecRegs_.isTailAgnostic() and vecRegs_.isTailAgnosticOnes())
+		    for (unsigned ti = vecRegs_.elemCount(); ti < elemMax; ti++)
+		      vecRegs_.write(vd, ti, destGroup, ones);
                 }
 	    }
 	  else
@@ -11449,11 +11488,19 @@ bool
 Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 {
   unsigned start = csRegs_.peekVstart();
-  unsigned groupX8 = di->vecFieldCount() * 8;
-  GroupMultiplier gm = GroupMultiplier::One;
-  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, gm);
-  badConfig = badConfig or not vecRegs_.legalConfig(eew, gm);
-  if ((not preVecExec()) or badConfig or di->isMasked())
+  unsigned fieldCount = di->vecFieldCount();
+  unsigned group = 1, groupX8 = 8, effGroupX8 = fieldCount*8;
+
+  // Field count must be a multiple of 8.
+  bool ok = (fieldCount & (fieldCount - 1)) == 0;
+  if (ok)
+    {
+      GroupMultiplier egm = GroupMultiplier::One;
+      ok = VecRegs::groupNumberX8ToSymbol(effGroupX8, egm);
+      ok = ok and preVecExec() and vecRegs_.legalConfig(eew, egm) and not di->isMasked();
+    }
+
+  if (not ok)
     {
       postVecFail(di);
       return false;
@@ -11461,16 +11508,21 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
   unsigned vd = di->op0(), rs1 = di->op1();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8))
+  // This should never fail, we call it to record the operand (vd) effective group.
+  if (not checkVecOpsVsEmul(di, vd, effGroupX8))
     return false;
 
   unsigned elemBytes = VecRegs::elemWidthInBytes(eew);
-  unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
-  URV addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
+  assert(elemBytes == sizeof(ELEM_TYPE));
+  unsigned elemCount = (group*vecRegs_.bytesPerRegister()*fieldCount) / elemBytes;
+  URV addr = intRegs_.read(rs1) + start*elemBytes;
 
-  vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
+  vecRegs_.ldStSize_ = elemBytes;
 
-  for (unsigned ix = start; ix < elemCount; ++ix, addr += sizeof(ELEM_TYPE))
+  if (start >= elemCount)
+    return true;
+
+  for (unsigned ix = start; ix < elemCount; ++ix, addr += elemBytes)
     {
       auto cause = ExceptionCause::NONE;
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
@@ -11496,13 +11548,15 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
           return false;
         }
 
-      vecRegs_.write(vd, ix, groupX8, elem);
+      vecRegs_.write(vd, ix, effGroupX8, elem);
 
       vecRegs_.ldStVa_.push_back(addr);
       vecRegs_.ldStPa_.push_back(pa1);
       vecRegs_.ldStPa2_.push_back(pa1);
       vecRegs_.maskedAddr_.push_back(false);
     }
+
+  vecRegs_.touchReg(vd, groupX8);  // We want the group and not the effective group.
 
   return true;
 }
@@ -11582,12 +11636,23 @@ Hart<URV>::execVlre1024_v(const DecodedInst* di)
 
 template <typename URV>
 bool
-Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
+Hart<URV>::vectorStoreWholeReg(const DecodedInst* di)
 {
   unsigned start = csRegs_.peekVstart();
-  unsigned groupX8 = VecRegs::groupMultiplierX8(gm);
-  ElementWidth eew = ElementWidth::Byte;
-  if (not preVecExec()  or  not vecRegs_.legalConfig(eew, gm)  or  di->isMasked())
+  unsigned fieldCount = di->vecFieldCount();
+  unsigned group = 1, effGroupX8 = fieldCount*8;
+
+  // Field count must be a multiple of 8.
+  bool ok = (fieldCount & (fieldCount - 1)) == 0;
+  if (ok)
+    {
+      GroupMultiplier egm = GroupMultiplier::One;
+      ElementWidth eew = ElementWidth::Byte;
+      ok = VecRegs::groupNumberX8ToSymbol(effGroupX8, egm);
+      ok = ok and preVecExec() and vecRegs_.legalConfig(eew, egm) and not di->isMasked();
+    }
+
+  if (not ok)
     {
       postVecFail(di);
       return false;
@@ -11595,19 +11660,20 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
 
   unsigned vd = di->op0(), rs1 = di->op1();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8))
+  // This should never fail, we call it to record the operand (vd) group.
+  if (not checkVecOpsVsEmul(di, vd, effGroupX8))
     return false;
 
-  unsigned elemSize = 1;
-  unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemSize / 8;
-  URV addr = intRegs_.read(rs1) + start*elemSize;
+  const unsigned elemBytes = 1;
+  unsigned elemCount = (group*vecRegs_.bytesPerRegister()*fieldCount) / elemBytes;
+  URV addr = intRegs_.read(rs1) + start*elemBytes;
 
-  vecRegs_.ldStSize_ = sizeof(uint8_t);
+  vecRegs_.ldStSize_ = elemBytes;
 
-  for (unsigned ix = start; ix < elemCount; ++ix, addr += elemSize)
+  for (unsigned ix = start; ix < elemCount; ++ix, addr += elemBytes)
     {
       uint8_t elem = 0;
-      vecRegs_.read(vd, ix, groupX8, elem);
+      vecRegs_.read(vd, ix, effGroupX8, elem);
 
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
       uint64_t gpa1 = addr, gpa2 = addr;
@@ -11639,7 +11705,7 @@ template <typename URV>
 void
 Hart<URV>::execVs1r_v(const DecodedInst* di)
 {
-  if (not vectorStoreWholeReg(di, GroupMultiplier::One))
+  if (not vectorStoreWholeReg(di))
     return;
   postVecSuccess();
 }
@@ -11649,7 +11715,7 @@ template <typename URV>
 void
 Hart<URV>::execVs2r_v(const DecodedInst* di)
 {
-  if (not vectorStoreWholeReg(di, GroupMultiplier::Two))
+  if (not vectorStoreWholeReg(di))
     return;
   postVecSuccess();
 }
@@ -11659,7 +11725,7 @@ template <typename URV>
 void
 Hart<URV>::execVs4r_v(const DecodedInst* di)
 {
-  if (not vectorStoreWholeReg(di, GroupMultiplier::Four))
+  if (not vectorStoreWholeReg(di))
     return;
   postVecSuccess();
 }
@@ -11669,7 +11735,7 @@ template <typename URV>
 void
 Hart<URV>::execVs8r_v(const DecodedInst* di)
 {
-  if (not vectorStoreWholeReg(di, GroupMultiplier::Eight))
+  if (not vectorStoreWholeReg(di))
     return;
   postVecSuccess();
 }
@@ -11779,14 +11845,17 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
   uint64_t stride = intRegs_.read(rs2);
   unsigned start = csRegs_.peekVstart();
-  unsigned elemCount = vecRegs_.elemMax(eew);
+  unsigned elemMax = vecRegs_.elemMax(eew);   // Includes tail elements.
   uint64_t addr = intRegs_.read(rs1) + start*stride;
 
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
 
+  if (start >= vecRegs_.elemCount())
+    return true;
+
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
 
-  for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
+  for (unsigned ix = start; ix < elemMax; ++ix, addr += stride)
     {
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
@@ -12080,7 +12149,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+  if (not checkIndexedOpsVsEmul(di, vd, vi, groupX8, offsetGroupX8))
     return false;
 
   if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8, 1 /* fieldCount */))
@@ -12089,12 +12158,17 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   uint64_t addr = intRegs_.read(rs1);
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elemCount = vecRegs_.elemMax(), elemSize = elemWidth / 8;
+  unsigned elemMax = vecRegs_.elemMax();  // Includes tail elements.
+  unsigned elemSize = elemWidth / 8;
+
   vecRegs_.ldStSize_ = elemSize;
+
+  if (start >= vecRegs_.elemCount())
+    return true;
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
 
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned ix = start; ix < elemMax; ++ix)
     {
       uint64_t vaddr;
       ELEM_TYPE elem = 0;
@@ -12111,7 +12185,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
         }
       if (skip)
 	{
-	  vecRegs_.write(vd, ix, destGroup, elem);
+          vecRegs_.write(vd, ix, destGroup, elem);
 	  continue;
 	}
 
@@ -12288,7 +12362,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+  if (not checkIndexedOpsVsEmul(di, vd, vi, groupX8, offsetGroupX8))
     return false;
 
   if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8, 1 /* fieldCount */))
@@ -12535,7 +12609,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
   unsigned start = csRegs_.peekVstart();
   uint64_t addr = intRegs_.read(rs1) + start*stride;
-  unsigned elemCount = vecRegs_.elemMax(eew);
+  unsigned elemMax = vecRegs_.elemMax(eew);  // Includes tail elements.
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
   // Used registers must not exceed 32.
@@ -12548,9 +12622,12 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   unsigned elemSize = sizeof(ELEM_TYPE);
   vecRegs_.ldStSize_ = elemSize;
 
+  if (start >= vecRegs_.elemCount())
+    return true;
+
   unsigned destGroup = 8*eg;
 
-  for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
+  for (unsigned ix = start; ix < elemMax; ++ix, addr += stride)
     {
       uint64_t faddr = addr;  // Field address
 
@@ -12558,7 +12635,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	{
 	  unsigned dvg = vd + field*eg;   // Destination vector gorup.
 	  ELEM_TYPE elem(0);
-	  bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
+	  bool skip = not vecRegs_.isDestActive(dvg, ix, destGroup, masked, elem);
           if (ix < vecRegs_.elemCount())
             {
               vecRegs_.ldStVa_.push_back(faddr);
@@ -12566,6 +12643,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	      vecRegs_.ldStPa2_.push_back(faddr);
               vecRegs_.maskedAddr_.push_back(skip);
             }
+
 	  if (skip)
 	    {
 	      vecRegs_.write(dvg, ix, destGroup, elem);
@@ -12595,6 +12673,24 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      if (ix == 0 or not faultFirst)
 		initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
+	      else if (vecRegs_.isTailAgnostic() and vecRegs_.isTailAgnosticOnes())
+		{
+		  // We reduce VL before processing tail elements. This is allowed
+		  // by the spec (items between old VL and new VL can be updated
+		  // with arbitrary values according to the spec).
+                  pokeCsr(CsrNumber::VL, ix);
+                  recordCsrWrite(CsrNumber::VL);
+                  vecRegs_.elemCount(ix);  // Update cached value of VL.
+
+		  // Fill tail elements with all-ones if so configured.
+		  ELEM_TYPE ones = ~ ELEM_TYPE{0};
+		  for (unsigned ti = vecRegs_.elemCount(); ti < elemMax; ti++)
+		    for (unsigned fi = 0; fi < fieldCount; ++fi)
+		      {
+			unsigned dvg = vd + fi*eg;   // Destination vector gorup.
+			vecRegs_.write(dvg, ti, destGroup, ones);
+		      }
+		}
 	      return false;
 	    }
 
@@ -13044,7 +13140,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+  if (not checkIndexedOpsVsEmul(di, vd, vi, groupX8, offsetGroupX8))
     return false;
 
   if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8, fieldCount))
@@ -13052,7 +13148,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
   uint64_t addr = intRegs_.read(rs1);
   unsigned start = csRegs_.peekVstart(), elemSize = elemWidth / 8;
-  unsigned elemCount = vecRegs_.elemMax();
+  unsigned elemMax = vecRegs_.elemMax();  // Includes tail elements.
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
   // Used registers must not exceed 32.
@@ -13061,18 +13157,22 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
       postVecFail(di);
       return false;
     }
+
   vecRegs_.ldStSize_ = elemSize;
+
+  if (start >= vecRegs_.elemCount())
+    return true;
 
   unsigned destGroup = 8*eg;
 
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned ix = start; ix < elemMax; ++ix)
     {
       for (unsigned field = 0; field < fieldCount; ++field)
 	{
           uint64_t faddr;
 	  unsigned dvg = vd + field*eg;  // Destination vector grop.
 	  ELEM_TYPE elem = 0;
-	  bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
+	  bool skip = not vecRegs_.isDestActive(dvg, ix, destGroup, masked, elem);
           if (ix < vecRegs_.elemCount())
             {
               uint64_t offset = 0;
@@ -13213,7 +13313,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
+  if (not checkIndexedOpsVsEmul(di, vd, vi, groupX8, offsetGroupX8))
     return false;
 
   if (not checkVecLdStIndexedInst(di, vd, vi, offsetWidth, offsetGroupX8, fieldCount))
@@ -14284,8 +14384,8 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
     {
     case EW::Half:   vfwadd_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfwadd_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
-    case EW::Word2:  // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
+    case EW::Word2:  // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
 
@@ -14305,7 +14405,6 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  WidenedFpScalar e2dw{e2};
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group*2);
 
@@ -14316,6 +14415,7 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar e2dw{e2};
 	  vecRegs_.read(vs1, ix, group, e1);
 	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
 	  dest = doFadd<ELEM_TYPE2X>(e1dw, e2dw);
@@ -14431,8 +14531,8 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
     {
     case EW::Half:   vfwsub_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfwsub_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
-    case EW::Word2:  // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
+    case EW::Word2:  // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
 
@@ -14452,7 +14552,6 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  WidenedFpScalar negE2dw{-e2};
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group*2);
 
@@ -14463,6 +14562,7 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar negE2dw{-e2};
 	  vecRegs_.read(vs1, ix, group, e1);
 	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
 	  dest = doFadd<ELEM_TYPE2X>(e1dw, negE2dw);
@@ -14577,8 +14677,8 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
     {
     case EW::Half:   vfwadd_wv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfwadd_wv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
-    case EW::Word2:  // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
+    case EW::Word2:  // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
 
@@ -14597,7 +14697,6 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  WidenedFpScalar e2dw{e2};
 
   unsigned group2x = group*2;
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group2x);
@@ -14609,6 +14708,7 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar e2dw{e2};
 	  vecRegs_.read(vs1, ix, group2x, e1dw);
 	  dest = doFadd<ELEM_TYPE2X>(e1dw, e2dw);
           URV incFlags = activeSimulatorFpFlags(); 
@@ -14740,7 +14840,6 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  WidenedFpScalar negE2dw{-e2};
 
   unsigned group2x = group*2;
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group2x);
@@ -14752,6 +14851,7 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar negE2dw{-e2};
 	  vecRegs_.read(vs1, ix, group2x, e1dw);
 	  dest = doFadd<ELEM_TYPE2X>(e1dw, negE2dw);
           URV incFlags = activeSimulatorFpFlags(); 
@@ -15140,7 +15240,6 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  WidenedFpScalar e2dw{e2};
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group*2);
 
@@ -15151,6 +15250,7 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar e2dw{e2};
 	  vecRegs_.read(vs1, ix, group, e1);
 	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
 	  dest = doFmul<ELEM_TYPE2X>(e1dw, e2dw);
@@ -16268,7 +16368,6 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
   ELEM_TYPE2X e2dw{}, dest{};
-  WidenedFpScalar e1dw{e1};
 
   unsigned group2x = group*2;
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group2x);
@@ -16280,6 +16379,7 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar e1dw{e1};
 	  vecRegs_.read(vs2, ix, group, e2);
 	  vecRegs_.read(vd, ix, group2x, dest);
 
@@ -16415,7 +16515,6 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
-  WidenedFpScalar e1dw{-e1};
 
   unsigned group2x = group*2;
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group2x);
@@ -16427,6 +16526,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar e1dw{-e1};
 	  vecRegs_.read(vs2, ix, group, e2);
 	  vecRegs_.read(vd, ix, group2x, dest);
 	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
@@ -16561,7 +16661,6 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
-  WidenedFpScalar e1dw{e1};
 
   unsigned group2x = group*2;
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group2x);
@@ -16573,6 +16672,7 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar e1dw{e1};
 	  vecRegs_.read(vs2, ix, group, e2);
 	  vecRegs_.read(vd, ix, group2x, dest);
 	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
@@ -16708,7 +16808,6 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
-  WidenedFpScalar e1dw{-e1};
 
   unsigned group2x = group*2;
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group2x);
@@ -16720,6 +16819,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
 	{
+          WidenedFpScalar e1dw{-e1};
 	  vecRegs_.read(vs2, ix, group, e2);
 	  vecRegs_.read(vd, ix, group2x, dest);
 	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
@@ -17024,7 +17124,7 @@ Hart<URV>::execVmfeq_vv(const DecodedInst* di)
     case EW::Half:   vmfeq_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmfeq_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmfeq_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
   postVecSuccess();
@@ -17146,7 +17246,7 @@ Hart<URV>::execVmfne_vv(const DecodedInst* di)
     case EW::Half:   vmfne_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmfne_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmfne_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
   postVecSuccess();
@@ -17263,7 +17363,7 @@ Hart<URV>::execVmflt_vv(const DecodedInst* di)
     case EW::Half:  vmflt_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vmflt_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmflt_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -17376,7 +17476,7 @@ Hart<URV>::execVmfle_vv(const DecodedInst* di)
     case EW::Half:  vmfle_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vmfle_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmfle_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -17597,7 +17697,7 @@ Hart<URV>::execVfclass_v(const DecodedInst* di)
     case EW::Half:   vfclass_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfclass_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfclass_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
   postVecSuccess();
@@ -17660,7 +17760,7 @@ Hart<URV>::execVfcvt_xu_f_v(const DecodedInst* di)
     case EW::Half:   vfcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_xu_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
   postVecSuccess();
@@ -17722,7 +17822,7 @@ Hart<URV>::execVfcvt_x_f_v(const DecodedInst* di)
     case EW::Half:   vfcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_x_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
   postVecSuccess();
@@ -17752,7 +17852,7 @@ Hart<URV>::execVfcvt_rtz_xu_f_v(const DecodedInst* di)
     case EW::Half:   vfcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_xu_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
   postVecSuccess();
@@ -17782,7 +17882,7 @@ Hart<URV>::execVfcvt_rtz_x_f_v(const DecodedInst* di)
     case EW::Half:   vfcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_x_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
   postVecSuccess();
@@ -17845,7 +17945,7 @@ Hart<URV>::execVfcvt_f_xu_v(const DecodedInst* di)
     case EW::Half:   vfcvt_f_xu_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_f_xu_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_f_xu_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
   postVecSuccess();
@@ -17908,7 +18008,7 @@ Hart<URV>::execVfcvt_f_x_v(const DecodedInst* di)
     case EW::Half:   vfcvt_f_x_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_f_x_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_f_x_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
   postVecSuccess();
@@ -17979,8 +18079,8 @@ Hart<URV>::execVfwcvt_xu_f_v(const DecodedInst* di)
     {
     case EW::Half:  vfwcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:  vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Word2: // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Word2: // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -18051,8 +18151,8 @@ Hart<URV>::execVfwcvt_x_f_v(const DecodedInst* di)
     {
     case EW::Half:  vfwcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:  vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Word2: // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Word2: // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -18089,8 +18189,8 @@ Hart<URV>::execVfwcvt_rtz_xu_f_v(const DecodedInst* di)
     {
     case EW::Half:  vfwcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:  vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Word2: // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Word2: // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -18126,8 +18226,8 @@ Hart<URV>::execVfwcvt_rtz_x_f_v(const DecodedInst* di)
     {
     case EW::Half:  vfwcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:  vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Word2: // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Word2: // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -18372,7 +18472,7 @@ Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
     {
     case EW::Half: vfwcvt_f_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfwcvt_f_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte: // Fallthrough
+    case EW::Byte: // Fall-through
     default:       postVecFail(di); return;
     }
   postVecSuccess();
@@ -18706,8 +18806,8 @@ Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
     {
     case EW::Half:  vfncvt_f_xu_w<uint16_t>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:  vfncvt_f_xu_w<uint32_t>(vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Word2: // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Word2: // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -18779,8 +18879,8 @@ Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
     {
     case EW::Half:  vfncvt_f_x_w<int16_t>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:  vfncvt_f_x_w<int32_t> (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Word2: // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Word2: // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -18851,8 +18951,8 @@ Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
     {
     case EW::Half:   vfncvt_f_f_w<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfncvt_f_f_w<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
-    case EW::Word2:  // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
+    case EW::Word2:  // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
 
@@ -18895,8 +18995,8 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
     {
     case EW::Half:  vfncvt_f_f_w<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:  vfncvt_f_f_w<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Word2: // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Word2: // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -19012,7 +19112,7 @@ Hart<URV>::vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   bool anyActive = false;
 
-  if (not vecRegs_.fpUnorderedSumTreeRed_)
+  if (not vecRegs_.fpUnorderedSumTreeRed_.at(__builtin_ctz(sizeof(ELEM_TYPE))))
     {
       for (unsigned ix = start; ix < elems; ++ix)
         {
@@ -19108,7 +19208,7 @@ Hart<URV>::execVfredusum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   if (elems == 0)
@@ -19120,7 +19220,7 @@ Hart<URV>::execVfredusum_vs(const DecodedInst* di)
     case EW::Half:  vfredusum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredusum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredusum_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -19187,7 +19287,7 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   if (elems == 0)
@@ -19199,7 +19299,7 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
     case EW::Half:  vfredosum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredosum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredosum_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -19267,7 +19367,7 @@ Hart<URV>::execVfredmin_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   if (elems == 0)
@@ -19279,7 +19379,7 @@ Hart<URV>::execVfredmin_vs(const DecodedInst* di)
     case EW::Half:  vfredmin_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredmin_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredmin_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -19346,7 +19446,7 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   if (elems == 0)
@@ -19358,7 +19458,7 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
     case EW::Half:  vfredmax_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredmax_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredmax_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -19390,7 +19490,7 @@ Hart<URV>::vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
 
   bool anyActive = false;
 
-  if (not vecRegs_.fpUnorderedSumTreeRed_)
+  if (not vecRegs_.fpUnorderedSumTreeRed_.at(__builtin_ctz(sizeof(ELEM_TYPE2X))))
     {
       for (unsigned ix = start; ix < elems; ++ix)
         {
@@ -19496,7 +19596,7 @@ Hart<URV>::execVfwredusum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   using EW = ElementWidth;
@@ -19504,8 +19604,8 @@ Hart<URV>::execVfwredusum_vs(const DecodedInst* di)
     {
     case EW::Half:  vfwredusum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfwredusum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Word2: // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Word2: // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -19583,7 +19683,7 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group, start))
+  if (not checkRedOpVsEmul(di))
     return;
 
   using EW = ElementWidth;
@@ -19591,8 +19691,8 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
     {
     case EW::Half:  vfwredosum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfwredosum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Word2: // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Word2: // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -19784,7 +19884,7 @@ Hart<URV>::execVfmin_vv(const DecodedInst* di)
     case EW::Half:   vfmin_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfmin_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfmin_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
 
@@ -19907,7 +20007,7 @@ Hart<URV>::execVfmax_vv(const DecodedInst* di)
     case EW::Half:  vfmax_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfmax_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfmax_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -20025,7 +20125,7 @@ Hart<URV>::execVfsgnj_vv(const DecodedInst* di)
     case EW::Half:  vfsgnj_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnj_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnj_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -20138,7 +20238,7 @@ Hart<URV>::execVfsgnjn_vv(const DecodedInst* di)
     case EW::Half:  vfsgnjn_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnjn_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnjn_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -20259,7 +20359,7 @@ Hart<URV>::execVfsgnjx_vv(const DecodedInst* di)
     case EW::Half:  vfsgnjx_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnjx_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnjx_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -20356,9 +20456,9 @@ Hart<URV>::execVfncvtbf16_f_f_w(const DecodedInst* di)
   switch (sew)
     {
     case EW::Half:   vfncvt_f_f_w<BFloat16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:   // Fallthrough to invalid case
-    case EW::Word:   // Fallthrough to invalid case
-    case EW::Word2:  // Fallthrough to invalid case
+    case EW::Byte:   // Fall-through to invalid case
+    case EW::Word:   // Fall-through to invalid case
+    case EW::Word2:  // Fall-through to invalid case
     default:         postVecFail(di); return;
     }
 
@@ -20395,9 +20495,9 @@ Hart<URV>::execVfwcvtbf16_f_f_v(const DecodedInst* di)
   switch (sew)
     {
     case EW::Half:  vfwcvt_f_f_v<BFloat16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Byte:  // Fallthrough to invalid case
-    case EW::Word:  // Fallthrough to invalid case
-    case EW::Word2: // Fallthrough to invalid case
+    case EW::Byte:  // Fall-through to invalid case
+    case EW::Word:  // Fall-through to invalid case
+    case EW::Word2: // Fall-through to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();

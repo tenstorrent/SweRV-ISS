@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -45,7 +45,7 @@ isPowerOf2(uint64_t x)
 Memory::Memory(uint64_t size, uint64_t pageSize)
   : size_(size), data_(nullptr), pageSize_(pageSize), reservations_(1),
     lastWriteData_(1), pmaMgr_(size)
-{ 
+{
   assert(size >= pageSize);
   assert(pageSize >= 64);
 
@@ -900,7 +900,7 @@ Memory::saveSnapshot(const std::string& filename,
   bool success = true;
   for (const auto& blk: usedBlocks)
     {
-#ifndef MEM_CALLBACK
+#ifndef MEM_CALLBACKS
       if (blk.first >= size_)
 	{
 	  std::cerr << "Memory::saveSnapshot: Block address (0x" << std::hex << blk.first
@@ -909,7 +909,9 @@ Memory::saveSnapshot(const std::string& filename,
 	  break;
 	}
 #endif
+
       size_t remainingSize = blk.second;
+#ifndef MEM_CALLBACKS
       if (remainingSize > size_ or size_ - remainingSize < blk.first)
 	{
 	  std::cerr << "Memory::saveSnapshot: Block at (0x" << std::hex << blk.first
@@ -917,6 +919,7 @@ Memory::saveSnapshot(const std::string& filename,
 	  success = false;
 	  break;
 	}
+#endif
 
       assert(prevAddr <= blk.first);
       prevAddr = blk.first + blk.second;
@@ -988,6 +991,7 @@ Memory::loadSnapshot(const std::string & filename,
   size_t remainingSize = 0;
   for (const auto& blk: usedBlocks)
     {
+#ifndef MEM_CALLBACKS
       if (blk.first >= size_)
 	{
 	  std::cerr << "Memory::loadSnapshot: Block address (0x" << std::hex << blk.first
@@ -995,7 +999,9 @@ Memory::loadSnapshot(const std::string & filename,
 	  success = false;
 	  break;
 	}
+#endif
       remainingSize = blk.second;
+#ifndef MEM_CALLBACKS
       if (remainingSize > size_ or size_ - remainingSize < blk.first)
 	{
 	  std::cerr << "Memory::loadSnapshot: Block at (0x" << std::hex << blk.first
@@ -1003,6 +1009,7 @@ Memory::loadSnapshot(const std::string & filename,
 	  success = false;
 	  break;
 	}
+#endif
 
       assert((blk.first & 3) == 0);
       assert((remainingSize & 3) == 0);
@@ -1094,6 +1101,38 @@ Memory::saveAddressTrace(std::string_view tag,
 
 
 bool
+Memory::loadAddressTrace(LineMap& lineMap, uint64_t& refCount, const std::string& path)
+{
+  std::ifstream ifs(path);
+
+  if (not ifs.good())
+    {
+      std::cerr << "Failed to open lines file " << path << "' for input.\n";
+      return false;
+    }
+
+  std::string line;
+  while (std::getline(ifs, line))
+    {
+      std::vector<std::string> tokens;
+      boost::split(tokens, line, boost::is_any_of(":"));
+
+      if (tokens.size() != 2)
+        {
+          std::cerr << "Error: Failed to load addresses from line.\n";
+          return false;
+        }
+
+      uint64_t vaddr = strtoull(tokens.at(0).c_str(), nullptr, 16);
+      uint64_t paddr = strtoull(tokens.at(1).c_str(), nullptr, 16);
+
+      lineMap[vaddr] = LineEntry{paddr, refCount++};
+    }
+  return true;
+}
+
+
+bool
 Memory::saveDataAddressTrace(const std::string& path) const
 {
   if (not dataLineTrace_)
@@ -1108,6 +1147,24 @@ Memory::saveInstructionAddressTrace(const std::string& path) const
   if (not instrLineTrace_)
     return true;
   return saveAddressTrace("instruction", instrLineMap_, path);
+}
+
+
+bool
+Memory::loadDataAddressTrace(const std::string& path)
+{
+  if (not dataLineTrace_)
+    return true;
+  return loadAddressTrace(dataLineMap_, memRefCount_, path);
+}
+
+
+bool
+Memory::loadInstructionAddressTrace(const std::string& path)
+{
+  if (not dataLineTrace_)
+    return true;
+  return loadAddressTrace(instrLineMap_, memRefCount_, path);
 }
 
 

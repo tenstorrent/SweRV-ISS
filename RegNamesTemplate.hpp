@@ -76,7 +76,7 @@ namespace WdRiscv
           result[numberToAbiName_.at(ix)] = RegNumberEnum(ix);
         }
 
-      if constexpr (GET_OTHER_NAME_TO_NUMBER_MAPPINGS != nullptr)
+      if (GET_OTHER_NAME_TO_NUMBER_MAPPINGS != nullptr)
         {
           for (auto&& [name, number] : GET_OTHER_NAME_TO_NUMBER_MAPPINGS())
             {

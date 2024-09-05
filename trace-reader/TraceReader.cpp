@@ -8,6 +8,7 @@
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/filter/bzip2.hpp>
+#include <boost/iostreams/filter/zstd.hpp>
 #include "PageTableMaker.hpp"
 
 using namespace WhisperUtil;
@@ -55,6 +56,12 @@ TraceReader::TraceReader(const std::string& inputPath)
   else if (len > 4 and inputPath.substr(len - 4) == ".bz2")
     {
       inStreambuf_.push(boost::iostreams::bzip2_decompressor());
+      inStreambuf_.push(fileStream_);
+      input_ = new std::istream(&inStreambuf_);
+    }
+  else if (len > 4 and inputPath.substr(len - 4) == ".zst")
+    {
+      inStreambuf_.push(boost::iostreams::zstd_decompressor());
       inStreambuf_.push(fileStream_);
       input_ = new std::istream(&inStreambuf_);
     }

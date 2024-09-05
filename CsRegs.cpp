@@ -566,9 +566,9 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
         return false;
       value = fcsr->read();
       if (num == CN::FFLAGS)
-        value = value & URV(FpFlags::FcsrMask);
+        value = FcsrFields{value}.bits_.FFLAGS;
       else
-        value = (value & URV(RoundingMode::FcsrMask)) >> URV(RoundingMode::FcsrShift);
+        value = FcsrFields{value}.bits_.FRM;
       return true;
     }
   else if (num == CN::MIREG)
@@ -736,6 +736,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
   enableSscofpmf(cofEnabled_);  // To activate/deactivate SCOUNTOVF.
   enableSmstateen(stateenOn_);  // To activate/deactivate STATEEN CSRs.
   enableTriggers(triggersOn_);  // To activate/deactivate SCONTEXT.
+  enableSsqosid(ssqosidOn_);  // To activate/deactivate SRMCFG.
 }
 
 
@@ -914,11 +915,12 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
 	vsie->setReadMask(mask);
     }
 
-  // Enable/disable hypervisor related exceptions (bits 23:20 in MEDELEG).
+  // If hypervisor is off, related bits in MEDELEG are read-only-zero (bits 23:20 and 10).
   csr = findCsr(CN::MEDELEG);
   if (csr)
     {
       URV bits = URV(0xf) << 20;  // Bits 23:20
+      bits |= URV(1) << 10;       // Bit 10
       auto mask = csr->getReadMask();
       csr->setReadMask(flag ? (mask | bits) : (mask & ~bits));
     }
@@ -932,19 +934,24 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
       csr->setWriteMask(flag ? (mask | bit) : (mask & ~bit));
     }
 
-  // In MIE, bits VSEIE, VSTIE, VSSIE, and SGEIE become read-only zero if no hypervisor.
+  // In MIE, bits VSEIE, VSTIE, VSSIE, and SGEIE become read-only-zero if no hypervisor.
   csr = findCsr(CN::MIE);
   if (csr)
     {
       URV bits = 0x1444;
       auto mask = csr->getReadMask();
       csr->setReadMask(flag ? (mask | bits) : (mask & ~bits));
+      if (not flag)
+	csr->write(csr->read()); // Clear bits in CSR that are now read-only-zero.
+      mask = csr->getWriteMask();
+      csr->setWriteMask(flag ? (mask | bits) : (mask & ~bits));
     }
 
   updateSstc();                // To activate/deactivate VSTIMECMP.
   enableSmstateen(stateenOn_); // To activate/deactivate STATEEN CSRs.
   enableAia(aiaEnabled_);      // To activate/deactivate AIA hypervisor CSRs.
   enableTriggers(triggersOn_); // To activate/deactivate HCONTEXT.
+  enableSsqosid(ssqosidOn_);   // To activate/deactivate SRMCFG.
 }
 
 
@@ -1188,6 +1195,17 @@ CsRegs<URV>::enableSmstateen(bool flag)
 
 template <typename URV>
 void
+CsRegs<URV>::enableSsqosid(bool flag)
+{
+  ssqosidOn_ = flag;
+  auto csr = findCsr(CsrNumber::SRMCFG);
+  if (csr)
+    csr->setImplemented(flag);
+}
+
+
+template <typename URV>
+void
 CsRegs<URV>::enableSmrnmi(bool flag)
 {
   using CN = CsrNumber; 
@@ -1261,6 +1279,26 @@ CsRegs<URV>::enableAia(bool flag)
 	  auto csr = findCsr(csrn);
 	  csr->setImplemented(hflag);
 	}
+    }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableSmmpm(bool flag)
+{
+  using CN = CsrNumber;
+
+  if constexpr (sizeof(URV) == 8)
+    {
+      uint8_t mask = flag? 0x3 : 0;
+      MseccfgFields<URV> rm{regs_.at(size_t(CN::MSECCFG)).getReadMask()};
+      rm.bits_.PMM = mask;
+      regs_.at(size_t(CN::MSECCFG)).setReadMask(rm.value_);
+
+      MseccfgFields<URV> wm{regs_.at(size_t(CN::MSECCFG)).getWriteMask()};
+      wm.bits_.PMM = mask;
+      regs_.at(size_t(CN::MSECCFG)).setWriteMask(wm.value_);
     }
 }
 
@@ -2346,10 +2384,9 @@ CsRegs<URV>::updateFcsrGroupForWrite(CsrNumber number, URV value)
       auto fcsr = getImplementedCsr(CsrNumber::FCSR);
       if (fcsr)
 	{
-          URV mask = URV(FpFlags::FcsrMask);
-	  URV fcsrVal = fcsr->read();
-          fcsrVal = (fcsrVal & ~mask) | (value & mask);
-	  fcsr->write(fcsrVal);
+	  FcsrFields fields{fcsr->read()};
+	  fields.bits_.FFLAGS = value;
+	  fcsr->write(fields.value_);
 	  // recordWrite(CsrNumber::FCSR);
 	}
       return;
@@ -2360,35 +2397,32 @@ CsRegs<URV>::updateFcsrGroupForWrite(CsrNumber number, URV value)
       auto fcsr = getImplementedCsr(CsrNumber::FCSR);
       if (fcsr)
 	{
-	  URV fcsrVal = fcsr->read();
-          URV mask = URV(RoundingMode::FcsrMask);
-          URV shift = URV(RoundingMode::FcsrShift);
-          fcsrVal = (fcsrVal & ~mask) | ((value << shift) & mask);
-	  fcsr->write(fcsrVal);
+	  FcsrFields fields{fcsr->read()};
+	  fields.bits_.FRM = value;
+	  fcsr->write(fields.value_);
 	  // recordWrite(CsrNumber::FCSR);
-          setSimulatorRoundingMode(RoundingMode((fcsrVal & mask) >> shift));
+          setSimulatorRoundingMode(RoundingMode(fields.bits_.FRM));
 	}
       return;
     }
 
   if (number == CsrNumber::FCSR)
     {
-      URV newVal = value & URV(FpFlags::FcsrMask);
+      FcsrFields fields{value};
       auto fflags = getImplementedCsr(CsrNumber::FFLAGS);
-      if (fflags and fflags->read() != newVal)
+      if (fflags and fflags->read() != fields.bits_.FFLAGS)
 	{
-	  fflags->write(newVal);
+	  fflags->write(fields.bits_.FFLAGS);
 	  // recordWrite(CsrNumber::FFLAGS);
 	}
 
-      newVal = (value & URV(RoundingMode::FcsrMask)) >> URV(RoundingMode::FcsrShift);
       auto frm = getImplementedCsr(CsrNumber::FRM);
-      if (frm and frm->read() != newVal)
+      if (frm and frm->read() != fields.bits_.FRM)
 	{
-	  frm->write(newVal);
+	  frm->write(fields.bits_.FRM);
 	  // recordWrite(CsrNumber::FRM);
 	}
-      setSimulatorRoundingMode(RoundingMode(newVal));
+      setSimulatorRoundingMode(RoundingMode(fields.bits_.FRM));
     }
 }
 
@@ -2402,10 +2436,9 @@ CsRegs<URV>::updateFcsrGroupForPoke(CsrNumber number, URV value)
       auto fcsr = getImplementedCsr(CsrNumber::FCSR);
       if (fcsr)
 	{
-          URV mask = URV(FpFlags::FcsrMask);
-	  URV fcsrVal = fcsr->read();
-          fcsrVal = (fcsrVal & ~mask) | (value & mask);
-	  fcsr->poke(fcsrVal);
+	  FcsrFields fields{fcsr->read()};
+	  fields.bits_.FFLAGS = value;
+	  fcsr->poke(fields.value_);
 	}
       return;
     }
@@ -2415,28 +2448,25 @@ CsRegs<URV>::updateFcsrGroupForPoke(CsrNumber number, URV value)
       auto fcsr = getImplementedCsr(CsrNumber::FCSR);
       if (fcsr)
 	{
-	  URV fcsrVal = fcsr->read();
-          URV mask = URV(RoundingMode::FcsrMask);
-          URV shift = URV(RoundingMode::FcsrShift);
-          fcsrVal = (fcsrVal & ~mask) | ((value << shift) & mask);
-	  fcsr->poke(fcsrVal);
-          setSimulatorRoundingMode(RoundingMode((fcsrVal & mask) >> shift));
+	  FcsrFields fields{fcsr->read()};
+	  fields.bits_.FRM = value;
+	  fcsr->poke(fields.value_);
+          setSimulatorRoundingMode(RoundingMode(fields.bits_.FRM));
 	}
       return;
     }
 
   if (number == CsrNumber::FCSR)
     {
-      URV newVal = value & URV(FpFlags::FcsrMask);
+      FcsrFields fields{value};
       auto fflags = getImplementedCsr(CsrNumber::FFLAGS);
-      if (fflags and fflags->read() != newVal)
-        fflags->poke(newVal);
+      if (fflags and fflags->read() != fields.bits_.FFLAGS)
+        fflags->poke(fields.bits_.FFLAGS);
 
-      newVal = (value & URV(RoundingMode::FcsrMask)) >> URV(RoundingMode::FcsrShift);
       auto frm = getImplementedCsr(CsrNumber::FRM);
-      if (frm and frm->read() != newVal)
-        frm->poke(newVal);
-      setSimulatorRoundingMode(RoundingMode(newVal));
+      if (frm and frm->read() != fields.bits_.FRM)
+        frm->poke(fields.bits_.FRM);
+      setSimulatorRoundingMode(RoundingMode(fields.bits_.FRM));
     }
 }
 
@@ -2714,10 +2744,9 @@ CsRegs<URV>::defineMachineRegs()
   mask = ~URV(1); // Bit 0 of MNEPC is not writeable
   defineCsr("mnepc", Csrn::MNEPC, !mand, !imp, 0, mask, mask);
 
-  mask = URV(1) << (sizeof(URV)*8 - 1);  // Most sig bit is read-only 1
-  defineCsr("mncause", Csrn::MNCAUSE, !mand, !imp, mask, ~mask, ~mask);
+  defineCsr("mncause", Csrn::MNCAUSE, !mand, !imp, 0, wam, wam);
 
-  mask = 0b1101010001000;  // Fields MNPP, MNPELP, MNPV, and NMIE writeable.
+  mask = 0b1100010001000;  // Fields MNPP, MNPV, and NMIE writeable.
   defineCsr("mnstatus", Csrn::MNSTATUS, !mand, !imp, 0, mask, pokeMask);
 
   // Define mhpmcounter3/mhpmcounter3h to mhpmcounter31/mhpmcounter31h
@@ -3109,7 +3138,7 @@ CsRegs<URV>::defineHypervisorRegs()
 
   csr = defineCsr("vstvec",      Csrn::VSTVEC,      !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
-  csr = defineCsr("vssratch",    Csrn::VSSCRATCH,   !mand, !imp, 0, wam, wam);
+  csr = defineCsr("vsscratch",    Csrn::VSSCRATCH,   !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
   mask = ~URV(1);  // Bit 0 of VSEPC is not writable.
   csr = defineCsr("vsepc",       Csrn::VSEPC,       !mand, !imp, 0, mask, mask);
@@ -3450,9 +3479,9 @@ CsRegs<URV>::peek(CsrNumber num, URV& value, bool virtMode) const
         return false;
       value = fcsr->read();
       if (num == CN::FFLAGS)
-        value = value & URV(FpFlags::FcsrMask);
+        value = FcsrFields{value}.bits_.FFLAGS;
       else
-        value = (value & URV(RoundingMode::FcsrMask)) >> URV(RoundingMode::FcsrShift);
+        value = FcsrFields{value}.bits_.FRM;
       return true;
     }
 
@@ -3690,8 +3719,7 @@ CsRegs<URV>::writeTrigger(CsrNumber number, PrivilegeMode mode, URV value)
   if (not read(CsrNumber::TSELECT, mode, trigger))
     return false;
 
-  // The CSR instructions never execute in debug mode.
-  bool dMode = false;
+  bool dMode = inDebugMode();
   if (number == CsrNumber::TDATA1)
     {
       bool ok = triggers_.writeData1(trigger, dMode, value);
@@ -3856,12 +3884,12 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
             {
               unsigned iid = highestIidPrio(vs & ~(URV(1) << unsigned(IC::S_EXTERNAL)));
               if (iid)
-                value = iid << 16 | hvf.bits_.IPRIOM? 0 : 1;
+                value = (iid << 16) | (hvf.bits_.IPRIOM? 0 : 1);
             }
           else if (hvf.bits_.IID != unsigned(IC::S_EXTERNAL))
             {
               prio = hvf.bits_.IPRIO;
-              value = (hvf.bits_.IID << 16) | hvf.bits_.IPRIOM? prio : 1;
+              value = (hvf.bits_.IID << 16) | (hvf.bits_.IPRIOM? prio : 1);
               if (not hvf.bits_.DPR)
                 return true;
             }

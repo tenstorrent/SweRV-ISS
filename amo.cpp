@@ -100,12 +100,18 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 #endif
 
   uint32_t uval = 0;
-  uint64_t mcmVal = 0;
-  bool hasMcm = mcm_ and mcm_->getCurrentLoadValue(*this, virtAddr, addr, addr, ldStSize_, mcmVal);
 
-  if (hasMcm)
-    uval = mcmVal;
-  else
+  bool hasOooVal = false;
+  if (ooo_)   // Out of order execution (mcm or perfApi)
+    {
+      uint64_t oooVal = 0;
+      bool isVec = false;
+      hasOooVal = getOooLoadValue(virtAddr, addr, addr, ldStSize_, isVec, oooVal);
+      if (hasOooVal)
+	uval = oooVal;
+    }
+
+  if (not hasOooVal)
     memRead(addr, addr, uval);
 
   value = SRV(int32_t(uval)); // Sign extend.
@@ -161,9 +167,18 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 #endif
 
   uint64_t uval = 0;
-  bool hasMcm = mcm_ and mcm_->getCurrentLoadValue(*this, virtAddr, addr, addr, ldStSize_, uval);
 
-  if (not hasMcm)
+  bool hasOooVal = false;
+  if (ooo_)   // Out of order execution (mcm or perfApi)
+    {
+      uint64_t oooVal = 0;
+      bool isVec = false;
+      hasOooVal = getOooLoadValue(virtAddr, addr, addr, ldStSize_, isVec, oooVal);
+      if (hasOooVal)
+	uval = oooVal;
+    }
+
+  if (not hasOooVal)
     memRead(addr, addr, uval);
 
   value = uval;
@@ -236,18 +251,18 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
     }
 
   ULT uval = 0;
-  bool hasMcmVal = false;
-  if (mcm_)
+
+  bool hasOooVal = false;
+  if (ooo_)
     {
-      uint64_t mcmVal = 0;
-      if (mcm_->getCurrentLoadValue(*this, virtAddr, addr1, addr1, ldStSize_, mcmVal))
-	{
-	  uval = mcmVal;
-	  hasMcmVal = true;
-	}
+      uint64_t oooVal = 0;
+      bool isVec = false;
+      hasOooVal = getOooLoadValue(virtAddr, addr1, addr1, ldStSize_, isVec, oooVal);
+      if (hasOooVal)
+	uval = oooVal;
     }
 
-  if (not hasMcmVal)
+  if (not hasOooVal)
     memRead(addr1, addr1, uval);
 
   URV value = uval;
@@ -359,31 +374,8 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   ldStData_ = storeVal;
   ldStWrite_ = true;
 
-  // If we write to special location, end the simulation.
-  if (toHostValid_ and addr1 == toHost_ and storeVal != 0)
-    {
-      memWrite(addr1, addr1, storeVal);
-      throw CoreException(CoreException::Stop, "write to to-host",
-			  toHost_, storeVal);
-    }
-
   if (mcm_)
     return true;  // Memory updated when merge buffer is written.
-
-  if (isAclintAddr(addr1))
-    {
-      assert(addr1 == addr2);
-      URV val = storeVal;
-      processClintWrite(addr1, ldStSize_, val);
-      storeVal = val;
-    }
-  else if (isInterruptorAddr(addr1, ldStSize_))
-    processInterruptorWrite(storeVal);
-  else if (isImsicAddr(addr1))
-    {
-      imsicWrite_(addr1, sizeof(storeVal), storeVal);
-      storeVal = 0;  // Reads from IMSIC space will yield zero.
-    }
 
   memWrite(addr1, addr1, storeVal);
 

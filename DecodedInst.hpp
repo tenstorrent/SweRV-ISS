@@ -132,6 +132,19 @@ namespace WdRiscv
     OperandMode ithOperandMode(unsigned i) const
     { return entry_? entry_->ithOperandMode(i) : OperandMode::None; }
 
+    /// For csrrs/csrrc the CSR register is read-only if the second integer register is x0
+    OperandMode effectiveIthOperandMode(unsigned i) const
+    {
+      auto mode = this->ithOperandMode(i);
+      auto instId = this->instId();
+      if (instId == WdRiscv::InstId::csrrs or instId == WdRiscv::InstId::csrrc)
+	{
+	  if (this->ithOperandType(i) == WdRiscv::OperandType::CsReg and this->op1() == 0)
+	    return WdRiscv::OperandMode::Read;
+	}
+      return mode;
+    }
+
     /// Return true if this object is valid.
     bool isValid() const
     { return valid_; }
@@ -148,8 +161,13 @@ namespace WdRiscv
     bool hasRoundingMode() const
     { return entry_ and entry_->hasRoundingMode(); }
 
+    /// Relevant for floating point instructions.
     unsigned roundingMode() const
     { return ((inst_ >> 12) & 7); }
+
+    /// Return true if instruction modifies the FFLAGS CSR.
+    bool modifiesFflags() const
+    { return entry_ and entry_->modifiesFflags(); }
 
     /// Immediate values are to be (left) shifted by this size
     unsigned immediateShiftSize() const
@@ -261,8 +279,30 @@ namespace WdRiscv
       return (inst() & 0x7f) == 0x27 and (f3 == 0 or f3 >= 5);
     }
 
+    /// Return true if this is a vector indexed load instruction.
+    bool isVectorLoadIndexed() const
+    {
+      unsigned mop = (inst() >> 26) & 3;
+      return isVectorLoad() and (mop == 1 or mop == 3);
+    }
+
+    /// Return true if this is a vector indexed store instruction.
+    bool isVectorStoreIndexed() const
+    {
+      unsigned mop = (inst() >> 26) & 3;
+      return isVectorStore() and (mop == 1 or mop == 3);
+    }
+
+    /// Return true if this an mop (maybe-operation) instruction.
+    bool isMop() const
+    {
+      auto id = instId();
+      return id == InstId::mop_rr or id == InstId::mop_r or id == InstId::c_mop;
+    }
+
     /// Return the element size in bytes of a vector load instruction. Return zero for a
-    /// non-vector-load instruction.
+    /// non-vector-load instruction. For load-indexed and load-segment-indexed, this
+    /// returns the index element size.
     unsigned vecLoadElemSize() const
     {
       if (not isVectorLoad()) return 0;
@@ -275,7 +315,8 @@ namespace WdRiscv
     }
 
     /// Return the element size in bytes of a vector store instruction. Return zero for a
-    /// non-vector-store instruction.
+    /// non-vector-store instruction. For store-indexed and store-segment-indexed, this
+    /// returns the index element size.
     unsigned vecStoreElemSize() const
     {
       if (not isVectorStore()) return 0;
@@ -424,6 +465,10 @@ namespace WdRiscv
     /// Set the field count. Only relevant to vector load/store instruction.
     void setVecFieldCount(uint32_t count)
     { vecFields_ = count; }
+
+    /// Reset address to given value.
+    void resetAddr(uint64_t addr)
+    { addr_ = addr; }
 
   protected:
 

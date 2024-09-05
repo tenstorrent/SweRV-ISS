@@ -309,7 +309,10 @@ namespace WdRiscv
     /// was not a store, then data will be cleared; otherwise, it will have
     /// as many entries as addresses.
     bool getLastMemory(std::vector<uint64_t>& addresses,
+                       std::vector<uint64_t>& paddresses,
+                       std::vector<uint64_t>& paddresses2,
 		       std::vector<uint64_t>& data,
+                       std::vector<bool>& masked,
 		       unsigned& elementSize) const;
 
     /// Return true if the given element width and grouping
@@ -456,8 +459,8 @@ namespace WdRiscv
 
     /// If flag is true, unordered fp reduction should use a reduction tree computation,
     /// else uses ordered version.
-    void configVectorFpUnorderedSumRed(bool flag)
-    { fpUnorderedSumTreeRed_ = flag; }
+    void configVectorFpUnorderedSumRed(ElementWidth ew, bool flag)
+    { fpUnorderedSumTreeRed_.at(uint32_t(ew)) = flag; }
 
     /// When flag is true, when VL > VLMAX reduce AVL to match VLMAX and write
     /// to VL. This only applies to vsetvl instructions.
@@ -597,6 +600,10 @@ namespace WdRiscv
       vxsat = vxsat_;
       steps = steps_;
     }
+
+    /// Ruturn the effective group multiplier of the given operand.
+    unsigned getOpEmul(unsigned op) const
+    { return op < 3? opsEmul_.at(op) : 0; }
 
   protected:
 
@@ -880,7 +887,7 @@ namespace WdRiscv
     bool tailAgnOnes_ = true; // True if ones written in tail elems when mask agnostic.
     bool updateWholeMask_ = false;  // True if mask instructions update whole mask reg.
     bool trapVtype_ = false; // If true trap invalid vtype; else set VTYPE.VILL.
-    bool fpUnorderedSumTreeRed_ = false; // True if unordered fp reduction should use a reduction tree computation
+    std::vector<bool> fpUnorderedSumTreeRed_; // True if unordered fp reduction should use a reduction tree computation
     bool legalizeVsetvlAvl_ = false; // If true legalize VL to VLMAX if vtype is legal (if applicable).
     bool legalizeVsetvliAvl_ = false; // If true legalize VL to VLMAX if vtype is legal (if applicable).
     bool legalizeForEgs_ = false;

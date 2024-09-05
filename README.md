@@ -69,12 +69,12 @@ simulator. In particular you would need:
 3. The Whisper source code which can be downloaded from 
    [github.](https://github.com/tenstorrent/SweRV-ISS)
 
-4. The g++ compiler version 12 or higher to compiler Whisper. The g++
+4. The g++ compiler version 12 or higher to compile Whisper. The g++
    compiler can be installed from a Linux distribution. Alternatively,
    the source code can be downloaded from
    [gnu.org/software/gcc.](https://www.gnu.org/software/gcc)
 
-5. The boost library version 1.75 of higher compiled with c++-20.
+5. The boost library version 1.75 or higher compiled with c++-20.
    Boost source can be downloaded from
    [boost.org.](https://www.boost.org)
 
@@ -739,7 +739,7 @@ The vector configuration is an object with the following fields:
 * trap_invalid_vtype: when true, trap on invalid/unsupported vtype configurations, when false set vtype.vill instead.
 * legalize_vsetvl_avl: when true, legalize VL to VLMAX if it would be greater than VLMAX after a vsetvl instruction.
 * legalize_vsetvli_avl: when true, legalize VL to VLMAX if it would be greater than VLMAX after a vsetvli instruction.
-* tt_fp_usum_tree_reduction: when true, enables Tenstorrent tree reduction-style vfredusum/vfwredusum, when false uses ordered version. 
+* tt_fp_usum_tree_reduction: for each SEW, enables Tenstorrent tree reduction-style vfredusum/vfwredusum, default is false.
 
 Example:
 ```
@@ -749,7 +749,8 @@ Example:
        "tail_agnositic_policy" : "undisturb",
        "mask_agnositic_policy" : "ones",
        "min_bytes_per_lmul" : { "m2" : 2, "m4" : 2 },
-       "max_bytes_per_lmul" : { "mf8" : 4 }
+       "max_bytes_per_lmul" : { "mf8" : 4 },
+       "tt_fp_usum_tree_reduction" : [ "e16", "e32", "e64" ]
     }
 ```
 
@@ -783,6 +784,11 @@ handling non-maskable interrupts.
 
 ###  enable_triggers
 Enable support for debug triggers when set to true.
+
+### trigger_use_tcontrol
+When set to true, the MTE field of the TCONTROL CSR controls the firing of triggers in
+machine mode. When set to false, the triggers fire in machine mode only if MSTATUS.MIE
+is zero.
 
 ###  perf_count_atomic_load_store
 When true, the lr/sc instructions will be counted as load/store 

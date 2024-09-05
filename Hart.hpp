@@ -68,11 +68,10 @@ namespace WdRiscv
   {
   public:
 
-    enum Type { Stop, Exit, Snapshot };
+    enum Type { Stop, Exit, Snapshot, SnapshotAndStop };
 
-    CoreException(Type type, const char* message = "", uint64_t address = 0,
-		  uint64_t value = 0)
-      : type_(type), msg_(message), addr_(address), val_(value)
+    CoreException(Type type, const char* message = "", uint64_t value = 0)
+      : type_(type), msg_(message), val_(value)
     { }
 
     const char* what() const noexcept override
@@ -81,16 +80,13 @@ namespace WdRiscv
     Type type() const
     { return type_; }
 
-    uint64_t address() const
-    { return addr_; }
-
     uint64_t value() const
     { return val_; }
 
   private:
+
     Type type_ = Stop;
     const char* msg_ = "";
-    uint64_t addr_ = 0;
     uint64_t val_ = 0;
   };
 
@@ -345,6 +341,10 @@ namespace WdRiscv
     void configAllInstAddrTrigger(bool flag)
     { csRegs_.configAllInstAddrTrigger(flag); }
 
+    /// Enable use of TCONTROL CSR to control triggers firing in machine mode.
+    void configTriggerUseTcontrol(bool flag)
+    { csRegs_.triggers_.enableTcontrol(flag); }
+
     /// Configure machine mode performance counters returning true on
     /// success and false on failure. N consecutive counters starting
     /// at MHPMCOUNTER3/MHPMCOUNTER3H are made read/write. The
@@ -429,6 +429,12 @@ namespace WdRiscv
     {
       using PM = PrivilegeMode;
 
+      if (isRvSmmpm())
+        {
+          uint8_t pmm = csRegs_.mseccfgPmm();
+          mPmBits_ = VirtMem::pointerMaskBits(VirtMem::Pmm(pmm));
+        }
+
       if (isRvSsnpm())
         {
           uint8_t pmm = csRegs_.senvcfgPmm();
@@ -490,6 +496,10 @@ namespace WdRiscv
     /// Return currently configured group multiplier
     GroupMultiplier groupMultiplier() const
     { return vecRegs_.groupMultiplier(); }
+
+     /// Get per-operand EMUL information of last instruction executed.
+     unsigned vecOpEmul(unsigned op) const
+     { return vecRegs_.getOpEmul(op); }
 
     /// Configure the load-reserve reservation size in bytes.
     /// A size smaller than 4/8 in rv32/rv64 has the effect of 4/8.
@@ -631,15 +641,6 @@ namespace WdRiscv
         }
       aclintSiOnReset_ = softwareInterruptOnReset;
       aclintDeliverInterrupts_ = deliverInterrupts;
-      indexToHart_ = indexToHart;
-    }
-
-    /// Define a memory mapped locations for interruptor agent.
-    void configInterruptor(uint64_t addr,
-			   std::function<Hart<URV>*(unsigned ix)> indexToHart)
-    {
-      interruptor_ = addr;
-      hasInterruptor_ = true;
       indexToHart_ = indexToHart;
     }
 
@@ -925,10 +926,18 @@ namespace WdRiscv
       return ldStSize_;
     }
 
+    /// Return the cache line size.
+    unsigned cacheLineSize() const
+    { return cacheLineSize_; }
+
     bool getLastVectorMemory(std::vector<uint64_t>& addresses,
+                             std::vector<uint64_t>& paddresses,
+                             std::vector<uint64_t>& paddresses2,
 			     std::vector<uint64_t>& data,
+                             std::vector<bool>& masked,
 			     unsigned& elementSize) const
-    { return vecRegs_.getLastMemory(addresses, data, elementSize); }
+    { return vecRegs_.getLastMemory(addresses, paddresses,
+                                    paddresses2, data, masked, elementSize); }
 
 
     void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const
@@ -1059,9 +1068,20 @@ namespace WdRiscv
       csRegs_.enableSmstateen(flag);
     }
 
+    /// Enable/disbale ssqosid extension.
+    void enableSsqosid(bool flag)
+    {
+      enableExtension(RvExtension::Ssqosid, flag);
+      csRegs_.enableSsqosid(flag);
+    }
+
     /// Enable/disable the resumable non maskable interrupt (Smrnmi) extension.
     void enableSmrnmi(bool flag)
     { enableExtension(RvExtension::Smrnmi, flag); csRegs_.enableSmrnmi(flag); }
+
+    /// Enable/disable smmpm extension.
+    void enableSmmpm(bool flag)
+    { enableExtension(RvExtension::Smmpm, flag); csRegs_.enableSmmpm(flag); }
 
     /// Enable/disable ssnpm extension.
     void enableSsnpm(bool flag)
@@ -1120,10 +1140,6 @@ namespace WdRiscv
     /// exceptions.
     void enableTriggers(bool flag)
     { enableTriggers_ = flag; csRegs_.enableTriggers(flag);  }
-
-    /// Enable/disable firing of triggers in machine mode when interrupts are enabled.
-    void enableMmodeTriggersWithIe(bool flag)
-    { csRegs_.enableMmodeTriggersWithIe(flag); }
 
     /// Enable performance counters (count up for some enabled performance counters when
     /// their events do occur).
@@ -1406,6 +1422,9 @@ namespace WdRiscv
     bool isRvzcmop() const
     { return extensionIsEnabled(RvExtension::Zcmop); }
 
+    bool isRvSmmpm() const
+    { return extensionIsEnabled(RvExtension::Smmpm); }
+
     bool isRvSsnpm() const
     { return extensionIsEnabled(RvExtension::Ssnpm); }
 
@@ -1629,6 +1648,9 @@ namespace WdRiscv
 
     /// Write the collected branch traces to the file at the given path.
     bool saveBranchTrace(const std::string& path);
+
+    /// Restore the collected branch traces at the given path.
+    bool loadBranchTrace(const std::string& path);
 
     /// Set behavior of first access to a virtual memory page: Either
     /// we take a page fault (flag is true) or we update the A/D bits
@@ -2016,6 +2038,9 @@ namespace WdRiscv
     bool mcmIEvict(uint64_t addr)
     { fetchCache_.removeLine(addr); return true; }
 
+    std::shared_ptr<Mcm<URV>> mcm() 
+    { return mcm_; }
+
     /// Config vector engine for updating whole mask register for mask-producing
     /// instructions (if flag is false, we only update body and tail elements; otherwise,
     /// we update body, tail, and elements within VLEN beyond tail).
@@ -2028,8 +2053,8 @@ namespace WdRiscv
     { vecRegs_.configVectorTrapVtype(flag); }
 
     /// When flag is true, use binary tree reduction for vfredusum and vfwredusum.
-    void configVectorFpUnorderedSumRed(bool flag)
-    { vecRegs_.configVectorFpUnorderedSumRed(flag); }
+    void configVectorFpUnorderedSumRed(ElementWidth ew, bool flag)
+    { vecRegs_.configVectorFpUnorderedSumRed(ew, flag); }
 
     /// When flag is true, when VL > VLMAX reduce AVL to match VLMAX and write
     /// to VL. This only applies to vsetvl/vsetvli instructions.
@@ -2111,9 +2136,6 @@ namespace WdRiscv
     bool isAclintMtimeAddr(uint64_t addr) const
     { return addr >= aclintMtimeStart_ and addr < aclintMtimeEnd_; }
 
-    bool isInterruptorAddr(uint64_t addr, unsigned size) const
-    { return hasInterruptor_ and addr == interruptor_ and size == 4; }
-
     bool isImsicAddr(uint64_t addr) const
     {
       return (imsic_ and ((addr >= imsicMbase_ and addr < imsicMend_) or
@@ -2145,8 +2167,13 @@ namespace WdRiscv
       resumeTime_ = flag? time_ + timeout : 0;
     }
 
+    /// Return true if hart is suspended.
     bool isSuspended()
     { return suspended_; }
+
+    /// Set value to the value read from the device associated with the given physical
+    /// address. No effect if pa is not a device address.
+    void deviceRead(uint64_t pa, unsigned size, uint64_t& value);
 
   protected:
 
@@ -2291,7 +2318,7 @@ namespace WdRiscv
 
     /// Get the data value for an out of order read (mcm or perfApi).
     bool getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
-			 uint64_t& value);
+			 bool isVec, uint64_t& value);
 
     /// Set current privilege mode.
     void setPrivilegeMode(PrivilegeMode m)
@@ -2504,32 +2531,31 @@ namespace WdRiscv
     /// given value
     void setFpFlags(unsigned value)
     {
-      uint32_t mask = uint32_t(FpFlags::FcsrMask);
-      fcsrValue_ = (fcsrValue_ & ~mask) | (value & mask);
+      FcsrFields fields{fcsrValue_};
+      fields.bits_.FFLAGS = value;
+      fcsrValue_ = fields.value_;
     }
 
     /// Set the rounding-mode field in FCSR to the least sig 3 bits of
     /// the given value
     void setFpRoundingMode(unsigned value)
     {
-      uint32_t mask = uint32_t(RoundingMode::FcsrMask);
-      uint32_t shift = uint32_t(RoundingMode::FcsrShift);
-      fcsrValue_ = (fcsrValue_ & ~mask) | ((value << shift) & mask);
+      FcsrFields fields{fcsrValue_};
+      fields.bits_.FRM = value;
+      fcsrValue_ = fields.value_;
     }
 
     /// Return the rounding mode in FCSR.
     RoundingMode getFpRoundingMode() const
-    {
-      uint32_t mask = uint32_t(RoundingMode::FcsrMask);
-      uint32_t shift = uint32_t(RoundingMode::FcsrShift);
-      return RoundingMode((fcsrValue_ & mask) >> shift);
+    { 
+      unsigned frm = FcsrFields{fcsrValue_}.bits_.FRM;
+      return RoundingMode(frm);
     }
 
     /// Return the flags in FCSR.
     uint32_t getFpFlags() const
     {
-      uint32_t mask = uint32_t(FpFlags::FcsrMask);
-      return fcsrValue_ & mask;
+      return FcsrFields{fcsrValue_}.bits_.FFLAGS;
     }
 
     /// Intended to be called from within the checkRoundingMode<size>
@@ -2928,10 +2954,6 @@ namespace WdRiscv
     /// the rest.
     void processClintWrite(uint64_t addr, unsigned stSize, URV& stVal);
 
-    /// Called if interruptor address is written. Unpack written value
-    /// and set MIP bit in target hart.
-    void processInterruptorWrite(uint32_t stVal);
-
     /// Mask to extract shift amount from a integer register value to use
     /// in shift instructions. This returns 0x1f in 32-bit more and 0x3f
     /// in 64-bit mode.
@@ -3019,11 +3041,15 @@ namespace WdRiscv
                                   unsigned offsetWidth, unsigned offsetGroupX8,
                                   unsigned fieldCount);
 
-    /// Check reduction vector operand against the group multiplier. Return true
-    /// if operand is a multiple of multiplier and false otherwise. Record group
-    /// multiplier for tracing.
-    bool checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
-			  unsigned groupX8, unsigned vstart);
+    /// Check reduction vector operand against the group multiplier. Record operands
+    /// group multiplier for tracing.
+    bool checkRedOpVsEmul(const DecodedInst* di);
+
+    /// Check destination and index operands against the group multipliers. Return
+    /// true if operand is a multiple of multiplier and false otherwise. Record
+    /// group multipliers for tracing
+    bool checkIndexedOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
+                               unsigned groupX8, unsigned offsetGroupX8);
 
     /// Similar to above but 3 vector operands and 1st operand is wide.
     bool checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0, unsigned op1,
@@ -4097,7 +4123,7 @@ namespace WdRiscv
     void execVlre1024_v(const DecodedInst*);
 
     [[nodiscard]]
-    bool vectorStoreWholeReg(const DecodedInst*, GroupMultiplier);
+    bool vectorStoreWholeReg(const DecodedInst*);
 
     void execVs1r_v(const DecodedInst*);
     void execVs2r_v(const DecodedInst*);
@@ -5044,9 +5070,6 @@ namespace WdRiscv
     // True if we want to defer an interrupt for later. By default, take immediately.
     URV deferredInterrupts_ = 0;
 
-    bool  hasInterruptor_ = false;
-    uint64_t interruptor_ = 0;
-
     URV nmiPc_ = 0;             // Non-maskable interrupt handler.
     URV nmiExceptionPc_ = 0;    // Handler for exceptions during non-maskable interrupts.
     bool nmiPending_ = false;
@@ -5204,6 +5227,9 @@ namespace WdRiscv
     bool steeInsec1_ = false;  // True if insecure access to a secure region.
     bool steeInsec2_ = false;  // True if insecure access to a secure region.
 
+    // Pointer masking
+    unsigned mPmBits_ = 0;
+
     VirtMem virtMem_;
     Isa isa_;
     Decoder decoder_;
@@ -5247,6 +5273,8 @@ namespace WdRiscv
     uint64_t bbPc_ = 0;                 // Entry PC of current basic block.
     uint64_t bbCacheAccess_ = 0;
     uint64_t bbCacheHit_ = 0;
+    bool bbPrevIsBranch_ = true;
+
     std::unordered_map<uint64_t, BbStat> basicBlocks_; // Map pc to basic-block frequency.
     FILE* bbFile_ = nullptr;            // Basic block file.
 

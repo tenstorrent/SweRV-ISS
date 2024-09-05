@@ -504,7 +504,14 @@ System<URV>::saveSnapshot(const std::string& dir)
     return false;
 
   Filesystem::path branchPath = dirPath / "branch-trace";
-  return hart0.saveBranchTrace(branchPath);
+  if (not hart0.saveBranchTrace(branchPath))
+    return false;
+
+  Filesystem::path imsicPath = dirPath / "imsic";
+  if (not imsicMgr_.saveSnapshot(imsicPath))
+    return false;
+
+  return true;
 }
 
 
@@ -560,8 +567,8 @@ template <typename URV>
 bool
 System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
 			 uint64_t sbase, uint64_t sstride,
-			 unsigned guests, unsigned ids,
-                         unsigned thresholdMask,
+			 unsigned guests, const std::vector<unsigned>& idsVec,
+                         const std::vector<unsigned>& tmVec, // Threshold masks
                          bool trace)
 {
   using std::cerr;
@@ -624,28 +631,48 @@ System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
 	}
     }
 
-  if ((ids % 64) != 0)
+  if (idsVec.size() != 3)
     {
-      cerr << "Error: IMSIC interrupt id limit (" << ids << ") is not a multiple of 64.\n";
+      cerr << "Error: IMSIC interrupt-ids array size (" << idsVec.size() << ") is "
+	   << "invalid -- Expecting 3.\n";
       return false;
     }
 
-  if (ids > 2048)
+  for (auto ids : idsVec)
     {
-      cerr << "Error: IMSIC interrupt id limit (" << ids << ") is larger than 2048.\n";
+      if ((ids % 64) != 0)
+	{
+	  cerr << "Error: IMSIC interrupt id limit (" << ids << ") is not a multiple of 64.\n";
+	  return false;
+	}
+
+      if (ids > 2048)
+	{
+	  cerr << "Error: IMSIC interrupt id limit (" << ids << ") is larger than 2048.\n";
+	  return false;
+	}
+    }
+
+  if (idsVec.size() != tmVec.size())
+    {
+      cerr << "Error: IMSIC interrupt ids count (" << idsVec.size() << ") is different "
+	   << " thant the threshold-mask count (" << tmVec.size() << ")\n";
       return false;
     }
 
-  if (thresholdMask < (ids - 1))
+  for (size_t i = 0; i < idsVec.size(); ++i)
     {
-      cerr << thresholdMask << " " << ids << "\n";
-      cerr << "Error: Threshold mask cannot be less than the max interrupt id.\n";
-      return false;
+      if (tmVec.at(i) < idsVec.at(i) - 1)
+	{
+	  cerr << "Error: Threshold mask (" << tmVec.at(0) << ") cannot be less than the "
+	       << "max interrupt id (" << (idsVec.at(i) - 1) << ").\n";
+	  return false;
+	}
     }
 
-  bool ok = imsicMgr_.configureMachine(mbase, mstride, ids, thresholdMask);
-  ok = imsicMgr_.configureSupervisor(sbase, sstride, ids, thresholdMask) and ok;
-  ok = imsicMgr_.configureGuests(guests, ids, thresholdMask) and ok;
+  bool ok = imsicMgr_.configureMachine(mbase, mstride, idsVec.at(0), tmVec.at(0));
+  ok = imsicMgr_.configureSupervisor(sbase, sstride, idsVec.at(1), tmVec.at(1)) and ok;
+  ok = imsicMgr_.configureGuests(guests, idsVec.at(2), tmVec.at(2)) and ok;
   if (not ok)
     {
       cerr << "Error: Failed to configure IMSIC.\n";
@@ -750,7 +777,8 @@ System<URV>::addPciDevices(const std::vector<std::string>& devs)
 
 template <typename URV>
 bool
-System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll, bool enablePpo)
+System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll,
+		       const std::vector<unsigned>& enabledPpos)
 {
   if (mbLineSize != 0)
     if (not isPowerOf2(mbLineSize) or mbLineSize > 512)
@@ -763,7 +791,47 @@ System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll, bool enablePpo)
   mcm_ = std::make_shared<Mcm<URV>>(this->hartCount(), pageSize(), mbLineSize);
   mbSize_ = mbLineSize;
   mcm_->setCheckWholeMbLine(mbLineCheckAll);
-  mcm_->enablePpo(enablePpo);
+
+  mcm_->enablePpo(false);
+
+  for (auto ppoIx : enabledPpos)
+    if (ppoIx < Mcm<URV>::PpoRule::Limit)
+      {
+	typedef typename Mcm<URV>::PpoRule Rule;
+	Rule rule = Rule(ppoIx);
+	mcm_->enablePpo(rule, true);
+      }
+
+  for (auto& hart :  sysHarts_)
+    hart->setMcm(mcm_);
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll, bool enablePpos)
+{
+  if (mbLineSize != 0)
+    if (not isPowerOf2(mbLineSize) or mbLineSize > 512)
+      {
+	std::cerr << "Error: Invalid merge buffer line size: "
+		  << mbLineSize << '\n';
+	return false;
+      }
+
+  mcm_ = std::make_shared<Mcm<URV>>(this->hartCount(), pageSize(), mbLineSize);
+  mbSize_ = mbLineSize;
+  mcm_->setCheckWholeMbLine(mbLineCheckAll);
+
+  typedef typename Mcm<URV>::PpoRule Rule;
+
+  for (unsigned ix = 0; ix < Rule::Limit; ++ix)
+    {
+      Rule rule = Rule(ix);
+      mcm_->enablePpo(rule, enablePpos);
+    }
 
   for (auto& hart :  sysHarts_)
     hart->setMcm(mcm_);
@@ -875,15 +943,6 @@ System<URV>::mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (not mcm_)
     return false;
   return mcm_->retire(hart, time, tag, di, trapped);
-}
-
-template <typename URV>
-bool
-System<URV>::mcmSetCurrentInstruction(Hart<URV>& hart, uint64_t tag)
-{
-  if (not mcm_)
-    return false;
-  return mcm_->setCurrentInstruction(hart, tag);
 }
 
 
@@ -1087,7 +1146,11 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
 
   while (true)
     {
-      bool progSnapshot = false;
+      struct {
+        bool prog = false;
+        bool stop = false;
+      } snap;
+
       std::atomic<bool> result = true;
 
       if (hartCount() == 1)
@@ -1102,8 +1165,10 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
             }
           catch (const CoreException& ce)
             {
-              if (ce.type() == CoreException::Type::Snapshot)
-                progSnapshot = true;
+              if (ce.type() == CoreException::Type::Snapshot or
+                  ce.type() == CoreException::Type::SnapshotAndStop)
+                snap.prog = true;
+              snap.stop = ce.type() != CoreException::Type::Snapshot;
             }
         }
       else if (not stepWinLo and not stepWinHi)
@@ -1112,7 +1177,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
           std::vector<std::thread> threadVec;
           std::atomic<unsigned> finished = 0;  // Count of finished threads.
 
-          auto threadFunc = [&result, &finished, &progSnapshot] (Hart<URV>* hart, FILE* traceFile) {
+          auto threadFunc = [&result, &finished, &snap] (Hart<URV>* hart, FILE* traceFile) {
                               try
                                 {
                                   bool r = hart->run(traceFile);
@@ -1120,8 +1185,10 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
                                 }
                               catch (const CoreException& ce)
                                 {
-                                  if (ce.type() == CoreException::Type::Snapshot)
-                                    progSnapshot = true;
+                                  if (ce.type() == CoreException::Type::Snapshot or
+                                      ce.type() == CoreException::Type::SnapshotAndStop)
+                                    snap.prog = true;
+                                  snap.stop = ce.type() != CoreException::Type::Snapshot;
                                 }
                               finished++;
                             };
@@ -1142,7 +1209,7 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
 
           for (auto& t : threadVec)
             {
-              if (progSnapshot)
+              if (snap.prog)
                 forceUserStop(0);
               t.join();
             }
@@ -1176,20 +1243,26 @@ System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t ste
                     }
                   catch (const CoreException& ce)
                     {
-                      if (ce.type() == CoreException::Type::Snapshot)
-                        progSnapshot = true;
+                      if (ce.type() == CoreException::Type::Snapshot or
+                          ce.type() == CoreException::Type::SnapshotAndStop)
+                        snap.prog = true;
+                      snap.stop = ce.type() != CoreException::Type::Snapshot;
                     }
                   if (stopped.at(ix))
                     finished++;
                 }
 
-              if (progSnapshot)
+              if (snap.prog)
                 break;
             }
         }
 
-      if (progSnapshot)
-        forceSnapshot();
+      if (snap.prog)
+        {
+          forceSnapshot();
+          if (snap.stop)
+            return result;
+        }
       else
         return result;
     }
@@ -1280,7 +1353,7 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::vector<uint6
 
 template <typename URV>
 bool
-System<URV>::loadSnapshot(const std::string& snapDir)
+System<URV>::loadSnapshot(const std::string& snapDir, bool restoreTrace)
 {
   using std::cerr;
 
@@ -1343,6 +1416,21 @@ System<URV>::loadSnapshot(const std::string& snapDir)
   if (not syscall.loadMmap(mmapPath.string()))
     return false;
 
+  if (restoreTrace)
+    {
+      Filesystem::path dtracePath = dirPath / "data-lines";
+      if (not memory_->loadDataAddressTrace(dtracePath))
+        return false;
+
+      Filesystem::path itracePath = dirPath / "instr-lines";
+      if (not memory_->loadInstructionAddressTrace(itracePath))
+        return false;
+
+      Filesystem::path branchPath = dirPath / "branch-trace";
+      if (not hart0.loadBranchTrace(branchPath))
+        return false;
+    }
+
   Filesystem::path memPath = dirPath / "memory";
   if (not memory_->loadSnapshot(memPath.string(), usedBlocks))
     return false;
@@ -1361,7 +1449,14 @@ System<URV>::loadSnapshot(const std::string& snapDir)
     }
 
   Filesystem::path fdPath = dirPath / "fd";
-  return syscall.loadFileDescriptors(fdPath.string());
+  if (not syscall.loadFileDescriptors(fdPath.string()))
+    return false;
+
+  Filesystem::path imsicPath = dirPath / "imsic";
+  if (not imsicMgr_.loadSnapshot(imsicPath))
+    return false;
+
+  return true;
 }
 
 

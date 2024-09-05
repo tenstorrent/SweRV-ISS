@@ -172,7 +172,7 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
 	return false;
 
   if (not args.loadFrom.empty())
-    if (not system.loadSnapshot(args.loadFrom))
+    if (not system.loadSnapshot(args.loadFrom, args.loadFromTrace))
       return false;
 
 
@@ -698,20 +698,21 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
       for (const auto& target : args.expandedTargets)
 	paths.push_back(target.at(0));
 
+      uint64_t offset = 0;
+
+#ifdef LZ4_COMPRESS
+      if (not system.loadLz4Files(args.lz4Files, offset, args.verbose))
+	errors++;
+#endif
+
       if (not system.loadElfFiles(paths, args.raw, args.verbose))
 	errors++;
 
       if (not system.loadHexFiles(args.hexFiles, args.verbose))
 	errors++;
 
-      uint64_t offset = 0;
       if (not system.loadBinaryFiles(args.binaryFiles, offset, args.verbose))
 	errors++;
-
-#ifdef LZ4_COMPRESS
-      if (not system.loadLz4Files(args.lz4Files, offset, args.verbose))
-	errors++;
-#endif
 
       if (not args.kernelFile.empty())
 	{
@@ -796,12 +797,6 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
 
   hart.enableConsoleInput(! args.noConInput);
 
-  if (args.interruptor)
-    {
-      uint64_t addr = *args.interruptor;
-      config.configInterruptor(system, hart, addr);
-    }
-
   if (args.syscallSlam)
     hart.defineSyscallSlam(*args.syscallSlam);
 
@@ -818,7 +813,8 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
     }
 
   if (args.triggers)
-    hart.enableTriggers(args.triggers);
+    hart.enableTriggers(*args.triggers);
+
   hart.enableGdb(args.gdb);
   if (args.gdbTcpPort.size()>hart.sysHartIndex())
     hart.setGdbTcpPort(args.gdbTcpPort[hart.sysHartIndex()]);
@@ -874,8 +870,20 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
       config.getMcmCheckAll(checkAll);
       if (args.mcmca)
 	checkAll = true;
-      if (not system.enableMcm(mcmLineSize, checkAll, not args.noPpo))
-	errors++;
+
+      if (args.noPpo)
+	{
+	  if (not system.enableMcm(mcmLineSize, checkAll, false /*enablePpos*/))
+	    errors++;
+	}
+      else
+	{
+	  std::vector<unsigned> enabledPpos;
+	  if (not config.getEnabledPpos(enabledPpos))
+	    errors++;
+	  else if (not system.enableMcm(mcmLineSize, checkAll, enabledPpos))
+	    errors++;
+	}
     }
 
   if (args.steesr.size() == 2)
@@ -933,6 +941,12 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
       else
 	hart.setTlbSize(size);
     }
+
+  if (args.nmiVec)
+    hart.defineNmiPc(*args.nmiVec);
+
+  if (args.nmeVec)
+    hart.defineNmiExceptionPc(*args.nmeVec);
 
   return errors == 0;
 }

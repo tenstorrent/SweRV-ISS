@@ -991,10 +991,6 @@ namespace WdRiscv
     /// Enable STEE (static trusted execution env)
     void enableStee(bool flag);
 
-    /// Enable/disable firing of triggers in machine mode when interrupts are enabled.
-    void enableMmodeTriggersWithIe(bool flag)
-    { triggers_.enableMmodeWithIe(flag); }
-
     /// Return true if one more debug triggers are enabled.
     bool hasActiveTrigger() const
     { return hasActiveTrigger_; }
@@ -1701,6 +1697,9 @@ namespace WdRiscv
     /// Enable/disable access to certain CSRs from non-machine mode.
     void enableSmstateen(bool flag);
 
+    /// Enable/disable Ssqosid extension.
+    void enableSsqosid(bool flag);
+
     /// Enable/disable resubale non maskable interrupt extension.
     void enableSmrnmi(bool flag);
 
@@ -1715,6 +1714,10 @@ namespace WdRiscv
 
     /// Enable/disable advanced interrupt artchitecture extension.
     void enableAia(bool flag);
+
+    /// Enable/disable smmpm extension. Sets mseccfg.PMM
+    /// to read-only zero if false.
+    void enableSmmpm(bool flag);
 
     /// Enable/disable ssnpm extension. Sets senvcfg.PMM/henvcfg.PMM
     /// to read-only zero if false.
@@ -1931,6 +1934,23 @@ namespace WdRiscv
       return fields.bits_.ADUE;
     }
 
+    /// Return the PMM bits of MSECCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t mseccfgPmm()
+    {
+      if constexpr (sizeof(URV) == 4)
+        return 0;
+      else
+        {
+          auto csr = getImplementedCsr(CsrNumber::MSECCFG);
+          if (not csr)
+            return 0;
+          URV value = csr->read();
+          MseccfgFields<uint64_t> fields(value);
+          return fields.bits_.PMM;
+        }
+    }
+
     /// Return the PMM bits of MENVCFG CSR. Returns 0
     /// if not implemented.
     uint8_t menvcfgPmm()
@@ -2119,6 +2139,7 @@ namespace WdRiscv
     bool cofEnabled_ = false;     // Counter overflow
     bool stateenOn_ = false;      // Mstateen extension.
     bool triggersOn_ = false;     // Stdtrig (debug triggers) extension.
+    bool ssqosidOn_ = false;      // Ssqosid extension.
     bool pmpTor_ = true;          // Top-of-range PMP mode enabled
     bool pmpNa4_ = true;          // Na4 PMP mode enabled
     bool aiaEnabled_ = false;     // Aia extension.

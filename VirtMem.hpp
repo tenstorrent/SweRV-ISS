@@ -382,6 +382,8 @@ namespace WdRiscv
         {
           pma.disable(Pma::Attrib::Idempotent);
           pma.enable(Pma::Attrib::Io);
+          pma.disable(Pma::Attrib::MisalOk);
+          pma.enable(Pma::Attrib::MisalAccFault);
         }
       return pma;
     }
@@ -636,33 +638,42 @@ namespace WdRiscv
       }
     }
 
+    /// Helper for below function
+    static uint64_t applyPointerMaskVa(uint64_t va, unsigned shift)
+    {
+      int64_t transformed = std::bit_cast<int64_t>(va);
+      transformed = (transformed << shift) >> shift;
+      return std::bit_cast<uint64_t>(transformed);
+    }
+
     /// Transform virtual address by appropriate pointer masking mode. This is
     /// only necessary for the effective address for load/stores.
     uint64_t applyPointerMaskVa(uint64_t va, PrivilegeMode priv, bool twoStage) const
     {
-      int64_t transformed = std::bit_cast<int64_t>(va);
-
       if (sPmBits_ and priv == PrivilegeMode::Supervisor and not twoStage)
-        transformed = (transformed << sPmBits_) >> sPmBits_;
+        return applyPointerMaskVa(va, sPmBits_);
       if (vsPmBits_ and priv == PrivilegeMode::Supervisor and twoStage)
-        transformed = (transformed << vsPmBits_) >> vsPmBits_;
+        return applyPointerMaskVa(va, vsPmBits_);
       if (uPmBits_ and priv == PrivilegeMode::User)
-        transformed = (transformed << uPmBits_) >> uPmBits_;
+        return applyPointerMaskVa(va, uPmBits_);
 
-      va = std::bit_cast<uint64_t>(transformed);
       return va;
     }
+
+    /// Helper for below function
+    static uint64_t applyPointerMaskPa(uint64_t pa, unsigned shift)
+    { return (pa << shift) >> shift; }
 
     /// Transform physical address by appropriate pointer masking mode. This
     /// also applies to GPAs (see section 3.5 of the spec).
     uint64_t applyPointerMaskPa(uint64_t pa, PrivilegeMode priv, bool twoStage) const
     {
       if (sPmBits_ and priv == PrivilegeMode::Supervisor and not twoStage)
-        pa = (pa << sPmBits_) >> sPmBits_;
+        return applyPointerMaskPa(pa, sPmBits_);
       if (vsPmBits_ and priv == PrivilegeMode::Supervisor and twoStage)
-        pa = (pa << vsPmBits_) >> vsPmBits_;
+        return applyPointerMaskPa(pa, vsPmBits_);
       if (uPmBits_ and priv == PrivilegeMode::User)
-        pa = (pa << uPmBits_) >> uPmBits_;
+        return applyPointerMaskPa(pa, uPmBits_);
       return pa;
     }
 

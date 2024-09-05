@@ -41,6 +41,9 @@ VecRegs::VecRegs()
   // At most we have 3 vector operands.
   opsEmul_.resize(3);
   opsEmul_.assign(opsEmul_.size(), 1);
+
+  // Per-SEW controlled unordered fpsum reduction.
+  fpUnorderedSumTreeRed_.resize(unsigned(VecEnums::WidthLimit), false);
 }
 
 
@@ -226,17 +229,26 @@ VecRegs::findReg(std::string_view name, unsigned& ix)
 
 bool
 VecRegs::getLastMemory(std::vector<uint64_t>& addresses,
+                       std::vector<uint64_t>& paddresses,
+                       std::vector<uint64_t>& paddresses2,
 		       std::vector<uint64_t>& data,
+                       std::vector<bool>& masked,
 		       unsigned& elementSize) const
 {
   addresses.clear();
+  paddresses.clear();
+  paddresses2.clear();
   data.clear();
+  masked.clear();
   elementSize = ldStSize_;
 
   if (ldStSize_ == 0)
     return false;
 
   addresses = ldStVa_;
+  paddresses = ldStPa_;
+  paddresses2 = ldStPa2_;
   data = stData_;
+  masked = maskedAddr_;
   return true;
 }

@@ -133,6 +133,12 @@ parseCmdLineVecData(std::string_view option,
       return false;
     }
 
+  if (trimmed.size() == 1 and trimmed.at(0) == '0')
+    {
+      val.push_back(0);
+      return true;
+    }
+
   if ((trimmed.size() & 1) != 0)
     {
       std::cerr << "Value for vector " << option << " must have an even"
@@ -264,7 +270,6 @@ Interactive<URV>::stepCommand(Hart<URV>& hart, const std::string& /*line*/,
     {
       if (hasTag)
 	{
-	  system_.mcmSetCurrentInstruction(hart, tag);
 	  DecodedInst di;
 	  hart.setInstructionCount(tag-1);
 	  hart.singleStep(di, traceFile);
@@ -2068,8 +2073,8 @@ bool
 Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
 			       const std::vector<std::string>& tokens)
 {
-  // Format: [hart=<number>] [time=<number>] mread <instruction-tag> <physical-address> <size> <rtl-data> <i>|<é>
-  if (tokens.size() < 5)
+  // Format: mread <instr-tag> <physical-address> <size> <rtl-data>
+  if (tokens.size() != 5)
     {
       std::cerr << "Invalid mread command: " << line << '\n';
       std::cerr << "  Expecting: mread <tag> <addr> <size> <data>\n";
@@ -2087,17 +2092,68 @@ Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
   uint64_t size = 0;
   if (not parseCmdLineNumber("size", tokens.at(3), size))
     return false;
-  if (size > 8 or size == 0)
+
+  if (size == 0)
     {
-      std::cerr << "Invalid mread size: " << size << " -- Expecting 1 to 8\n";
+      std::cerr << "Invalid mread size: 0\n";
       return false;
     }
 
-  uint64_t data = 0;
-  if (not parseCmdLineNumber("data", tokens.at(4), data))
+  if (size <= 8)
+    {
+      uint64_t data = 0;
+      if (not parseCmdLineNumber("data", tokens.at(4), data))
+	return false;
+      return system_.mcmRead(hart, this->time_, tag, addr, size, data);
+    }
+
+  // mread for a vector load, expected size is half a cache line size (32)
+  // or a cache line size (64).
+
+  std::vector<uint8_t> bytes;
+  if (not parseCmdLineVecData("data", tokens.at(4), bytes))
     return false;
 
-  return system_.mcmRead(hart, this->time_, tag, addr, size, data);
+  if (bytes.size() != size)
+    {
+      std::cerr << "Invalid mread command: size (" << size << ") does not match number "
+		<< " of bytes in data (" << bytes.size() << "\n";
+      return false;
+    }
+
+  unsigned clz = hart.cacheLineSize();
+  if (size > clz)
+    {
+      std::cerr << "Invalid size for mread command for vector: " << size << ", must be "
+		<< "less than cache line size (" << clz << ")\n";
+      return false;
+    }
+
+  bool ok = true;
+
+  std::reverse(bytes.begin(), bytes.end());
+
+  // For speed, use double-word mread when possible, else word, else byte.
+  if ((size & 0x7) == 0 and (addr & 0x7) == 0)
+    {
+      const uint64_t* vdata = reinterpret_cast<const uint64_t*> (bytes.data());
+      for (unsigned i = 0; i < size and ok; i += 8, ++vdata, addr += 8)
+	ok = system_.mcmRead(hart, this->time_, tag, addr, 8, *vdata);
+    }
+  else if ((size & 0x3) == 0 and (addr & 0x3) == 0)
+    {
+      const uint32_t* vdata = reinterpret_cast<const uint32_t*> (bytes.data());
+      for (unsigned i = 0; i < size and ok; i += 4, ++vdata, addr += 4)
+	ok = system_.mcmRead(hart, this->time_, tag, addr, 4, *vdata);
+    }
+  else
+    {
+      const uint8_t* vdata = bytes.data();
+      for (unsigned i = 0; i < size and ok; ++i, ++vdata, ++addr)
+	ok = system_.mcmRead(hart, this->time_, tag, addr, 1, *vdata);
+    }
+
+  return ok;
 }
 
 
@@ -2224,11 +2280,63 @@ Interactive<URV>::mbinsertCommand(Hart<URV>& hart, const std::string& line,
   if (not parseCmdLineNumber("size", tokens.at(3), size))
     return false;
 
-  uint64_t data = 0;
-  if (not parseCmdLineNumber("data", tokens.at(4), data))
+  if (size <= 8)
+    {
+      uint64_t data = 0;
+      if (not parseCmdLineNumber("data", tokens.at(4), data))
+	return false;
+      return system_.mcmMbInsert(hart, this->time_, tag, addr, size, data);
+    }
+
+  // mbinsert for a vector load, expected size is less than that of cache line (64).
+  std::vector<uint8_t> bytes;
+  if (not parseCmdLineVecData("data", tokens.at(4), bytes))
     return false;
 
-  return system_.mcmMbInsert(hart, this->time_, tag, addr, size, data);
+  // Expand a zero to the required number of bytes. Backward ccompatibility.
+  if (bytes.size() == 1 and bytes.at(0) == 0)
+    bytes.resize(size);
+
+  if (bytes.size() != size)
+    {
+      std::cerr << "Invalid mbinsert command: size (" << size << ") does not match number "
+		<< " of bytes in data (" << bytes.size() << "\n";
+      return false;
+    }
+
+  unsigned clz = hart.cacheLineSize();
+  if (size > clz)
+    {
+      std::cerr << "Invalid size for mbinsert command for vector: " << size << ", must be "
+		<< "less than cache line size (" << clz << ")\n";
+      return false;
+    }
+
+  bool ok = true;
+
+  std::reverse(bytes.begin(), bytes.end());
+
+  // For speed, use double-word insert when possible, else word, else byte.
+  if ((size & 0x7) == 0 and (addr & 0x7) == 0)
+    {
+      const uint64_t* vdata = reinterpret_cast<const uint64_t*> (bytes.data());
+      for (unsigned i = 0; i < size and ok; i += 8, ++vdata, addr += 8)
+	ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 8, *vdata);
+    }
+  else if ((size & 0x3) == 0 and (addr & 0x3) == 0)
+    {
+      const uint32_t* vdata = reinterpret_cast<const uint32_t*> (bytes.data());
+      for (unsigned i = 0; i < size and ok; i += 4, ++vdata, addr += 4)
+	ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 4, *vdata);
+    }
+  else
+    {
+      const uint8_t* vdata = bytes.data();
+      for (unsigned i = 0; i < size and ok; ++i, ++vdata, ++addr)
+	ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 1, *vdata);
+    }
+
+  return ok;
 }
 
 

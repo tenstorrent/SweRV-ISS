@@ -225,9 +225,10 @@ namespace WdRiscv
     bool saveSnapshot(const std::string& dirPath);
 
     /// Load register and memory state from snapshot previously saved
-    /// in the given directory. Return true on success and false on
-    /// failure.
-    bool loadSnapshot(const std::string& snapshotDirectory);
+    /// in the given directory. If restoreTrace is true, also restore
+    /// branch/inst/data address traces. Return true on success and
+    /// false on failure.
+    bool loadSnapshot(const std::string& snapshotDirectory, bool restoreTrace);
 
     /// Write contents of memory accessed by current run in verilog
     /// hex format to the file at the given path. Return true on
@@ -272,16 +273,21 @@ namespace WdRiscv
     /// id plus 1 and must be a multiple of 64.
     bool configImsic(uint64_t mbase, uint64_t mstride,
 		     uint64_t sbase, uint64_t sstride,
-		     unsigned guests, unsigned ids,
-                     unsigned thresholdMask,
+		     unsigned guests, const std::vector<unsigned>& ids,
+                     const std::vector<unsigned>& thresholdMasks,
                      bool trace);
 
-    /// Enable memory consistency model. This is relevant in server/interactive where RTL
-    /// monitor or interactive command may initiate out of order memory
-    /// transactions. Behavior is undefined if used in non-server/non-interactive mode or
-    /// if used after execution has started. The mergeBuffserSize is the merge buffer line
-    /// size in bytes.
-    bool enableMcm(unsigned mergeBufferSize, bool mbLineCheckAll, bool enablePpo = true);
+    /// Enable memory consistency model with given merge buffer size. This is relevant in
+    /// server/interactive where RTL monitor or interactive command may initiate out of
+    /// order memory transactions. Behavior is undefined if used in
+    /// non-server/non-interactive mode or if used after execution has started. The
+    /// mergeBuffserSize is the merge buffer line size in bytes. Only the PPO rules with
+    /// numbers in the enabledPpos vector are enabled.
+    bool enableMcm(unsigned mbSize, bool mbLineCheckAll,
+		   const std::vector<unsigned>& enabledPpos);
+
+    /// Similar to preceding method but with all PPO rules enabled/disabled.
+    bool enableMcm(unsigned mbSize, bool mbLineCheckAll, bool enablePpos = true);
 
     /// Enable the performance mode API.
     bool enablePerfApi(std::vector<FILE*>& traceFiles);
@@ -347,8 +353,6 @@ namespace WdRiscv
     /// Initiate an instruction retire.
     bool mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		   const DecodedInst& di, bool trapped);
-
-    bool mcmSetCurrentInstruction(Hart<URV>& hart, uint64_t tag);
 
 
     /// Perf model APIs.

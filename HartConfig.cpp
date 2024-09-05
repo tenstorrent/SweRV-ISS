@@ -23,6 +23,7 @@
 #include "System.hpp"
 #include "Core.hpp"
 #include "Hart.hpp"
+#include "Mcm.hpp"
 
 
 using namespace WdRiscv;
@@ -959,11 +960,27 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
   tag = "tt_fp_usum_tree_reduction";
   if (vconf.contains(tag))
     {
-      bool flag = false;
-      if (not getJsonBoolean(tag, vconf.at(tag), flag))
-        errors++;
-      else
-        hart.configVectorFpUnorderedSumRed(flag);
+      const auto& items = vconf.at(tag);
+      for (const auto& item : items)
+	{
+          if (not item.is_string())
+            {
+              std::cerr << "Error: Invalid value in config file item " << tag
+		   << " -- expecting string\n";
+              errors++;
+	      continue;
+            }
+
+          std::string_view sew = item.get<std::string_view>();
+          ElementWidth ew;
+          if (not VecRegs::to_sew(sew, ew))
+            {
+              std::cerr << "Error: can't convert to valid SEW: " << tag << '\n';
+              errors++;
+              continue;
+            }
+          hart.configVectorFpUnorderedSumRed(ew, true);
+        }
     }
 
   tag = "legalize_vsetvl_avl";
@@ -1381,21 +1398,6 @@ HartConfig::configAclint(System<URV>& system, Hart<URV>& hart, uint64_t clintSta
 
 template<typename URV>
 bool
-HartConfig::configInterruptor(System<URV>& system, Hart<URV>& hart, uint64_t addr) const
-{
-  // Define callback to recover a hart from a hart index. We do
-  // this to avoid having the Hart class depend on the System class.
-  auto indexToHart = [&system](unsigned ix) -> Hart<URV>* {
-    return system.ithHart(ix).get();
-  };
-
-  hart.configInterruptor(addr, indexToHart);
-  return true;
-}
-
-
-template<typename URV>
-bool
 HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 {
   using std::cerr;
@@ -1492,14 +1494,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enableTriggers(flag);
     }
 
-  // Enable firing triggers in machine mode even when interrupts are enabled.
-  tag = "mmode_triggers_ok_with_ie";
-  if (config_ -> contains(tag))
-    {
-      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
-      hart.enableMmodeTriggersWithIe(flag);
-    }
-
   // Enable performance counters.
   tag = "enable_performance_counters";
   if (config_ -> contains(tag))
@@ -1583,6 +1577,14 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
       hart.configAllInstAddrTrigger(flag);
+    }
+
+  // Enable use of TCONTROL CSR to control triggers in Machine mode.
+  tag = "trigger_use_tcontrol";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.configTriggerUseTcontrol(flag);
     }
 
   tag = "trigger_types";
@@ -2216,17 +2218,54 @@ HartConfig::applyImsicConfig(System<URV>& system) const
     if (not getJsonUnsigned("imsic.guests", imsic.at(tag), guests))
       return false;
 
-  unsigned ids = 64;
+
+  std::vector<unsigned> idVec = { 64, 64, 64}; // For M, S, and VS privs.
   tag = "ids";
   if (imsic.contains(tag))
-    if (not getJsonUnsigned("imsic.ids", imsic.at(tag), ids))
-      return false;
+    {
+      if (imsic.at(tag).is_array())
+	{
+	  if (not getJsonUnsignedVec("imsic.ids", imsic.at(tag), idVec))
+	    return false;
+	  if (idVec.size() != 3)
+	    {
+	      std::cerr << "Config file imsic.ids array must have 3 values\n";
+	      return false;
+	    }
+	}
+      else
+	{
+	  unsigned ids = 0;
+	  if (not getJsonUnsigned("imsic.ids", imsic.at(tag), ids))
+	    return false;
+	  std::fill(idVec.begin(), idVec.end(), ids);
+	}
+    }
 
-  uint64_t thresholdMask = std::bit_ceil(ids) - 1;
+  // Threshold mask is the smallest all-ones bit-mask that covers all the bits
+  // necessary to represent an id.
+  std::vector<unsigned> tmVec(idVec.size());   // Threshold masks.
+  for (unsigned i = 0; i < idVec.size(); ++i)
+    tmVec.at(i) = std::bit_ceil(idVec.at(i)) - 1;
+
   tag = "eithreshold_mask";
   if (imsic.contains(tag))
-    if (not getJsonUnsigned("imsic.eithreshold_mask", imsic.at(tag), thresholdMask))
-      return false;
+    {
+      if (imsic.at(tag).is_array())
+	{
+	  if (not getJsonUnsignedVec("imsic.threshold_mask", imsic.at(tag), tmVec))
+	    return false;
+	  if (tmVec.size() != 3)
+	    {
+	      std::cerr << "Config file imsic.threshold array must have 3 values\n";
+	      return false;
+	    }
+	}
+      unsigned tm = 0;
+      if (not getJsonUnsigned("imsic.eithreshold_mask", imsic.at(tag), tm))
+	return false;
+      std::fill(tmVec.begin(), tmVec.end(), tm);
+    }
 
   bool trace = false;
   tag = "trace";
@@ -2234,7 +2273,7 @@ HartConfig::applyImsicConfig(System<URV>& system) const
     if (not getJsonBoolean("imsic.trace", imsic.at(tag), trace))
       return false;
 
-  return system.configImsic(mbase, mstride, sbase, sstride, guests, ids, thresholdMask, trace);
+  return system.configImsic(mbase, mstride, sbase, sstride, guests, idVec, tmVec, trace);
 }
 
 
@@ -2304,13 +2343,12 @@ HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
     if (not getJsonBoolean(tag, config_ -> at(tag), enableMcm))
       return false;
 
-  tag = "enable_ppo";
-  bool enablePpo = true;
-  if (config_ -> contains(tag))
-    if (not getJsonBoolean(tag, config_ -> at(tag), enablePpo))
-      return false;
+  // Parse enable_ppo, it it is missing all PPO rules are enabled.
+  std::vector<unsigned> enabledPpos;
+  if (not getEnabledPpos(enabledPpos))
+    return false;
 
-  if (enableMcm and not system.enableMcm(mbLineSize, checkAll, enablePpo))
+  if (enableMcm and not system.enableMcm(mbLineSize, checkAll, enabledPpos))
     return false;
 
   tag = "enable_tso";
@@ -2455,6 +2493,51 @@ HartConfig::getIsa(std::string& isa) const
       return true;
     }
   return false;
+}
+
+
+bool
+HartConfig::getEnabledPpos(std::vector<unsigned>& enabledPpos) const
+{
+  std::string tag = "enable_ppo";
+
+  if (config_ -> contains(tag))
+    {
+      auto& ep = config_ -> at(tag);
+      if (ep.is_boolean())
+	{
+	  bool flag = false;
+	  if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+	    return false;
+	  if (flag)
+	    for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Limit; ++i)
+	      enabledPpos.push_back(i);
+	}
+      else if (ep.is_array())
+	{
+	  std::vector<unsigned> temp;
+
+	  if (not getJsonUnsignedVec(tag, ep, temp))
+	    return false;
+
+	  // Keep valid rule numbers
+	  for (auto ix : temp)
+	    {
+	      if (ix < Mcm<uint64_t>::PpoRule::Limit)
+		enabledPpos.push_back(ix);
+	      else
+		std::cerr << "Invalid PPO rule number in config file enable_ppo tag: " << ix << '\n';
+	    }
+	}
+    }
+  else
+    {
+      // Tag is missing: all rules enabled.
+      for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Limit; ++i)
+	enabledPpos.push_back(i);
+    }
+
+  return true;
 }
 
 
@@ -2686,14 +2769,6 @@ HartConfig::configAclint<uint64_t>(System<uint64_t>&, Hart<uint64_t>&, uint64_t 
                                    uint64_t size, uint64_t mswiOffset, bool hasMswi,
                                    uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
 		                   bool siOnReset = false, bool deliverInterrupts = true) const;
-
-template bool
-HartConfig::configInterruptor<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,
-					uint64_t addr) const;
-
-template bool
-HartConfig::configInterruptor<uint64_t>(System<uint64_t>& system, Hart<uint64_t>& hart,
-					uint64_t addr) const;
 
 template bool
 HartConfig::applyImsicConfig(System<uint32_t>&) const;

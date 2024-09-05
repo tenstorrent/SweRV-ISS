@@ -106,11 +106,12 @@ namespace WdRiscv
     std::optional<uint64_t> instCountLim;
     std::optional<uint64_t> memorySize;
     std::optional<uint64_t> tlbSize;
+    std::optional<uint64_t> nmiVec;
+    std::optional<uint64_t> nmeVec;
     Uint64Vec snapshotPeriods;
     Uint64Vec steesr;
     std::optional<uint64_t> alarmInterval;
     std::optional<uint64_t> clint;        // Advanced core-local-interrupt (CLINT) mem mapped address
-    std::optional<uint64_t> interruptor;  // Interrupt generator mem mapped address
     std::optional<uint64_t> syscallSlam;
     std::optional<uint64_t> instCounter;
     std::optional<uint64_t> branchWindow;
@@ -135,7 +136,8 @@ namespace WdRiscv
     bool version = false;
     bool traceLdSt = false;  // Trace ld/st data address if true.
     bool csv = false;        // Log files in CSV format when true.
-    bool triggers = false;   // Enable debug triggers when true.
+    std::optional<bool> triggers;   // Enable debug triggers when true.
+    std::optional<bool> notriggers;   // Disable debug triggers when true.
     bool counters = false;   // Enable performance counters when true.
     bool gdb = false;        // Enable gdb mode when true.
     std::vector<unsigned> gdbTcpPort;   // Enable gdb mode over TCP when port is positive.
@@ -146,7 +148,7 @@ namespace WdRiscv
     bool elfisa = false;     // Use ELF file RISCV architecture tags to set MISA if true.
     bool unmappedElfOk = false;
     bool mcm = false;        // Memory consistency checks.
-    bool noPpo = false;      // Skip PPO checks in MCM.
+    std::optional<bool> noPpo;      // Skip PPO checks in MCM.
     bool mcmca = false;      // Memory consistency checks: check all bytes of merge buffer.
     bool perfApi = false;    // Performance model API.
     bool reportub = false;         // Report used blocks with sparse memory.
@@ -156,5 +158,6 @@ namespace WdRiscv
     bool tracePtw = false;   // Enable printing of page table walk info in log.
     bool shm = false;        // Enable shared memory IPC for server mode (default is socket).
     bool logPerHart = false; // Enable separate log files for each hart.
+    bool loadFromTrace = false;    // Enable loading trace information from snapshot.
   };
 }

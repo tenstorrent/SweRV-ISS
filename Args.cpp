@@ -35,6 +35,25 @@ printVersion()
   #undef str
   #undef xstr
 #endif
+  std::cout << "Compile options: \n";
+#ifdef SOFT_FLOAT
+  std::cout << "SOFT_FLOAT\n";
+#endif
+#ifdef MEM_CALLBACKS
+  std::cout << "MEM_CALLBACKS\n";
+#endif
+#ifdef HINT_OPS
+  std::cout << "HINT_OPS\n";
+#endif
+#ifdef PCI
+  std::cout << "PCI\n";
+#endif
+#ifdef FAST_SLOPPY
+  std::cout << "FAST_SLOPPY\n";
+#endif
+#ifdef LZ4_COMPRESS
+  std::cout << "LZ4_COMPRESS\n";
+#endif
 }
 
 
@@ -114,6 +133,20 @@ Args::collectCommandLineValues(const boost::program_options::variables_map& varM
         ok = false;
     }
 
+  if (varMap.count("nmivec"))
+    {
+      auto numStr = varMap["nmivec"].as<std::string>();
+      if (not parseCmdLineNumber("nmivec", numStr, this->nmiVec))
+        ok = false;
+    }
+
+  if (varMap.count("nmevec"))
+    {
+      auto numStr = varMap["nmevec"].as<std::string>();
+      if (not parseCmdLineNumber("nmevec", numStr, this->nmeVec))
+        ok = false;
+    }
+
   if (varMap.count("tohostsym"))
     this->toHostSym = varMap["tohostsym"].as<std::string>();
 
@@ -160,18 +193,6 @@ Args::collectCommandLineValues(const boost::program_options::variables_map& varM
         }
     }
 
-  if (varMap.count("interruptor"))
-    {
-      auto numStr = varMap["interruptor"].as<std::string>();
-      if (not parseCmdLineNumber("interruptor", numStr, this->interruptor))
-        ok = false;
-      else if (this->interruptor.has_value() and (*this->interruptor & 7) != 0)
-        {
-          std::cerr << "Error: interruptor address must be a multiple of 8\n";
-          ok = false;
-        }
-    }
-
   if (varMap.count("syscallslam"))
     {
       auto numStr = varMap["syscallslam"].as<std::string>();
@@ -184,6 +205,21 @@ Args::collectCommandLineValues(const boost::program_options::variables_map& varM
       auto numStr = varMap["mcmls"].as<std::string>();
       if (not parseCmdLineNumber("mcmls", numStr, this->mcmls))
         ok = false;
+    }
+
+  if (varMap.count("noppo"))
+    this->noPpo = true;
+
+  if (varMap.count("triggers"))
+    this->triggers = true;
+
+  if (varMap.count("notriggers"))
+    this->triggers = false;
+
+  if (varMap.count("triggers") and varMap.count("notriggers"))
+    {
+      std::cerr << "Error: Cannot specify both --triggers and --notriggers.\n";
+      ok = false;
     }
 
   if (varMap.count("steesr"))
@@ -366,14 +402,20 @@ Args::parseCmdLineArgs(std::span<char*> argv)
 	 "Memory size (must be a multiple of 4096).")
 	("tlbsize", po::value<std::string>(),
 	 "Memory size (must be a power of 2).")
+	("nmivec", po::value<std::string>(),
+	 "PC value after a non-maskable interrupt.")
+	("nmevec", po::value<std::string>(),
+	 "PC value after an exception in the non-maskable interrupt handler.")
 	("interactive,i", po::bool_switch(&this->interactive),
 	 "Enable interactive mode.")
 	("traceload", po::bool_switch(&this->traceLdSt),
 	 "Enable tracing of load/store instruction data address (deprecated -- now always on).")
 	("traceptw", po::bool_switch(&this->tracePtw),
 	 "Enable printing of page table walk information in log.")
-	("triggers", po::bool_switch(&this->triggers),
+	("triggers",
 	 "Enable debug triggers (triggers are on in interactive and server modes)")
+	("notriggers",
+	 "Disable debug triggers (triggers are on in interactive and server modes)")
 	("counters", po::bool_switch(&this->counters),
 	 "Enable performance counters")
 	("gdb", po::bool_switch(&this->gdb),
@@ -413,6 +455,9 @@ Args::parseCmdLineArgs(std::span<char*> argv)
          "Specifying multiple periods will only save a snapshot on first instance (not periodic).")
 	("loadfrom", po::value(&this->loadFrom),
 	 "Snapshot directory from which to restore a previously saved (snapshot) state.")
+        ("loadfromtrace", po::bool_switch(&this->loadFromTrace),
+         "If true, also restore data-lines/instr-lines/branch-trace from a snapshot "
+         "directory. This needs to be used in conjunction with --loadfrom.")
 	("stdout", po::value(&this->stdoutFile),
 	 "Redirect standard output of newlib/Linux target program to this.")
 	("stderr", po::value(&this->stderrFile),
@@ -458,12 +503,6 @@ Args::parseCmdLineArgs(std::span<char*> argv)
          "of these double words sets the timer-limit of the corresponding hart. "
          "A timer interrupt in such a hart becomes pending when the timer value "
          "equals or exceeds the timer limit.")
-        ("interruptor", po::value<std::string>(),
-         "Define address, z, of a memory mapped interrupt agent. Storing a word in z,"
-	 "using a sw instruction, will set/clear a bit in the MIP CSR of a hart"
-	 "in the system. The stored word should have the hart index in bits 0 to 11,"
-	 "the interrupt id (bit number of MIP) in bits 12 to 19, and the interrupt"
-	 "value in bits 20 to 31 (0 to clear, non-zero to set).")
         ("syscallslam", po::value<std::string>(),
          "Define address, a, of a non-cached memory area in which the "
          "memory changes of an emulated system call will be slammed. This "
@@ -474,7 +513,7 @@ Args::parseCmdLineArgs(std::span<char*> argv)
          "sequence.")
 	("mcm", po::bool_switch(&this->mcm),
 	 "Enable memory consistency checks. This is meaningful in server/interactive mode.")
-	("noppo", po::bool_switch(&this->noPpo),
+	("noppo",
 	 "Skip preserve program order rule check in MCM when this is used.")
 	("mcmca", po::bool_switch(&this->mcmca),
 	 "Check all bytes of the memory consistency check merge buffer. If not used "
@@ -582,7 +621,7 @@ Args::parseCmdLineNumber(const std::string& option, const std::string& numberStr
   uint64_t scale = 1;
   if (good)
     {
-      char suffix = str.back();
+      char suffix = std::tolower(str.back());
       if (suffix == 'k')
         scale = 1024;
       else if (suffix == 'm')

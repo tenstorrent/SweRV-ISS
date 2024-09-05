@@ -489,6 +489,14 @@ namespace WdRiscv
     /// addresses into the given file.
     bool saveInstructionAddressTrace(const std::string& path) const;
 
+    /// If address tracing enabled, then load the accumulated data
+    /// addresses from the given file.
+    bool loadDataAddressTrace(const std::string& path);
+
+    /// If instruction tracing enabled, then load the accumulated
+    /// instruction addresses into the given file.
+    bool loadInstructionAddressTrace(const std::string& path);
+
     /// Return the line number corresponding to the given address.
     uint64_t getLineNumber(uint64_t addr) const
     { return addr >> lineShift_; }
@@ -718,6 +726,10 @@ namespace WdRiscv
 
     static bool saveAddressTrace(std::string_view tag,
                                  const LineMap& lineMap,
+                                 const std::string& path);
+
+    static bool loadAddressTrace(LineMap& lineMap,
+                                 uint64_t& refCount,
                                  const std::string& path);
 
     /// Add line of given address to the data line address trace.

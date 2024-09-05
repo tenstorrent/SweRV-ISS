@@ -62,8 +62,9 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
       auto csr = csRegs_.findCsr(CN(i));
       if (not csr or not csr->isImplemented())
 	continue;
-      if (csr->read() != csr->getResetValue())
-	ofs << "c 0x" << i << " 0x" << csr->read() << "\n";
+      if (csr->read() == 0 and csr->getResetValue() == 0)
+	continue;
+      ofs << "c 0x" << i << " 0x" << csr->read() << "\n";
     }
 
   for (unsigned i = unsigned(CN::MIN_CSR_); i <= unsigned(CN::MAX_CSR_); i++)
@@ -74,8 +75,9 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
       auto csr = csRegs_.findCsr(CN(i));
       if (not csr or not csr->isImplemented())
 	continue;
-      if (csr->read() != csr->getResetValue())
-	ofs << "c 0x" << i << " 0x" << csr->read() << "\n";
+      if (csr->read() == 0 and csr->getResetValue() == 0)
+	continue;
+      ofs << "c 0x" << i << " 0x" << csr->read() << "\n";
     }
   ofs << std::dec;
 
@@ -272,10 +274,17 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
 	      errors++;
 	      continue;
 	    }
-	  auto csr = csRegs_.findCsr(CsrNumber(num));
+          auto csrNum = CsrNumber(num);
+	  auto csr = csRegs_.findCsr(csrNum);
           // Poke to propagate updates to cached values
 	  if (csr and csr->isImplemented())
-            pokeCsr(static_cast<CsrNumber>(num), val);
+            {
+              if ((csrNum >= CsrNumber::MIREG and csrNum <= CsrNumber::MIREG6) or
+                  (csrNum >= CsrNumber::SIREG and csrNum <= CsrNumber::SIREG6) or
+                  (csrNum >= CsrNumber::VSIREG and csrNum <= CsrNumber::VSIREG6))
+                continue;
+              pokeCsr(csrNum, val);
+            }
 	  else
 	    cerr << "Warning: Register snapshot loader: Line " << lineNum
 		 << ": No such CSR: " << line << '\n';

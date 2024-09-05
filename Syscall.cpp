@@ -1292,7 +1292,7 @@ Syscall<URV>::emulate(unsigned ix)
     case 93:  // exit
     case 94:  // exit_group
       {
-	throw CoreException(CoreException::Exit, "", 0, a0);
+	throw CoreException(CoreException::Exit, "", a0);
 	return 0;
       }
 

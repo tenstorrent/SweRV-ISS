@@ -404,7 +404,7 @@ IFormInst::encodeAddi(unsigned rdv, unsigned rs1v, int imm)
   if (rdv > 32 or rs1v > 32)
     return false;
 
-  if (imm > (1 << 11) or -imm < -(1 << 11))
+  if (imm > (1 << 12) or -imm < -(1 << 12))
     return false;  // Must fit in 12 bits
 
   fields.opcode = 0x13;
@@ -462,7 +462,7 @@ IFormInst::encodeJalr(unsigned rdv, unsigned rs1v, int offset)
   if (rdv > 31 or rs1v > 31)
     return false;  // Register(s) out of bounds.
 
-  if (offset >= (1 << 11) or -offset < -(1 << 11))
+  if (offset >= (1 << 12) or -offset < -(1 << 12))
     return false;  // Offset out of bounds.
 
   fields.opcode = 0x67;
@@ -485,7 +485,7 @@ IFormInst::encodeLb(unsigned rdv, unsigned rs1v, int offset)
   if (rdv > 31 or rs1v > 31)
     return false;  // Register(s) out of bounds.
 
-  if (offset >= (1 << 11) or -offset < -(1 << 11))
+  if (offset >= (1 << 12) or -offset < -(1 << 12))
     return false;  // Offset out of bounds.
 
  fields.opcode = 0x03;
@@ -824,7 +824,7 @@ SFormInst::encodeSb(unsigned rs1v, unsigned rs2v, int imm)
   if (rs1v > 31 or rs2v > 31)
     return false;  // Register(s) out of bounds.
 
-  if (imm >= (1<<11) or -imm < -(1<<11))
+  if (imm >= (1<<12) or -imm < -(1<<12))
     return false;  // Immediate out of bounds.
 
   bits.opcode = 0x23;

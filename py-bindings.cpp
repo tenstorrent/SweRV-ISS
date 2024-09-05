@@ -4,7 +4,9 @@
 #include <string_view>
 #include <filesystem>
 
+#include "Interactive.hpp"
 #include "System.hpp"
+#include "Mcm.hpp"
 #include "Hart.hpp"
 #include "Memory.hpp"
 #include "HartConfig.hpp"
@@ -371,9 +373,12 @@ static void defineHart(M m)
           else
             {
               std::vector<uint64_t> addr;
+              std::vector<uint64_t> paddr;
+              std::vector<uint64_t> paddr2;
               std::vector<uint64_t> data;
+              std::vector<bool> masked;
               unsigned elemSize = 0;
-              if (self.getLastVectorMemory(addr, data, elemSize) and not data.empty())
+              if (self.getLastVectorMemory(addr, paddr, paddr2, data, masked, elemSize) and not data.empty())
                 for (size_t i = 0; i < data.size(); ++i)
                   {
                     auto p = std::make_pair("m" + std::to_string(addr.at(i)), elemSize);
@@ -392,7 +397,34 @@ static void defineHart(M m)
           return str;
         }, py::arg("inst"), py::doc("Disassemble 32-bit instruction."))
     .def("__getattr__", py::overload_cast<Hart<T>&, const std::string&>(&attr<T>))
-    .def("__setattr__", py::overload_cast<Hart<T>&, const std::string&, const py::object&>(&attr<T>));
+    .def("__setattr__", py::overload_cast<Hart<T>&, const std::string&, const py::object&>(&attr<T>))
+    .def("mcm_read", [](Hart<T>& self, uint64_t time, uint64_t tag, uint64_t addr,
+                        unsigned size, uint64_t data) {
+          if (not self.mcm())
+            return false;
+          return self.mcm()->readOp(self, time, tag, addr, size, data);
+        }, py::doc("MCM read operation."))
+    .def("mcm_mb_write", [](Hart<T>& self, uint64_t time, uint64_t addr,
+                            const std::vector<uint8_t>& data,
+                            const std::vector<bool>& mask) {
+          if (not self.mcm())
+            return false;
+          return self.mcm()->mergeBufferWrite(self, time, addr, data, mask);
+        }, py::doc("MCM merge buffer write operation."))
+    .def("mcm_mb_insert", [](Hart<T>& self, uint64_t time, uint64_t tag,
+                             uint64_t addr, unsigned size, uint64_t data) {
+          if (not self.mcm())
+            return false;
+          return self.mcm()->mergeBufferInsert(self, time, tag, addr, size, data);
+        }, py::doc("MCM merge buffer insert operation."))
+    .def("mcm_bypass", [](Hart<T>& self, uint64_t time, uint64_t tag,
+                          uint64_t addr, unsigned size, uint64_t data) {
+          if (not self.mcm())
+            return false;
+          return self.mcm()->bypassOp(self, time, tag, addr, size, data);
+        }, py::doc("MCM merge buffer bypass operation."))
+    .def("mcm_ifetch", &Hart<T>::mcmIFetch, py::doc("MCM instruction fetch operation."))
+    .def("mcm_ievict", &Hart<T>::mcmIEvict, py::doc("MCM instruction cache eviction operation."));
 };
 
 
@@ -450,13 +482,21 @@ static void defineSystem(M m)
           std::vector<std::string> stringified = stringify(files);
           return self.loadElfFiles(stringified, false, verbose);
         }, py::arg("files"), py::arg("verbose") = false, py::doc("ELF files to load. Returns true on success."))
+#ifdef LZ4_COMPRESS
+    .def("load_lz4_files", [stringify](System<T>& self, const std::vector<std::filesystem::path>& files, uint64_t offset, bool verbose) {
+          std::vector<std::string> stringified = stringify(files);
+          return self.loadLz4Files(stringified, offset, verbose);
+        })
+#endif
     .def("harts", [](System<T>& self) {
           std::vector<std::shared_ptr<Hart<T>>> harts;
           for (unsigned i = 0; i < self.hartCount(); ++i)
             harts.push_back(self.ithHart(i));
           return harts;
         }, py::doc("Get all of the harts in the system in a list."))
-    .def("memory", &System<T>::memory, py::doc("Get memory instance from system."));
+    .def("memory", [](System<T>& self) {
+          return self.memory();
+        }, py::doc("Get memory instance from system."));
 }
 
 

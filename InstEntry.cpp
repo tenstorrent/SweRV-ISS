@@ -67,6 +67,7 @@ InstTable::InstTable()
 	case RvExtension::Zvksh:
 	case RvExtension::Zvfbfmin:
 	case RvExtension::Zvfbfwma:
+	case RvExtension::Zvqdot:
 	  entry.setVector(true);
 	  break;
 	default:
@@ -6752,7 +6753,7 @@ InstTable::setupInstVec()
       { "vqdot.vv", InstId::vqdot_vv,
         0b101100'0'00000'00000'010'00000'1011011, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::V, RvFormat::R,
+        RvExtension::Zvqdot, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs1Mask,
 	OperandType::VecReg, OperandMode::Read, rs2Mask,
@@ -6761,7 +6762,7 @@ InstTable::setupInstVec()
       { "vqdot.vx", InstId::vqdot_vx,
         0b101100'0'00000'00000'110'00000'1011011, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::V, RvFormat::R,
+        RvExtension::Zvqdot, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs1Mask,
         OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6770,7 +6771,7 @@ InstTable::setupInstVec()
       { "vqdotu.vv", InstId::vqdotu_vv,
         0b101000'0'00000'00000'010'00000'1011011, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::V, RvFormat::R,
+        RvExtension::Zvqdot, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs1Mask,
 	OperandType::VecReg, OperandMode::Read, rs2Mask,
@@ -6779,7 +6780,7 @@ InstTable::setupInstVec()
       { "vqdotu.vx", InstId::vqdotu_vx,
         0b101000'0'00000'00000'110'00000'1011011, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::V, RvFormat::R,
+        RvExtension::Zvqdot, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs1Mask,
         OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6788,7 +6789,7 @@ InstTable::setupInstVec()
       { "vqdotsu.vv", InstId::vqdotsu_vv,
         0b101010'0'00000'00000'010'00000'1011011, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::V, RvFormat::R,
+        RvExtension::Zvqdot, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs1Mask,
 	OperandType::VecReg, OperandMode::Read, rs2Mask,
@@ -6797,7 +6798,7 @@ InstTable::setupInstVec()
       { "vqdotsu.vx", InstId::vqdotsu_vx,
         0b101010'0'00000'00000'110'00000'1011011, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::V, RvFormat::R,
+        RvExtension::Zvqdot, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs1Mask,
         OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6806,7 +6807,7 @@ InstTable::setupInstVec()
       { "vqdotus.vx", InstId::vqdotus_vx,
         0b101110'0'00000'00000'110'00000'1011011, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::V, RvFormat::R,
+        RvExtension::Zvqdot, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs1Mask,
         OperandType::IntReg, OperandMode::Read, rs2Mask,

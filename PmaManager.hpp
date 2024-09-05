@@ -97,16 +97,14 @@ namespace WdRiscv
     { return attrib_& MisalOk; }
 
     /// Return true if misaligned access generates a misaligned
-    /// exception in this region. Returns false if misaligned access
-    /// is supported.
+    /// exception in this region.
     bool misalOnMisal() const
-    { return isMisalignedOk() and not (attrib_ & MisalAccFault); }
+    { return not (attrib_ & MisalAccFault); }
 
     /// Return true if misaligned access generates an access fault
-    /// exception in this region. Returns false if misaligned access
-    /// is supported.
+    /// exception in this region.
     bool accessFaultOnMisal() const
-    { return isMisalignedOk() and (attrib_ & MisalAccFault); }
+    { return (attrib_ & MisalAccFault); }
 
     /// Return true if this object has the same attributes as the
     /// given object.
@@ -292,6 +290,10 @@ namespace WdRiscv
     /// Clear the default PMA (no access).
     void clearDefaultPma()
     { defaultPma_.attrib_ = Pma::Attrib::None; }
+
+    /// Enable given attributes in the default PMA.
+    void enableInDefaultPma(Pma::Attrib a)
+    { defaultPma_.enable(a); }
 
     const std::vector<PmaTrace>& getPmaTrace() const
     { return pmaTrace_; }

@@ -82,9 +82,6 @@ namespace WdRiscv
 		      bool siOnReset = false, bool deliverInterrupts = true) const;
 
     template<typename URV>
-    bool configInterruptor(System<URV>&, Hart<URV>&, uint64_t addr) const;
-
-    template<typename URV>
     bool applyImsicConfig(System<URV>&) const;
 
     template<typename URV>
@@ -133,6 +130,10 @@ namespace WdRiscv
     /// Set isa to the value of the isa tag (instruction set archietcture)
     /// in the JSON config file. Example: "isa" : "rv32im"
     bool getIsa(std::string& isa) const;
+
+    /// Recover value(s) of "enable_ppo" tag. If missing or set to true then all rules are
+    /// enabled. Return true on success and false on failure.
+    bool getEnabledPpos(std::vector<unsigned>& enabledPpos) const;
 
     /// Return true if the reset value of the MISA CSR has the user
     /// extension enabled. Return false if MISA CSR is not present in

@@ -62,6 +62,7 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "zfbfmin", RvExtension::Zfbfmin },
   { "zvfbfmin", RvExtension::Zvfbfmin },
   { "zvfbfwma", RvExtension::Zvfbfwma },
+  { "zvqdot", RvExtension::Zvqdot },
   { "sstc", RvExtension::Sstc },
   { "svpbmt", RvExtension::Svpbmt },
   { "smaia", RvExtension::Smaia },
@@ -75,10 +76,12 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "zihpm", RvExtension::Zihpm },
   { "zifencei", RvExtension::Zifencei },
   { "zihintpause", RvExtension::Zihintpause },
+  { "smmpm", RvExtension::Smmpm },
   { "ssnpm", RvExtension::Ssnpm },
   { "smnpm", RvExtension::Smnpm },
   { "sscofpmf", RvExtension::Sscofpmf },
   { "smstateen", RvExtension::Smstateen },
+  { "ssqosid", RvExtension::Ssqosid },
 });
 static_assert(STRING_EXT_PAIRS.size() == static_cast<unsigned>(RvExtension::None));
 
@@ -141,6 +144,7 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zfbfmin)) = Info{ {{0,8}}, {0,8} };
   infoVec_.at(extIx(RvExtension::Zvfbfmin)) = Info{ {{0,8}}, {0,8} };
   infoVec_.at(extIx(RvExtension::Zvfbfwma)) = Info{ {{0,8}}, {0,8} };
+  infoVec_.at(extIx(RvExtension::Zvqdot)) = Info{ {{0,1}}, {0,1} };
   infoVec_.at(extIx(RvExtension::Sstc)) = Info{ {{0,5}}, {0,5} };
   infoVec_.at(extIx(RvExtension::Svpbmt)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Smaia)) = Info{ {{1,0}}, {1,0} };
@@ -154,10 +158,11 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zihpm)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::Zifencei)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::Zihintpause)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Smmpm)) = Info { {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Ssnpm)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Smnpm)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Sscofpmf)) = Info{ {{0,5}}, {0,5} };
-  infoVec_.at(extIx(RvExtension::Smstateen)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Ssqosid)) = Info{ {{1,0}}, {1,0} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
 }
