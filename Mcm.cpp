@@ -3584,8 +3584,7 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory())
     return true;
 
-  const auto& bdi = instrB.di_;
-  if (bdi.isLoad() or bdi.isStore() or bdi.isAmo() or bdi.isVectorStore() or bdi.isVectorLoad())
+  if (instrB.isLoad_ or instrB.isStore_)
     {
       uint64_t addrTime = instrB.addrTime_;
 
@@ -3649,8 +3648,7 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
   const auto& regProducer = hartData_.at(hartIx).regProducer_;
   const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
-  const auto& bdi = instrB.di_;
-  if (not bdi.isStore() and not bdi.isAmo() and not bdi.isVectorStore())
+  if (not instrB.isStore_)
     return true;
 
   auto rule11 = [this, &instrVec] (uint64_t earlyB, auto producerTag) -> bool {
@@ -3682,6 +3680,7 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
     }
 
   // VL is control dependency for vector instructions
+  const auto& bdi = instrB.di_;
   if (bdi.isVectorStore())
     {
       auto& refMap = hartData_.at(hartIx).vecRefMap_;
@@ -3824,8 +3823,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
       if (instrM.isCanceled() or not instrM.di_.isValid())
 	continue;
 
-      const auto& mdi = instrM.di_;
-      if ((not mdi.isStore() and not mdi.isAmo() and not mdi.isVectorStore()))
+      if (not instrM.isStore_)
 	continue;
 
       if (not overlaps(instrM, addrSet))
