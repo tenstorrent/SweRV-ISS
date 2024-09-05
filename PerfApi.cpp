@@ -136,31 +136,27 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
   uint64_t gpc = 0; // Guest physical pc.
   cause = hart->fetchInstNoTrap(vpc, ppc, ppc2, gpc, opcode);
 
-  if (cause == ExceptionCause::NONE)
-    {
-      packet = std::make_shared<InstrPac>(tag, vpc, ppc, ppc2);
-      assert(packet);
-      packet->fetched_ = true;
-      packet->opcode_= opcode;
-      insertPacket(hartIx, tag, packet);
-      if (not decode(hartIx, time, tag))
-	assert(0);
-      prevFetch_ = packet;
-      trap = false;
+  packet = std::make_shared<InstrPac>(tag, vpc, ppc, ppc2);
+  assert(packet);
+  packet->fetched_ = true;
+  packet->opcode_= opcode;
+  insertPacket(hartIx, tag, packet);
+  if (not decode(hartIx, time, tag))
+    assert(0);
+  prevFetch_ = packet;
 
-      if (prev and not prev->trapped() and prev->executed() and prev->nextIva_ != vpc)
-	{
-	  packet->shouldFlush_ = true;
-	  packet->flushVa_ = prev->nextIva_;
-	}
-    }
-  else
+  trap = cause != ExceptionCause::NONE;
+
+  if (prev and not prev->trapped() and prev->executed() and prev->nextIva_ != vpc)
     {
-      // TOOD: To support full system mode, the trapPc will be modified depending on the exception encountered
+      packet->shouldFlush_ = true;
+      packet->flushVa_ = prev->nextIva_;
+    }
+
+  if (trap)
+    {
       prevFetch_ = nullptr;
-      trap = true;
       trapPc = 0;
-      return false;
     }
 
   return true;
@@ -247,6 +243,8 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
 
   auto& packet = *pacPtr;
   auto& di = packet.decodedInst();
+  if (di.isLr())
+    return true;   // LR is executed and retired at PerApi::retire.
 
   auto& packetMap = hartPacketMaps_.at(hartIx);
 
@@ -579,6 +577,7 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
       return false;
     }
 
+
   if (packet.instrVa() != hart->peekPc())
     {
       std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag << std::hex
@@ -724,7 +723,8 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
 
 
 bool
-PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned size, uint64_t& data)
+PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t va, uint64_t pa1,
+		     uint64_t pa2, unsigned size, uint64_t& data)
 {
   auto hart = checkHart("Get-load-data", hartIx);
   auto packet = checkTag("Get-load-Data", hartIx, tag);
@@ -744,6 +744,17 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
       return true;
     }
 
+  bool isDev = hart->isAclintMtimeAddr(pa1) or hart->isImsicAddr(pa1) or hart->isPciAddr(pa1);
+  if (isDev)
+    {
+      hart->deviceRead(pa1, size, data);
+      return true;
+    }
+
+  data = 0;
+  if (uint64_t toHost = 0; hart->getToHostAddress(toHost) && toHost == pa1)
+    return true;  // Reading from toHost yields 0.
+
   auto& storeMap =  hartStoreMaps_.at(hartIx);
 
   unsigned mask = (1 << size) - 1;  // One bit ber byte of load data.
@@ -762,7 +773,7 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
 
       uint64_t stAddr = stPac->dataVa();
       unsigned stSize = stPac->dataSize();
-      if (stAddr + stSize < vaddr or vaddr + size < stSize)
+      if (stAddr + stSize < va or va + size < stSize)
 	continue;  // No overlap.
 
       uint64_t stData = stPac->opVal_.at(0);
@@ -770,7 +781,7 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
       for (unsigned i = 0; i < size; ++i)
 	{
 	  unsigned byteMask = 1 << i;
-	  uint64_t byteAddr = vaddr + i;
+	  uint64_t byteAddr = va + i;
 	  if (byteAddr >= stAddr and byteAddr < stAddr + stSize)
 	    {
 	      data &= ~(0xffull << (i * 8));
@@ -784,12 +795,24 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
   if (forwarded == mask)
     return true;
 
+  unsigned size1 = size;
+  if (pa1 != pa2 and pageNum(pa1) != pageNum(pa2))
+    size1 = offsetToNextPage(pa1);
+
   for (unsigned i = 0; i < size; ++i)
     if (not (forwarded & (1 << i)))
       {
 	uint8_t byte = 0;
-	if (not hart->peekMemory(vaddr + i, byte, true))
-	  assert(0);
+	if (i < size1)
+	  {
+	    if (not hart->peekMemory(pa1 + i, byte, true))
+	      assert(0);
+	  }
+	else
+	  {
+	    if (not hart->peekMemory(pa2 + (i-size1), byte, true))
+	      assert(0);
+	  }
 	data |= uint64_t(byte) << (i*8);
       }
 

@@ -359,7 +359,8 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// Set data to the load value of the given instruction tag and return true on
     /// success. Return false on failure leaving data unmodified: tag is not valid or
     /// corresponding instruction is not executed or is not a load.
-    bool getLoadData(unsigned hart, uint64_t tag, uint64_t vaddr, unsigned size, uint64_t& data);
+    bool getLoadData(unsigned hart, uint64_t tag, uint64_t va, uint64_t pa1,
+		     uint64_t pa2, unsigned size, uint64_t& data);
 
     /// Set the data value of a store/amo instruction to be commited to memory
     /// at drain/retire time.
@@ -382,6 +383,19 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     { traceFiles_ = files; }
 
   protected:
+
+    /// Return the page number corresponding to the given address
+    uint64_t pageNum(uint64_t addr) const
+    { return addr >> 12; }
+
+    /// Return the address of the page with the given page number.
+    uint64_t pageAddress(uint64_t pageNum) const
+    { return pageNum << 12; }
+
+    /// Return the difference between the next page boundary and the current
+    /// address. Return 0 if address is on a page boundary.
+    unsigned offsetToNextPage(uint64_t addr) const
+    { return pageSize_ - (addr & (pageSize_ - 1)); }
 
     bool commitMemoryWrite(Hart64& hart, uint64_t addr, unsigned size, uint64_t value);
 
@@ -474,6 +488,8 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
 
     FILE* commandLog_ = nullptr;
     std::vector<FILE*> traceFiles_;   // One per hart.
+
+    unsigned pageSize_ = 4096;
 
     /// Global indexing for all registers.
     const unsigned intRegOffset_ = 0;
