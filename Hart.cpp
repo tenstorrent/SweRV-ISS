@@ -2611,7 +2611,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
   // Check if stuck because of lack of exception handler. Disable if
   // you do want the stuck behavior.
 #if 1
-  if (di and di->instId() == InstId::illegal)
+  if (di == nullptr or di->instId() == InstId::illegal)
     {
       if (instCounter_ == counterAtLastIllegal_ + 1)
 	consecutiveIllegalCount_++;
