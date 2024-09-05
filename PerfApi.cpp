@@ -267,6 +267,7 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
     }
 
   // Collect register operand values.
+  bool peekOk = true;
   assert(di.operandCount() <= packet.opVal_.size());
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
@@ -292,8 +293,9 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
 	      return false;
 	    }
 	}
-      else if (not peekRegister(*hart, di.ithOperandType(i), regNum, value))
-	assert(0);
+      else 
+	peekOk = peekRegister(*hart, di.ithOperandType(i), regNum, value) and peekOk;
+
       packet.opVal_.at(i) = value;
     }
 
@@ -301,6 +303,9 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   // values.
   if (not execute(hartIx, packet))
     assert(0);
+
+  if (not peekOk)
+    assert(packet.trap_);
 
   packet.executed_ = true;
   packet.execTime_ = time;
@@ -353,6 +358,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   std::array<uint64_t, 4> prevVal;  // Previous operand values
 
   // Save prev value of operands.
+  bool peekOk = true;
   for (unsigned i = 0; i < packet.di_.operandCount(); ++i)
     {
       auto mode = packet.di_.ithOperandMode(i);
@@ -368,12 +374,10 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 	    assert(0);
 	  break;
 	case OT::FpReg:
-	  if (not hart.peekFpReg(operand, prevVal.at(i)))
-	    assert(0);
+	  peekOk = hart.peekFpReg(operand, prevVal.at(i)) and peekOk;
 	  break;
 	case OT::CsReg:
-	  if (not hart.peekCsr(WdRiscv::CsrNumber(operand), prevVal.at(i)))
-	    assert(0);
+	  peekOk = hart.peekCsr(WdRiscv::CsrNumber(operand), prevVal.at(i)) and peekOk;
 	  break;
 	case OT::VecReg:
 	  assert(0);
@@ -403,12 +407,10 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 	    assert(0);
 	  break;
 	case OT::FpReg:
-	  if (not hart.pokeFpReg(operand, val))
-	    assert(0);
+	  peekOk = hart.pokeFpReg(operand, val) and peekOk;
 	  break;
 	case OT::CsReg:
-	  if (not hart.pokeCsr(WdRiscv::CsrNumber(operand), val))
-	    assert(0);
+	  peekOk = hart.pokeCsr(WdRiscv::CsrNumber(operand), val) and peekOk;
 	  break;
 	case OT::VecReg:
 	  assert(0);
@@ -425,6 +427,9 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   bool trap = hart.lastInstructionTrapped();
   packet.trap_ = packet.trap_ or trap;
+
+  if (not peekOk)
+    assert(trap);
 
   packet.nextIva_ = hart.peekPc();
 
@@ -587,12 +592,19 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
 
   // Undo renaming of destination registers.
   auto& producers = hartRegProducers_.at(hartIx);
-  for (size_t i = 0; i < packet.destValues_.size(); ++i)
+  auto& di = packet.decodedInst();
+  for (size_t i = 0; i < di.operandCount(); ++i)
     {
-      auto gri = packet.destValues_.at(i).first;
-      auto& producer = producers.at(gri);
-      if (producer and producer->tag() == packet.tag())
-        producer = nullptr;
+      using OM = WdRiscv::OperandMode;
+      auto mode = di.ithOperandMode(i);
+      if (mode == OM::Write or mode == OM::ReadWrite)
+	{
+	  unsigned regNum = di.ithOperand(i);
+	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
+	  auto& producer = producers.at(gri);
+	  if (producer and producer->tag() == packet.tag())
+	    producer = nullptr;
+	}
     }
 
   packet.retired_ = true;
