@@ -3824,8 +3824,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
       if (instrM.isCanceled() or not instrM.di_.isValid())
 	continue;
 
-      const auto& mdi = instrM.di_;
-      if ((not mdi.isStore() and not mdi.isAmo() and not mdi.isVectorStore()))
+      if (not instrM.isStore_)
 	continue;
 
       if (not overlaps(instrM, addrSet))
