@@ -608,16 +608,17 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
 
   packet.retired_ = true;
 
-  if (packet.isAmo())
+  if (packet.isAmo() or packet.isSc())
     {
       uint64_t sva = 0, spa1 = 0, spa2 = 0, sval = 0;
       unsigned size = hart->lastStore(sva, spa1, spa2, sval);
       if (not commitMemoryWrite(*hart, spa1, size, packet.storeData_))
 	assert(0);
-    }
-  else if (packet.isSc())
-    {
-      hart->cancelLr(WdRiscv::CancelLrCause::SC);
+      if (packet.isSc())
+	hart->cancelLr(WdRiscv::CancelLrCause::SC);
+      auto& storeMap = hartStoreMaps_.at(hartIx);
+      packet.drained_ = true;
+      storeMap.erase(packet.tag());
     }
 
   // Clear dependency on other packets to expedite release of packet memory.
@@ -686,13 +687,6 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
 
   auto& packet = *pacPtr;
 
-  if (packet.drained())
-    {
-      std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag
-		<< " Instruction drained more than once\n";
-      return false;
-    }
-
   if (not packet.di_.isStore())
     {
       std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag
@@ -700,13 +694,24 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
       return false;
     }
 
-  uint64_t value = packet.opVal_.at(0);
-  uint64_t addr = packet.dpa_;    // FIX TODO : Handle page crossing store.
+  if (packet.isAmo() or packet.isSc())
+    assert(packet.drained());   // AMO/SC drained at retire.
+  else
+    {
+      if (packet.drained())
+	{
+	  std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag
+		    << " Instruction drained more than once\n";
+	}
 
-  if (not commitMemoryWrite(*hart, addr, packet.dsize_, value))
-    assert(0);
+      uint64_t value = packet.storeData_;
+      uint64_t addr = packet.dpa_;    // FIX TODO : Handle page crossing store.
 
-  packet.drained_ = true;
+      if (not commitMemoryWrite(*hart, addr, packet.dsize_, value))
+	assert(0);
+
+      packet.drained_ = true;
+    }
 
   // Clear dependency on other packets to expedite release of packet memory.
   for (auto& producer : packet.opProducers_)
