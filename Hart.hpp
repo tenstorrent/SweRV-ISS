@@ -1883,6 +1883,13 @@ namespace WdRiscv
     void tracePtw(bool flag)
     { tracePtw_ = flag; }
 
+    // PC after an NMI is nmi_vec when flag is false; otherwise, it is nmi_vec +
+    // cause*4. Similarly after an exception while in the nmi interrupt handler, the PC is
+    // is nmi_excetion_vec when flag is false; otherwise, it is nmi_exception_vec +
+    // cause*4.
+    void indexedNmi(bool flag)
+    { indexedNmi_ = flag; }
+
     /// Enable/disable PMP access trace
     void tracePmp(bool flag)
     { pmpManager_.enableTrace(flag); }
@@ -5095,6 +5102,7 @@ namespace WdRiscv
 
     bool instrLineTrace_ = false;
     bool dataLineTrace_ = false;
+    bool indexedNmi_ = false;  // NMI handler is at a cause-scaled offset when true.
 
     unsigned cacheLineSize_ = 64;
 

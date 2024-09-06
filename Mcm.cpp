@@ -825,7 +825,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 	       << " invalid data (must be 0) for a cbo.zero instruction: " << rtlData << '\n';
 	  return false;
 	}
-      uint64_t lineStart = physAddr & ~(uint64_t(lineSize_) - 1);
+      uint64_t lineStart = lineAlign(physAddr);
       if (physAddr + size - lineStart > lineSize_)
 	return false;
 
@@ -1298,7 +1298,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
   if (not checkBufferWriteParams(hart.hartId(), time, lineSize_, rtlSize, physAddr))
     return false;
 
-  uint64_t lineAddr = physAddr - (physAddr % lineSize_);
+  uint64_t lineAddr = lineAlign(physAddr);
   hart.cancelOtherHartsLr(physAddr);
 
   unsigned hartIx = hart.sysHartIndex();
@@ -3206,6 +3206,11 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
 	  // predecessor and successor time.
 	  if (not succ.isStore_)
 	    {
+	      uint64_t predLine = lineNum(pred.physAddr_);
+	      uint64_t succLine = lineNum(succ.physAddr_);
+	      if (predLine != succLine)
+		continue;
+
 	      auto low = std::lower_bound(sysMemOps_.begin(), sysMemOps_.end(), succTime,
 					  [](const MemoryOp& op, const uint64_t& t) -> bool
 					  { return op.time_ < t; });
@@ -3220,7 +3225,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
 		  auto& op = *iter;
 		  fail = (not op.isRead_ and op.time_ >= succTime and op.time_ <= predTime
 			  and op.hartIx_ != hartIx
-			  and (op.physAddr_ / lineSize_) == (succ.physAddr_ / lineSize_));
+			  and lineNum(op.physAddr_) == succLine);
 		}
 	      if (not fail)
 		continue;

@@ -410,13 +410,22 @@ namespace WdRiscv
     /// failure. Return true on success or if given instruction is not CMO.
     bool retireCmo(Hart<URV>& hart, McmInstr& instr);
 
-    /// Return the page number corresponding to the given address
+    /// Return the page number corresponding to the given address.
     uint64_t pageNum(uint64_t addr) const
-    { return addr >> 12; }
+    { return addr >> pageShift_; }
 
     /// Return the address of the page with the given page number.
     uint64_t pageAddress(uint64_t pageNum) const
-    { return pageNum << 12; }
+    { return pageNum << pageShift_; }
+
+    /// Return the line number corresponding to the given address.
+    uint64_t lineNum(uint64_t addr) const
+    { return addr >> lineShift_; }
+
+    /// Return the closest line boundary less than or equal to the given address.
+    uint64_t lineAlign(uint64_t addr) const
+    { return (addr >> lineShift_) << lineShift_; }
+
 
     /// Remove from hartPendingWrites_ the write ops falling with the given RTL
     /// line and masked by rtlMask (rtlMask bit is on for op bytes) and place
@@ -781,9 +790,11 @@ namespace WdRiscv
     MemoryOpVec sysMemOps_;             // Memory ops of all harts ordered by time.
 
     uint64_t time_ = 0;
+
     unsigned pageSize_ = 4096;
-    unsigned lineSize_ = 64; // Merge buffer line size.
-    unsigned windowSize_ = 1000;
+    unsigned pageShift_ = 12;   // Log2(pageSize_);
+    unsigned lineSize_ = 64;    // Merge buffer line size.
+    unsigned lineShift_ = 6;    // log2(lineSize_);
 
     bool writeOnInsert_ = false;
 
