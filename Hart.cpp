@@ -2965,7 +2965,7 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
       origMode == PM::Machine)
     {
       assert(not interrupt);
-      base = nmiExceptionPc_;
+      base = indexedNmi_ ? nmiExceptionPc_ + 4*cause : nmiExceptionPc_;;
     }
 
   setPc(base);
@@ -2999,6 +2999,8 @@ template <typename URV>
 bool
 Hart<URV>::initiateNmi(URV cause, URV pcToSave)
 {
+  URV nextPc = indexedNmi_ ? nmiPc_ + 4*cause : nmiPc_;
+
   if (extensionIsEnabled(RvExtension::Smrnmi))
     {
       MnstatusFields mnf{csRegs_.peekMnstatus()};
@@ -3019,11 +3021,11 @@ Hart<URV>::initiateNmi(URV cause, URV pcToSave)
       // Update mnstatus
       pokeCsr(CsrNumber::MNSTATUS, mnf.value_);
 
-      // Set the pc to the nmi vector.
-      setPc(nmiPc_);
+      // Set the pc to the nmi handler.
+      setPc(nextPc);
     }
   else
-    undelegatedInterrupt(cause, pcToSave, nmiPc_);
+    undelegatedInterrupt(cause, pcToSave, nextPc);
 
   nmiCount_++;
   if (instFreq_)

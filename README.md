@@ -781,6 +781,16 @@ Defines the address of the handler of non-maskable interrupts.
 Defines the address of the handler of exceptions encountered while
 handling non-maskable interrupts.
 
+### indexed_nmi
+
+When false, the PC after an NMI will be base value defined by nmi_vec.
+When true, the PC will be the base plus 4 times the NMI cause. Default
+value is false.
+
+Similarly, when false, then after an exception while in the NMI interrupt
+handler, the PC will be the base value defined by nmi_exception_vec.
+When true, the PC will be the base plus 4 times the exception cause.
+
 
 ###  enable_triggers
 Enable support for debug triggers when set to true.

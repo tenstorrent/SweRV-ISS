@@ -1436,8 +1436,19 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
-  // Use ABI register names (e.g. sp instead of x2).
+  // PC after an NMI is nmi_vec when this is false; otherwise, it is
+  // nmi_vec + cause*4. Similarly after an exception while in the
+  // nmi interrupt handler, the PC is is nmi_excetion_vec when this is
+  // false; otherwise, it is nmi_exception_vec + cause*4.
   bool flag = false;
+  tag = "indexed_nmi";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_->at(tag), flag) or errors++;
+      hart.indexedNmi(flag);
+    }
+
+  // Use ABI register names (e.g. sp instead of x2).
   tag = "abi_names";
   if (config_ -> contains(tag))
     {
