@@ -1196,109 +1196,6 @@ processMemMappedMasks(Hart<URV>& hart, std::string_view path, const nlohmann::js
 }
 
 
-template <typename URV>
-static
-bool
-applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config)
-{
-  using std::cerr;
-
-  if (not config.is_array())
-    {
-      cerr << "Error: Invalid memmap.pma entry in config file memmap (execpting an array)\n";
-      return false;
-    }
-
-  unsigned errors = 0;
-  unsigned ix = 0;
-  for (auto it = config.begin(); it != config.end(); ++it, ++ix)
-    {
-      std::string path = std::string("memmap.pma[") + std::to_string(ix) + "]";
-
-      const auto& item = *it;
-      if (not item.is_object())
-	{
-	  cerr << "Error: Configuration item at" << path << " is not an object\n";
-	  errors++;
-	  continue;
-	}
-
-      unsigned itemErrors = 0;
-
-      std::string_view tag = "low";
-      uint64_t low = 0;
-      if (not item.contains(tag))
-	{
-	  cerr << "Error: Missing entry \"low\" in configuration item " << path << "\n";
-	  itemErrors++;
-	}
-      else if (not getJsonUnsigned(util::join(".", path, tag), item.at(tag), low))
-	itemErrors++;
-
-      tag = "high";
-      uint64_t high = 0;
-      if (not item.contains(tag))
-	{
-	  cerr << "Error: Missing entry \"high\" in configuration item " << path << "\n";
-	  itemErrors++;
-	}
-      else if (not getJsonUnsigned(util::join(".", path, tag), item.at(tag), high))
-	itemErrors++;
-
-      tag = "attribs";
-      if (not item.contains(tag))
-	{
-	  cerr << "Error: Missing entry \"attribs\" in configuration item " << path << "\n";
-	  itemErrors++;
-	}
-      else
-	{
-	  Pma pma;
-	  if (not getConfigPma(path, item.at(tag), pma))
-	    itemErrors++;
-	  if (not itemErrors)
-	    {
-	      if (not hart.definePmaRegion(ix, low, high, pma))
-		itemErrors++;
-	      else if (pma.hasMemMappedReg())
-		{
-		  unsigned size = 4;
-		  tag = "register_size";
-		  if (item.contains(tag))
-		    {
-		      auto path2 = util::join(".", path, tag);
-		      if (not getJsonUnsigned(path2, item.at(tag), size))
-			itemErrors++;
-		      else if (size != 4 and size != 8)
-			{
-			  cerr << "Error: Invalid size in config item " << path2 << '\n';
-			  itemErrors++;
-			}
-		    }  
-
-		  if ((low & (size - 1)) != 0 and not itemErrors)
-		    {
-		      cerr << "Error: Memory mapped region address (0x" << std::hex
-			   << low << std::dec << ") must be aligned to its size ("
-			   << size << '\n';
-		      itemErrors++;
-		    }
-
-		  tag = "masks";
-		  if (item.contains(tag) and not itemErrors)
-		    if (not processMemMappedMasks(hart, path, item.at(tag), low, high, size))
-		      itemErrors++;
-		}
-	    }
-	}
-
-      errors += itemErrors;
-    }
-
-  return errors == 0;
-}
-
-
 /// Return true if config has a defined pmacfg CSR. This is either a
 /// pmacfg with no "exists" attribute or with "exists" attribute set
 /// to true.
@@ -1346,6 +1243,124 @@ hasDefinedPmacfgCsr(const nlohmann::json& config)
 }
 
 
+template <typename URV>
+static
+bool
+applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config, bool hasPmacfgCsr)
+{
+  using std::cerr;
+
+  if (not config.is_array())
+    {
+      cerr << "Error: Invalid memmap.pma entry in config file memmap (execpting an array)\n";
+      return false;
+    }
+
+  unsigned memMappedCount = 0;  // Count of memory mapped entries.
+
+  unsigned errors = 0;
+  unsigned ix = 0;
+  for (auto it = config.begin(); it != config.end(); ++it, ++ix)
+    {
+      std::string path = std::string("memmap.pma[") + std::to_string(ix) + "]";
+
+      const auto& item = *it;
+      if (not item.is_object())
+	{
+	  cerr << "Error: Configuration item at" << path << " is not an object\n";
+	  errors++;
+	  continue;
+	}
+
+      unsigned itemErrors = 0;
+
+      std::string_view tag = "low";
+      uint64_t low = 0;
+      if (not item.contains(tag))
+	{
+	  cerr << "Error: Missing entry \"low\" in configuration item " << path << "\n";
+	  errors++;
+	}
+      else if (not getJsonUnsigned(util::join(".", path, tag), item.at(tag), low))
+	errors++;
+
+      tag = "high";
+      uint64_t high = 0;
+      if (not item.contains(tag))
+	{
+	  cerr << "Error: Missing entry \"high\" in configuration item " << path << "\n";
+	  errors++;
+	}
+      else if (not getJsonUnsigned(util::join(".", path, tag), item.at(tag), high))
+	errors++;
+
+      tag = "attribs";
+      if (not item.contains(tag))
+	{
+	  cerr << "Error: Missing entry \"attribs\" in configuration item " << path << "\n";
+	  errors++;
+	  continue;
+	}
+
+      Pma pma;
+      if (not getConfigPma(path, item.at(tag), pma))
+	{
+	  errors++;
+	  continue;
+	}
+
+      if (not hart.definePmaRegion(ix, low, high, pma))
+	{
+	  errors++;
+	  continue;
+	}
+
+      if (pma.hasMemMappedReg())
+	{
+	  memMappedCount++;
+
+	  unsigned size = 4;
+	  tag = "register_size";
+	  if (item.contains(tag))
+	    {
+	      auto path2 = util::join(".", path, tag);
+	      if (not getJsonUnsigned(path2, item.at(tag), size))
+		{
+		  errors++;
+		  continue;
+		}
+	      if (size != 4 and size != 8)
+		{
+		  cerr << "Error: Invalid size in config item " << path2 << '\n';
+		  errors++;
+		  continue;
+		}
+	    }  
+
+	  if ((low & (size - 1)) != 0)
+	    {
+	      cerr << "Error: Memory mapped region address (0x" << std::hex
+		   << low << std::dec << ") must be aligned to its size ("
+		   << size << '\n';
+	      errors++;
+	    }
+
+	  tag = "masks";
+	  if (item.contains(tag) and not itemErrors)
+	    if (not processMemMappedMasks(hart, path, item.at(tag), low, high, size))
+	      errors++;
+	}
+    }
+
+  if (memMappedCount != config.size() and hasPmacfgCsr)
+    if (hart.sysHartIndex() == 0)
+      cerr << "Warning: Configuration file has both memmap pma "
+	   << "and a pmacfg CSR. CSRs will override memmap.\n";
+
+  return errors == 0;
+}
+
+
 template<typename URV>
 bool
 HartConfig::applyMemoryConfig(Hart<URV>& hart) const
@@ -1358,15 +1373,8 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
       const auto& memMap = config_ -> at("memmap");
       std::string_view tag = "pma";
       if (memMap.contains(tag))
-	{
-	  if (hasDefinedPmacfgCsr(*config_) and hart.sysHartIndex() == 0)
-	    {
-	      std::cerr << "Warning: Configuration file has both memmap pma "
-			<< "and a pmacfg CSR. CSRs will override memmap.\n";
-	    }
-	  if (not applyPmaConfig(hart, memMap.at(tag)))
-	    errors++;
-	}
+	if (not applyPmaConfig(hart, memMap.at(tag), hasDefinedPmacfgCsr(*config_)))
+	  errors++;
     }
 
   if (config_ -> contains("cache"))
