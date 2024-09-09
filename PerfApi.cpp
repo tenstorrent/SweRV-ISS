@@ -742,7 +742,9 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t va, uint64_t pa1,
       return false;
     }
 
-  // AMOs do not put load data in destination register. AMOs should not do early read.
+  // If AMO destination register is x0, we lose the loaded value: redo the read for AMOs
+  // to avoid that case. AMOs should not have a discrepancy between early read and read at
+  // excecute, so redoing the read is ok.
   if (packet->executed() and not packet->isAmo())
     {
       assert(size == packet->dataSize());
