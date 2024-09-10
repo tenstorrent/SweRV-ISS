@@ -626,7 +626,7 @@ namespace WdRiscv
 
     McmInstr* findOrAddInstr(unsigned hartIx, McmInstrIx tag);
 
-    /// Helper to cancelInstruction. 
+    /// Helper to cancelInstruction.
     void cancelInstr(Hart<URV>& hart, McmInstr& instr);
 
     /// Propagate depenencies from source to dest registers. Set the time data of dest

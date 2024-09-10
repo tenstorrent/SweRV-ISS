@@ -4561,6 +4561,56 @@ Hart<URV>::takeTriggerAction(FILE* traceFile, URV pc, URV info,
 }
 
 
+template <typename URV>
+bool
+Hart<URV>::getLastVecLdStRegsUsed(const DecodedInst& di, unsigned opIx,
+                                  unsigned& regBase, unsigned& regCount) const
+{
+  unsigned elemSize, elemCount;
+  if (not vecRegs_.vecLdStElemsUsed(elemSize, elemCount))
+    return false;
+
+  if (not elemCount)
+    return false;
+
+  if (di.ithOperandType(opIx) != OperandType::VecReg)
+    return false;
+
+  unsigned elemsPerVec = vecRegSize() / elemSize;
+
+  // Trim by vstart.
+  unsigned start = csRegs_.peekVstart();
+  regBase = di.ithOperand(opIx) + (start/elemsPerVec);
+
+  // Trim by vl.
+  assert(di.ithOperandType(opIx) == OperandType::VecReg);
+
+  unsigned group = vecOpEmul(opIx);
+  if (di.vecFieldCount())
+    group *= di.vecFieldCount();
+
+  // Index register use EEW encoded in the instruction.
+  if ((di.isVectorLoadIndexed() or di.isVectorStoreIndexed()) and opIx == 2)
+    {
+      unsigned width = (di.inst() >> 12) & 7;
+      switch (width)
+      {
+        case 0: elemSize = 1; break;
+        case 5: elemSize = 2; break;
+        case 6: elemSize = 4; break;
+        case 7: elemSize = 8; break;
+        default: assert(false);
+      }
+    }
+
+  regCount = group;
+  if (elemCount < elemsPerVec*group)
+    regCount = (elemCount + elemsPerVec - 1) / elemsPerVec;
+
+  return true;
+}
+
+
 //NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 // True if keyboard interrupt (user hit control-c) pending.
 static std::atomic<bool> userStop = false;

@@ -605,6 +605,15 @@ namespace WdRiscv
     unsigned getOpEmul(unsigned op) const
     { return op < 3? opsEmul_.at(op) : 0; }
 
+    /// Return the elem size and count used in the last instruction.
+    bool vecLdStElemsUsed(unsigned& size, unsigned& count) const
+    {
+      size = ldStSize_;
+      count = ldStVa_.size();
+      return ldStSize_ != 0;
+    }
+
+
   protected:
 
     /// Clear load/address and store data used for logging/tracing.
