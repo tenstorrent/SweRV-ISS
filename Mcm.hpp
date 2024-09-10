@@ -609,6 +609,9 @@ namespace WdRiscv
 	}
     }
 
+    /// Return true if given trapped instruction is a partially executed vector load/store.
+    bool isPartialVecLdSt(Hart<URV>& hart, const DecodedInst& di) const;
+
     void cancelNonRetired(Hart<URV>& hart, uint64_t instrTag);
 
     bool checkRtlWrite(unsigned hartId, const McmInstr& instr,

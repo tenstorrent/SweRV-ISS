@@ -1029,6 +1029,23 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
 
 template <typename URV>
 bool
+Mcm<URV>::isPartialVecLdSt(Hart<URV>& hart, const DecodedInst& di) const
+{
+  if (not di.isVectorLoad() and not di.isVectorStore())
+    return false;
+
+  assert(hart.lastInstructionTrapped());
+
+  URV elems = 0;  // Partially complated elements.
+  if (not hart.peekCsr(CsrNumber::VSTART, elems))
+    return false;  // Should not happen.
+
+  return elems > 0;
+}
+
+
+template <typename URV>
+bool
 Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		 const DecodedInst& di, bool trapped)
 {
@@ -1046,7 +1063,14 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       return false;
     }
 
-  if (not di.isValid() or trapped)
+  if (not di.isValid())
+    {
+      cancelInstr(hart, *instr);  // Instruction took a trap at fetch.
+      return true;
+    }
+
+  // If a partially executed vec ld/st store is trapped, we commit its results.
+  if (trapped and not isPartialVecLdSt(hart, di))
     {
       cancelInstr(hart, *instr);  // Instruction took a trap.
       return true;
@@ -1460,7 +1484,7 @@ Mcm<URV>::cancelInstr(Hart<URV>& hart, McmInstr& instr)
   if (iter != undrained.end())
     {
       std::cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << instr.tag_ <<
-	" canceled or trapped instruction associated write operations.\n";
+	" canceled or trapped instruction has a write operation.\n";
       undrained.erase(iter);
     }
 
@@ -1489,9 +1513,10 @@ Mcm<URV>::cancelNonRetired(Hart<URV>& hart, uint64_t instrTag)
 
   while (instrTag)
     {
-      if (vec.at(instrTag-1).retired_ or vec.at(instrTag-1).canceled_)
+      auto& instr = vec.at(--instrTag);
+      if (instr.retired_ or instr.canceled_)
 	break;
-      cancelInstr(hart, vec.at(--instrTag));
+      cancelInstr(hart, instr);
     }
 }
 
