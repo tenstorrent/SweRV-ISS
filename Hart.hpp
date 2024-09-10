@@ -2196,6 +2196,21 @@ namespace WdRiscv
       updateAddressTranslation();
     }
 
+    /// Increment time base and timer value.
+    void tickTime()
+    {
+      ++timeSample_;
+      time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+    }
+
+    /// Decrement time base and timer value. This is used by PerfApi to undo effects of
+    /// execute.
+    void untickTime()
+    {
+      time_ -= not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+      --timeSample_;
+    }
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.

@@ -443,14 +443,18 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 	{
 	  uint64_t sva = 0, spa1 = 0, spa2 = 0, sval = 0;
 	  unsigned ssize = hart.lastStore(sva, spa1, spa2, sval);
-	  if (ssize == 0)
-	    assert(0);
+	  if (ssize == 0 and not di.isSc())
+	    {
+	      std::cerr << "Hart=" << hartIx << " tag=" << packet.tag_
+			<< " store/AMO with zero size\n";
+	      assert(0);
+	    }
 
 	  packet.dva_ = sva;
 	  packet.dpa_ = spa1;  // FIX TODO : handle page corrsing
 	  packet.dsize_ = ssize;
 	  assert(ssize == packet.dsize_);
-	  if (di.isStore())
+	  if (di.isStore() and not di.isSc())
 	    {
 	      auto& storeMap =  hartStoreMaps_.at(hartIx);
 	      storeMap[packet.tag()] = getInstructionPacket(hartIx, packet.tag());
@@ -484,6 +488,8 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   hart.setVirtualMode(hart.lastVirtMode());
   hart.setPrivilegeMode(hart.lastPrivMode());
+
+  hart.untickTime();  // Restore timer value.
 
   if (trap or packet.di_.isXRet())
     {
@@ -612,8 +618,9 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
     {
       uint64_t sva = 0, spa1 = 0, spa2 = 0, sval = 0;
       unsigned size = hart->lastStore(sva, spa1, spa2, sval);
-      if (not commitMemoryWrite(*hart, spa1, size, packet.storeData_))
-	assert(0);
+      if (size != 0)   // Could be zero for a failed sc
+	if (not commitMemoryWrite(*hart, spa1, size, packet.storeData_))
+	  assert(0);
       if (packet.isSc())
 	hart->cancelLr(WdRiscv::CancelLrCause::SC);
       auto& storeMap = hartStoreMaps_.at(hartIx);

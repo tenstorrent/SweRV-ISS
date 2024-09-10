@@ -4730,10 +4730,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	  auto lock = (ownTrace_)? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(execMutex);
 
           if (not hartIx_)
-            {
-              ++timeSample_;
-              time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
-            }
+	    tickTime();  // Hart 0 increments timer.
 
           if (suspended_)
             {
@@ -5036,10 +5033,7 @@ Hart<URV>::simpleRunWithLimit()
   while (noUserStop and instCounter_ < limit)
     {
       if (not hartIx_)
-        {
-          ++timeSample_;
-          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
-        }
+	tickTime();
 
       if (suspended_)
         {
@@ -5101,10 +5095,7 @@ Hart<URV>::simpleRunNoLimit()
   while (noUserStop)
     {
       if (not hartIx_)
-        {
-          ++timeSample_;
-          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
-        }
+	tickTime();
 
       if (suspended_)
         {
@@ -5675,10 +5666,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
   try
     {
       if (not hartIx_)
-        {
-          ++timeSample_;
-          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
-        }
+	tickTime();
 
       if (suspended_)
         {
