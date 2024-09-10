@@ -944,6 +944,15 @@ Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
   invalidateDecodeCache(addr, sizeof(val));
 
+  if (isPciAddr(addr))
+    {
+      if (addr >= pciConfigBase_ and addr < pciConfigEnd_)
+        pci_->config_mmio<uint16_t>(addr, val, true);
+      else
+        pci_->mmio<uint16_t>(addr, val, true);
+      return true;
+    }
+
   return memory_.poke(addr, val, usePma);
 }
 
@@ -975,8 +984,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
         imsicWrite_(addr, sizeof(val), val);
       return true;
     }
-  else if (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
-                    (addr >= pciMmioBase_ and addr < pciMmioEnd_)))
+  else if (isPciAddr(addr))
     {
       if (addr >= pciConfigBase_ and addr < pciConfigEnd_)
         pci_->config_mmio<uint32_t>(addr, val, true);
@@ -1012,8 +1020,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
         imsicWrite_(addr, sizeof(val), val);
       return true;
     }
-  else if (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
-                    (addr >= pciMmioBase_ and addr < pciMmioEnd_)))
+  else if (isPciAddr(addr))
     {
       if (addr >= pciConfigBase_ and addr < pciConfigEnd_)
         pci_->config_mmio<uint64_t>(addr, val, true);
