@@ -3477,9 +3477,16 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
     updateCachedVsstatus();
 
   if (csRegs_.peekMstatus() != mstatus_.value())
-    { updateCachedMstatus(); csRegs_.recordWrite(CN::MSTATUS); }
+    {
+      updateCachedMstatus();
+      csRegs_.recordWrite(CN::MSTATUS);
+    }
   else if (isRvh() and csRegs_.peekHstatus() != hstatus_.value())
-    { updateCachedHstatus(); csRegs_.recordWrite(CN::HSTATUS); }
+    {
+      updateCachedHstatus();
+      if (csRegs_.peekHstatus() != hstatus_.value())
+	csRegs_.recordWrite(CN::HSTATUS);
+    }
 
   effectiveIe_ = csRegs_.effectiveInterruptEnable();
 }

@@ -357,11 +357,12 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   // Save prev value of operands.
   bool peekOk = true;
-  for (unsigned i = 0; i < packet.di_.operandCount(); ++i)
+  auto& di = packet.decodedInst();
+  for (unsigned i = 0; i < di.operandCount(); ++i)
     {
-      auto mode = packet.di_.ithOperandMode(i);
-      auto type = packet.di_.ithOperandType(i);
-      uint32_t operand = packet.di_.ithOperand(i);
+      auto mode = di.ithOperandMode(i);
+      auto type = di.ithOperandType(i);
+      uint32_t operand = di.ithOperand(i);
       if (mode == OM::None)
 	continue;
 
@@ -389,11 +390,11 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
     }
 
   // Poke packet operands into hart.
-  for (unsigned i = 0; i < packet.di_.operandCount(); ++i)
+  for (unsigned i = 0; i < di.operandCount(); ++i)
     {
-      auto mode = packet.di_.ithOperandMode(i);
-      auto type = packet.di_.ithOperandType(i);
-      uint32_t operand = packet.di_.ithOperand(i);
+      auto mode = di.ithOperandMode(i);
+      auto type = di.ithOperandType(i);
+      uint32_t operand = di.ithOperand(i);
       uint64_t val = packet.opVal_.at(i);
       if (mode == OM::None)
 	continue;
@@ -433,7 +434,6 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   if (not trap)
     {
-      auto& di = packet.decodedInst();
       if (di.isLoad())
 	{
 	  hart.lastLdStAddress(packet.dva_, packet.dpa_);  // FIX TODO : handle page corrsing
@@ -491,27 +491,25 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   hart.untickTime();  // Restore timer value.
 
-  if (trap or packet.di_.isXRet())
+  // Restore CSRs modified by the instruction or trap. TODO: For vector ld/st we have to
+  // restore partially modified vectors.
+  std::vector<WdRiscv::CsrNumber> csrns;
+  hart.lastCsr(csrns);
+  for (auto csrn : csrns)
     {
-      // Restore CSRs modified by the trap. TODO: For vector ld/st we have to restore
-      // partially modified vectors.
-      std::vector<WdRiscv::CsrNumber> csrns;
-      hart.lastCsr(csrns);
-      for (auto csrn : csrns)
-	{
-	  uint64_t value = hart.lastCsrValue(csrn);
-	  if (not hart.pokeCsr(csrn, value))
-	    assert(0);
-	}
+      uint64_t value = hart.lastCsrValue(csrn);
+      if (not hart.pokeCsr(csrn, value))
+	assert(0);
     }
-  else
+
+  if (not trap and not di.isXRet())
     {
       // Restore hart status.
-      for (unsigned i = 0; i < packet.di_.operandCount(); ++i)
+      for (unsigned i = 0; i < di.operandCount(); ++i)
 	{
-	  auto mode = packet.di_.ithOperandMode(i);
-	  auto type = packet.di_.ithOperandType(i);
-	  uint32_t operand = packet.di_.ithOperand(i);
+	  auto mode = di.ithOperandMode(i);
+	  auto type = di.ithOperandType(i);
+	  uint32_t operand = di.ithOperand(i);
 	  uint64_t prev = prevVal.at(i);
 	  if (mode == OM::None)
 	    continue;
