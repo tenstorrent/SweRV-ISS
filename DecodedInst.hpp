@@ -279,6 +279,20 @@ namespace WdRiscv
       return (inst() & 0x7f) == 0x27 and (f3 == 0 or f3 >= 5);
     }
 
+    /// Return true if this is a vector strided load instruction.
+    bool isVectorLoadStrided() const
+    {
+      unsigned mop = (inst() >> 26) & 3;
+      return isVectorLoad() and (mop == 2);
+    }
+
+    /// Return true if this is a vector strided store instruction.
+    bool isVectorStoreStrided() const
+    {
+      unsigned mop = (inst() >> 26) & 3;
+      return isVectorStore() and (mop == 2);
+    }
+
     /// Return true if this is a vector indexed load instruction.
     bool isVectorLoadIndexed() const
     {

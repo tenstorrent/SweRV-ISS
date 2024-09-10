@@ -628,8 +628,20 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
       instr.addrTime_ = regTime.at(addrReg);
     }
 
+  if (di.isVectorLoadStrided() or di.isVectorStoreStrided())
+    {
+      unsigned strideReg = effectiveRegIx(di, 2);
+      uint64_t addrTime = regTime.at(strideReg);
+      if (addrTime >= instr.addrTime_)
+        {
+          instr.addrProducer_ = regProducer.at(strideReg);
+          instr.addrTime_ = addrTime;
+        }
+    }
+
   if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
     {
+      // FIXME: this needs to take into account vstart/vl.
       unsigned offsetReg = effectiveRegIx(di, 2);
       unsigned ixGroup = hart.vecOpEmul(2);
       for (unsigned i = 0; i < ixGroup; ++i)
@@ -654,6 +666,7 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
 
   if (di.isVectorStore())
     {
+      // FIXME: this needs to take into account vstart/vl.
       unsigned dataReg = effectiveRegIx(di, 0);
       unsigned srcGroup = hart.vecOpEmul(0);
       if (di.vecFieldCount())
