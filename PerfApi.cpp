@@ -486,13 +486,16 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
       // Memory should not have changed.
     }
 
-  hart.setVirtualMode(hart.lastVirtMode());
-  hart.setPrivilegeMode(hart.lastPrivMode());
-
   hart.untickTime();  // Restore timer value.
 
   // Restore CSRs modified by the instruction or trap. TODO: For vector ld/st we have to
   // restore partially modified vectors.
+  if (not trap)
+    {   // Must be an MRET/SRET/... Privilege lowered.  Restore it before restoring CSRs.
+      hart.setVirtualMode(hart.lastVirtMode());
+      hart.setPrivilegeMode(hart.lastPrivMode());
+    }
+
   std::vector<WdRiscv::CsrNumber> csrns;
   hart.lastCsr(csrns);
   for (auto csrn : csrns)
@@ -500,6 +503,12 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
       uint64_t value = hart.lastCsrValue(csrn);
       if (not hart.pokeCsr(csrn, value))
 	assert(0);
+    }
+
+  if (trap)
+    {  // Privilege raised.  Restore it after restoring CSRs.
+      hart.setVirtualMode(hart.lastVirtMode());
+      hart.setPrivilegeMode(hart.lastPrivMode());
     }
 
   if (not trap and not di.isXRet())
