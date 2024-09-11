@@ -2748,7 +2748,7 @@ CsRegs<URV>::defineMachineRegs()
   defineCsr("mncause", Csrn::MNCAUSE, !mand, !imp, 0, wam, wam);
 
   mask = 0b1100010001000;  // Fields MNPP, MNPV, and NMIE writeable.
-  defineCsr("mnstatus", Csrn::MNSTATUS, !mand, !imp, 0, mask, pokeMask);
+  defineCsr("mnstatus", Csrn::MNSTATUS, !mand, !imp, 0b1000, mask, pokeMask);
 
   // Define mhpmcounter3/mhpmcounter3h to mhpmcounter31/mhpmcounter31h
   // as write-anything/read-zero (user can change that in the config

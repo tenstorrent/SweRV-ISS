@@ -62,7 +62,8 @@ class PciDev {
     // Setup function after BARs are allocated
     virtual bool setup() = 0;
 
-    /// Helper function to set extra structures to the header memory region (e.g. capability structures). Sets the offset from base address in bytes.
+    /// Helper function to set extra structures to the header memory region (e.g. capability structures).
+    /// Sets the offset from base address in bytes.
     template <typename T>
     uint8_t* ask_header_blocks(size_t size, uint32_t& offset)
     {
@@ -126,6 +127,8 @@ class PciDev {
       return bar_sizes_.at(bar);
     }
 
+    /// Returns true if BAR size is configured properly. Sets io to true
+    /// if BAR is marked as IO space, and false otherwise.
     bool bar_type(unsigned bar, bool& io) const
     {
       assert(bar < 6 and "There are only 6 bars");
@@ -164,14 +167,19 @@ class PciDev {
       std::function<bool(uint32_t offset, uint64_t& data)> read_cb = nullptr;
     };
 
+    /// Writes data to header based on offset from PCI_BASE_ADDRESS_0.
     template <typename T>
     void write_config(uint8_t offset, T data);
 
+    /// Reads data from header based on offset from PCI_BASE_ADDRESS_0.
     template <typename T>
     void read_config(uint8_t offset, T& data) const;
 
+    /// Similar to active_bar, but also detects which BAR an address
+    /// belongs to.
     std::tuple<bool, unsigned> active_addr(uint64_t addr) const;
 
+    /// Returns true if the selected BAR is active.
     bool active_bar(unsigned bar) const;
 
   private:
