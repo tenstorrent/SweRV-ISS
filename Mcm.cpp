@@ -334,6 +334,7 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 	}
 
       unsigned regIx = baseVecReg + ix + vecRegOffset_;
+      regProducer.at(regIx) = instr.tag_;
       regTimeVec.at(regIx) = regTime;
     }
 }
