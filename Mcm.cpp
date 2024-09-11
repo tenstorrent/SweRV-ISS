@@ -334,6 +334,7 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 	}
 
       unsigned regIx = baseVecReg + ix + vecRegOffset_;
+      regProducer.at(regIx) = instr.tag_;
       regTimeVec.at(regIx) = regTime;
     }
 }
@@ -637,7 +638,7 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
       if (hart.getLastVecLdStRegsUsed(di, 2, base, group))
         {
           unsigned offsetReg = base + vecRegOffset_;
-          for (unsigned i = base; i < group; ++i)
+          for (unsigned i = 0; i < group; ++i)
             {
               uint64_t addrTime = regTime.at(offsetReg + i);
               if (addrTime >= instr.addrTime_)
@@ -664,7 +665,7 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
       if (hart.getLastVecLdStRegsUsed(di, 0, base, group))
         {
           unsigned dataReg = base + vecRegOffset_;
-          for (unsigned i = base; i < group; ++i)
+          for (unsigned i = 0; i < group; ++i)
             {
               uint64_t dataTime = regTime.at(dataReg + i);
               if (dataTime >= instr.dataTime_)
