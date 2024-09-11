@@ -939,6 +939,11 @@ namespace WdRiscv
     { return vecRegs_.getLastMemory(addresses, paddresses,
                                     paddresses2, data, masked, elementSize); }
 
+    /// Computes the base register and registers used of a vector load/store
+    /// instruction. This helper trims by vstart/vl (not vm). This is for MCM
+    /// dependency tracking.
+    bool getLastVecLdStRegsUsed(const DecodedInst& di, unsigned opIx,
+                                unsigned& regBase, unsigned& regCount) const;
 
     void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const
     { syscall_.getMemoryChanges(v); }

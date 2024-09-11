@@ -256,10 +256,9 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 
   uint64_t time = 0;
 
-  unsigned group = 1;
-  int baseVecReg = hart.lastVecReg(di, group);
-  if (baseVecReg < 0)
-    return;  // No register was written by vector load.
+  unsigned baseVecReg, group = 1;
+  if (not hart.getLastVecLdStRegsUsed(di, 0, baseVecReg, group))
+    return; // No register was written by vector load.
 
   unsigned hartIx = hart.sysHartIndex();
   auto& regProducer = hartData_.at(hartIx).regProducer_;
@@ -293,14 +292,7 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 
   unsigned elemsPerVec = hart.vecRegSize() / elemSize;
 
-  // A subset of vector registers in the group may have been loaded because
-  // the load is limited by VL.
-  unsigned vecRegCount = group;
-  unsigned elemCount = addr.size();
-  if (elemCount < elemsPerVec*group)
-    vecRegCount = (elemCount + elemsPerVec - 1) / elemsPerVec;
-
-  for (unsigned ix = 0; ix < vecRegCount; ++ix)
+  for (unsigned ix = 0; ix < group; ++ix)
     {
       uint64_t regTime = 0;  // Vector register time
 
@@ -641,16 +633,18 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
 
   if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
     {
-      // FIXME: this needs to take into account vstart/vl.
-      unsigned offsetReg = effectiveRegIx(di, 2);
-      unsigned ixGroup = hart.vecOpEmul(2);
-      for (unsigned i = 0; i < ixGroup; ++i)
+      unsigned base, group = 1;
+      if (hart.getLastVecLdStRegsUsed(di, 2, base, group))
         {
-          uint64_t addrTime = regTime.at(offsetReg + i);
-          if (addrTime >= instr.addrTime_)
+          unsigned offsetReg = base + vecRegOffset_;
+          for (unsigned i = base; i < group; ++i)
             {
-              instr.addrProducer_ = regProducer.at(offsetReg + i);
-              instr.addrTime_ = addrTime;
+              uint64_t addrTime = regTime.at(offsetReg + i);
+              if (addrTime >= instr.addrTime_)
+                {
+                  instr.addrProducer_ = regProducer.at(offsetReg + i);
+                  instr.addrTime_ = addrTime;
+                }
             }
         }
     }
@@ -666,19 +660,18 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
 
   if (di.isVectorStore())
     {
-      // FIXME: this needs to take into account vstart/vl.
-      unsigned dataReg = effectiveRegIx(di, 0);
-      unsigned srcGroup = hart.vecOpEmul(0);
-      if (di.vecFieldCount())
-	srcGroup *= di.vecFieldCount();
-
-      for (unsigned i = 0; i < srcGroup; ++i)
+      unsigned base, group = 1;
+      if (hart.getLastVecLdStRegsUsed(di, 0, base, group))
         {
-          uint64_t dataTime = regTime.at(dataReg + i);
-          if (dataTime >= instr.dataTime_)
+          unsigned dataReg = base + vecRegOffset_;
+          for (unsigned i = base; i < group; ++i)
             {
-              instr.dataProducer_ = regProducer.at(dataReg + i);
-              instr.dataTime_ = dataTime;
+              uint64_t dataTime = regTime.at(dataReg + i);
+              if (dataTime >= instr.dataTime_)
+                {
+                  instr.dataProducer_ = regProducer.at(dataReg + i);
+                  instr.dataTime_ = dataTime;
+                }
             }
         }
     }
