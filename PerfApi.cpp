@@ -366,7 +366,8 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   packet.trap_ = packet.trap_ or trap;
 
   // If save fails or set fails, there must be a trap.
-  assert((saveOk and setOk) or trap);
+  if (not saveOk or not setOk)
+    assert(trap);
 
   // Record PC of subsequent packet.
   packet.nextIva_ = hart.peekPc();
