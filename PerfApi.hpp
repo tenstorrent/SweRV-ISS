@@ -460,6 +460,26 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
       return 0;
     }
 
+    /// Save hart register values corresponding to packet operands in prevVal.  Return
+    /// true on success. Return false if any of the required hart registers cannot be
+    /// read.
+    bool saveHartValues(Hart64& hart, const InstrPac& packet,
+			std::array<uint64_t, 4>& prevVal);
+
+    /// Install packet operand values (some obtained from previous in-flight instructions)
+    /// into the hart registers. Return true on success. Return false if any of the
+    /// required hart registers cannot be written.
+    bool setHartValues(Hart64& hart, const InstrPac& packet);
+
+    /// Restore the hart registers corresponding to the packet operands to the values in
+    /// the prevVal array.
+    void restoreHartValues(Hart64& hart, const InstrPac& packet,
+			   const std::array<uint64_t, 4>& prevVal);
+
+    /// Record the results (register values) corresponding to the operands of the packet
+    /// after the execution of the instruction of that packet.
+    void recordExecutionResults(Hart64& hart, InstrPac& packet);
+
   private:
 
     /// Map an instruction tag to corresponding packet.
