@@ -3875,7 +3875,8 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	  {
 	    cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
 		 << mapt << " tag2=" << instrB.tag_ << " mtag=" << mTag
-		 << " time1=" << latestOpTime(ap) << " time2=" << earlyB << '\n';
+		 << " time1=" << latestOpTime(ap) << " time2=" << earlyB
+		 << " dep=addr\n";
 	    return false;
 	  }
 
@@ -3886,7 +3887,8 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	  {
 	    cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
 		 << mdpt << " tag2=" << instrB.tag_ << " mtag=" << mTag
-		 << " time1=" << latestOpTime(dp) << " time2=" << earlyB << '\n';
+		 << " time1=" << latestOpTime(dp) << " time2=" << earlyB
+		 << " dep=data\n";
 	    return false;
 	  }
 

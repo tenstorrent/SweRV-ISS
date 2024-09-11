@@ -5416,7 +5416,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   URV mie = csRegs_.peekMie();
   URV possible = mie & mip;
 
-  // If in a non-maskable interrupt handler, then allinterrupts disabled.
+  // If in a non-maskable interrupt handler, then all interrupts disabled.
   if (extensionIsEnabled(RvExtension::Smrnmi) and
       (MnstatusFields{csRegs_.peekMnstatus()}.bits_.NMIE) == 0)
     return false;
