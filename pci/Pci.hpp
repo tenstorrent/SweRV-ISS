@@ -55,7 +55,7 @@ class Pci {
       uint32_t data;
     };
 
-    // Base represents the MMIO (PCI address). For simplicity this can be the same as the CPU address (make sure to mark 32b memory space).
+    // Base represents the MMIO (PCI address). For simplicity this can be the same as the CPU address space.
     uint32_t config_base_;
     uint32_t mmio_base_;
     uint32_t mmio_eol_;
