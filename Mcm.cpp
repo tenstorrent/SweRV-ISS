@@ -632,6 +632,7 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
         }
     }
 
+#if 0
   if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
     {
       unsigned base, group = 1;
@@ -649,6 +650,7 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
             }
         }
     }
+#endif
 
   // Set producer of data register.
   if (di.isStore() or di.isAmo())
@@ -3621,19 +3623,47 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory())
     return true;
 
-  if (instrB.isLoad_ or instrB.isStore_)
-    {
-      uint64_t addrTime = instrB.addrTime_;
+  if (not instrB.isLoad_ and not instrB.isStore_)
+    return true;
 
-      for (auto opIx : instrB.memOps_)
+  uint64_t addrTime = instrB.addrTime_;
+
+  for (auto opIx : instrB.memOps_)
+    {
+      if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ <= addrTime)
 	{
-	  if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ <= addrTime)
-	    {
+	  cerr << "Error: PPO rule 9 failed: hart-id=" << hart.hartId() << " tag1="
+	       << instrB.addrProducer_ << " tag2=" << instrB.tag_ << '\n';
+	  return false;
+	}
+    }
+
+  // Check address dependency of index registers of vector instruction B.
+  const auto& di = instrB.di_;
+  if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
+    {
+      auto earlyB = earliestOpTime(instrB);
+
+      auto hartIx = hart.sysHartIndex();
+
+      const auto& regTime = hartData_.at(hartIx).regTime_;
+      const auto& regProducer = hartData_.at(hartIx).regProducer_;
+
+      unsigned base, group = 1;
+      if (hart.getLastVecLdStRegsUsed(di, 2, base, group))
+        {
+          unsigned offsetReg = base + vecRegOffset_;
+          for (unsigned i = 0; i < group; ++i)
+            {
+              uint64_t indexRegTime = regTime.at(offsetReg + i);
+	      if (indexRegTime < earlyB)
+		continue;
+	      auto producerTag = regProducer.at(offsetReg + i);
 	      cerr << "Error: PPO rule 9 failed: hart-id=" << hart.hartId() << " tag1="
-		   << instrB.addrProducer_ << " tag2=" << instrB.tag_ << '\n';
+		   << producerTag << " tag2=" << instrB.tag_ << '\n';
 	      return false;
 	    }
-	}
+        }
     }
 
   return true;

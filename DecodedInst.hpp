@@ -314,12 +314,12 @@ namespace WdRiscv
       return id == InstId::mop_rr or id == InstId::mop_r or id == InstId::c_mop;
     }
 
-    /// Return the element size in bytes of a vector load instruction. Return zero for a
-    /// non-vector-load instruction. For load-indexed and load-segment-indexed, this
-    /// returns the index element size.
-    unsigned vecLoadElemSize() const
+    /// Return the element size in bytes of a vector load/store instruction. Return zero
+    /// for a non vector load/store instruction. For indexed or segment-indexed
+    /// instructions, this returns the index element size.
+    unsigned vecLoadOrStoreElemSize() const
     {
-      if (not isVectorLoad()) return 0;
+      if (not isVectorLoad() and not isVectorStore()) return 0;
       unsigned f3 = (inst() >> 12) & 7;
       if (f3 == 0) return 1;
       if (f3 == 5) return 2;
@@ -328,18 +328,24 @@ namespace WdRiscv
       return 0;
     }
 
+    /// Return the element size in bytes of a vector load instruction. Return zero for a
+    /// non-vector-load instruction. For load-indexed and load-segment-indexed, this
+    /// returns the index element size.
+    unsigned vecLoadElemSize() const
+    {
+      if (not isVectorLoad())
+	return 0;
+      return vecLoadOrStoreElemSize();
+    }
+
     /// Return the element size in bytes of a vector store instruction. Return zero for a
     /// non-vector-store instruction. For store-indexed and store-segment-indexed, this
     /// returns the index element size.
     unsigned vecStoreElemSize() const
     {
-      if (not isVectorStore()) return 0;
-      unsigned f3 = (inst() >> 12) & 7;
-      if (f3 == 0) return 1;
-      if (f3 == 5) return 2;
-      if (f3 == 6) return 4;
-      if (f3 == 7) return 8;
-      return 0;
+      if (not isVectorStore())
+	return 0;
+      return vecLoadOrStoreElemSize();
     }
 
     /// Return true if this a CSR instruction.
