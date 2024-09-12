@@ -2747,7 +2747,7 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
   if (isGpaTrap(causeCode))
     {
       bool implicitWrite;
-      // FIXME: info2 should be masked non-zero first
+      // FIXME: info2 should be checked non-zero first
       if (virtMem_.stage1TrapImplAcc(implicitWrite) and info2)
         {
           /// From Table 8.12 of privileged spec.
@@ -2756,7 +2756,6 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
           else
             return 0x3000 | (uint32_t(implicitWrite) << 5);
         }
-      return 0;
     }
 
   if (not di)
