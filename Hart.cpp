@@ -4590,21 +4590,11 @@ Hart<URV>::getLastVecLdStRegsUsed(const DecodedInst& di, unsigned opIx,
   if (di.ithOperandType(opIx) != OperandType::VecReg)
     return false;
 
-  unsigned elemsPerVec = vecRegSize() / elemSize;
-
-  // Trim by vstart.
-  unsigned start = csRegs_.peekVstart();
-  regBase = di.ithOperand(opIx) + (start/elemsPerVec);
-
-  // Trim by vl.
-  assert(di.ithOperandType(opIx) == OperandType::VecReg);
-
-  unsigned group = vecOpEmul(opIx);
-  if (di.vecFieldCount())
-    group *= di.vecFieldCount();
+  unsigned fieldCount = di.vecFieldCount();
 
   // Index register use EEW encoded in the instruction.
-  if ((di.isVectorLoadIndexed() or di.isVectorStoreIndexed()) and opIx == 2)
+  bool isIndexed = di.isVectorLoadIndexed() or di.isVectorStoreIndexed();
+  if (isIndexed and opIx == 2)  // Operand is index register.
     {
       unsigned width = (di.inst() >> 12) & 7;
       switch (width)
@@ -4615,6 +4605,25 @@ Hart<URV>::getLastVecLdStRegsUsed(const DecodedInst& di, unsigned opIx,
         case 7: elemSize = 8; break;
         default: assert(false);
       }
+    }
+
+  unsigned elemsPerVec = vecRegSize() / elemSize;
+
+  // Trim by vstart.
+  unsigned start = csRegs_.peekVstart();
+  regBase = di.ithOperand(opIx) + (start/elemsPerVec);
+
+  // Trim by vl.
+  assert(di.ithOperandType(opIx) == OperandType::VecReg);
+
+  unsigned group = vecOpEmul(opIx);
+
+  if (fieldCount)
+    {
+      if (opIx == 2 and isIndexed)
+	elemCount /= fieldCount;  // Adjust index vector element count.
+      else
+	group *= di.vecFieldCount();  // Adjust non index vector group.
     }
 
   regCount = group;

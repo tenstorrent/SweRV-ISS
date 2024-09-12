@@ -632,6 +632,7 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
         }
     }
 
+#if 0
   if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
     {
       unsigned base, group = 1;
@@ -649,6 +650,7 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
             }
         }
     }
+#endif
 
   // Set producer of data register.
   if (di.isStore() or di.isAmo())
@@ -3621,19 +3623,27 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory())
     return true;
 
-  if (instrB.isLoad_ or instrB.isStore_)
-    {
-      uint64_t addrTime = instrB.addrTime_;
+  uint64_t addrTime = instrB.addrTime_;
 
-      for (auto opIx : instrB.memOps_)
+  for (auto opIx : instrB.memOps_)
+    {
+      if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ <= addrTime)
 	{
-	  if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ <= addrTime)
-	    {
-	      cerr << "Error: PPO rule 9 failed: hart-id=" << hart.hartId() << " tag1="
-		   << instrB.addrProducer_ << " tag2=" << instrB.tag_ << '\n';
-	      return false;
-	    }
+	  cerr << "Error: PPO rule 9 failed: hart-id=" << hart.hartId() << " tag1="
+	       << instrB.addrProducer_ << " tag2=" << instrB.tag_ << '\n';
+	  return false;
 	}
+    }
+
+  // Check address dependency of index registers of vector instruction B.
+
+  McmInstrIx ixTag = 0; // Producer of vector index register.
+  uint64_t ixTime = 0;  // Producer time of vector index register.
+  if (isVecIndexOutOfOrder(hart, instrB, ixTag, ixTime))
+    {
+      cerr << "Error: PPO rule 9 failed: hart-id=" << hart.hartId() << " tag1="
+	   << ixTag << " tag2=" << instrB.tag_ << '\n';
+      return false;
     }
 
   return true;
@@ -3857,39 +3867,41 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
   for (McmInstrIx mTag = instrB.tag_ - 1; mTag >= minTag; --mTag)
     {
       const auto& instrM = instrVec.at(mTag);
-      if (instrM.isCanceled() or not instrM.di_.isValid())
+      if (instrM.isCanceled() or not instrM.di_.isValid() or not instrM.isStore_)
 	continue;
-
-      if (not instrM.isStore_)
-	continue;
-
       if (not overlaps(instrM, addrSet))
 	continue;
 
       auto mapt = instrM.addrProducer_;  // M address producer tag.
       auto mdpt = instrM.dataProducer_;  // M data producer tag.
-
-      const auto& ap = instrVec.at(mapt);  // Address producer.
+      auto& ap = instrVec.at(mapt);  // Address producer.
+      auto& dp = instrVec.at(mdpt);  // Data producer.
 
       if (ap.isMemory())
 	if (not ap.complete_ or isBeforeInMemoryTime(instrB, ap))
 	  {
 	    cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
 		 << mapt << " tag2=" << instrB.tag_ << " mtag=" << mTag
-		 << " time1=" << latestOpTime(ap) << " time2=" << earlyB
-		 << " dep=addr\n";
+		 << " time1=" << latestOpTime(ap) << " time2=" << earlyB << " dep=addr\n";
 	    return false;
 	  }
 
-      const auto& dp = instrVec.at(mdpt);  // Data producer.
-
+      McmInstrIx ixProducer = 0;   // Vector index register producer.
+      uint64_t ixTime = 0;         // Vector index register producer time.
+      if (isVecIndexOutOfOrder(hart, instrB, ixProducer, ixTime))
+	{
+	  cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
+	       << mdpt << " tag2=" << instrB.tag_ << " mtag=" << ixProducer
+	       << " time1=" << ixTime << " time2=" << earlyB << " dep=addr\n";
+	  return false;
+	}
+	
       if (mapt != mdpt and dp.isMemory())
 	if (not dp.complete_ or isBeforeInMemoryTime(instrB, dp))
 	  {
 	    cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
 		 << mdpt << " tag2=" << instrB.tag_ << " mtag=" << mTag
-		 << " time1=" << latestOpTime(dp) << " time2=" << earlyB
-		 << " dep=data\n";
+		 << " time1=" << latestOpTime(dp) << " time2=" << earlyB << " dep=data\n";
 	    return false;
 	  }
 
@@ -3945,6 +3957,16 @@ Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
 		 << " time1=" << latestOpTime(ap) << " time2=" << earlyB << '\n';
 	    return false;
 	  }
+
+      McmInstrIx ixTag = 0; // Producer of vector index register.
+      uint64_t ixTime = 0;  // Producer time of vector index register.
+      if (isVecIndexOutOfOrder(hart, instrB, ixTag, ixTime))
+	{
+	    cerr << "Error: PPO rule 13 failed: hart-id=" << hart.hartId() << " tag1="
+		 << ixTag << " tag2=" << instrB.tag_ << " mtag=" << mTag
+		 << " time1=" << ixTime << " time2=" << earlyB << '\n';
+	    return false;
+	}
     }
 
   return true;
@@ -4049,6 +4071,48 @@ Mcm<URV>::checkSfenceWInval(Hart<URV>& hart, const McmInstr& instr) const
 
   cerr << "Error: Hart-id=" << hart.hartId() << "sfence.w.inval tag=" << instr.tag_
        << " retired while there are pending stores in the store/merge buffer.\n";
+  return false;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr,
+			       McmInstrIx& producerTag, uint64_t& producerTime) const
+{
+  // FIX: This needs refinement, it needs to check the data (non-index) registers of instr
+  // one at a time.
+  //   for each data reg
+  //       identify corresponding index register(s)
+  //       find latest producer time of index register(s)
+  //       find earliest memory time of data register
+  //       fail if data reg mem time < producer time of index reg
+
+  const auto& di = instr.di_;
+  if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
+    {
+      auto t0 = earliestOpTime(instr);
+
+      auto hartIx = hart.sysHartIndex();
+      const auto& regTime = hartData_.at(hartIx).regTime_;
+      const auto& regProducer = hartData_.at(hartIx).regProducer_;
+
+      unsigned base = 0, group = 1;
+      if (hart.getLastVecLdStRegsUsed(di, 2, base, group))  // Index reg is operand 2
+        {
+          unsigned offsetReg = base + vecRegOffset_;
+          for (unsigned i = 0; i < group; ++i)
+            {
+              uint64_t indexRegTime = regTime.at(offsetReg + i);
+	      if (indexRegTime < t0)
+		continue;
+	      producerTag = regProducer.at(offsetReg + i);
+	      producerTime = indexRegTime;
+	      return true;
+	    }
+        }
+    }
+
   return false;
 }
 
