@@ -2746,15 +2746,15 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
   // Implicit accesses for VS-stage address translation generate a pseudocode.
   if (isGpaTrap(causeCode))
     {
-      bool implicitWrite;
+      bool s1ImplicitWrite;
       // FIXME: info2 should be checked non-zero first
-      if (virtMem_.stage1TrapImplAcc(implicitWrite) and info2)
+      if (virtMem_.implAccTrap(s1ImplicitWrite) and info2)
         {
           /// From Table 8.12 of privileged spec.
           if constexpr (sizeof(URV) == 4)
-            return 0x2000 | (uint32_t(implicitWrite) << 5);
+            return 0x2000 | (uint32_t(s1ImplicitWrite) << 5);
           else
-            return 0x3000 | (uint32_t(implicitWrite) << 5);
+            return 0x3000 | (uint32_t(s1ImplicitWrite) << 5);
         }
     }
 
