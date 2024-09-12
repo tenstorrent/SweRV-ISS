@@ -2775,7 +2775,8 @@ Mcm<URV>::vecOverlapsRefPhysAddr(const McmInstr& instr, uint64_t addr) const
 
 template <typename URV>
 bool
-Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
+Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB, uint64_t& t1,
+		   uint64_t& t2, uint64_t& physAddr) const
 {
   if (instrA.isCanceled())
     return true;
@@ -2786,24 +2787,30 @@ Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
     return true;
 
   // Check overlapped bytes.
-  bool ok = true;
-  for (unsigned i = 0; i < instrB.memOps_.size() and ok; ++i)
+  for (unsigned i = 0; i < instrB.memOps_.size(); ++i)
     {
       auto opIx = instrB.memOps_.at(i);
       auto& op = sysMemOps_.at(opIx);
 
-      for (unsigned byteIx = 0; byteIx < op.size_ and ok; ++byteIx)
+      for (unsigned byteIx = 0; byteIx < op.size_; ++byteIx)
 	{
 	  uint64_t addr = op.physAddr_ + byteIx;
 	  if (not overlapsRefPhysAddr(instrA, addr))
 	    continue;
 	  uint64_t ta = latestByteTime(instrA, addr);
 	  uint64_t tb = earliestByteTime(instrB, addr);
-	  ok = ta < tb or (ta == tb and instrA.isStore_);
+	  bool ok = ta < tb or (ta == tb and instrA.isStore_);
+	  if (not ok)
+	    {
+	      t1 = ta;
+	      t2 = tb;
+	      physAddr = addr;
+	      return false;
+	    }
 	}
     }
 
-  return ok;
+  return true;
 }
 
 
@@ -2833,10 +2840,12 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
       if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory())
 	continue;
 
-      if (not ppoRule1(instrA, instrB))
+      uint64_t physAddr = 0, t1 = 0, t2 = 0;
+      if (not ppoRule1(instrA, instrB, t1, t2, physAddr))
 	{
 	  cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
-	       << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+	       << instrA.tag_ << " tag2=" << instrB.tag_ << " time1=" << t1
+	       << " time2=" << t2 << std::hex << " pa=0x" << physAddr << std::dec << '\n';
 	  return false;
 	}
     }
@@ -2847,11 +2856,14 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
     {
       if (tag >= instrB.tag_)
 	break;
+
       const auto& instrA =  instrVec.at(tag);
-      if (not ppoRule1(instrA, instrB))
+      uint64_t physAddr = 0, t1 = 0, t2 = 0;
+      if (not ppoRule1(instrA, instrB, t1, t2, physAddr))
 	{
 	  cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
-	       << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+	       << instrA.tag_ << " tag2=" << instrB.tag_ << " time1=" << t1
+	       << " time2=" << t2 << std::hex << " pa=0x" << physAddr << std::dec << '\n';
 	  return false;
 	}
     }
