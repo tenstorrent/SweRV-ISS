@@ -385,6 +385,13 @@ namespace WdRiscv
 
     bool referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64_t& val);
 
+    /// Return true if given instruction is an indexed load/store and it has
+    /// an index register with a value produced after the instruction has used
+    /// that index register. If out of order, set producer to the tag of the
+    /// instruction producing the value of the ooo index register.
+    bool isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr,
+			      McmInstrIx& producer, uint64_t& produerTime) const;
+
     /// Trim read operations to match reference (whisper). Mark replay read ops as
     /// canceled. Remove cancled ops.
     bool commitReadOps(Hart<URV>& hart, McmInstr*);
