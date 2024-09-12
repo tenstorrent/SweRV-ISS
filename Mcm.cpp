@@ -2774,6 +2774,23 @@ Mcm<URV>::vecOverlapsRefPhysAddr(const McmInstr& instr, uint64_t addr) const
 
 
 template <typename URV>
+void
+Mcm<URV>::printPpo1Error(unsigned hartId, McmInstrIx tag1, McmInstrIx tag2, uint64_t t1,
+			 uint64_t t2, uint64_t pa) const
+{
+  cerr << "Error: PPO rule 1 failed: hart-id=" << hartId << " tag1=" << tag1
+       << " tag2=" << tag2 << " time1=";
+
+  if (t1 == ~uint64_t(0))
+    cerr << "inf";
+  else
+    cerr << t1;
+
+  cerr << " time2=" << t2 << std::hex << " pa=0x" << pa << std::dec << '\n';
+}
+
+
+template <typename URV>
 bool
 Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB, uint64_t& t1,
 		   uint64_t& t2, uint64_t& physAddr) const
@@ -2841,13 +2858,11 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 	continue;
 
       uint64_t physAddr = 0, t1 = 0, t2 = 0;
-      if (not ppoRule1(instrA, instrB, t1, t2, physAddr))
-	{
-	  cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
-	       << instrA.tag_ << " tag2=" << instrB.tag_ << " time1=" << t1
-	       << " time2=" << t2 << std::hex << " pa=0x" << physAddr << std::dec << '\n';
-	  return false;
-	}
+      if (ppoRule1(instrA, instrB, t1, t2, physAddr))
+	continue;
+
+      printPpo1Error(hart.hartId(), instrA.tag_, instrB.tag_, t1, t2, physAddr);
+      return false;
     }
 
   const auto& undrained = hartData_.at(hartIx).undrainedStores_;
@@ -2859,13 +2874,11 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 
       const auto& instrA =  instrVec.at(tag);
       uint64_t physAddr = 0, t1 = 0, t2 = 0;
-      if (not ppoRule1(instrA, instrB, t1, t2, physAddr))
-	{
-	  cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
-	       << instrA.tag_ << " tag2=" << instrB.tag_ << " time1=" << t1
-	       << " time2=" << t2 << std::hex << " pa=0x" << physAddr << std::dec << '\n';
-	  return false;
-	}
+      if (ppoRule1(instrA, instrB, t1, t2, physAddr))
+	continue;
+
+      printPpo1Error(hart.hartId(), tag, instrB.tag_, t1, t2, physAddr);
+      return false;
     }
 
   return true;

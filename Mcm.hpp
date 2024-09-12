@@ -384,6 +384,10 @@ namespace WdRiscv
 
     using MemoryOpVec = std::vector<MemoryOp>;
 
+    /// Helper to ppoRule1.
+    void printPpo1Error(unsigned hartId, McmInstrIx tag1, McmInstrIx tag2, uint64_t t1,
+			uint64_t t2, uint64_t pa) const;
+
     bool referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64_t& val);
 
     /// Return true if given instruction is an indexed load/store and it has
