@@ -81,6 +81,7 @@ Session<URV>::defineSystem(const Args& args, const HartConfig& config)
 
   if (args.hexFiles.empty() and args.expandedTargets.empty()
       and args.binaryFiles.empty() and args.kernelFile.empty()
+      and args.loadFrom.empty()
 #ifdef LZ4_COMPRESS
       and args.lz4Files.empty()
 #endif
