@@ -3957,6 +3957,16 @@ Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
 		 << " time1=" << latestOpTime(ap) << " time2=" << earlyB << '\n';
 	    return false;
 	  }
+
+      McmInstrIx ixTag = 0; // Producer of vector index register.
+      uint64_t ixTime = 0;  // Producer time of vector index register.
+      if (isVecIndexOutOfOrder(hart, instrB, ixTag, ixTime))
+	{
+	    cerr << "Error: PPO rule 13 failed: hart-id=" << hart.hartId() << " tag1="
+		 << ixTag << " tag2=" << instrB.tag_ << " mtag=" << mTag
+		 << " time1=" << ixTime << " time2=" << earlyB << '\n';
+	    return false;
+	}
     }
 
   return true;
