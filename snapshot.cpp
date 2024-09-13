@@ -211,6 +211,7 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
   bool virtMode = false;
 
   URV mstatus = 0, mstatush = 0;
+  bool foundMstatus = false, foundMstatush = false;
 
   using std::cerr;
 
@@ -287,11 +288,13 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
                 continue;
               if (csrNum == CsrNumber::MSTATUS)
                 {
+                  foundMstatus = true;
                   mstatus = val;
                   continue;
                 }
               if (csrNum == CsrNumber::MSTATUSH)
                 {
+                  foundMstatush = true;
                   mstatush = val;
                   continue;
                 }
@@ -352,9 +355,11 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
   virtMode_ = virtMode;
 
   // We poke MSTATUS last to prevent corruption.
-  pokeCsr(CsrNumber::MSTATUS, mstatus);
+  if (foundMstatus)
+    pokeCsr(CsrNumber::MSTATUS, mstatus);
   if constexpr (sizeof(URV) == 4)
-    pokeCsr(CsrNumber::MSTATUSH, mstatush);
+    if (foundMstatush)
+      pokeCsr(CsrNumber::MSTATUSH, mstatush);
 
   if (errors)
     {
