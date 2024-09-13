@@ -632,26 +632,6 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
         }
     }
 
-#if 0
-  if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
-    {
-      unsigned base, group = 1;
-      if (hart.getLastVecLdStRegsUsed(di, 2, base, group))
-        {
-          unsigned offsetReg = base + vecRegOffset_;
-          for (unsigned i = 0; i < group; ++i)
-            {
-              uint64_t addrTime = regTime.at(offsetReg + i);
-              if (addrTime >= instr.addrTime_)
-                {
-                  instr.addrProducer_ = regProducer.at(offsetReg + i);
-                  instr.addrTime_ = addrTime;
-                }
-            }
-        }
-    }
-#endif
-
   // Set producer of data register.
   if (di.isStore() or di.isAmo())
     {
@@ -661,6 +641,7 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
       instr.dataTime_ = regTime.at(dataReg);
     }
 
+#if 1
   if (di.isVectorStore())
     {
       unsigned base, group = 1;
@@ -678,6 +659,7 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
             }
         }
     }
+#endif
 }
 
 
@@ -3689,7 +3671,7 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
   if (bdi.isStore() and bdi.op0() == 0)
     return true;  // No dependency on X0
 
-  if (bdi.isStore() or bdi.isAmo() or bdi.isVectorStore())
+  if (bdi.isStore() or bdi.isAmo())
     {
       if ((bdi.isSc() and bdi.op1() == 0) or (bdi.isStore() and bdi.op0() == 0))
 	return true;
@@ -3700,7 +3682,35 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
 	  if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ <= dataTime)
 	    {
 	      cerr << "Error: PPO rule 10 failed: hart-id=" << hart.hartId() << " tag1="
-		   << instrB.dataProducer_  << " tag2=" << instrB.tag_ << '\n';
+		   << instrB.dataProducer_  << " tag2=" << instrB.tag_ << " time1="
+		   << dataTime << " time2=" << sysMemOps_.at(opIx).time_ << '\n';
+	      return false;
+	    }
+	}
+    }
+
+  if (bdi.isVectorStore())
+    {
+      auto earlyB = earliestOpTime(instrB);
+
+      auto hartIx = hart.sysHartIndex();
+      const auto& regTime = hartData_.at(hartIx).regTime_;
+      const auto& regProducer = hartData_.at(hartIx).regProducer_;
+
+      unsigned base = 0, group = 1;
+      if (hart.getLastVecLdStRegsUsed(bdi, 0, base, group))  // Dest reg is oeprand 0
+	{
+          unsigned offsetReg = base + vecRegOffset_;
+          for (unsigned i = 0; i < group; ++i)
+            {
+              uint64_t time = regTime.at(offsetReg + i);
+	      auto tag = regProducer.at(offsetReg + i);
+	      if (earlyB <= time)
+		{
+		  cerr << "Error: PPO rule 10 failed: hart-id=" << hart.hartId()
+		       << " tag1=" << tag << " tag2=" << instrB.tag_ << " time1="
+		       << time << " time2=" << earlyB << '\n';
+		}
 	      return false;
 	    }
 	}
