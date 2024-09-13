@@ -2999,6 +2999,9 @@ Hart<URV>::initiateNmi(URV cause, URV pcToSave)
 
   if (extensionIsEnabled(RvExtension::Smrnmi))
     {
+      hasInterrupt_ = true;
+      interruptCount_++;
+
       MnstatusFields mnf{csRegs_.peekMnstatus()};
       if (mnf.bits_.NMIE == 0)
 	return false;  // mnstatus.nmie is off
