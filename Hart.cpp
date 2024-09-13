@@ -5553,7 +5553,7 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause) const
     }
 
   // MIP read value is ored with supervisor external interrupt pin.
-  mip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  mip = overrideWithSeiPin(mip);
 
   mip &= ~deferredInterrupts_;  // Inhibited by test-bench.
 
@@ -10963,10 +10963,10 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
 
@@ -11014,10 +11014,10 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
 
   if (di->op1() == 0)
     {
@@ -11074,10 +11074,10 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
 
   if (di->op1() == 0)
     {
@@ -11126,10 +11126,10 @@ Hart<URV>::execCsrrwi(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
 
   doCsrWrite(di, csr, di->op1(), di->op0(), prev);
 
@@ -11179,10 +11179,10 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
 
   if (imm == 0)
     {
@@ -11241,10 +11241,10 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
 
   if (imm == 0)
     {
