@@ -265,8 +265,8 @@ namespace WdRiscv
     /// Clear extra translation information
     void clearExecInfo()
     {
-      stage1ImplicitAccessTrap_ = false;
-      stage1AttemptedADUpdate_ = false;
+      implAccTrap_ = false;
+      s1ADUpdate_ = false;
       pbmt_ = Pbmt::None;
       vsPbmt_ = Pbmt::None;
     }
@@ -718,13 +718,13 @@ namespace WdRiscv
     void setFaultOnFirstAccessStage2(bool flag)
     { faultOnFirstAccess2_ = flag; }
 
-    /// Return true if last translation had a fault in VS-stage translation caused by
+    /// Return true if last translation had a fault in translation caused by
     /// implicit access and false otherwise. Sets flag if attempted to update A/D bits
     /// on last stage 1 translation. This is necessary to properly write mtinst/htinst.
-    bool stage1TrapImplAcc(bool& implicitWrite) const
+    bool implAccTrap(bool& s1ImplicitWrite) const
     {
-      implicitWrite = stage1AttemptedADUpdate_;
-      return stage1ImplicitAccessTrap_;
+      s1ImplicitWrite = s1ADUpdate_;
+      return implAccTrap_;
     }
 
     /// Clear saved data for updated leaf level PTE.
@@ -845,8 +845,8 @@ namespace WdRiscv
     bool dataPageCross_;
 
     // Extra trap information
-    bool stage1ImplicitAccessTrap_ = false;
-    bool stage1AttemptedADUpdate_ = false;
+    bool implAccTrap_ = false;
+    bool s1ADUpdate_ = false;
 
     Pbmt pbmt_ = Pbmt::None;
     Pbmt vsPbmt_ = Pbmt::None;

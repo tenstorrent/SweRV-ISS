@@ -632,26 +632,6 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
         }
     }
 
-#if 0
-  if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
-    {
-      unsigned base, group = 1;
-      if (hart.getLastVecLdStRegsUsed(di, 2, base, group))
-        {
-          unsigned offsetReg = base + vecRegOffset_;
-          for (unsigned i = 0; i < group; ++i)
-            {
-              uint64_t addrTime = regTime.at(offsetReg + i);
-              if (addrTime >= instr.addrTime_)
-                {
-                  instr.addrProducer_ = regProducer.at(offsetReg + i);
-                  instr.addrTime_ = addrTime;
-                }
-            }
-        }
-    }
-#endif
-
   // Set producer of data register.
   if (di.isStore() or di.isAmo())
     {
@@ -661,6 +641,7 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
       instr.dataTime_ = regTime.at(dataReg);
     }
 
+#if 1
   if (di.isVectorStore())
     {
       unsigned base, group = 1;
@@ -678,6 +659,7 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
             }
         }
     }
+#endif
 }
 
 
@@ -2774,8 +2756,26 @@ Mcm<URV>::vecOverlapsRefPhysAddr(const McmInstr& instr, uint64_t addr) const
 
 
 template <typename URV>
+void
+Mcm<URV>::printPpo1Error(unsigned hartId, McmInstrIx tag1, McmInstrIx tag2, uint64_t t1,
+			 uint64_t t2, uint64_t pa) const
+{
+  cerr << "Error: PPO rule 1 failed: hart-id=" << hartId << " tag1=" << tag1
+       << " tag2=" << tag2 << " time1=";
+
+  if (t1 == ~uint64_t(0))
+    cerr << "inf";
+  else
+    cerr << t1;
+
+  cerr << " time2=" << t2 << std::hex << " pa=0x" << pa << std::dec << '\n';
+}
+
+
+template <typename URV>
 bool
-Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
+Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB, uint64_t& t1,
+		   uint64_t& t2, uint64_t& physAddr) const
 {
   if (instrA.isCanceled())
     return true;
@@ -2786,24 +2786,30 @@ Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const
     return true;
 
   // Check overlapped bytes.
-  bool ok = true;
-  for (unsigned i = 0; i < instrB.memOps_.size() and ok; ++i)
+  for (unsigned i = 0; i < instrB.memOps_.size(); ++i)
     {
       auto opIx = instrB.memOps_.at(i);
       auto& op = sysMemOps_.at(opIx);
 
-      for (unsigned byteIx = 0; byteIx < op.size_ and ok; ++byteIx)
+      for (unsigned byteIx = 0; byteIx < op.size_; ++byteIx)
 	{
 	  uint64_t addr = op.physAddr_ + byteIx;
 	  if (not overlapsRefPhysAddr(instrA, addr))
 	    continue;
 	  uint64_t ta = latestByteTime(instrA, addr);
 	  uint64_t tb = earliestByteTime(instrB, addr);
-	  ok = ta < tb or (ta == tb and instrA.isStore_);
+	  bool ok = ta < tb or (ta == tb and instrA.isStore_);
+	  if (not ok)
+	    {
+	      t1 = ta;
+	      t2 = tb;
+	      physAddr = addr;
+	      return false;
+	    }
 	}
     }
 
-  return ok;
+  return true;
 }
 
 
@@ -2833,12 +2839,12 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
       if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory())
 	continue;
 
-      if (not ppoRule1(instrA, instrB))
-	{
-	  cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
-	       << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
-	  return false;
-	}
+      uint64_t physAddr = 0, t1 = 0, t2 = 0;
+      if (ppoRule1(instrA, instrB, t1, t2, physAddr))
+	continue;
+
+      printPpo1Error(hart.hartId(), instrA.tag_, instrB.tag_, t1, t2, physAddr);
+      return false;
     }
 
   const auto& undrained = hartData_.at(hartIx).undrainedStores_;
@@ -2847,13 +2853,14 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
     {
       if (tag >= instrB.tag_)
 	break;
+
       const auto& instrA =  instrVec.at(tag);
-      if (not ppoRule1(instrA, instrB))
-	{
-	  cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
-	       << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
-	  return false;
-	}
+      uint64_t physAddr = 0, t1 = 0, t2 = 0;
+      if (ppoRule1(instrA, instrB, t1, t2, physAddr))
+	continue;
+
+      printPpo1Error(hart.hartId(), tag, instrB.tag_, t1, t2, physAddr);
+      return false;
     }
 
   return true;
@@ -3664,7 +3671,7 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
   if (bdi.isStore() and bdi.op0() == 0)
     return true;  // No dependency on X0
 
-  if (bdi.isStore() or bdi.isAmo() or bdi.isVectorStore())
+  if (bdi.isStore() or bdi.isAmo())
     {
       if ((bdi.isSc() and bdi.op1() == 0) or (bdi.isStore() and bdi.op0() == 0))
 	return true;
@@ -3675,7 +3682,35 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
 	  if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ <= dataTime)
 	    {
 	      cerr << "Error: PPO rule 10 failed: hart-id=" << hart.hartId() << " tag1="
-		   << instrB.dataProducer_  << " tag2=" << instrB.tag_ << '\n';
+		   << instrB.dataProducer_  << " tag2=" << instrB.tag_ << " time1="
+		   << dataTime << " time2=" << sysMemOps_.at(opIx).time_ << '\n';
+	      return false;
+	    }
+	}
+    }
+
+  if (bdi.isVectorStore())
+    {
+      auto earlyB = earliestOpTime(instrB);
+
+      auto hartIx = hart.sysHartIndex();
+      const auto& regTime = hartData_.at(hartIx).regTime_;
+      const auto& regProducer = hartData_.at(hartIx).regProducer_;
+
+      unsigned base = 0, group = 1;
+      if (hart.getLastVecLdStRegsUsed(bdi, 0, base, group))  // Dest reg is oeprand 0
+	{
+          unsigned offsetReg = base + vecRegOffset_;
+          for (unsigned i = 0; i < group; ++i)
+            {
+              uint64_t time = regTime.at(offsetReg + i);
+	      auto tag = regProducer.at(offsetReg + i);
+	      if (earlyB <= time)
+		{
+		  cerr << "Error: PPO rule 10 failed: hart-id=" << hart.hartId()
+		       << " tag1=" << tag << " tag2=" << instrB.tag_ << " time1="
+		       << time << " time2=" << earlyB << '\n';
+		}
 	      return false;
 	    }
 	}

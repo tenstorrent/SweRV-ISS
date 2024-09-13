@@ -505,7 +505,6 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
   if (vsMode_ == Mode::Sv32)
     {
       auto cause =  stage1PageTableWalk<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
-      stage1ImplicitAccessTrap_ = cause != ExceptionCause::NONE;
       return cause;
     }
 
@@ -540,7 +539,6 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
     return stage1PageFaultType(read, write, exec);
 
   auto cause = (this->*walkFn)(va, priv, read, write, exec, pa, entry);
-  stage1ImplicitAccessTrap_ = cause != ExceptionCause::NONE;
   return cause;
 }
 
@@ -651,6 +649,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	  // Or B
 	  saveUpdatedPte(pteAddr, sizeof(pte.data_), pte.data_);  // For logging
 
+          implAccTrap_ = true;
 	  // B1. Check PMP. The privMode here is the effective one that
 	  // already accounts for MPRV.
 	  if (pmpMgr_.isEnabled())
@@ -676,6 +675,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	    if (not memWrite(pteAddr, bigEnd_, pte.data_))
 	      return stage1PageFaultType(read, write, exec);
 	  }
+          implAccTrap_ = false;
 	}
       break;
     }
@@ -814,6 +814,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  // Or B
 	  saveUpdatedPte(pteAddr, sizeof(pte.data_), pte.data_);  // For logging
 
+          implAccTrap_ = true;
 	  // B1. Check PMP. The privMode here is the effective one that
 	  // already accounts for MPRV.
 	  if (pmpMgr_.isEnabled())
@@ -839,6 +840,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	    if (not memWrite(pteAddr, bigEnd_, pte.data_))
 	      return stage2PageFaultType(read, write, exec);
 	  }
+          implAccTrap_ = false;
 	}
       break;
     }
@@ -991,7 +993,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  // Or B
 	  saveUpdatedPte(pteAddr, sizeof(pte.data_), pte.data_);  // For logging
 
-          stage1AttemptedADUpdate_ = true;
+          implAccTrap_ = s1ADUpdate_ = true;
 	  // B1. Check PMP. The privMode here is the effective one that
 	  // already accounts for MPRV.
 	  if (pmpMgr_.isEnabled())
@@ -1023,6 +1025,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	    if (not memWrite(pteAddr2, bigEnd_, pte.data_))
 	      return stage1PageFaultType(read, write, exec);
 	  }
+          implAccTrap_ = false;
 	}
       break;
     }

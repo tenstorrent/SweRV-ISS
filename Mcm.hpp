@@ -279,7 +279,8 @@ namespace WdRiscv
     bool ppoRule13(Hart<URV>& hart, const McmInstr& instr) const;
 
     /// Helper to above ppoRule1.
-    bool ppoRule1(const McmInstr& instrA, const McmInstr& instrB) const;
+    bool ppoRule1(const McmInstr& instrA, const McmInstr& instrB, uint64_t& t1,
+		  uint64_t& t2, uint64_t& physAddr) const;
 
     /// Helper to above ppoRule5.
     bool ppoRule5(Hart<URV>&, const McmInstr& instrA, const McmInstr& instrB) const;
@@ -382,6 +383,10 @@ namespace WdRiscv
   protected:
 
     using MemoryOpVec = std::vector<MemoryOp>;
+
+    /// Helper to ppoRule1.
+    void printPpo1Error(unsigned hartId, McmInstrIx tag1, McmInstrIx tag2, uint64_t t1,
+			uint64_t t2, uint64_t pa) const;
 
     bool referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64_t& val);
 

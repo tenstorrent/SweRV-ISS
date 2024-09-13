@@ -2753,17 +2753,16 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
   // Implicit accesses for VS-stage address translation generate a pseudocode.
   if (isGpaTrap(causeCode))
     {
-      bool implicitWrite;
-      // FIXME: info2 should be masked non-zero first
-      if (virtMem_.stage1TrapImplAcc(implicitWrite) and info2)
+      bool s1ImplicitWrite;
+      // FIXME: info2 should be checked non-zero first
+      if (virtMem_.implAccTrap(s1ImplicitWrite) and info2)
         {
           /// From Table 8.12 of privileged spec.
           if constexpr (sizeof(URV) == 4)
-            return 0x2000 | (uint32_t(implicitWrite) << 5);
+            return 0x2000 | (uint32_t(s1ImplicitWrite) << 5);
           else
-            return 0x3000 | (uint32_t(implicitWrite) << 5);
+            return 0x3000 | (uint32_t(s1ImplicitWrite) << 5);
         }
-      return 0;
     }
 
   if (not di)
@@ -3010,20 +3009,28 @@ Hart<URV>::initiateNmi(URV cause, URV pcToSave)
       MnstatusFields mnf{csRegs_.peekMnstatus()};
       if (mnf.bits_.NMIE == 0)
 	return false;  // mnstatus.nmie is off
+
+      hasInterrupt_ = true;
+      interruptCount_++;
+
       mnf.bits_.NMIE = 0;  // Clear mnstatus.mnie
-
-      pokeCsr(CsrNumber::MNEPC, pcToSave);
-      cause |= URV(1) << (sizeof(URV)*8 - 1);
-      pokeCsr(CsrNumber::MNCAUSE, cause);
-
-      mnf.bits_.MNPV = virtMode_;  // Save virtual mode
-      setVirtualMode(false);  // Clear virtual mode
 
       mnf.bits_.MNPP = unsigned(privMode_);  // Save privilege mode
       privMode_ = PrivilegeMode::Machine;
 
-      // Update mnstatus
-      pokeCsr(CsrNumber::MNSTATUS, mnf.value_);
+      mnf.bits_.MNPV = virtMode_;  // Save virtual mode
+      setVirtualMode(false);  // Clear virtual mode
+
+      if (not csRegs_.write(CsrNumber::MNEPC, privMode_, pcToSave))
+        assert(0 and "Failed to write MNEPC register");
+      cause |= URV(1) << (sizeof(URV)*8 - 1);
+      if (not csRegs_.write(CsrNumber::MNCAUSE, privMode_, cause))
+        assert(0 and "Failed to write MNCAUSE register");
+
+      // Update mnstatus, need to poke it to clear NMIE
+      if (not pokeCsr(CsrNumber::MNSTATUS, mnf.value_))
+        assert(0 and "Failed to write MNSTATUS register");
+      recordCsrWrite(CsrNumber::MNSTATUS);
 
       // Set the pc to the nmi handler.
       setPc(nextPc);
@@ -3052,6 +3059,7 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
 
   // NMI is taken in machine mode.
   privMode_ = PrivilegeMode::Machine;
+  setVirtualMode(false);
 
   // Save address of instruction that caused the exception or address
   // of interrupted instruction.
@@ -5622,7 +5630,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       // Deliver/clear virtual supervisor timer from vstimecmp CSR.
       if (vstimecmpActive_)
 	{
-	  if (time_ >= (vstimecmp_ - htimedelta_ + timeShift_))
+	  if ((time_ + htimedelta_) >= (vstimecmp_ + timeShift_))
 	    mipVal = mipVal | (URV(1) << URV(IC::VS_TIMER));
 	  else
 	    {
@@ -10365,6 +10373,7 @@ Hart<URV>::execMnret(const DecodedInst* di)
 
   mnf.bits_.NMIE = 1;  // Set mnstatus.mnie
   pokeCsr(CsrNumber::MNSTATUS, mnf.value_);
+  recordCsrWrite(CsrNumber::MNSTATUS);
 
   // Restore PC
   URV epc = 0;

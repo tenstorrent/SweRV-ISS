@@ -210,6 +210,9 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
   auto privMode = PrivilegeMode::Machine;
   bool virtMode = false;
 
+  URV mstatus = 0, mstatush = 0;
+  bool foundMstatus = false, foundMstatush = false;
+
   using std::cerr;
 
   while(std::getline(ifs, line))
@@ -283,6 +286,18 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
                   (csrNum >= CsrNumber::SIREG and csrNum <= CsrNumber::SIREG6) or
                   (csrNum >= CsrNumber::VSIREG and csrNum <= CsrNumber::VSIREG6))
                 continue;
+              if (csrNum == CsrNumber::MSTATUS)
+                {
+                  foundMstatus = true;
+                  mstatus = val;
+                  continue;
+                }
+              if (csrNum == CsrNumber::MSTATUSH)
+                {
+                  foundMstatush = true;
+                  mstatush = val;
+                  continue;
+                }
               pokeCsr(csrNum, val);
             }
 	  else
@@ -338,6 +353,13 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
 
   setPrivilegeMode(privMode);
   virtMode_ = virtMode;
+
+  // We poke MSTATUS last to prevent corruption.
+  if (foundMstatus)
+    pokeCsr(CsrNumber::MSTATUS, mstatus);
+  if constexpr (sizeof(URV) == 4)
+    if (foundMstatush)
+      pokeCsr(CsrNumber::MSTATUSH, mstatush);
 
   if (errors)
     {

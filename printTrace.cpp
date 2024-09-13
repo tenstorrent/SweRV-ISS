@@ -783,7 +783,9 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   if (hasTrap)
     {
       URV cause = 0;
-      if (privilegeMode() == PrivilegeMode::Machine)
+      if (nmiPending_)
+        cause = peekCsr(CsrNumber::MNCAUSE);
+      else if (privilegeMode() == PrivilegeMode::Machine)
         cause = peekCsr(CsrNumber::MCAUSE);
       else if (privilegeMode() == PrivilegeMode::Supervisor)
         cause = peekCsr(CsrNumber::SCAUSE);
