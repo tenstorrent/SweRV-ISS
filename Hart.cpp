@@ -811,10 +811,8 @@ namespace WdRiscv
   void
   Hart<uint32_t>::writeMstatus()
   {
-    csRegs_.poke(CsrNumber::MSTATUS, mstatus_.value_.low_);
-    csRegs_.poke(CsrNumber::MSTATUSH, mstatus_.value_.high_);
-    csRegs_.recordWrite(CsrNumber::MSTATUS);
-    csRegs_.recordWrite(CsrNumber::MSTATUSH);
+    csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, mstatus_.value_.low_);
+    csRegs_.write(CsrNumber::MSTATUSH, PrivilegeMode::Machine, mstatus_.value_.high_);
     updateCachedMstatus();
   }
 
@@ -823,8 +821,7 @@ namespace WdRiscv
   void
   Hart<uint64_t>::writeMstatus()
   {
-    csRegs_.poke(CsrNumber::MSTATUS, mstatus_.value_);
-    csRegs_.recordWrite(CsrNumber::MSTATUS);
+    csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, mstatus_.value_);
     updateCachedMstatus();
   }
 
