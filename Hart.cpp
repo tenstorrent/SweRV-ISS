@@ -2748,7 +2748,7 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
     {
       bool s1ImplicitWrite;
       // FIXME: info2 should be checked non-zero first
-      if (virtMem_.implAccTrap(s1ImplicitWrite) and info2)
+      if (virtMem_.s1ImplAccTrap(s1ImplicitWrite) and info2)
         {
           /// From Table 8.12 of privileged spec.
           if constexpr (sizeof(URV) == 4)
