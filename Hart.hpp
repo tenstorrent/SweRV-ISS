@@ -2184,8 +2184,13 @@ namespace WdRiscv
     { return suspended_; }
 
     /// Set value to the value read from the device associated with the given physical
-    /// address. No effect if pa is not a device address.
+    /// address.
     void deviceRead(uint64_t pa, unsigned size, uint64_t& value);
+
+    /// Write the given value to the device associated with the given phyiscal address.
+    /// address.
+    template <typename STORE_TYPE>
+    void deviceWrite(uint64_t pa, STORE_TYPE value);
 
     /// Set current privilege mode.
     void setPrivilegeMode(PrivilegeMode m)

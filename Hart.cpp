@@ -1853,13 +1853,17 @@ Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
     {
       val = time_;
       val = val >> (pa - 0xbff8) * 8;
+      return;
     }
-  else if (isImsicAddr(pa))
+
+  if (isImsicAddr(pa))
     {
       if (imsicRead_)
         imsicRead_(pa, sizeof(val), val);
+      return;
     }
-  else if (isPciAddr(pa))
+
+  if (isPciAddr(pa))
     {
       switch (size)
 	{
@@ -1910,7 +1914,43 @@ Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
 	default:
 	  assert(0);
 	}
+      return;
     }
+
+  assert(0);  // No device contains given address.
+}
+
+
+template <typename URV>
+template<typename STORE_TYPE>
+void
+Hart<URV>::deviceWrite(uint64_t pa, STORE_TYPE storeVal)
+{
+  if (isAclintAddr(pa))
+    {
+      URV val = storeVal;
+      processClintWrite(pa, ldStSize_, val);
+      storeVal = val;
+      memWrite(pa, pa, storeVal);
+      return;
+    }
+
+  if (isImsicAddr(pa))
+    {
+      imsicWrite_(pa, sizeof(storeVal), storeVal);
+      return;
+    }
+
+  if (isPciAddr(pa))
+    {
+      if (pa >= pciConfigBase_ and pa < pciConfigEnd_)
+        pci_->config_mmio<STORE_TYPE>(pa, storeVal, true);
+      else
+        pci_->mmio<STORE_TYPE>(pa, storeVal, true);
+      return;
+    }
+
+  assert(0);
 }
 
 
@@ -1937,7 +1977,7 @@ Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr
 
   ULT uval = 0;   // Unsigned loaded value
 
-  bool isDevice = isAclintMtimeAddr(addr1) or isImsicAddr(addr1) or isPciAddr(addr1);
+  bool isDevice = isAclintAddr(addr1) or isImsicAddr(addr1) or isPciAddr(addr1);
 
   bool hasOooVal = false;
   if (ooo_)
