@@ -71,8 +71,12 @@ namespace WdRiscv
     bool mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<URV>& hart,
 			FILE* commandLog);
 
-    /// Memory consistency model merge buffer insert command..
+    /// Memory consistency model merge buffer insert command.
     bool mcmInsertCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<URV>& hart,
+			  FILE* commandLog);
+
+    /// Memory consistency model merge buffer bypass command.
+    bool mcmBypassCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<URV>& hart,
 			  FILE* commandLog);
 
     /// Server mode loop: Receive command and send reply till a quit

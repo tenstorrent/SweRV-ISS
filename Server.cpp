@@ -974,6 +974,75 @@ Server<URV>::mcmInsertCommand(const WhisperMessage& req, WhisperMessage& reply,
 }
 
 
+template <typename URV>
+bool
+Server<URV>::mcmBypassCommand(const WhisperMessage& req, WhisperMessage& reply,
+			      Hart<URV>& hart, FILE* cmdLog)
+{
+  bool ok = true;
+  uint32_t hartId = req.hart;
+
+  if (req.size <= 8)
+    {
+      ok = system_.mcmBypass(hart, req.time, req.instrTag, req.address, req.size, req.value);
+
+      if (cmdLog)
+	fprintf(cmdLog, "hart=%" PRIu32 " time=%" PRIu64 " mbbypass %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
+		hartId, req.time, req.instrTag, req.address, req.size, req.value);
+    }
+  else
+    {
+      if (req.size > req.buffer.size())
+	{
+	  std::cerr << "Error: Server command: McmBypass data size too large: "
+		    << req.size << '\n';
+	  ok = false;
+	}
+      else
+	{
+	  // For speed, use double-word insert when possible, else word, else byte.
+	  uint64_t size = req.size, time = req.time, tag = req.instrTag, addr = req.address;
+	  if ((size & 0x7) == 0 and (addr & 0x7) == 0)
+	    {
+	      const uint64_t* data = reinterpret_cast<const uint64_t*>(req.buffer.data());
+	      for (unsigned i = 0; i < size and ok; i += 8, ++data)
+		ok = system_.mcmBypass(hart, time, tag, addr + i, 8, *data);
+	    }
+	  else if ((size & 0x3) == 0 and (addr & 0x3) == 0)
+	    {
+	      const uint32_t* data = reinterpret_cast<const uint32_t*>(req.buffer.data());
+	      for (unsigned i = 0; i < size and ok; i += 4, ++data)
+		ok = system_.mcmBypass(hart, time, tag, addr + i, 4, *data);
+	    }
+	  else
+	    {
+	      const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
+	      for (unsigned i = 0; i < size and ok; ++i, ++data)
+		ok = system_.mcmBypass(hart, time, tag, addr + i, 1, *data);
+	    }
+
+	  if (cmdLog)
+	    {
+	      fprintf(cmdLog, "hart=%" PRIu32 " time=%" PRIu64 " mbbypass %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x",
+		      hartId, req.time, req.instrTag, req.address, req.size);
+	      const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
+	      for (unsigned i = req.size; i > 0; --i)
+		{
+		  unsigned val = data[i-1];
+		  fprintf(cmdLog, "%02x", val);
+		}
+	      fprintf(cmdLog, "\n");
+	    }
+	}
+    }
+
+  if (not ok)
+    reply.type = Invalid;
+
+  return ok;
+}
+
+
 /// Dump all registers contents in tracefile.
 template <typename URV>
 static void
@@ -1354,14 +1423,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         break;
 
       case McmBypass:
-        if (commandLog)
-          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mbbypass %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
-                  hartId, msg.time, msg.instrTag, msg.address, msg.size,
-                  msg.value);
-
-        if (not system_.mcmBypass(hart, msg.time, msg.instrTag, msg.address,
-				 msg.size, msg.value))
-          reply.type = Invalid;
+	mcmBypassCommand(msg, reply, hart, commandLog);
         break;
 
       case McmIFetch:
