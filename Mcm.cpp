@@ -3637,7 +3637,8 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
       if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ <= addrTime)
 	{
 	  cerr << "Error: PPO rule 9 failed: hart-id=" << hart.hartId() << " tag1="
-	       << instrB.addrProducer_ << " tag2=" << instrB.tag_ << '\n';
+	       << instrB.addrProducer_ << " tag2=" << instrB.tag_
+               << " time1=" << addrTime << " time2=" << sysMemOps_.at(opIx).time_ << '\n';
 	  return false;
 	}
     }
