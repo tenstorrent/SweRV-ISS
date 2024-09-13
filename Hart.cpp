@@ -2999,26 +2999,31 @@ Hart<URV>::initiateNmi(URV cause, URV pcToSave)
 
   if (extensionIsEnabled(RvExtension::Smrnmi))
     {
-      hasInterrupt_ = true;
-      interruptCount_++;
-
       MnstatusFields mnf{csRegs_.peekMnstatus()};
       if (mnf.bits_.NMIE == 0)
 	return false;  // mnstatus.nmie is off
+
+      hasInterrupt_ = true;
+      interruptCount_++;
+
       mnf.bits_.NMIE = 0;  // Clear mnstatus.mnie
-
-      pokeCsr(CsrNumber::MNEPC, pcToSave);
-      cause |= URV(1) << (sizeof(URV)*8 - 1);
-      pokeCsr(CsrNumber::MNCAUSE, cause);
-
-      mnf.bits_.MNPV = virtMode_;  // Save virtual mode
-      setVirtualMode(false);  // Clear virtual mode
 
       mnf.bits_.MNPP = unsigned(privMode_);  // Save privilege mode
       privMode_ = PrivilegeMode::Machine;
 
-      // Update mnstatus
-      pokeCsr(CsrNumber::MNSTATUS, mnf.value_);
+      mnf.bits_.MNPV = virtMode_;  // Save virtual mode
+      setVirtualMode(false);  // Clear virtual mode
+
+      if (not csRegs_.write(CsrNumber::MNEPC, privMode_, pcToSave))
+        assert(0 and "Failed to write MNEPC register");
+      cause |= URV(1) << (sizeof(URV)*8 - 1);
+      if (not csRegs_.write(CsrNumber::MNCAUSE, privMode_, cause))
+        assert(0 and "Failed to write MNCAUSE register");
+
+      // Update mnstatus, need to poke it to clear NMIE
+      if (not pokeCsr(CsrNumber::MNSTATUS, mnf.value_))
+        assert(0 and "Failed to write MNSTATUS register");
+      recordCsrWrite(CsrNumber::MNSTATUS);
 
       // Set the pc to the nmi handler.
       setPc(nextPc);
@@ -3047,6 +3052,7 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
 
   // NMI is taken in machine mode.
   privMode_ = PrivilegeMode::Machine;
+  setVirtualMode(false);
 
   // Save address of instruction that caused the exception or address
   // of interrupted instruction.
@@ -10365,6 +10371,7 @@ Hart<URV>::execMnret(const DecodedInst* di)
 
   mnf.bits_.NMIE = 1;  // Set mnstatus.mnie
   pokeCsr(CsrNumber::MNSTATUS, mnf.value_);
+  recordCsrWrite(CsrNumber::MNSTATUS);
 
   // Restore PC
   URV epc = 0;
