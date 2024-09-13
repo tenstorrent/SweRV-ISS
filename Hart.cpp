@@ -5619,7 +5619,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       // Deliver/clear virtual supervisor timer from vstimecmp CSR.
       if (vstimecmpActive_)
 	{
-	  if (time_ >= (vstimecmp_ - htimedelta_ + timeShift_))
+	  if ((time_ + htimedelta_) >= (vstimecmp_ + timeShift_))
 	    mipVal = mipVal | (URV(1) << URV(IC::VS_TIMER));
 	  else
 	    {
