@@ -2024,14 +2024,8 @@ namespace WdRiscv
         });
     }
 
-    void attachPci(std::shared_ptr<Pci> pci, uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize)
-    {
-      pci_ = pci;
-      pciConfigBase_ = configBase;
-      pciConfigEnd_ = pciConfigBase_ + (1ULL << 28);
-      pciMmioBase_ = mmioBase;
-      pciMmioEnd_ = mmioBase + mmioSize;
-    }
+    void attachPci(std::shared_ptr<Pci> pci)
+    { pci_ = pci; }
 
     /// Return true if given extension is enabled.
     constexpr bool extensionIsEnabled(RvExtension ext) const
@@ -2170,10 +2164,7 @@ namespace WdRiscv
     }
 
     bool isPciAddr(uint64_t addr) const
-    {
-      return (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
-			(addr >= pciMmioBase_ and addr < pciMmioEnd_)));
-    }
+    { return pci_ and pci_->contains_addr(addr); }
 
     /// Return true if there is one or more active performance counter (a counter that is
     /// assigned a valid event).
@@ -5270,10 +5261,6 @@ namespace WdRiscv
     std::function<bool(uint64_t, unsigned, uint64_t&)> imsicRead_ = nullptr;
     std::function<bool(uint64_t, unsigned, uint64_t)> imsicWrite_ = nullptr;
     std::shared_ptr<Pci> pci_;
-    uint64_t pciConfigBase_ = 0;
-    uint64_t pciConfigEnd_ = 0;
-    uint64_t pciMmioBase_ = 0;
-    uint64_t pciMmioEnd_ = 0;
 
     // Callback invoked before a CSR instruction accesses a CSR.
     std::function<void(unsigned, CsrNumber)> preCsrInst_ = nullptr;

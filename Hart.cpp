@@ -975,13 +975,9 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
         imsicWrite_(addr, sizeof(val), val);
       return true;
     }
-  else if (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
-                    (addr >= pciMmioBase_ and addr < pciMmioEnd_)))
+  else if (isPciAddr(addr))
     {
-      if (addr >= pciConfigBase_ and addr < pciConfigEnd_)
-        pci_->config_mmio<uint32_t>(addr, val, true);
-      else
-        pci_->mmio<uint32_t>(addr, val, true);
+      pci_->access<uint32_t>(addr, val, true);
       return true;
     }
 
@@ -1012,13 +1008,9 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
         imsicWrite_(addr, sizeof(val), val);
       return true;
     }
-  else if (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
-                    (addr >= pciMmioBase_ and addr < pciMmioEnd_)))
+  else if (isPciAddr(addr))
     {
-      if (addr >= pciConfigBase_ and addr < pciConfigEnd_)
-        pci_->config_mmio<uint64_t>(addr, val, true);
-      else
-        pci_->mmio<uint64_t>(addr, val, true);
+      pci_->access<uint64_t>(addr, val, true);
       return true;
     }
 
@@ -1862,10 +1854,7 @@ Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
 	case 1:
 	  {
 	    uint8_t pciVal = 0;
-	    if (pa >= pciConfigBase_ and pa < pciConfigEnd_)
-	      pci_->config_mmio<uint8_t>(pa, pciVal, false);
-	    else
-	      pci_->mmio<uint8_t>(pa, pciVal, false);
+            pci_->access<uint8_t>(pa, pciVal, false);
 	    val = pciVal;
 	  }
 	  break;
@@ -1873,10 +1862,7 @@ Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
 	case 2:
 	  {
 	    uint16_t pciVal = 0;
-	    if (pa >= pciConfigBase_ and pa < pciConfigEnd_)
-	      pci_->config_mmio<uint16_t>(pa, pciVal, false);
-	    else
-	      pci_->mmio<uint16_t>(pa, pciVal, false);
+            pci_->access<uint16_t>(pa, pciVal, false);
 	    val = pciVal;
 	  }
 	  break;
@@ -1884,10 +1870,7 @@ Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
 	case 4:
 	  {
 	    uint32_t pciVal = 0;
-	    if (pa >= pciConfigBase_ and pa < pciConfigEnd_)
-	      pci_->config_mmio<uint32_t>(pa, pciVal, false);
-	    else
-	      pci_->mmio<uint32_t>(pa, pciVal, false);
+            pci_->access<uint32_t>(pa, pciVal, false);
 	    val = pciVal;
 	  }
 	  break;
@@ -1895,10 +1878,7 @@ Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
 	case 8:
 	  {
 	    uint64_t pciVal = 0;
-	    if (pa >= pciConfigBase_ and pa < pciConfigEnd_)
-	      pci_->config_mmio<uint64_t>(pa, pciVal, false);
-	    else
-	      pci_->mmio<uint64_t>(pa, pciVal, false);
+            pci_->access<uint64_t>(pa, pciVal, false);
 	    val = pciVal;
 	  }
 	  break;
@@ -2203,10 +2183,7 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
     }
   else if (isPciAddr(pa1))
     {
-      if (pa1 >= pciConfigBase_ and pa1 < pciConfigEnd_)
-        pci_->config_mmio<STORE_TYPE>(pa1, storeVal, true);
-      else
-        pci_->mmio<STORE_TYPE>(pa1, storeVal, true);
+      pci_->access<STORE_TYPE>(pa1, storeVal, true);
       return true;
     }
 

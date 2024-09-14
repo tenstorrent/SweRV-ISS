@@ -14,14 +14,24 @@ class Pci {
   public:
 
     // config_base refers to base address of PCI config regions. mmio_base refers to base address of PCI MMIO region (for example for BARs).
-    Pci(uint32_t config_base, uint32_t mmio_base, size_t mmio_len, unsigned buses, unsigned slots);
+    Pci(uint32_t config_base, uint32_t config_len, uint32_t mmio_base, size_t mmio_len, unsigned buses, unsigned slots);
 
-    // The base address is set on CPU side (config and mmio sit in different regions).
-    template <typename T>
-    void config_mmio(uint32_t addr, T& data, bool w);
+    // Returns true if address relies within the defined PCI memory regions.
+    bool contains_addr(uint64_t addr) const
+    { return (addr >= config_base_ and addr < (config_base_ + config_len_)) or
+             (addr >= mmio_base_ and addr < (mmio_base_ + mmio_len_)); }
 
     template <typename T>
-    void mmio(uint32_t addr, T& data, bool w);
+    void access(uint32_t addr, T& data, bool w)
+    {
+      if (addr >= config_base_ and addr < (config_base_ + config_len_))
+        config_mmio<T>(addr, data, w);
+      else if (addr >= mmio_base_ and addr < (mmio_base_ + mmio_len_))
+        mmio<T>(addr, data, w);
+
+      assert(false);
+      return;
+    }
 
     // Finds a device on buses and returns a pointer to it if it's registered.
     std::shared_ptr<PciDev> find_registered_device(unsigned bus, unsigned slot, unsigned function);
@@ -32,6 +42,13 @@ class Pci {
                           const std::function<void(uint64_t, unsigned, uint64_t)>& write);
 
   private:
+
+    // The base address is set on CPU side (config and mmio sit in different regions).
+    template <typename T>
+    void config_mmio(uint32_t addr, T& data, bool w);
+
+    template <typename T>
+    void mmio(uint32_t addr, T& data, bool w);
 
     // Allocate BARs for device specified. Returns true on success (enough memory) and false on failure.
     // We cheat here by using `linux,pci-probe-only` fdt property (under chosen)
@@ -56,10 +73,11 @@ class Pci {
     };
 
     // Base represents the MMIO (PCI address). For simplicity this can be the same as the CPU address space.
-    uint32_t config_base_;
-    uint32_t mmio_base_;
-    uint32_t mmio_eol_;
-    size_t mmio_len_;
+    uint32_t config_base_; // Base address of the configuration region.
+    size_t config_len_;    // Size of the configuration region.
+    uint32_t mmio_base_; // Base address of MMIO region.
+    size_t mmio_len_;    // Size of the MMIO region.
+    uint32_t mmio_eol_;  // Represents the current allocated end of the MMIO region.
 
     std::vector<std::vector<std::shared_ptr<PciDev>>> buses_;
     std::vector<std::shared_ptr<PciDev::mmio_blocks>> mmio_;
