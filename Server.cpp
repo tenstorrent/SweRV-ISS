@@ -1330,6 +1330,16 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 	  break;
 	}
 
+      case ClearNmi:
+        {
+	  if (checkHart(msg, "nmi", reply))
+	    hart.clearPendingNmi();
+	  if (commandLog)
+            fprintf(commandLog, "hart=%" PRIu32 " clear_nmi # ts=%s\n", hartId,
+		    timeStamp.c_str());
+	  break;
+        }
+
       case EnterDebug:
         {
           if (checkHart(msg, "enter_debug", reply))
