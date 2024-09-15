@@ -256,20 +256,17 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 
   uint64_t time = 0;
 
-  unsigned baseVecReg, group = 1;
-  if (not hart.getLastVecLdStRegsUsed(di, 0, baseVecReg, group))
+  unsigned base, group = 1;  // First register and group of destination vec register.
+  if (not hart.getLastVecLdStRegsUsed(di, 0, base, group))  // Operand 0 is destination reg.
     return; // No register was written by vector load.
 
   unsigned hartIx = hart.sysHartIndex();
-  auto& regProducer = hartData_.at(hartIx).regProducer_;
-  auto& regTimeVec = hartData_.at(hartIx).regTime_;
 
   // In case no vec register was written.
   for (unsigned ix = 0; ix < group; ++ix)
     {
-      unsigned regIx = baseVecReg + ix + vecRegOffset_;
-      regTimeVec.at(regIx) = 0;
-      regProducer.at(regIx) = 0;
+      setVecRegTime(hartIx, base + ix, 0);
+      setVecRegProducer(hartIx, base + ix, 0);
     }
 
   if (group == 1)
@@ -278,9 +275,8 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 	if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ > time)
 	  time = sysMemOps_.at(opIx).time_;
 
-      unsigned regIx = baseVecReg + vecRegOffset_;
-      regProducer.at(regIx) = instr.tag_;
-      regTimeVec.at(regIx) = time;
+      setVecRegProducer(hartIx, base, instr.tag_);
+      setVecRegTime(hartIx, base, time);
       return;
     }
 
@@ -333,9 +329,8 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 	    }
 	}
 
-      unsigned regIx = baseVecReg + ix + vecRegOffset_;
-      regProducer.at(regIx) = instr.tag_;
-      regTimeVec.at(regIx) = regTime;
+      setVecRegProducer(hartIx, base + ix, instr.tag_);
+      setVecRegTime(hartIx, base + ix, regTime);
     }
 }
 
@@ -3649,8 +3644,11 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
   uint64_t ixTime = 0;  // Producer time of vector index register.
   if (isVecIndexOutOfOrder(hart, instrB, ixTag, ixTime))
     {
+      auto t0 = earliestOpTime(instrB);
+
       cerr << "Error: PPO rule 9 failed: hart-id=" << hart.hartId() << " tag1="
-	   << ixTag << " tag2=" << instrB.tag_ << '\n';
+	   << ixTag << " tag2=" << instrB.tag_ << " time1=" << ixTime
+	   << " time2=" << t0 << '\n';
       return false;
     }
 
@@ -4116,40 +4114,142 @@ bool
 Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr,
 			       McmInstrIx& producerTag, uint64_t& producerTime) const
 {
-  // FIX: This needs refinement, it needs to check the data (non-index) registers of instr
-  // one at a time.
-  //   for each data reg
-  //       identify corresponding index register(s)
-  //       find latest producer time of index register(s)
-  //       find earliest memory time of data register
-  //       fail if data reg mem time < producer time of index reg
-
   const auto& di = instr.di_;
-  if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
+
+  bool isVecIndexed = di.isVectorLoadIndexed() or di.isVectorStoreIndexed();
+  if (not isVecIndexed)
+    return false;
+
+  auto hartIx = hart.sysHartIndex();
+
+  unsigned ixBase = 0, ixCount = 1;  // First vec and count of index registers
+  if (hart.getLastVecLdStRegsUsed(di, 2, ixBase, ixCount))  // Index reg is operand 2
     {
-      auto t0 = earliestOpTime(instr);
+      unsigned base = 0, count = 1;  // First vec and count of data registers
+      if (not hart.getLastVecLdStRegsUsed(di, 0, base, count)) // Data reg is operand 0
+	{
+	  assert(0);
+	  return false;
+	}
 
-      auto hartIx = hart.sysHartIndex();
-      const auto& regTime = hartData_.at(hartIx).regTime_;
-      const auto& regProducer = hartData_.at(hartIx).regProducer_;
+      std::vector<uint64_t> dataEarlyTimes;
+      getVecRegEarlyTimes(hart, instr, count, dataEarlyTimes);
 
-      unsigned base = 0, group = 1;
-      if (hart.getLastVecLdStRegsUsed(di, 2, base, group))  // Index reg is operand 2
-        {
-          unsigned offsetReg = base + vecRegOffset_;
-          for (unsigned i = 0; i < group; ++i)
-            {
-              uint64_t indexRegTime = regTime.at(offsetReg + i);
-	      if (indexRegTime < t0)
+      if (count <= ixCount)
+	{
+	  for (unsigned ii = 0; ii < ixCount; ++ii)  // for each index-reg index
+	    {
+	      uint64_t ixTime = vecRegTime(hartIx, ixBase + ii);
+	      unsigned di = ii * count / ixCount;
+	      uint64_t dataTime = dataEarlyTimes.at(di);
+	      if (ixTime < dataTime)
 		continue;
-	      producerTag = regProducer.at(offsetReg + i);
-	      producerTime = indexRegTime;
+
+	      producerTag = vecRegProducer(hartIx, ixBase + ii);
+	      producerTime = ixTime;
 	      return true;
 	    }
-        }
+	}
+      else   // For each index register there are muliple data register
+	{
+	  unsigned factor = count / ixCount;  // Data regs per index reg.
+
+	  for (unsigned ii = 0; ii < ixCount; ++ii)  // for each index-reg index
+	    {
+	      uint64_t ixTime = vecRegTime(hartIx, ixBase + ii);
+
+	      for (unsigned di = ii*factor; di < (ii+1)*factor; ++di)
+		{
+		  uint64_t dataTime = dataEarlyTimes.at(di);
+		  if (ixTime < dataTime)
+		    continue;
+
+		  producerTag = vecRegProducer(hartIx, ixBase + ii);
+		  producerTime = ixTime;
+		  return true;
+		}
+	    }
+	}
     }
 
   return false;
+}
+
+
+template <typename URV>
+void
+Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned count,
+			      std::vector<uint64_t>& times) const
+{
+  times.resize(count);
+  for (auto& t : times)
+    t = time_;   // Used retire time as default.
+
+  if (instr.memOps_.empty())
+    return;
+
+  if (count == 1)
+    {
+      uint64_t mint = time_;
+      for (const auto& opIx : instr.memOps_)
+	if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ < mint)
+	  mint = sysMemOps_.at(opIx).time_;
+
+      times.at(0) = mint;
+      return;
+    }
+
+  std::vector<uint64_t> addr, paddr, paddr2, data;
+  std::vector<bool> masked;
+  unsigned elemSize = 0;
+  if (not hart.getLastVectorMemory(addr, paddr, paddr2, data, masked, elemSize))
+    return;  // Should not happen.
+
+  unsigned elemsPerVec = hart.vecRegSize() / elemSize;
+
+  for (unsigned ix = 0; ix < count; ++ix)
+    {
+      uint64_t regTime = time_;  // Vector register time
+
+      unsigned offset = ix * elemsPerVec;
+      for (unsigned elemIx = 0; elemIx < elemsPerVec; ++elemIx)  // Elem ix in vec reg.
+	{
+	  unsigned ixInGroup = offset + elemIx;    // Elem ix in vec-reg-group
+	  if (ixInGroup >= addr.size())
+	    continue;  // Should not happen
+
+	  if (ixInGroup < masked.size() and masked.at(ixInGroup))
+	    {
+	      regTime = time_;  // What if mask-policy is preserve?
+	      continue;
+	    }
+
+	  uint64_t pa1 = paddr.at(ixInGroup), pa2 = paddr2.at(ixInGroup);
+	  unsigned size1 = elemSize, size2 = 0;
+	  if (pa1 != pa2)
+	    {
+	      size1 = offsetToNextPage(pa1);
+	      assert(size1 > 0 and size1 < 8);
+	      size2 = elemSize - size1;
+	    }
+
+	  for (unsigned i = 0; i < size1; ++i)
+	    {
+	      uint64_t addr = pa1 + i;
+	      uint64_t byteTime = earliestByteTime(instr, addr);
+	      regTime = std::min(byteTime, regTime);
+	    }
+
+	  for (unsigned i = 0; i < size2; ++i)
+	    {
+	      uint64_t addr = pa2 + i;
+	      uint64_t byteTime = earliestByteTime(instr, addr);
+	      regTime = std::min(byteTime, regTime);
+	    }
+	}
+
+      times.at(ix) = regTime;
+    }
 }
 
 

@@ -397,6 +397,9 @@ namespace WdRiscv
     bool isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr,
 			      McmInstrIx& producer, uint64_t& produerTime) const;
 
+    void getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned count,
+			     std::vector<uint64_t>& times) const;
+
     /// Trim read operations to match reference (whisper). Mark replay read ops as
     /// canceled. Remove cancled ops.
     bool commitReadOps(Hart<URV>& hart, McmInstr*);
@@ -438,6 +441,35 @@ namespace WdRiscv
     uint64_t lineAlign(uint64_t addr) const
     { return (addr >> lineShift_) << lineShift_; }
 
+    /// Set the tag of the instruction producing the latest data of the given vector
+    /// register.
+    void setVecRegProducer(unsigned hartIx, unsigned vecReg, McmInstrIx tag)
+    {
+      auto& regProducer = hartData_.at(hartIx).regProducer_;
+      regProducer.at(vecReg + vecRegOffset_) = tag;
+    }
+
+    /// Set the time the data of the given vector register was produced.
+    void setVecRegTime(unsigned hartIx, unsigned vecReg, uint64_t time)
+    {
+      auto& regTime = hartData_.at(hartIx).regTime_;
+      regTime.at(vecReg + vecRegOffset_) = time;
+    }
+
+    /// Return the time the data of the given vector register was produced.
+    uint64_t vecRegTime(unsigned hartIx, unsigned vecReg) const
+    {
+      const auto& regTime = hartData_.at(hartIx).regTime_;
+      return regTime.at(vecReg + vecRegOffset_);
+    }
+
+    /// Return the tag of the instruction producing the latest data in data of the given
+    /// vector register. Return 0 if no such instruction.
+    McmInstrIx vecRegProducer(unsigned hartIx, unsigned vecReg) const
+    {
+      const auto& regProducer = hartData_.at(hartIx).regProducer_;
+      return regProducer.at(vecReg + vecRegOffset_);
+    }
 
     /// Remove from hartPendingWrites_ the write ops falling with the given RTL
     /// line and masked by rtlMask (rtlMask bit is on for op bytes) and place

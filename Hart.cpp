@@ -4612,13 +4612,8 @@ Hart<URV>::getLastVecLdStRegsUsed(const DecodedInst& di, unsigned opIx,
 
   unsigned group = vecOpEmul(opIx);
 
-  if (fieldCount)
-    {
-      if (opIx == 2 and isIndexed)
-	elemCount /= fieldCount;  // Adjust index vector element count.
-      else
-	group *= di.vecFieldCount();  // Adjust non index vector group.
-    }
+  if (fieldCount and opIx == 2 and isIndexed)  // Operand 2 in vector index register.
+    elemCount /= fieldCount;  // Adjust index vector element count.
 
   regCount = group;
   if (elemCount < elemsPerVec*group)
