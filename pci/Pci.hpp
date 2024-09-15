@@ -29,7 +29,6 @@ class Pci {
       else if (addr >= mmio_base_ and addr < (mmio_base_ + mmio_len_))
         mmio<T>(addr, data, w);
 
-      assert(false);
       return;
     }
 
