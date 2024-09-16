@@ -1334,6 +1334,8 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       line.push_back(byte);
     }
 
+  std::vector<McmInstrIx> insertTags(lineSize_);
+
   // Apply pending writes (from mbinsert operations) to our line and to memory.
   for (const auto& write : coveredWrites)
     {
@@ -1365,7 +1367,10 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 
       unsigned ix = write.physAddr_ - physAddr;
       for (unsigned i = 0; i < write.size_; ++i)
-	line.at(ix+i) = ((uint8_t*) &(write.rtlData_))[i];
+	{
+	  line.at(ix+i) = ((uint8_t*) &(write.rtlData_))[i];
+	  insertTags.at(ix+i) = write.instrTag_;
+	}
     }
 
   // Compare inserted data to written (drained) data.
@@ -1374,11 +1379,16 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
   for (unsigned i = 0; i < count; ++i)
     if ((rtlMask.empty() or rtlMask.at(i)) and (line.at(i) != rtlData.at(i)))
       {
+	cerr << "Error: hart-id=" << hart.hartId() << " time=" << time;
 	uint64_t addr = physAddr + i;
-	cerr << "Error: Mismatch on merge buffer write time=" << time
-	     << " hart-id=" << hart.hartId() << " addr=0x" << std::hex
-	     << addr << " write-data=0x" << unsigned(rtlData.at(i))
-	     << " insert-data=0x" << unsigned(line.at(i)) << std::dec << '\n';
+	if (insertTags.at(i) == 0)
+	  cerr << " merge-buffer write without corresponding insert addr=0x"
+	       << std::hex << addr << std::dec << '\n';
+	else
+	  cerr << " merge-buffer write does not match merge-buffer insert addr=0x"
+	       << std::hex << addr << " write-data=0x" << unsigned(rtlData.at(i))
+	       << " insert-data=0x" << unsigned(line.at(i)) << std::dec
+	       << " insert-tag=" << insertTags.at(i) << '\n';
 	result = false;
 	break;
       }
