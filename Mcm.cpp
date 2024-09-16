@@ -478,7 +478,7 @@ Mcm<URV>::updateVecRegTimes(const Hart<URV>& hart, const McmInstr& instr)
   auto& regProducer = hartData_.at(hartIx).regProducer_;
   auto& regTimeVec = hartData_.at(hartIx).regTime_;
 
-  uint64_t time = 0, tag = instr.tag_;
+  uint64_t time = 0, tag = 0;
 
   assert(di.ithOperandMode(0) == OperandMode::Write);  // 1st operand must be the destination
 
@@ -523,7 +523,7 @@ Mcm<URV>::updateVecRegTimes(const Hart<URV>& hart, const McmInstr& instr)
   for (unsigned ii = 0; ii < destEmul; ++ii)
     {
       time = 0;
-      tag = instr.tag_;
+      tag = 0;
 
       auto destIx = baseDestIx + ii;
 
@@ -3653,13 +3653,14 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
 
   McmInstrIx ixTag = 0; // Producer of vector index register.
   uint64_t ixTime = 0;  // Producer time of vector index register.
-  if (isVecIndexOutOfOrder(hart, instrB, ixTag, ixTime))
+  unsigned ixReg = 0;   // Vector index register.
+  if (isVecIndexOutOfOrder(hart, instrB, ixReg, ixTag, ixTime))
     {
       auto t0 = earliestOpTime(instrB);
 
       cerr << "Error: PPO rule 9 failed: hart-id=" << hart.hartId() << " tag1="
 	   << ixTag << " tag2=" << instrB.tag_ << " time1=" << ixTime
-	   << " time2=" << t0 << '\n';
+	   << " time2=" << t0 << " vec-ix-reg=" << ixReg << '\n';
       return false;
     }
 
@@ -3933,11 +3934,13 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 
       McmInstrIx ixProducer = 0;   // Vector index register producer.
       uint64_t ixTime = 0;         // Vector index register producer time.
-      if (isVecIndexOutOfOrder(hart, instrB, ixProducer, ixTime))
+      unsigned ixReg = 0;          // Vector index register.
+      if (isVecIndexOutOfOrder(hart, instrB, ixReg, ixProducer, ixTime))
 	{
 	  cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
 	       << mdpt << " tag2=" << instrB.tag_ << " mtag=" << ixProducer
-	       << " time1=" << ixTime << " time2=" << earlyB << " dep=addr\n";
+	       << " time1=" << ixTime << " time2=" << earlyB << " dep=addr"
+	       << " vec-ix-reg=" << ixReg << '\n';
 	  return false;
 	}
 	
@@ -4005,11 +4008,13 @@ Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
 
       McmInstrIx ixTag = 0; // Producer of vector index register.
       uint64_t ixTime = 0;  // Producer time of vector index register.
-      if (isVecIndexOutOfOrder(hart, instrB, ixTag, ixTime))
+      unsigned ixReg = 0;   // Vector index register.
+      if (isVecIndexOutOfOrder(hart, instrB, ixReg, ixTag, ixTime))
 	{
 	    cerr << "Error: PPO rule 13 failed: hart-id=" << hart.hartId() << " tag1="
 		 << ixTag << " tag2=" << instrB.tag_ << " mtag=" << mTag
-		 << " time1=" << ixTime << " time2=" << earlyB << '\n';
+		 << " time1=" << ixTime << " time2=" << earlyB
+		 << " vec-ix-reg=" << ixReg << '\n';
 	    return false;
 	}
     }
@@ -4122,7 +4127,7 @@ Mcm<URV>::checkSfenceWInval(Hart<URV>& hart, const McmInstr& instr) const
 
 template <typename URV>
 bool
-Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr,
+Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned& ixReg,
 			       McmInstrIx& producerTag, uint64_t& producerTime) const
 {
   const auto& di = instr.di_;
@@ -4157,7 +4162,10 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr,
 		continue;
 
 	      producerTag = vecRegProducer(hartIx, ixBase + ii);
+	      if (producerTag == 0)
+		continue;
 	      producerTime = ixTime;
+	      ixReg = ixBase + ii;
 	      return true;
 	    }
 	}
@@ -4176,7 +4184,10 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr,
 		    continue;
 
 		  producerTag = vecRegProducer(hartIx, ixBase + ii);
+		  if (producerTag == 0)
+		    continue;
 		  producerTime = ixTime;
+		  ixReg = ixBase + ii;
 		  return true;
 		}
 	    }

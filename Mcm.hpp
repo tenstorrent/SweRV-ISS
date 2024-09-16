@@ -394,7 +394,7 @@ namespace WdRiscv
     /// an index register with a value produced after the instruction has used
     /// that index register. If out of order, set producer to the tag of the
     /// instruction producing the value of the ooo index register.
-    bool isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr,
+    bool isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned& ixReg,
 			      McmInstrIx& producer, uint64_t& produerTime) const;
 
     void getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned count,
