@@ -10714,6 +10714,43 @@ Hart<URV>::imsicAccessible(const DecodedInst* di, CsrNumber csr, PrivilegeMode m
               return false;
             }
         }
+
+        // From section 5.3, When mvien.SEIP is set, 0x70-0xFF are reserved and stopei
+        // are reserved from S-mode.
+        bool isS = privMode_ == PrivilegeMode::Supervisor and not virtMode_;
+        if (isS and (csr == CN::STOPEI or csr == CN::SIREG))
+          {
+            URV mvien;
+            if (not peekCsr(CsrNumber::MVIEN, mvien))
+              return false;
+
+            if ((mvien >> 9) & 1)
+              {
+                if (csr == CN::STOPEI)
+                  {
+                    illegalInst(di);
+                    return false;
+                  }
+                else // sireg
+                  {
+                    CN iselect = CsRegs<URV>::advance(csr, -1);
+                    URV sel = 0;
+                    if (not peekCsr(iselect, sel))
+                      {
+                        std::cerr << "Failed to peek AIA select csr\n";
+                        return false;
+                      }
+
+                    using EIC = TT_IMSIC::File::ExternalInterruptCsr;
+                    if (sel >= EIC::DELIVERY and
+                        sel <= EIC::E63)
+                      {
+                        illegalInst(di);
+                        return false;
+                      }
+                  }
+              }
+          }
     }
   else if (csr == CN::MTOPEI or csr == CN::STOPEI or csr == CN::VSTOPEI or
            csr == CN::MIREG or csr == CN::SIREG or csr == CN::VSIREG)
