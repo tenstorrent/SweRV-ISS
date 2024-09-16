@@ -4205,7 +4205,7 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned c
 {
   times.resize(count);
   for (auto& t : times)
-    t = time_;   // Used retire time as default.
+    t = time_;   // Use retire time as default.
 
   if (instr.memOps_.empty())
     return;
@@ -4259,7 +4259,8 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned c
 	    {
 	      uint64_t addr = pa1 + i;
 	      uint64_t byteTime = earliestByteTime(instr, addr);
-	      regTime = std::min(byteTime, regTime);
+	      if (byteTime > 0)  // Byte time is zero for undrained writes.
+		regTime = std::min(byteTime, regTime);
 	    }
 
 	  for (unsigned i = 0; i < size2; ++i)
