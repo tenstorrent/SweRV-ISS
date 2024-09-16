@@ -761,7 +761,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
           if (di.isBranchToRegister() and
               di.op0() == 0 and di.op1() == IntRegNumber::RegRa and di.op2() == 0)
             buffer.printChar('r');
-          else if (di.op0() == IntRegNumber::RegRa)
+          else if (di.op0() == IntRegNumber::RegRa or di.op0() == IntRegNumber::RegX5)
             buffer.printChar('c');
           else
             buffer.printChar('j');
