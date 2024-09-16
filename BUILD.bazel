@@ -35,7 +35,7 @@ cc_binary(
 )
 
 pybind_extension(
-    name          = "py-bindings",
+    name          = "pywhisper",
     srcs          = ["py-bindings.cpp"],
     deps          = [":rvcore"],
     local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS"],
@@ -43,6 +43,7 @@ pybind_extension(
 )
 
 py_library(
-    name          = "pywhisper",
-    data          = ["py-bindings.so"],
+    name          = "pywhisper_lib",
+    data          = ["pywhisper.so"],
+    visibility    = ["//visibility:public"],
 )
