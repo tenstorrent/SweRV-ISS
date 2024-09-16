@@ -383,6 +383,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableSvinval(true);
   if (isa_.isEnabled(RvExtension::Svpbmt))
     enableTranslationPbmt(true);
+  if (isa_.isEnabled(RvExtension::Svadu))
+    enableTranslationAdu(true);
   if (isa_.isEnabled(RvExtension::Smrnmi))
     enableSmrnmi(true);
   if (isa_.isEnabled(RvExtension::Zicntr))
@@ -688,6 +690,8 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 
   // Reflect initial state of menvcfg CSR on pbmt and sstc.
   updateTranslationPbmt();
+  updateTranslationAdu();
+  updateTranslationPmm();
   csRegs_.updateSstc();
 
   // If any PMACFG CSR is defined, change the default PMA to no access.
@@ -3420,6 +3424,7 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
   else if (csr == CN::MENVCFG or csr == CN::SENVCFG or csr == CN::HENVCFG)
     {
       updateTranslationPbmt();
+      updateTranslationAdu();
       updateTranslationPmm();
       csRegs_.updateSstc();
       stimecmpActive_ = csRegs_.menvcfgStce();

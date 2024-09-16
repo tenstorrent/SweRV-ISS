@@ -398,6 +398,10 @@ namespace WdRiscv
     void enableSvinval(bool flag)
     { enableExtension(RvExtension::Svinval, flag); }
 
+    /// Enable Svadu extension.
+    void enableTranslationAdu(bool flag)
+    { enableExtension(RvExtension::Svadu, flag); updateTranslationAdu(); }
+
     /// Called when Svpbmt configuration changes. Enable/disable pbmt in
     /// virtual memory class.
     void updateTranslationPbmt()
@@ -407,21 +411,34 @@ namespace WdRiscv
 
       auto menv = csRegs_.getImplementedCsr(CsrNumber::MENVCFG);
       if (menv)
+	flag = flag and csRegs_.menvcfgPbmte();
+      virtMem_.enablePbmt(flag);
+      auto henv = csRegs_.getImplementedCsr(CsrNumber::HENVCFG);
+      if (henv)
+        flag = flag and csRegs_.henvcfgPbmte();
+      virtMem_.enableVsPbmt(flag);
+    }
+
+    /// Called when Svadu configuration changes. Enable/disable A/D
+    /// hardware updates.
+    void updateTranslationAdu()
+    {
+      bool flag = extensionIsEnabled(RvExtension::Svadu);
+      csRegs_.enableSvadu(flag);
+
+      auto menv = csRegs_.getImplementedCsr(CsrNumber::MENVCFG);
+      if (menv)
 	{
-	  flag = flag and csRegs_.menvcfgPbmte();
 	  bool adu = csRegs_.menvcfgAdue();
 	  virtMem_.setFaultOnFirstAccess(not adu);
 	  virtMem_.setFaultOnFirstAccessStage2(not adu);
 	}
-      virtMem_.enablePbmt(flag);
       auto henv = csRegs_.getImplementedCsr(CsrNumber::HENVCFG);
       if (henv)
 	{
-          flag = flag and csRegs_.henvcfgPbmte();
 	  bool adu = csRegs_.henvcfgAdue();
 	  virtMem_.setFaultOnFirstAccessStage1(not adu);
 	}
-      virtMem_.enableVsPbmt(flag);
     }
 
     /// Called when pointer masking configuration changes.
