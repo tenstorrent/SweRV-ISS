@@ -11296,11 +11296,10 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
       vecRegs_.ldStPa_.push_back(addr);
       vecRegs_.ldStPa2_.push_back(addr);
       vecRegs_.maskedAddr_.push_back(skip);
+      vecRegs_.stData_.push_back(0);
+
       if (skip)
-	{
-	  vecRegs_.stData_.push_back(0);
-	  continue;
-	}
+	continue;
 
       ELEM_TYPE elem = 0;
       vecRegs_.read(vd, ix, groupX8, elem);
@@ -11316,7 +11315,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 	    assert(0);
           vecRegs_.ldStPa_.back() = pa1;
 	  vecRegs_.ldStPa2_.back() = pa2;
-	  vecRegs_.stData_.push_back(elem);
+	  vecRegs_.stData_.back() = elem;
 	}
       else
         {
@@ -12020,11 +12019,10 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
       vecRegs_.ldStPa_.push_back(addr);
       vecRegs_.ldStPa2_.push_back(addr);
       vecRegs_.maskedAddr_.push_back(skip);
+      vecRegs_.stData_.push_back(0);
+
       if (skip)
-	{
-	  vecRegs_.stData_.push_back(0);
-	  continue;
-	}
+	continue;
 
       ELEM_TYPE elem = 0;
       vecRegs_.read(vd, ix, groupX8, elem);
@@ -12038,9 +12036,9 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 	{
 	  if (not writeForStore(addr, pa1, pa2, elem))
 	    assert(0);
-	  vecRegs_.stData_.push_back(elem);
           vecRegs_.ldStPa_.back() = pa1;
 	  vecRegs_.ldStPa2_.back() = pa2;
+	  vecRegs_.stData_.back() = elem;
 	}
       else
         {
@@ -12385,11 +12383,9 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       vecRegs_.ldStPa_.push_back(vaddr);
       vecRegs_.ldStPa2_.push_back(vaddr);
       vecRegs_.maskedAddr_.push_back(skip);
+      vecRegs_.stData_.push_back(0);
       if (skip)
-	{
-	  vecRegs_.stData_.push_back(0);
-	  continue;
-	}
+	continue;
 
       uint64_t pa1 = vaddr, pa2 = vaddr; // Physical addresses or faulting virtual addresses.
       uint64_t gpa1 = vaddr, gpa2 = vaddr;
@@ -12449,9 +12445,9 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
           return false;
         }
 
-      vecRegs_.stData_.push_back(data);
       vecRegs_.ldStPa_.back() = pa1;
       vecRegs_.ldStPa2_.back() = pa2;
+      vecRegs_.stData_.back() = data;
     }
 
   return true;
@@ -12842,11 +12838,9 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
           vecRegs_.ldStPa_.push_back(faddr);
           vecRegs_.ldStPa2_.push_back(faddr);
 	  vecRegs_.maskedAddr_.push_back(skip);
+	  vecRegs_.stData_.push_back(0);
 	  if (skip)
-	    {
-	      vecRegs_.stData_.push_back(0);
-	      continue;
-	    }
+	    continue;
 
 	  ELEM_TYPE elem = 0;
 	  vecRegs_.read(dvg, ix, groupX8, elem);
@@ -12857,9 +12851,9 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	    {
 	      if (not writeForStore(faddr, pa1, pa2, elem))
 		assert(0);
-	      vecRegs_.stData_.push_back(elem);
               vecRegs_.ldStPa_.back() = pa1;
               vecRegs_.ldStPa2_.back() = pa2;
+	      vecRegs_.stData_.back() = elem;
 	    }
 	  else
 	    {
@@ -13348,11 +13342,10 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
           vecRegs_.ldStPa_.push_back(faddr);
           vecRegs_.ldStPa2_.push_back(faddr);
 	  vecRegs_.maskedAddr_.push_back(skip);
+	  vecRegs_.stData_.push_back(0);
+
 	  if (skip)
-	    {
-	      vecRegs_.stData_.push_back(0);
-	      continue;
-	    }
+	    continue;
 
 	  auto cause = ExceptionCause::NONE;
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
@@ -13412,9 +13405,9 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	      return false;
 	    }
 
-	  vecRegs_.stData_.push_back(data);
           vecRegs_.ldStPa_.back() = pa1;
           vecRegs_.ldStPa2_.back() = pa2;
+	  vecRegs_.stData_.back() = data;
 	}
     }
 

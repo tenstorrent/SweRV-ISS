@@ -904,10 +904,11 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 
       for (unsigned i = 0; i < addr.size(); ++i)
         {
-	  uint64_t pa1 = paddr.at(i), pa2 = paddr2.at(i), value = data.at(i);
           bool skip = i < masked.size() and masked.at(i);
 	  if (skip)
 	    continue;
+
+	  uint64_t pa1 = paddr.at(i), pa2 = paddr2.at(i), value = data.at(i);
 
 	  if (pa1 == pa2)
 	    vecRefs.add(pa1, value, elemSize);
@@ -1382,10 +1383,10 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	cerr << "Error: hart-id=" << hart.hartId() << " time=" << time;
 	uint64_t addr = physAddr + i;
 	if (insertTags.at(i) == 0)
-	  cerr << " merge-buffer write without corresponding insert addr=0x"
+	  cerr << " merge-buffer write without corresponding insert phys-addr=0x"
 	       << std::hex << addr << std::dec << '\n';
 	else
-	  cerr << " merge-buffer write does not match merge-buffer insert addr=0x"
+	  cerr << " merge-buffer write does not match merge-buffer insert phys-addr=0x"
 	       << std::hex << addr << " write-data=0x" << unsigned(rtlData.at(i))
 	       << " insert-data=0x" << unsigned(line.at(i)) << std::dec
 	       << " insert-tag=" << insertTags.at(i) << '\n';
