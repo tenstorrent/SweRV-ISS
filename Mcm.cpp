@@ -3704,25 +3704,29 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
 
   if (bdi.isVectorStore())
     {
-      auto earlyB = earliestOpTime(instrB);
-
       auto hartIx = hart.sysHartIndex();
       const auto& regTime = hartData_.at(hartIx).regTime_;
       const auto& regProducer = hartData_.at(hartIx).regProducer_;
 
-      unsigned base = 0, group = 1;
-      if (hart.getLastVecLdStRegsUsed(bdi, 0, base, group))  // Dest reg is oeprand 0
+      unsigned base = 0, count = 1;
+      if (hart.getLastVecLdStRegsUsed(bdi, 0, base, count))  // Dest reg is oeprand 0
 	{
+	  std::vector<uint64_t> dataEarlyTimes;  // Times when B wrote its registers.
+	  getVecRegEarlyTimes(hart, instrB, count, dataEarlyTimes);
+
           unsigned offsetReg = base + vecRegOffset_;
-          for (unsigned i = 0; i < group; ++i)
+          for (unsigned i = 0; i < count; ++i)
             {
-              uint64_t time = regTime.at(offsetReg + i);
-	      auto tag = regProducer.at(offsetReg + i);
-	      if (earlyB <= time)
+	      auto atag = regProducer.at(offsetReg + i);
+	      if (atag == 0)
+		continue;
+              auto atime = regTime.at(offsetReg + i);  // Time B data reg was produced.
+	      auto btime = dataEarlyTimes.at(i);       // Time B data reg was written.
+	      if (btime <= atime)
 		{
 		  cerr << "Error: PPO rule 10 failed: hart-id=" << hart.hartId()
-		       << " tag1=" << tag << " tag2=" << instrB.tag_ << " time1="
-		       << time << " time2=" << earlyB << '\n';
+		       << " tag1=" << atag << " tag2=" << instrB.tag_ << " time1="
+		       << atime << " time2=" << btime << '\n';
 		}
 	      return false;
 	    }
@@ -3934,17 +3938,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	    return false;
 	  }
 
-      McmInstrIx ixProducer = 0;   // Vector index register producer.
-      uint64_t ixTime = 0;         // Vector index register producer time.
-      unsigned ixReg = 0;          // Vector index register.
-      if (isVecIndexOutOfOrder(hart, instrB, ixReg, ixProducer, ixTime))
-	{
-	  cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
-	       << mdpt << " tag2=" << instrB.tag_ << " mtag=" << ixProducer
-	       << " time1=" << ixTime << " time2=" << earlyB << " dep=addr"
-	       << " vec-ix-reg=" << ixReg << '\n';
-	  return false;
-	}
+      // TODO FIX : handle case where M is an indexed vector store.
 	
       if (mapt != mdpt and dp.isMemory())
 	if (not dp.complete_ or isBeforeInMemoryTime(instrB, dp))
@@ -3989,7 +3983,7 @@ Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
 
   auto earlyB = earliestOpTime(instrB);
 
-  // Look for a memory instruction M ahead between B and instruction with minTag.
+  // Look for a memory instruction M between B and instruction with minTag.
   for (McmInstrIx mTag = instrB.tag_ - 1; mTag >= minTag; --mTag)
     {
       const auto& instrM = instrVec.at(mTag);
@@ -4008,17 +4002,7 @@ Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
 	    return false;
 	  }
 
-      McmInstrIx ixTag = 0; // Producer of vector index register.
-      uint64_t ixTime = 0;  // Producer time of vector index register.
-      unsigned ixReg = 0;   // Vector index register.
-      if (isVecIndexOutOfOrder(hart, instrB, ixReg, ixTag, ixTime))
-	{
-	    cerr << "Error: PPO rule 13 failed: hart-id=" << hart.hartId() << " tag1="
-		 << ixTag << " tag2=" << instrB.tag_ << " mtag=" << mTag
-		 << " time1=" << ixTime << " time2=" << earlyB
-		 << " vec-ix-reg=" << ixReg << '\n';
-	    return false;
-	}
+      // TODO FIX : handle case where M is an indexed vector store.
     }
 
   return true;
