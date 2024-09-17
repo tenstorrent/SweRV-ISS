@@ -1623,9 +1623,13 @@ namespace WdRiscv
     void enableClearMtvalOnEbreak(bool flag)
     { clearMtvalOnEbreak_ = flag; }
 
-    /// Disable clearing of reservation set after xRET
+    /// Enable/disable clearing of reservation set after xRET
     void enableCancelLrOnTrap(bool flag)
     { cancelLrOnTrap_ = flag; }
+
+    /// Enable/disable clearing of reservation set on entering debug mode.
+    void enableCancelLrOnDebug(bool flag)
+    { cancelLrOnDebug_ = flag; }
 
     /// Enable/disable misaligned access. If disabled then misaligned
     /// ld/st will trigger an exception.
@@ -1975,11 +1979,16 @@ namespace WdRiscv
     /// to the interrupt cause; otherwise, leave cause unmodified.
     bool isInterruptPossible(URV mipValue, InterruptCause& cause) const;
 
-    /// Configure this hart to set its program counter to the given
-    /// addr on entering debug mode. If addr bits are all set, then
-    /// the PC is not changed on entering debug mode.
+    /// Configure this hart to set its program counter to the given addr on entering debug
+    /// mode. If addr bits are all set, then the PC is not changed on entering debug mode.
     void setDebugParkLoop(URV addr)
     { debugParkLoop_ = addr; }
+
+    /// Return true if the hart is in the debug park loop (DPL): debug park loop is
+    /// defined and an EBREAK exception was seen. We leave DPL when ebreak instruction is
+    /// executed.
+    bool inDebugParkLoop() const
+    { return inDebugParkLoop_; }
 
     /// Configure this hart to set its program counter to the given
     /// addr on encountering a trap (except breakpoint) during debug
@@ -5194,7 +5203,8 @@ namespace WdRiscv
     URV effectiveIe_ = 0;           // Effective interrupt enable.
 
     bool clearMprvOnRet_ = true;
-    bool cancelLrOnTrap_ = true;    // Cancel reservation on traps when true.
+    bool cancelLrOnTrap_ = false;   // Cancel reservation on traps when true.
+    bool cancelLrOnDebug_ = false;  // Cancel
 
     // Make hfence.gvma ignore huest physical addresses when true.
     bool hfenceGvmaIgnoresGpa_ = false;
@@ -5209,6 +5219,8 @@ namespace WdRiscv
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
     URV debugParkLoop_ = ~URV(0);    // Jump to this address on entering debug mode.
     URV debugTrapAddr_ = ~URV(0);    // Jump to this address on exception in debug mode.
+
+    bool inDebugParkLoop_ = false;    // True if BREAKP exception goes to DPL.
 
     bool clearMtvalOnIllInst_ = true;
     bool clearMtvalOnEbreak_ = true;

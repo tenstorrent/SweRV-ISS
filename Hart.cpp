@@ -2606,15 +2606,18 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
     }
 #endif
 
-  // In debug mode no exception is taken. If an ebreak exception and
-  // debug park loop is defined, we jump to it. If not an ebreak and
-  // debug trap entry point is defined, we jump to it.
+  // In debug mode no exception is taken. If we get an ebreak exception and debug park
+  // loop is defined, we jump to it. If we get a non-ebreak exception and debug trap entry
+  // point is defined, we jump to it.
   if (debugMode_)
     {
       if (cause == ExceptionCause::BREAKP)
 	{
 	  if (debugParkLoop_ != ~URV(0))
-	    setPc(debugParkLoop_);
+	    {
+	      inDebugParkLoop_ = true;
+	      setPc(debugParkLoop_);
+	    }
 	}
       else if (debugTrapAddr_ != ~URV(0))
 	setPc(debugTrapAddr_);
@@ -9461,10 +9464,11 @@ template <typename URV>
 void
 Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
 {
-  cancelLr(CancelLrCause::ENTER_DEBUG);  // Entering debug modes loses LR reservation.
+  if (cancelLrOnDebug_)
+    cancelLr(CancelLrCause::ENTER_DEBUG);  // Lose LR reservation.
 
   if (debugMode_)
-    std::cerr << "Error: Entering debug-mode while in debug-mode\n";
+    std::cerr << "Warning: Entering debug-mode while in debug-mode\n";
   debugMode_ = true;
   csRegs_.enterDebug(true);
 
@@ -9950,8 +9954,14 @@ Hart<URV>::execEbreak(const DecodedInst*)
       return;
     }
 
-  // If in machine/supervisor/user mode and DCSR bit ebreakm/s/u is
-  // set, then enter debug mode.
+  if (inDebugParkLoop_)
+    {
+      inDebugParkLoop_ = false;
+      return;
+    }
+
+  // If in machine/supervisor/user mode and DCSR bit ebreakm/s/u is set, then enter debug
+  // mode.
   URV dcsrVal = 0;
   if (peekCsr(CsrNumber::DCSR, dcsrVal))
     {
@@ -9965,8 +9975,8 @@ Hart<URV>::execEbreak(const DecodedInst*)
 
       if (debug)
         {
-          // The documentation (RISCV external debug support) does
-          // not say whether or not we set EPC and MTVAL.
+          // The documentation (RISCV external debug support) does not say whether or not
+          // we set EPC and MTVAL.
           enterDebugMode_(DebugModeCause::EBREAK, currPc_);
           ebreakInstDebug_ = true;
           recordCsrWrite(CsrNumber::DCSR);
