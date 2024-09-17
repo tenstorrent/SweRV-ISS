@@ -1093,7 +1093,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (di.isAmo() and (not instrHasRead(*instr) or not instrHasWrite(*instr)))
     {
       cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << tag
-	   << " AMO instruction retired before read/write op.\n";
+	   << " AMO instruction retired before read/write op\n";
       return false;
     }
 
@@ -1199,6 +1199,8 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
 
   uint64_t lineEnd = rtlAddr + rtlLineSize;
 
+  bool ok = true;
+
   for (size_t i = 0; i < pendingWrites.size(); ++i)
     {
       auto& op = pendingWrites.at(i);  // Write op
@@ -1212,10 +1214,10 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
 	{
 	  if (op.physAddr_ + op.size_  > lineEnd)
 	    {
-	      cerr << "Error: Pending store address out of line bounds time=" << time
+	      cerr << "Error: Pending write address out of line bounds time=" << time
 		   << " hart-id=" << hart.hartId() << " addr=0x" << std::hex
 		   << op.physAddr_ << std::dec << "\n";
-	      return false;
+	      ok = false;
 	    }
 
 	  if (not instr or instr->isCanceled())
@@ -1223,7 +1225,7 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
 	      cerr << "Error: Write for an invalid/speculated store time=" << time
 		   << " hart-id=" << hart.hartId() << " tag=" << op.instrTag_
 		   << " addr=0x" << std::hex << op.physAddr_ << std::dec << "\n";
-	      return false;
+	      ok = false;
 	    }
 
 	  if (rtlMask.empty())
@@ -1241,11 +1243,11 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
 	      written = masked != 0;
 	      if (written and masked != op.size_)
 		{
-		  cerr << "Error: time=" << time << " hart-id=" << hart.hartId()
+		  cerr << "Error: hart-id=" << hart.hartId() << " time=" << time
 		       << " tag=" << op.instrTag_ << " addr=0x" << std::hex
 		       << op.physAddr_ << std::dec << " Merge buffer insert operation"
-		       << " is only partially covered by a merge buffer write.\n";
-		  return false;
+		       << " is only partially covered by a merge buffer write\n";
+		  ok = false;
 		}
 	    }
 	}
@@ -1276,8 +1278,8 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
 	  cerr << "Error: hart-id=" << hart.hartId() << " time=" << time
 	       << " tag1=" << prev.instrTag_ << " tag2=" << op.instrTag_
 	       << " time1=" << prev.time_ << " time2=" << op.time_
-	       << " merge buffer has instructions not in program order.\n";
-	  return false;
+	       << " merge buffer has instructions not in program order\n";
+	  ok = false;
 	}
       assert(op.time_ >= prev.time_);
     }
@@ -1293,7 +1295,7 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
       sysMemOps_.push_back(op);
     }
 
-  return true;
+  return ok;
 }
 
 
@@ -1383,10 +1385,10 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	cerr << "Error: hart-id=" << hart.hartId() << " time=" << time;
 	uint64_t addr = physAddr + i;
 	if (insertTags.at(i) == 0)
-	  cerr << " merge-buffer write without corresponding insert phys-addr=0x"
+	  cerr << " merge-buffer write without corresponding insert addr=0x"
 	       << std::hex << addr << std::dec << '\n';
 	else
-	  cerr << " merge-buffer write does not match merge-buffer insert phys-addr=0x"
+	  cerr << " merge-buffer write does not match merge-buffer insert addr=0x"
 	       << std::hex << addr << " write-data=0x" << unsigned(rtlData.at(i))
 	       << " insert-data=0x" << unsigned(line.at(i)) << std::dec
 	       << " insert-tag=" << insertTags.at(i) << '\n';
@@ -1481,7 +1483,7 @@ Mcm<URV>::cancelInstr(Hart<URV>& hart, McmInstr& instr)
   if (iter != undrained.end())
     {
       std::cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << instr.tag_ <<
-	" canceled or trapped instruction has a write operation.\n";
+	" canceled or trapped instruction has a write operation\n";
       undrained.erase(iter);
     }
 
@@ -1557,9 +1559,9 @@ Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
 
   if (op.rtlData_ != op.data_)
     {
-      cerr << "Error: RTL/whisper read mismatch time=" << op.time_
-	   << " hart-id=" << hart.hartId() << " instr-tag=" 
-	   << op.instrTag_ << " addr=0x" << std::hex << addr
+      cerr << "Error: hart-id=" << hart.hartId() << " instr-tag=" << op.instrTag_
+	   << " time=" << op.time_ << " RTL/whisper read mismatch "
+	   << " addr=0x" << std::hex << addr
 	   << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
 	   << " whisper=0x" << op.data_ << std::dec << '\n';
       return false;
@@ -2122,8 +2124,8 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
       {
 	complete = false;
 	ok = false;
-	cerr << "Error: hart-id= " << hart.hartId() << " tag=" << instr->tag_
-	     << " phys-addr=0x" << std::hex << addr << std::dec
+	cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr->tag_
+	     << " addr=0x" << std::hex << addr << std::dec
 	     << " read ops do not cover all the bytes of vector load instruction\n";
 	break;
       }
@@ -3038,7 +3040,7 @@ Mcm<URV>::finalChecks(Hart<URV>& hart)
 
   const auto& pendingWrites = hartData_.at(hartIx).pendingWrites_;
   if (not pendingWrites.empty())
-    cerr << "Warning: Merge buffer is not empty at end of run.\n";
+    cerr << "Warning: Merge buffer is not empty at end of run\n";
 
   uint64_t toHost = 0;
   bool hasToHost = hart.getToHostAddress(toHost);
@@ -3050,7 +3052,7 @@ Mcm<URV>::finalChecks(Hart<URV>& hart)
       const auto& instr = instrVec.at(tag);
       if (not hasToHost or toHost != instr.virtAddr_)
 	cerr << "Warning: Hart-id=" << hart.hartId() << " tag=" << instr.tag_
-	     << " Store instruction is not drained at end of run.\n";
+	     << " Store instruction is not drained at end of run\n";
     }
 
   return true;
@@ -4120,7 +4122,7 @@ Mcm<URV>::checkSfenceWInval(Hart<URV>& hart, const McmInstr& instr) const
     return true;
 
   cerr << "Error: Hart-id=" << hart.hartId() << "sfence.w.inval tag=" << instr.tag_
-       << " retired while there are pending stores in the store/merge buffer.\n";
+       << " retired while there are pending stores in the store/merge buffer\n";
   return false;
 }
 
