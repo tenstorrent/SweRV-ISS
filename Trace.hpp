@@ -389,21 +389,22 @@ namespace WdRiscv
         return 0;
 
       std::unordered_set<uint64_t> pages;
-      const auto& addrs = hart_->vecRegs().ldStAddrs();
-      const auto& masked = hart_->vecRegs().maskedAddrs();
-      assert(addrs.size() == masked.size());
 
-      for (unsigned i = 0; i < addrs.size(); ++i)
-        {
-          const auto& addr = addrs.at(i);
-          const auto& mask = masked.at(i);
+      unsigned elemSize = 0;
+      auto& info = hart.getLastVectorMemory(elemSize);
 
-          if (not mask)
-            {
-              unsigned page = hart_->virtMem().pageNumber(addr);
-              pages.emplace(page);
-            }
-        }
+      if (elemSize != 0)
+	for (auto& einfo : info)
+	  {
+	    const auto& addr = einfo.va_;
+	    const auto& mask = einfo.masked_;
+
+	    if (not mask)
+	      {
+		unsigned page = hart_->virtMem().pageNumber(addr);
+		pages.emplace(page);
+	      }
+	  }
       return pages.size();
     }
 
