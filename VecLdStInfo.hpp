@@ -53,6 +53,24 @@ namespace WdRiscv
       elemSize_ = elemSize;
       vec_ = vecReg;
       isLoad_ = isLoad;
+      
+      isIndexed_ = false;
+      isSegmented_ = false;
+
+      ixVec_ = 0;
+      fields_ = 0;
+    }
+
+    void initIndexed(unsigned elemSize, unsigned vecReg, unsigned ixReg, bool isLoad)
+    {
+      init(elemSize, vecReg, isLoad);
+      isIndexed_ = true;
+      ixVec_ = ixReg;
+    }
+
+    void setFieldCount(unsigned fields)
+    {
+      fields_ = fields;
     }
 
     void addElem(const VecLdStElem& elem)
@@ -73,10 +91,14 @@ namespace WdRiscv
       elems_.back().stData_ = data;
     }
 
-    unsigned elemSize_ = 0;
-    unsigned vec_ = 0;      // Base vector register of vector load/store instruction.
-    bool isLoad_ = false;
-    std::vector<VecLdStElem> elems_;
+    unsigned elemSize_ = 0;           // Elem size in bytes.
+    unsigned vec_ = 0;                // Base data vector register.
+    unsigned ixVec_ = 0;              // Base index vector register.
+    unsigned fields_ = 0;             // For load/store segment.
+    bool isLoad_ = false;             // True for load instructions.
+    bool isIndexed_ = false;          // True for indexed instructions.
+    bool isSegmented_ = false;        // True for load/store segment.
+    std::vector<VecLdStElem> elems_;  // Element info.
   };
 
 }

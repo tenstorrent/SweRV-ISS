@@ -12138,7 +12138,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   unsigned elemSize = elemWidth / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, true /*isLoad*/);
+  ldStInfo.initIndexed(elemSize, vd, vi, true /*isLoad*/);
 
   if (start >= vecRegs_.elemCount())
     return true;
@@ -12346,7 +12346,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   unsigned elemCount = vecRegs_.elemCount(), elemSize = elemWidth / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, false /*isLoad*/);
+  ldStInfo.initIndexed(elemSize, vd, vi, false /*isLoad*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
@@ -12589,6 +12589,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   unsigned elemSize = sizeof(ELEM_TYPE);
   auto& ldStInfo = vecRegs_.ldStInfo_;
   ldStInfo.init(elemSize, vd, true /*isLoad*/);
+  ldStInfo.setFieldCount(fieldCount);
 
   if (start >= vecRegs_.elemCount())
     return true;
@@ -12789,6 +12790,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
   ldStInfo.init(elemSize, vd, false /*isLoad*/);
+  ldStInfo.setFieldCount(fieldCount);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
     {
@@ -13113,7 +13115,8 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
     }
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, true /*isLoad*/);
+  ldStInfo.initIndexed(elemSize, vd, vi, true /*isLoad*/);
+  ldStInfo.setFieldCount(fieldCount);
 
   if (start >= vecRegs_.elemCount())
     return true;
@@ -13283,7 +13286,8 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
     }
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, false /*isLoad*/);
+  ldStInfo.initIndexed(elemSize, vd, vi, false /*isLoad*/);
+  ldStInfo.setFieldCount(fieldCount);
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
