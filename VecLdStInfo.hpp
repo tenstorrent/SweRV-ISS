@@ -30,6 +30,9 @@ namespace WdRiscv
     unsigned field_ = 0;   // For segment load store: field of element.
     bool masked_ = false;  // True if element is masked off (element skipped).
 
+    VecLdStElem()
+    { }
+
     VecLdStElem(uint64_t va, uint64_t pa, uint64_t pa2, uint64_t data, unsigned ix,
 		bool masked, unsigned field = 0)
       : va_{va}, pa_{pa}, pa2_{pa2}, stData_{data}, ix_{ix}, field_{field},
@@ -101,6 +104,13 @@ namespace WdRiscv
       elems_.back().pa_ = pa;
       elems_.back().pa2_ = pa2;
       elems_.back().stData_ = data;
+    }
+
+    /// Remove last added element.
+    void removeLastElem()
+    {
+      assert(not elems_.empty());
+      elems_.resize(elems_.size() - 1);
     }
 
     unsigned elemSize_ = 0;           // Elem size in bytes.

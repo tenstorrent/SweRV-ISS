@@ -11143,6 +11143,8 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
         }
       else
         {
+	  ldStInfo.removeLastElem();
+
 	  if (faultFirst)
 	    {
 	      if (ix == 0)
@@ -11309,6 +11311,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 	}
       else
         {
+	  ldStInfo.removeLastElem();
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
           return false;
@@ -11873,6 +11876,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
         }
       else
         {
+	  ldStInfo.removeLastElem();
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
           return false;
@@ -12020,6 +12024,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 	}
       else
         {
+	  ldStInfo.removeLastElem();
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
           return false;
@@ -12183,6 +12188,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	}
       else
         {
+	  ldStInfo.removeLastElem();
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
           return false;
@@ -12413,6 +12419,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
       if (cause != ExceptionCause::NONE)
         {
+	  ldStInfo.removeLastElem();
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
           return false;
@@ -12633,6 +12640,8 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
             }
 	  else
 	    {
+	      ldStInfo.removeLastElem();
+
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      if (ix == 0 or not faultFirst)
 		initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
@@ -12819,6 +12828,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	    }
 	  else
 	    {
+	      ldStInfo.removeLastElem();
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
 	      return false;
@@ -13166,6 +13176,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	    }
 	  else
 	    {
+	      ldStInfo.removeLastElem();
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
 	      return false;
@@ -13358,6 +13369,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
 	  if (cause != ExceptionCause::NONE)
 	    {
+	      ldStInfo.removeLastElem();
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
 	      return false;
