@@ -391,7 +391,7 @@ namespace WdRiscv
       std::unordered_set<uint64_t> pages;
 
       unsigned elemSize = 0;
-      auto& info = hart.getLastVectorMemory(elemSize);
+      auto& info = hart_->getLastVectorMemory(elemSize);
 
       if (elemSize != 0)
 	for (auto& einfo : info)
