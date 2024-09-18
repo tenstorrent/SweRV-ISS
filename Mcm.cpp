@@ -280,9 +280,10 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
       return;
     }
 
-  unsigned elemSize = 0;
-  auto& info = hart.getLastVectorMemory(elemSize);
-  if (elemSize == 0 or info.empty())
+  auto& info = hart.getLastVectorMemory();
+  auto& elems = info.elems_;
+  unsigned elemSize = info.elemSize_;
+  if (elemSize == 0 or elems.empty())
     return;  // Should not happen.
 
   unsigned elemsPerVec = hart.vecRegSize() / elemSize;
@@ -295,16 +296,16 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
       for (unsigned elemIx = 0; elemIx < elemsPerVec; ++elemIx)  // Elem ix in vec reg.
 	{
 	  unsigned ixInGroup = offset + elemIx;    // Elem ix in vec-reg-group
-	  if (ixInGroup >= info.size())
+	  if (ixInGroup >= elems.size())
 	    continue;  // Should not happen
 
-	  if (info.at(ixInGroup).masked_)
+	  if (elems.at(ixInGroup).masked_)
 	    {
 	      regTime = time_;  // What if mask-policy is preserve?
 	      continue;
 	    }
 
-	  uint64_t pa1 = info.at(ixInGroup).pa_, pa2 = info.at(ixInGroup).pa2_;
+	  uint64_t pa1 = elems.at(ixInGroup).pa_, pa2 = elems.at(ixInGroup).pa2_;
 	  unsigned size1 = elemSize, size2 = 0;
 	  if (pa1 != pa2)
 	    {
@@ -890,8 +891,9 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 
   if (instr.di_.isVectorStore())
     {
-      unsigned elemSize = 0;
-      auto& info = hart.getLastVectorMemory(elemSize);
+      auto& info = hart.getLastVectorMemory();
+      auto& elems = info.elems_;
+      unsigned elemSize = info.elemSize_;
       if (elemSize == 0)
 	return true;   // Not a store.
 
@@ -900,13 +902,13 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 
       auto& vecRefs = hartData_.at(hartIx).vecRefMap_[instr.tag_];
 
-      for (unsigned i = 0; i < info.size(); ++i)
+      for (unsigned i = 0; i < elems.size(); ++i)
         {
-          bool skip = info.at(i).masked_;
+          bool skip = elems.at(i).masked_;
 	  if (skip)
 	    continue;
 
-	  uint64_t pa1 = info.at(i).pa_, pa2 = info.at(i).pa2_, value = info.at(i).stData_;
+	  uint64_t pa1 = elems.at(i).pa_, pa2 = elems.at(i).pa2_, value = elems.at(i).stData_;
 
 	  if (pa1 == pa2)
 	    vecRefs.add(pa1, value, elemSize);
@@ -1970,8 +1972,11 @@ template <typename URV>
 bool
 Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 {
-  unsigned elemSize = 0;
-  auto& info = hart.getLastVectorMemory(elemSize);
+  const VecLdStInfo& info = hart.getLastVectorMemory();
+  const std::vector<VecLdStElem>& elems = info.elems_;
+
+  unsigned elemSize = info.elemSize_;
+
   if (elemSize == 0)
     {
       std::cerr << "Error: Mcm::commitVecReadOps: hart-id=" << hart.hartId()
@@ -1994,13 +1999,13 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   // elements. Associated reference addresses with instruction.
   auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr->tag_];
   bool hasOverlap = false;
-  for (unsigned i = 0; i < info.size(); ++i)
+  for (unsigned i = 0; i < elems.size(); ++i)
     {
-      if (info.at(i).masked_)
+      if (elems.at(i).masked_)
 	continue;  // Masked off element.
 
       unsigned size1 = elemSize, size2 = 0;
-      uint64_t ea1 = info.at(i).pa_, ea2 = info.at(i).pa2_;
+      uint64_t ea1 = elems.at(i).pa_, ea2 = elems.at(i).pa2_;
 
       if (ea1 != ea2 and pageNum(ea1) != pageNum(ea2))
 	{
@@ -4228,10 +4233,11 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned c
       return;
     }
 
-  unsigned elemSize = 0;
-  const std::vector<VecLdStInfo>& info = hart.getLastVectorMemory(elemSize);
+  const VecLdStInfo& info = hart.getLastVectorMemory();
+  auto elemSize = info.elemSize_;
+  const auto& elems = info.elems_;
 
-  if (elemSize == 0 or info.empty())
+  if (elemSize == 0 or info.elems_.empty())
     return;  // Should not happen.
 
   unsigned elemsPerVec = hart.vecRegSize() / elemSize;
@@ -4244,16 +4250,16 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned c
       for (unsigned elemIx = 0; elemIx < elemsPerVec; ++elemIx)  // Elem ix in vec reg.
 	{
 	  unsigned ixInGroup = offset + elemIx;    // Elem ix in vec-reg-group
-	  if (ixInGroup >= info.size())
+	  if (ixInGroup >= elems.size())
 	    continue;  // Should not happen
 
-	  if (ixInGroup < info.size() and info.at(ixInGroup).masked_)
+	  if (elems.at(ixInGroup).masked_)
 	    {
 	      regTime = time_;  // What if mask-policy is preserve?
 	      continue;
 	    }
 
-	  uint64_t pa1 = info.at(ixInGroup).pa_, pa2 = info.at(ixInGroup).pa2_;
+	  uint64_t pa1 = elems.at(ixInGroup).pa_, pa2 = elems.at(ixInGroup).pa2_;
 	  unsigned size1 = elemSize, size2 = 0;
 	  if (pa1 != pa2)
 	    {

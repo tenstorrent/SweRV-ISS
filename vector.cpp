@@ -11103,7 +11103,8 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   unsigned elemMax = vecRegs_.elemMax(eew); // Includes tail elems.
   uint64_t addr = intRegs_.read(rs1) + start*elemSize;
 
-  vecRegs_.ldStSize_ = elemSize;
+  auto& ldStInfo = vecRegs_.ldStInfo_;
+  ldStInfo.init(elemSize, vd, true /*isLoad*/);
 
   if (start >= vecRegs_.elemCount())
     return true;
@@ -11115,7 +11116,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
       if (ix < vecRegs_.elemCount())
-	vecRegs_.ldStInfo_.push_back(VecLdStInfo{addr, addr, addr, 0, elemSize, skip, true});
+	ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
       if (skip)
 	{
           vecRegs_.write(vd, ix, destGroup, elem);
@@ -11138,8 +11139,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
           if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data))
 	    assert(0);
 	  elem = data;
-          vecRegs_.ldStInfo_.back().pa_ = pa1;
-	  vecRegs_.ldStInfo_.back().pa2_ = pa2;
+          ldStInfo.setLastElem(pa1, pa2);
         }
       else
         {
@@ -11284,14 +11284,13 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   unsigned start = csRegs_.peekVstart();
   uint64_t addr = intRegs_.read(rs1) + start*elemSize;
 
-  vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
+  auto& ldStInfo = vecRegs_.ldStInfo_;
+  ldStInfo.init(elemSize, vd, false /*isLoad*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += elemSize)
     {
       bool skip = masked and not vecRegs_.isActive(0, ix);
-      bool isLoad = false;
-      vecRegs_.ldStInfo_.push_back(VecLdStInfo{addr, addr, addr, 0, elemSize, skip, isLoad});
-
+      ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
       if (skip)
 	continue;
 
@@ -11301,15 +11300,12 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
       uint64_t gpa1 = addr, gpa2 = addr;
 
-      auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(elem),
-                                           false /*hyper*/);
+      auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	{
 	  if (not writeForStore(addr, pa1, pa2, elem))
 	    assert(0);
-          vecRegs_.ldStInfo_.back().pa_ = pa1;
-	  vecRegs_.ldStInfo_.back().pa2_ = pa2;
-	  vecRegs_.ldStInfo_.back().stData_ = elem;
+	  ldStInfo.setLastElem(pa1, pa2, elem);
 	}
       else
         {
@@ -11510,7 +11506,8 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   unsigned elemCount = (group*vecRegs_.bytesPerRegister()*fieldCount) / elemBytes;
   URV addr = intRegs_.read(rs1) + start*elemBytes;
 
-  vecRegs_.ldStSize_ = elemBytes;
+  auto& ldStInfo = vecRegs_.ldStInfo_;
+  ldStInfo.init(elemBytes, vd, true /*isLoad*/);
 
   if (start >= elemCount)
     return true;
@@ -11544,8 +11541,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
       vecRegs_.write(vd, ix, effGroupX8, elem);
 
       bool skip = false;  // Not masked off
-      bool isLoad = true;
-      vecRegs_.ldStInfo_.push_back(VecLdStInfo{addr, pa1, pa2, 0, elemBytes, skip, isLoad});
+      ldStInfo.addElem(VecLdStElem{addr, pa1, pa2, 0, ix, skip});
     }
 
   vecRegs_.touchReg(vd, groupX8);  // We want the group and not the effective group.
@@ -11660,23 +11656,23 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di)
   unsigned elemCount = (group*vecRegs_.bytesPerRegister()*fieldCount) / elemBytes;
   URV addr = intRegs_.read(rs1) + start*elemBytes;
 
-  vecRegs_.ldStSize_ = elemBytes;
+  auto& ldStInfo = vecRegs_.ldStInfo_;
+  ldStInfo.init(elemBytes, vd, false /*isLoad*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += elemBytes)
     {
-      uint8_t elem = 0;
-      vecRegs_.read(vd, ix, effGroupX8, elem);
+      uint8_t val = 0; // Element value.
+      vecRegs_.read(vd, ix, effGroupX8, val);
 
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
       uint64_t gpa1 = addr, gpa2 = addr;
       auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, elemBytes, false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	{
-	  if (not writeForStore(addr, pa1, pa2, elem))
+	  if (not writeForStore(addr, pa1, pa2, val))
 	    assert(0);
 	  bool skip = false; // Not masked off.
-	  bool isLoad = false;
-	  vecRegs_.ldStInfo_.push_back(VecLdStInfo{addr, pa1, pa2, elem, elemBytes, skip, isLoad});
+	  ldStInfo.addElem(VecLdStElem{addr, pa1, pa2, val, ix, skip});
 	}
       else
         {
@@ -11838,7 +11834,8 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   uint64_t addr = intRegs_.read(rs1) + start*stride;
 
   unsigned elemSize = sizeof(ELEM_TYPE);
-  vecRegs_.ldStSize_ = elemSize;
+  auto& ldStInfo = vecRegs_.ldStInfo_;
+  ldStInfo.init(elemSize, vd, true /*isLoad*/);
 
   if (start >= vecRegs_.elemCount())
     return true;
@@ -11850,7 +11847,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
       if (ix < vecRegs_.elemCount())
-	vecRegs_.ldStInfo_.push_back(VecLdStInfo{addr, addr, addr, 0, elemSize, skip, true});
+	ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
 
       if (skip)
 	{
@@ -11872,8 +11869,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 	  if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data))
 	    assert(0);
 	  elem = data;
-          vecRegs_.ldStInfo_.back().pa_ = pa1;
-	  vecRegs_.ldStInfo_.back().pa2_ = pa2;
+          ldStInfo.setLastElem(pa1, pa2);
         }
       else
         {
@@ -11997,20 +11993,20 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   uint64_t addr = intRegs_.read(rs1) + start*stride;
 
   unsigned elemSize = sizeof(ELEM_TYPE);
-  vecRegs_.ldStSize_ = elemSize;
+  auto& ldStInfo = vecRegs_.ldStInfo_;
+  ldStInfo.init(elemSize, vd, false /*isLoad*/);
 
   // TODO check permissions, translate, ....
   for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
     {
       bool skip = masked and not vecRegs_.isActive(0, ix);
-      bool isLoad = false;
-      vecRegs_.ldStInfo_.push_back(VecLdStInfo{addr, addr, addr, 0, elemSize, skip, isLoad});
+      ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
 
       if (skip)
 	continue;
 
-      ELEM_TYPE elem = 0;
-      vecRegs_.read(vd, ix, groupX8, elem);
+      ELEM_TYPE val = 0;
+      vecRegs_.read(vd, ix, groupX8, val);
 
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
       uint64_t gpa1 = addr, gpa2 = addr;
@@ -12018,11 +12014,9 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
       auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	{
-	  if (not writeForStore(addr, pa1, pa2, elem))
+	  if (not writeForStore(addr, pa1, pa2, val))
 	    assert(0);
-          vecRegs_.ldStInfo_.back().pa_ = pa1;
-	  vecRegs_.ldStInfo_.back().pa2_ = pa2;
-	  vecRegs_.ldStInfo_.back().stData_ = elem;
+	  ldStInfo.setLastElem(pa1, pa2, val);
 	}
       else
         {
@@ -12143,7 +12137,8 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   unsigned elemMax = vecRegs_.elemMax();  // Includes tail elements.
   unsigned elemSize = elemWidth / 8;
 
-  vecRegs_.ldStSize_ = elemSize;
+  auto& ldStInfo = vecRegs_.ldStInfo_;
+  ldStInfo.init(elemSize, vd, true /*isLoad*/);
 
   if (start >= vecRegs_.elemCount())
     return true;
@@ -12160,7 +12155,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
           uint64_t offset = 0;
           vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset);
           vaddr = addr + offset;
-	  vecRegs_.ldStInfo_.push_back(VecLdStInfo{vaddr, vaddr, vaddr, 0, elemSize, skip, true});
+	  ldStInfo.addElem(VecLdStElem{vaddr, vaddr, vaddr, 0, ix, skip});
         }
       if (skip)
 	{
@@ -12184,8 +12179,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    assert(0);
 	  elem = data;
 	  vecRegs_.write(vd, ix, destGroup, elem);
-          vecRegs_.ldStInfo_.back().pa_ = pa1;
-          vecRegs_.ldStInfo_.back().pa2_ = pa2;
+          ldStInfo.setLastElem(pa1, pa2);
 	}
       else
         {
@@ -12350,7 +12344,9 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   uint64_t addr = intRegs_.read(rs1);
   unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount(), elemSize = elemWidth / 8;
-  vecRegs_.ldStSize_ = elemSize;
+
+  auto& ldStInfo = vecRegs_.ldStInfo_;
+  ldStInfo.init(elemSize, vd, false /*isLoad*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
@@ -12360,8 +12356,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
       uint64_t vaddr = addr + offset, data = 0;
       bool skip = masked and not vecRegs_.isActive(0, ix);
-      bool isLoad = false;
-      vecRegs_.ldStInfo_.push_back(VecLdStInfo{vaddr, vaddr, vaddr, 0, elemSize, skip, isLoad});
+      ldStInfo.addElem(VecLdStElem{vaddr, vaddr, vaddr, 0, ix, skip});
       if (skip)
 	continue;
 
@@ -12423,9 +12418,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
           return false;
         }
 
-      vecRegs_.ldStInfo_.back().pa_ = pa1;
-      vecRegs_.ldStInfo_.back().pa2_ = pa2;
-      vecRegs_.ldStInfo_.back().stData_ = data;
+      ldStInfo.setLastElem(pa1, pa2, data);
     }
 
   return true;
@@ -12594,7 +12587,8 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
     }
 
   unsigned elemSize = sizeof(ELEM_TYPE);
-  vecRegs_.ldStSize_ = elemSize;
+  auto& ldStInfo = vecRegs_.ldStInfo_;
+  ldStInfo.init(elemSize, vd, true /*isLoad*/);
 
   if (start >= vecRegs_.elemCount())
     return true;
@@ -12611,7 +12605,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	  ELEM_TYPE elem(0);
 	  bool skip = not vecRegs_.isDestActive(dvg, ix, destGroup, masked, elem);
           if (ix < vecRegs_.elemCount())
-	    vecRegs_.ldStInfo_.push_back(VecLdStInfo{faddr, faddr, faddr, 0, elemSize, skip, true});
+	    ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip});
 
 	  if (skip)
 	    {
@@ -12634,8 +12628,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	      if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data))
 		assert(0);
 	      elem = data;
-              vecRegs_.ldStInfo_.back().pa_ = pa1;
-              vecRegs_.ldStInfo_.back().pa2_ = pa2;
+              ldStInfo.setLastElem(pa1, pa2);
             }
 	  else
 	    {
@@ -12794,7 +12787,8 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
       return false;
     }
 
-  vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
+  auto& ldStInfo = vecRegs_.ldStInfo_;
+  ldStInfo.init(elemSize, vd, false /*isLoad*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
     {
@@ -12807,23 +12801,19 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	  unsigned dvg = vd + field*eg;   // Source vector gorup.
 
 	  bool skip = masked and not vecRegs_.isActive(0, ix);
-	  bool isLoad = false;
-	  vecRegs_.ldStInfo_.push_back(VecLdStInfo{faddr, faddr, faddr, 0, elemSize, skip, isLoad}); 
+	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip}); 
 	  if (skip)
 	    continue;
 
-	  ELEM_TYPE elem = 0;
-	  vecRegs_.read(dvg, ix, groupX8, elem);
+	  ELEM_TYPE val = 0;
+	  vecRegs_.read(dvg, ix, groupX8, val);
 
-	  auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(elem),
-                                               false /*hyper*/);
+	  auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
 	    {
-	      if (not writeForStore(faddr, pa1, pa2, elem))
+	      if (not writeForStore(faddr, pa1, pa2, val))
 		assert(0);
-              vecRegs_.ldStInfo_.back().pa_ = pa1;
-              vecRegs_.ldStInfo_.back().pa2_ = pa2;
-	      vecRegs_.ldStInfo_.back().stData_ = elem;
+	      ldStInfo.setLastElem(pa1, pa2, val);
 	    }
 	  else
 	    {
@@ -13122,7 +13112,8 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
       return false;
     }
 
-  vecRegs_.ldStSize_ = elemSize;
+  auto& ldStInfo = vecRegs_.ldStInfo_;
+  ldStInfo.init(elemSize, vd, true /*isLoad*/);
 
   if (start >= vecRegs_.elemCount())
     return true;
@@ -13144,7 +13135,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
                 assert(0);
 
               faddr = addr + offset + field*elemSize;
-              vecRegs_.ldStInfo_.push_back(VecLdStInfo{faddr, faddr, faddr, 0, elemSize, skip, true});
+              ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip});
             }
 	  if (skip)
 	    {
@@ -13168,8 +13159,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 		assert(0);
 	      elem = data;
 	      vecRegs_.write(dvg, ix, destGroup, elem);
-              vecRegs_.ldStInfo_.back().pa_ = pa1;
-              vecRegs_.ldStInfo_.back().pa2_ = pa2;
+              ldStInfo.setLastElem(pa1, pa2);
 	    }
 	  else
 	    {
@@ -13291,7 +13281,9 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
       postVecFail(di);
       return false;
     }
-  vecRegs_.ldStSize_ = elemSize;
+
+  auto& ldStInfo = vecRegs_.ldStInfo_;
+  ldStInfo.init(elemSize, vd, false /*isLoad*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
@@ -13305,8 +13297,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	{
 	  unsigned dvg = vd + field*eg;  // Source vector grop.
 	  bool skip = masked and not vecRegs_.isActive(0, ix);
-	  bool isLoad = false;
-	  vecRegs_.ldStInfo_.push_back(VecLdStInfo{faddr, faddr, faddr, 0, elemSize, skip, isLoad});
+	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip});
 	  if (skip)
 	    continue;
 
@@ -13368,9 +13359,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	      return false;
 	    }
 
-          vecRegs_.ldStInfo_.back().pa_ = pa1;
-          vecRegs_.ldStInfo_.back().pa2_ = pa2;
-	  vecRegs_.ldStInfo_.back().stData_ = data;
+	  ldStInfo.setLastElem(pa1, pa2, data);
 	}
     }
 

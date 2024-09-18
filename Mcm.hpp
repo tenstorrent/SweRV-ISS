@@ -724,8 +724,8 @@ namespace WdRiscv
     /// corresponding data for store.
     struct VecRef
     {
-      VecRef(uint64_t addr = 0, uint64_t data = 0, unsigned size = 0)
-	: addr_(addr), data_(data), size_(size)
+      VecRef(uint64_t addr = 0, uint64_t data = 0, unsigned size = 0, unsigned regIx = 0)
+	: addr_(addr), data_(data), size_(size), regIx_(regIx)
       { }
 
       bool overlaps(uint64_t addr) const
@@ -733,7 +733,8 @@ namespace WdRiscv
 
       uint64_t addr_ = 0;
       uint64_t data_ = 0;
-      unsigned size_ = 0;
+      uint16_t size_ = 0;
+      uint16_t regIx_ = 0;
     };
 
     /// Collection of vector load/store reference (Whisper) addresses for a single

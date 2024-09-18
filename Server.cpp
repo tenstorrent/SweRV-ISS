@@ -661,16 +661,13 @@ Server<URV>::processStepChanges(Hart<URV>& hart,
     }
   else
     {
-      unsigned elemSize = 0;
-      auto& info = hart.getLastVectorMemory(elemSize);
-      if (not info.empty())
-	for (auto& einfo : info)
+      auto& info = hart.getLastVectorMemory();
+      unsigned elemSize = info.elemSize_;
+      if (not info.empty() and not info.isLoad_)
+	for (auto& einfo : info.elems_)
 	  {
-	    if (not einfo.isLoad_)
-	      {
-		WhisperMessage msg(0, Change, 'm', einfo.va_, einfo.stData_, elemSize);
-		pendingChanges.push_back(msg);
-	      }
+	    WhisperMessage msg(0, Change, 'm', einfo.va_, einfo.stData_, elemSize);
+	    pendingChanges.push_back(msg);
 	  }
     }
 

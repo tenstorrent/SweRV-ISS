@@ -225,11 +225,3 @@ VecRegs::findReg(std::string_view name, unsigned& ix)
   ix = n;
   return true;
 }
-
-
-const std::vector<VecLdStInfo>&
-VecRegs::getLastMemory(unsigned& elemSize) const
-{
-  elemSize = ldStSize_;
-  return ldStInfo_;
-}

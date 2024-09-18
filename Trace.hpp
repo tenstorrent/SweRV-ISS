@@ -390,11 +390,11 @@ namespace WdRiscv
 
       std::unordered_set<uint64_t> pages;
 
-      unsigned elemSize = 0;
-      auto& info = hart_->getLastVectorMemory(elemSize);
+      auto& info = hart_->getLastVectorMemory();
+      unsigned elemSize = info.elemSize_;
 
       if (elemSize != 0)
-	for (auto& einfo : info)
+	for (auto& einfo : info.elems_)
 	  {
 	    const auto& addr = einfo.va_;
 	    const auto& mask = einfo.masked_;

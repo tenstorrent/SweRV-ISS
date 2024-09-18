@@ -962,8 +962,8 @@ namespace WdRiscv
     unsigned cacheLineSize() const
     { return cacheLineSize_; }
 
-    const std::vector<VecLdStInfo>& getLastVectorMemory(unsigned& elemSize) const
-    { return vecRegs_.getLastMemory(elemSize); }
+    const VecLdStInfo& getLastVectorMemory() const
+    { return vecRegs_.getLastMemory(); }
 
     /// Computes the base register and registers used of a vector load/store
     /// instruction. This helper trims by vstart/vl (not vm). This is for MCM

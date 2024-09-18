@@ -305,9 +305,10 @@ namespace WdRiscv
 
     /// Return a reference to the vector ld/st element information. If last executed
     /// instruction was not ld/st or if it did not update any element then the returned
-    /// reference will be to an empty vector. Set elemSize to the element size of the
-    /// last ld/st instruction or 0 if last instruction was not ld/st.
-    const std::vector<VecLdStInfo>& getLastMemory(unsigned& elemSize) const;
+    /// reference will be to an empty object. Returned object is cleared before the
+    /// execution of each instruction.
+    const VecLdStInfo& getLastMemory() const
+    { return ldStInfo_; }
 
     /// Return true if the given element width and grouping
     /// combination is legal.
@@ -551,7 +552,7 @@ namespace WdRiscv
     }
 
     /// Information about ld/st instruction. Cleared before each instruction is executed.
-    const std::vector<VecLdStInfo>& ldStInfo() const
+    const VecLdStInfo& ldStInfo() const
     { return ldStInfo_; }
 
     struct Step
@@ -602,9 +603,9 @@ namespace WdRiscv
     /// not load/store.
     bool vecLdStElemsUsed(unsigned& size, unsigned& count) const
     {
-      size = ldStSize_;
-      count = ldStInfo_.size();
-      return ldStSize_ != 0;
+      size = ldStInfo_.elemSize_;
+      count = ldStInfo_.elems_.size();
+      return size != 0;
     }
 
 
@@ -613,7 +614,6 @@ namespace WdRiscv
     /// Clear load/address and store data used for logging/tracing.
     void clearTraceData()
     {
-      ldStSize_ = 0;
       ldStInfo_.clear();
       fpFlags_.clear();
       vxsat_.clear();
@@ -902,8 +902,7 @@ namespace WdRiscv
 
     // Following used for logging/tracing. Cleared before each instruction.
     // Collected by a vector load/store instruction.
-    unsigned ldStSize_ = 0;
-    std::vector<VecLdStInfo> ldStInfo_;
+    VecLdStInfo ldStInfo_;
     std::vector<bool> maskedAddr_;    // True if address is masked off (element skipped).
     std::vector<Step> steps_;         // Incremental steps taken by previous instruction (useful for vector instruction debug).
     std::vector<uint8_t> fpFlags_;    // Incremental fp flags (useful for vector instruction debug).
