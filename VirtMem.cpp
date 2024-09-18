@@ -230,13 +230,13 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
 
   pa = va;
 
-  if (mode_ == Mode::Bare)
-    return ExceptionCause::NONE;
-
   // Apply pointer masking unless translation is for fetch.
   bool effExec = exec or (read and (xForR_ or execReadable_));
   if (not effExec)
     pa = va = applyPointerMaskVa(va, priv, false);
+
+  if (mode_ == Mode::Bare)
+    return ExceptionCause::NONE;
 
   // Lookup virtual page number in TLB.
   uint64_t virPageNum = va >> pageBits_;
