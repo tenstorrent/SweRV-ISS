@@ -2760,9 +2760,9 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
     }
 
   // Clear relevant fields.
-  if (di->isLoad() and not di->isHypervisor())
+  if (di->isLoad() and not di->isHypervisor() and not di->isLr())
     uncompressed &= 0x000fffff;
-  else if (di->isStore() and not di->isHypervisor())
+  else if (di->isStore() and not di->isHypervisor() and not di->isSc())
     uncompressed &= 0x01fff07f;
   else if (di->isCmo())
     uncompressed &= 0xfffff07f;
