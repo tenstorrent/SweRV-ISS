@@ -23,7 +23,7 @@ namespace WdRiscv
   struct VecLdStElem
   {
     uint64_t va_ = 0;      // Virtual address of data.
-    uint64_t pa_ = 0;      // Physical addres of data.
+    uint64_t pa_ = 0;      // Physical address of data.
     uint64_t pa2_ = 0;     // For page crossers: addr on 2nd page, otherwise same as pa_.
     uint64_t stData_ = 0;  // Store data.
     unsigned ix_ = 0;      // Index of element in vector register group.
@@ -36,18 +36,22 @@ namespace WdRiscv
   };
 
 
-  /// Track vector load/store execution information.
+  /// Track execution information for a vector load store instruction. This is used for
+  /// tracing and by the memory consistency model.
   struct VecLdStInfo
   {
+    /// Return true if no element was loaded/stored by vector instruction.
     bool empty() const
     { return elems_.empty(); }
 
+    /// Clear this object.
     void clear()
     {
       elemSize_ = 0;
       elems_.clear();
     }
 
+    /// Set element size (in bytes), data vector register, and type (load or store).
     void init(unsigned elemSize, unsigned vecReg, bool isLoad)
     {
       elemSize_ = elemSize;
@@ -61,6 +65,8 @@ namespace WdRiscv
       fields_ = 0;
     }
 
+    /// Set element size (in bytes), data vector register, index vector register, and type
+    /// (load or store).
     void initIndexed(unsigned elemSize, unsigned vecReg, unsigned ixReg, bool isLoad)
     {
       init(elemSize, vecReg, isLoad);
@@ -68,22 +74,26 @@ namespace WdRiscv
       ixVec_ = ixReg;
     }
 
+    /// Set the field count. Used for load/store segment.
     void setFieldCount(unsigned fields)
     {
       fields_ = fields;
     }
 
+    /// Add element information to this object.
     void addElem(const VecLdStElem& elem)
     {
       elems_.push_back(elem);
     }
 
+    /// Set the physical addresses of the last added element.
     void setLastElem(uint64_t pa, uint64_t pa2)
     {
       elems_.back().pa_ = pa;
       elems_.back().pa2_ = pa2;
     }
 
+    /// Set the physical addresses and the store data value of the last added element.
     void setLastElem(uint64_t pa, uint64_t pa2, uint64_t data)
     {
       elems_.back().pa_ = pa;
