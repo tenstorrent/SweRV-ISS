@@ -280,10 +280,9 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
       return;
     }
 
-  std::vector<uint64_t> addr, paddr, paddr2, data;
-  std::vector<bool> masked;
   unsigned elemSize = 0;
-  if (not hart.getLastVectorMemory(addr, paddr, paddr2, data, masked, elemSize))
+  auto& info = hart.getLastVectorMemory(elemSize);
+  if (elemSize == 0 or info.empty())
     return;  // Should not happen.
 
   unsigned elemsPerVec = hart.vecRegSize() / elemSize;
@@ -296,16 +295,16 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
       for (unsigned elemIx = 0; elemIx < elemsPerVec; ++elemIx)  // Elem ix in vec reg.
 	{
 	  unsigned ixInGroup = offset + elemIx;    // Elem ix in vec-reg-group
-	  if (ixInGroup >= addr.size())
+	  if (ixInGroup >= info.size())
 	    continue;  // Should not happen
 
-	  if (ixInGroup < masked.size() and masked.at(ixInGroup))
+	  if (info.at(ixInGroup).masked_)
 	    {
 	      regTime = time_;  // What if mask-policy is preserve?
 	      continue;
 	    }
 
-	  uint64_t pa1 = paddr.at(ixInGroup), pa2 = paddr2.at(ixInGroup);
+	  uint64_t pa1 = info.at(ixInGroup).pa_, pa2 = info.at(ixInGroup).pa2_;
 	  unsigned size1 = elemSize, size2 = 0;
 	  if (pa1 != pa2)
 	    {
@@ -891,10 +890,9 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 
   if (instr.di_.isVectorStore())
     {
-      std::vector<uint64_t> addr, paddr, paddr2, data;
-      std::vector<bool> masked;
       unsigned elemSize = 0;
-      if (not hart.getLastVectorMemory(addr, paddr, paddr2, data, masked, elemSize))
+      auto& info = hart.getLastVectorMemory(elemSize);
+      if (elemSize == 0)
 	return true;   // Not a store.
 
       instr.size_ = elemSize;
@@ -902,13 +900,13 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 
       auto& vecRefs = hartData_.at(hartIx).vecRefMap_[instr.tag_];
 
-      for (unsigned i = 0; i < addr.size(); ++i)
+      for (unsigned i = 0; i < info.size(); ++i)
         {
-          bool skip = i < masked.size() and masked.at(i);
+          bool skip = info.at(i).masked_;
 	  if (skip)
 	    continue;
 
-	  uint64_t pa1 = paddr.at(i), pa2 = paddr2.at(i), value = data.at(i);
+	  uint64_t pa1 = info.at(i).pa_, pa2 = info.at(i).pa2_, value = info.at(i).stData_;
 
 	  if (pa1 == pa2)
 	    vecRefs.add(pa1, value, elemSize);
@@ -1972,10 +1970,9 @@ template <typename URV>
 bool
 Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 {
-  std::vector<uint64_t> va, pa1, pa2, data;
-  std::vector<bool> masked;
   unsigned elemSize = 0;
-  if (not hart.getLastVectorMemory(va, pa1, pa2, data, masked, elemSize))
+  auto& info = hart.getLastVectorMemory(elemSize);
+  if (elemSize == 0)
     {
       std::cerr << "Error: Mcm::commitVecReadOps: hart-id=" << hart.hartId()
 		<< " tag=" << instr->tag_ << " instruction is not a vector load\n";
@@ -1997,13 +1994,13 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   // elements. Associated reference addresses with instruction.
   auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr->tag_];
   bool hasOverlap = false;
-  for (unsigned i = 0; i < pa1.size(); ++i)
+  for (unsigned i = 0; i < info.size(); ++i)
     {
-      if (i < masked.size() and masked.at(i))
+      if (info.at(i).masked_)
 	continue;  // Masked off element.
 
       unsigned size1 = elemSize, size2 = 0;
-      uint64_t ea1 = pa1.at(i), ea2 = pa2.at(i);
+      uint64_t ea1 = info.at(i).pa_, ea2 = info.at(i).pa2_;
 
       if (ea1 != ea2 and pageNum(ea1) != pageNum(ea2))
 	{
@@ -4207,10 +4204,10 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned c
       return;
     }
 
-  std::vector<uint64_t> addr, paddr, paddr2, data;
-  std::vector<bool> masked;
   unsigned elemSize = 0;
-  if (not hart.getLastVectorMemory(addr, paddr, paddr2, data, masked, elemSize))
+  const std::vector<VecLdStInfo>& info = hart.getLastVectorMemory(elemSize);
+
+  if (elemSize == 0 or info.empty())
     return;  // Should not happen.
 
   unsigned elemsPerVec = hart.vecRegSize() / elemSize;
@@ -4223,16 +4220,16 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned c
       for (unsigned elemIx = 0; elemIx < elemsPerVec; ++elemIx)  // Elem ix in vec reg.
 	{
 	  unsigned ixInGroup = offset + elemIx;    // Elem ix in vec-reg-group
-	  if (ixInGroup >= addr.size())
+	  if (ixInGroup >= info.size())
 	    continue;  // Should not happen
 
-	  if (ixInGroup < masked.size() and masked.at(ixInGroup))
+	  if (ixInGroup < info.size() and info.at(ixInGroup).masked_)
 	    {
 	      regTime = time_;  // What if mask-policy is preserve?
 	      continue;
 	    }
 
-	  uint64_t pa1 = paddr.at(ixInGroup), pa2 = paddr2.at(ixInGroup);
+	  uint64_t pa1 = info.at(ixInGroup).pa_, pa2 = info.at(ixInGroup).pa2_;
 	  unsigned size1 = elemSize, size2 = 0;
 	  if (pa1 != pa2)
 	    {

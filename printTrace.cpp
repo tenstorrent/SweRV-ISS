@@ -305,18 +305,19 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 	oss << ":0x" << ldStPhysAddr1_;
       tmp += " [" + oss.str() + "]";
     }
-  else if (not vecRegs_.ldStVa_.empty())
+  else if (not vecRegs_.ldStInfo_.empty())
     {
       std::ostringstream oss;
-      for (uint64_t i = 0; i < vecRegs_.ldStVa_.size(); ++i)
+      for (uint64_t i = 0; i < vecRegs_.ldStInfo_.size(); ++i)
         {
+	  auto& einfo = vecRegs_.ldStInfo_.at(i);
           if (i > 0)
             oss << ";";
-          oss << "0x" << std::hex << vecRegs_.ldStVa_.at(i);
-          if (vecRegs_.ldStPa_.at(i) != vecRegs_.ldStVa_.at(i))
-            oss << ":0x" << vecRegs_.ldStPa_.at(i);
-          if (i < vecRegs_.stData_.size())
-            oss << '=' << "0x" << vecRegs_.stData_.at(i);
+          oss << "0x" << std::hex << einfo.va_;
+	  if (einfo.pa_ != einfo.va_)
+            oss << ":0x" << einfo.pa_;
+          if (not einfo.isLoad_)
+            oss << '=' << "0x" << einfo.stData_;
         }
       tmp += " [" + oss.str() + "]";
     }
@@ -718,19 +719,20 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   // Memory
   buffer.printChar(',');
   uint64_t virtDataAddr = 0, physDataAddr = 0;
-  if (not vecRegs_.ldStVa_.empty())
+  if (not vecRegs_.ldStInfo_.empty())
     {
-      for (uint64_t i = 0; i < vecRegs_.ldStVa_.size(); ++i)
+      for (uint64_t i = 0; i < vecRegs_.ldStInfo_.size(); ++i)
         {
+	  auto& einfo = vecRegs_.ldStInfo_.at(i);
           if (i > 0)
             buffer.printChar(';');
-          buffer.print(vecRegs_.ldStVa_.at(i));
-          if (vecRegs_.ldStPa_.at(i) != vecRegs_.ldStVa_.at(i))
-            buffer.printChar(':').print(vecRegs_.ldStPa_.at(i));
-          if (i < vecRegs_.maskedAddr_.size() and vecRegs_.maskedAddr_.at(i))
+          buffer.print(einfo.va_);
+          if (einfo.pa_ != einfo.va_)
+            buffer.printChar(':').print(einfo.pa_);
+          if (einfo.masked_)
             buffer.printChar('m');
-          if (i < vecRegs_.stData_.size())
-            buffer.printChar('=').print(vecRegs_.stData_.at(i));
+          if (not einfo.isLoad_)
+            buffer.printChar('=').print(einfo.stData_);
         }
     }
   else if (lastLdStAddress(virtDataAddr, physDataAddr))

@@ -661,17 +661,16 @@ Server<URV>::processStepChanges(Hart<URV>& hart,
     }
   else
     {
-      std::vector<uint64_t> addr;
-      std::vector<uint64_t> paddr;
-      std::vector<uint64_t> paddr2;
-      std::vector<uint64_t> data;
-      std::vector<bool> masked;
       unsigned elemSize = 0;
-      if (hart.getLastVectorMemory(addr, paddr, paddr2, data, masked, elemSize) and not data.empty())
-	for (size_t i = 0; i < data.size(); ++i)
+      auto& info = hart.getLastVectorMemory(elemSize);
+      if (not info.empty())
+	for (auto& einfo : info)
 	  {
-	    WhisperMessage msg(0, Change, 'm', addr.at(i), data.at(i), elemSize);
-	    pendingChanges.push_back(msg);
+	    if (not einfo.isLoad_)
+	      {
+		WhisperMessage msg(0, Change, 'm', einfo.va_, einfo.stData_, elemSize);
+		pendingChanges.push_back(msg);
+	      }
 	  }
     }
 
