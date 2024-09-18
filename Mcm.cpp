@@ -1978,7 +1978,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 		<< " tag=" << instr->tag_ << " instruction is not a vector load\n";
       return false;
     }
- 
+
   assert(instr->size_ == elemSize);
 
   // Map a reference address to a reference value and a flag indicating if address is
@@ -3902,61 +3902,85 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
   auto minTag = getMinReadTagWithLargerTime(hartIx, instrB);
   const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
-  auto earlyB = earliestOpTime(instrB);
+  // 1. For each read byte address of B, identify the closest overlapping store M in
+  //    program order. Keep the store tag and the B byte load time.
+  struct ByteInfo
+  {
+    McmInstrIx storeTag_ = 0;  // Closest store writing byte.
+    uint64_t time_ = 0;        // Time byte was loaded by B.
+  };
 
-  std::unordered_set<uint64_t> addrSet;  // Addresses of bytes loaded by B
+  std::unordered_map<uint64_t, ByteInfo> byteMap;
+
   for (auto ix : instrB.memOps_)
     {
       auto& op = sysMemOps_.at(ix);
       for (unsigned i = 0; i < op.size_; ++i)
-	addrSet.insert(op.physAddr_ + i);
+	{
+	  if (not op.isRead_)
+	    continue;
+	  uint64_t addr = op.physAddr_ + i;
+	  auto iter = byteMap.find(addr);
+	  if (iter != byteMap.end())
+	    iter->second.time_ = std::min(iter->second.time_, op.time_);
+	  else
+	    byteMap[addr] = ByteInfo{0, op.time_};
+	}
     }
 
-  // Look for a store/amo instruction M with data addresses overlapping those of B.
   for (McmInstrIx mTag = instrB.tag_ - 1; mTag >= minTag; --mTag)
     {
       const auto& instrM = instrVec.at(mTag);
       if (instrM.isCanceled() or not instrM.di_.isValid() or not instrM.isStore_)
 	continue;
-      if (not overlaps(instrM, addrSet))
+
+      for (auto& [addr, byteInfo] : byteMap)
+	if (byteInfo.storeTag_ == 0 and overlapsRefPhysAddr(instrM, addr))
+	  byteInfo.storeTag_ = mTag;
+    }
+
+
+  // 2. Process the bytes of B.
+  for (auto& [addr, byteInfo] : byteMap)
+    {
+      auto mTag = byteInfo.storeTag_;
+      if (mTag == 0)
 	continue;
 
-      auto mapt = instrM.addrProducer_;  // M address producer tag.
-      auto mdpt = instrM.dataProducer_;  // M data producer tag.
-      auto& ap = instrVec.at(mapt);  // Address producer.
-      auto& dp = instrVec.at(mdpt);  // Data producer.
+      const auto& instrM = instrVec.at(mTag);
+      auto& mdi = instrM.di_;   // M decoded-instruction.
+      auto byteTime = byteInfo.time_;
 
-      if (ap.isMemory())
-	if (not ap.complete_ or isBeforeInMemoryTime(instrB, ap))
-	  {
-	    cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
-		 << mapt << " tag2=" << instrB.tag_ << " mtag=" << mTag
-		 << " time1=" << latestOpTime(ap) << " time2=" << earlyB << " dep=addr\n";
-	    return false;
-	  }
-
-      // TODO FIX : handle case where M is an indexed vector store.
-	
-      if (mapt != mdpt and dp.isMemory())
-	if (not dp.complete_ or isBeforeInMemoryTime(instrB, dp))
-	  {
-	    cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
-		 << mdpt << " tag2=" << instrB.tag_ << " mtag=" << mTag
-		 << " time1=" << latestOpTime(dp) << " time2=" << earlyB << " dep=data\n";
-	    return false;
-	  }
-
-      // Remove instruction B data addresses covered by instruction M.
-      for (auto iter = addrSet.begin(); iter != addrSet.end(); )
+      if (not mdi.isVectorStore())
 	{
-	  auto currentIter = iter;
-	  auto addr = *iter++;
-	  if (overlapsRefPhysAddr(instrM, addr))
-	    addrSet.erase(currentIter);
-	}
+	  auto mapt = instrM.addrProducer_;  // M address producer tag.
+	  auto mdpt = instrM.dataProducer_;  // M data producer tag.
+	  auto& ap = instrVec.at(mapt);  // Address producer.
+	  auto& dp = instrVec.at(mdpt);  // Data producer.
+	  auto addrTime = instrM.addrTime_;
+	  auto dataTime = instrM.dataTime_;
 
-      if (addrSet.empty())
-	break;   // All of B data addresses covered.
+	  if (mapt != 0 and ap.isMemory())
+	    if (not ap.complete_ or byteTime <= addrTime)
+	      {
+		cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
+		     << mapt << " tag2=" << instrB.tag_ << " mtag=" << mTag
+		     << " time1=" << addrTime << " time2=" << byteTime << " dep=addr\n";
+		return false;
+	      }
+
+	  if (mdpt != 0 and dp.isMemory())
+	    if (not dp.complete_ or byteTime <= dataTime)
+	      {
+		cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
+		     << mdpt << " tag2=" << instrB.tag_ << " mtag=" << mTag
+		     << " time1=" << dataTime << " time2=" << byteTime << " dep=data\n";
+		return false;
+	      }
+	}
+      else    // M is a vector store
+	{
+	}
     }
 
   return true;
