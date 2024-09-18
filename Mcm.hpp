@@ -775,7 +775,7 @@ namespace WdRiscv
 	return isOutOfBounds(ref.addr_, ref.addr_ + ref.size_ - 1);
       }
 
-      void add(uint64_t addr, uint64_t data, unsigned size)
+      void add(uint64_t addr, uint64_t data, unsigned size, unsigned vecReg)
       {
 	assert(size > 0);
 
@@ -790,7 +790,7 @@ namespace WdRiscv
 	    low_ = std::min(low_, l);
 	    high_ = std::max(high_, h);
 	  }
-	refs_.push_back(VecRef(addr, data, size));
+	refs_.push_back(VecRef(addr, data, size, vecReg));
       }
 
       std::vector<VecRef> refs_;

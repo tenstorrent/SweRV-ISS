@@ -12606,7 +12606,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	  ELEM_TYPE elem(0);
 	  bool skip = not vecRegs_.isDestActive(dvg, ix, destGroup, masked, elem);
           if (ix < vecRegs_.elemCount())
-	    ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip});
+	    ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
 
 	  if (skip)
 	    {
@@ -12803,7 +12803,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	  unsigned dvg = vd + field*eg;   // Source vector gorup.
 
 	  bool skip = masked and not vecRegs_.isActive(0, ix);
-	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip}); 
+	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field}); 
 	  if (skip)
 	    continue;
 
@@ -13138,7 +13138,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
                 assert(0);
 
               faddr = addr + offset + field*elemSize;
-              ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip});
+              ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
             }
 	  if (skip)
 	    {
@@ -13301,7 +13301,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	{
 	  unsigned dvg = vd + field*eg;  // Source vector grop.
 	  bool skip = masked and not vecRegs_.isActive(0, ix);
-	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip});
+	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
 	  if (skip)
 	    continue;
 

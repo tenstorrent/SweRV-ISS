@@ -158,7 +158,7 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa,
   sysMemOps_.push_back(op);
   instr->isLoad_ = true;
   instr->complete_ = checkLoadComplete(*instr);
-  
+
   return true;
 }
 
@@ -902,16 +902,18 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 
       auto& vecRefs = hartData_.at(hartIx).vecRefMap_[instr.tag_];
 
-      for (unsigned i = 0; i < elems.size(); ++i)
+      for (auto& elem : elems)
         {
-          bool skip = elems.at(i).masked_;
+          bool skip = elem.masked_;
 	  if (skip)
 	    continue;
 
-	  uint64_t pa1 = elems.at(i).pa_, pa2 = elems.at(i).pa2_, value = elems.at(i).stData_;
+	  unsigned vecIx = hart.identifyDataRegister(info, elem);
+
+	  uint64_t pa1 = elem.pa_, pa2 = elem.pa2_, value = elem.stData_;
 
 	  if (pa1 == pa2)
-	    vecRefs.add(pa1, value, elemSize);
+	    vecRefs.add(pa1, value, elemSize, vecIx);
 	  else
 	    {
 	      unsigned size1 = offsetToNextPage(pa1);
@@ -919,8 +921,8 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	      unsigned size2 = elemSize - size1;
 	      uint64_t val1 = (value <<  ((8 - size1)*8)) >> ((8 - size1)*8);
 	      uint64_t val2 = (value >> (size1*8));
-	      vecRefs.add(pa1, val1, size1);
-	      vecRefs.add(pa2, val2, size2);
+	      vecRefs.add(pa1, val1, size1, vecIx);
+	      vecRefs.add(pa2, val2, size2, vecIx);
 	    }
         }
 
@@ -1347,7 +1349,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	  cerr << "Mcm::mergeBufferWrite: Store address out of line bound\n";
 	  return false;
 	}
-      
+
       switch (write.size_)
 	{
 	case 1:
@@ -1530,7 +1532,7 @@ Mcm<URV>::cancelInstruction(Hart<URV>& hart, uint64_t instrTag)
     return;
   cancelInstr(hart, *instr);
 }
-  
+
 
 template <typename URV>
 bool
@@ -1617,7 +1619,7 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
 
   return false;
 }
-  
+
 
 template <typename URV>
 bool
@@ -1655,7 +1657,7 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
       for (unsigned i = 0; i < op.size_; ++i)
 	rtlValues[op.physAddr_ + i] = op.rtlData_ >> (i*8);
     }
-  
+
   auto& vecRefMap = hartData_.at(store.hartIx_).vecRefMap_;
   auto iter = vecRefMap.find(store.tag_);
   assert(iter != vecRefMap.end());
@@ -1702,7 +1704,7 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
 
   return true;
 }
-  
+
 
 
 /// Return a mask where the ith bit is set if addr + i is in the range
@@ -1999,13 +2001,15 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   // elements. Associated reference addresses with instruction.
   auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr->tag_];
   bool hasOverlap = false;
-  for (unsigned i = 0; i < elems.size(); ++i)
+  for (auto& elem : elems)
     {
-      if (elems.at(i).masked_)
+      if (elem.masked_)
 	continue;  // Masked off element.
 
       unsigned size1 = elemSize, size2 = 0;
-      uint64_t ea1 = elems.at(i).pa_, ea2 = elems.at(i).pa2_;
+      uint64_t ea1 = elem.pa_, ea2 = elem.pa2_;
+
+      unsigned vecIx = hart.identifyDataRegister(info, elem);
 
       if (ea1 != ea2 and pageNum(ea1) != pageNum(ea2))
 	{
@@ -2013,11 +2017,11 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 	  size2 = elemSize - size1;
 	  assert(size1 > 0 and size1 < elemSize);
 	  assert(size2 > 0 and size2 < elemSize);
-	  vecRefs.add(ea1, 0, size1);
-	  vecRefs.add(ea2, 0, size2);
+	  vecRefs.add(ea1, 0, size1, vecIx);
+	  vecRefs.add(ea2, 0, size2, vecIx);
 	}
       else
-	vecRefs.add(ea1, 0, size1);
+	vecRefs.add(ea1, 0, size1, vecIx);
 
       for (unsigned i = 0; i < size1; ++i)
 	{
@@ -2073,7 +2077,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 	      rb.covered = true;
 	      rb.value = op.data_ >> (i*8);
 	    }
-	}	  
+	}
     }
 
   // Remove ops still marked canceled.
@@ -2134,7 +2138,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 
   instr->complete_ = complete;
   return ok;
-}  
+}
 
 
 template <typename URV>
@@ -2276,7 +2280,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
 
   return covered;
 }
-  
+
 
 template <typename URV>
 bool
@@ -2300,7 +2304,7 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
     {
       if (not rangesOverlap(vecRef.addr_, vecRef.size_, readOp.physAddr_, readOp.size_))
 	continue;
-	      
+
       for (unsigned rix = 0; rix < readOp.size_; ++rix)
 	{
 	  uint64_t byteAddr = readOp.physAddr_ + rix;
@@ -2387,7 +2391,7 @@ Mcm<URV>::storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& 
 	      break;
 	    }
 	}
-      
+
       if (drained)
 	continue;  // Cannot forward from a drained write.
 
@@ -2674,7 +2678,7 @@ Mcm<URV>::overlaps(const McmInstr& i1, const McmInstr& i2) const
 
   return false;
 }
-  
+
 
 
 template <typename URV>
@@ -2884,7 +2888,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   // Rule 2: a and b are loads, x is a byte read by both a and b, there is no store to x
   // between a and b in program order, and a and b return values for x written by
   // different memory operations.
- 
+
   // Instruction B must be a load/AMO instruction.
   if (not instrB.isLoad_)
     return true;  // NA: B is not a load.
@@ -2917,7 +2921,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 
       // If a byte of B is written by A, then put its physical address in locallyWriten.
       identifyWrittenBytes(instrA, instrB, locallyWritten);
- 
+
       if (instrA.memOps_.empty() or instrB.memOps_.empty())
 	{
 	  cerr << "Error: PPO Rule 2: Instruction with no memory op: hart-id="
@@ -2961,7 +2965,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	    }
 	}
     }
-  
+
   return true;
 }
 
@@ -2972,7 +2976,7 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 3: A is a write resulting from an AMO/SC instructions, A and
   // B have overlapping addresses, B loads data from A.
- 
+
   // Instruction B must be a load/AMO instruction.
   const DecodedInst& bdi = instrB.di_;
   if (bdi.isStore())
@@ -3126,7 +3130,7 @@ Mcm<URV>::checkFence(Hart<URV>& hart, const McmInstr& instrB) const
   // that rule simpler to implement.
   if (not bdi.isFencePredWrite())
     return true;
-  
+
   unsigned hartIx = hart.sysHartIndex();
   auto& undrained = hartData_.at(hartIx).undrainedStores_;
   if (not undrained.empty())
@@ -3135,10 +3139,10 @@ Mcm<URV>::checkFence(Hart<URV>& hart, const McmInstr& instrB) const
 	   << " fence instruction with predecessor-write retired with undrained stores\n";
       return false;
     }
-  
+
   return true;
 }
-  
+
 
 template <typename URV>
 bool
@@ -3160,7 +3164,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
   if (earlyB > instrB.retireTime_)
     return true;
 
-  unsigned hartIx = hart.sysHartIndex();  
+  unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   // Collect all fence instructions that can affect B.
@@ -3192,7 +3196,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
     }
   if (reordered.empty())
     return true;
-      
+
   for (auto fenceTag : fences)
     {
       const auto& fence = instrVec.at(fenceTag);
@@ -3582,7 +3586,7 @@ Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
     }
 
   return true;
-}  
+}
 
 
 template <typename URV>
@@ -4055,7 +4059,7 @@ Mcm<URV>::checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const
 
       if (instrA.isCanceled() or not instrA.isRetired())
 	continue;
-  
+
       if (earlyB > instrA.retireTime_)
 	break;
 
@@ -4116,7 +4120,7 @@ Mcm<URV>::checkSfenceInvalIr(Hart<URV>& hart, const McmInstr& instr) const
     }
 
   return true;
-}  
+}
 
 
 template <typename URV>

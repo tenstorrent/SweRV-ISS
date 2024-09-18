@@ -27,11 +27,13 @@ namespace WdRiscv
     uint64_t pa2_ = 0;     // For page crossers: addr on 2nd page, otherwise same as pa_.
     uint64_t stData_ = 0;  // Store data.
     unsigned ix_ = 0;      // Index of element in vector register group.
+    unsigned field_ = 0;   // For segment load store: field of element.
     bool masked_ = false;  // True if element is masked off (element skipped).
 
     VecLdStElem(uint64_t va, uint64_t pa, uint64_t pa2, uint64_t data, unsigned ix,
-		bool masked)
-      : va_{va}, pa_{pa}, pa2_{pa2}, stData_{data}, ix_{ix}, masked_{masked}
+		bool masked, unsigned field = 0)
+      : va_{va}, pa_{pa}, pa2_{pa2}, stData_{data}, ix_{ix}, field_{field},
+	masked_{masked}
     { }
   };
 

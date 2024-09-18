@@ -2213,6 +2213,11 @@ namespace WdRiscv
     /// address. No effect if pa is not a device address.
     void deviceRead(uint64_t pa, unsigned size, uint64_t& value);
 
+    /// Return the data vector register number associated with the given ld/st element
+    /// info.  We return the individual register and not the base register of a group.
+    unsigned identifyDataRegister(const VecLdStInfo& info, const VecLdStElem& elem) const
+    { return vecRegs_.identifyDataRegister(info, elem); }
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
