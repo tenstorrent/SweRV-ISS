@@ -639,18 +639,22 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
 #if 1
   if (di.isVectorStore())
     {
-      unsigned base, group = 1;
-      if (hart.getLastVecLdStRegsUsed(di, 0, base, group))
+      unsigned base, count = 1;
+      if (hart.getLastVecLdStRegsUsed(di, 0, base, count))
         {
           unsigned dataReg = base + vecRegOffset_;
-          for (unsigned i = 0; i < group; ++i)
+          for (unsigned i = 0; i < count; ++i)
             {
-              uint64_t dataTime = regTime.at(dataReg + i);
+              auto dataTime = regTime.at(dataReg + i);
+	      auto dataProducer = regProducer.at(dataReg + i);
               if (dataTime >= instr.dataTime_)
                 {
-                  instr.dataProducer_ = regProducer.at(dataReg + i);
+                  instr.dataProducer_ = dataProducer;
                   instr.dataTime_ = dataTime;
                 }
+
+	      unsigned vecIx = base + i;
+	      instr.vecProdTimes_.at(i) = McmInstr::VecProdTime{vecIx, dataProducer, dataTime};
             }
         }
     }
@@ -3948,9 +3952,10 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	  byteInfo.storeTag_ = mTag;
     }
 
+  auto& vecRefMap = hartData_.at(hartIx).vecRefMap_;
 
   // 2. Process the bytes of B.
-  for (auto& [addr, byteInfo] : byteMap)
+  for (auto& [byteAddr, byteInfo] : byteMap)
     {
       auto mTag = byteInfo.storeTag_;
       if (mTag == 0)
@@ -3989,6 +3994,46 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	}
       else    // M is a vector store
 	{
+	  auto iter = vecRefMap.find(mTag);
+	  if (iter == vecRefMap.end())
+	    continue;
+
+	  auto& vecRefs = iter->second;
+
+	  // For each data vector of M.
+	  for (auto& vecRef : vecRefs.refs_)
+	    {
+	      // Identify vector writing to memory overlappin byte address of B.
+	      if (not vecRef.overlaps(byteAddr))
+		continue;
+	      unsigned dataVec = vecRef.regIx_;
+
+	      // Find the producer of identified vector.
+	      McmInstrIx aTag = 0;
+	      uint64_t aTime = 0;
+	      for (auto& vpd : instrM.vecProdTimes_)
+		if (vpd.regIx_ == dataVec)
+		  {
+		    aTag = vpd.tag_;
+		    aTime = vpd.time_;
+		    break;
+		  }
+
+	      if (aTag == 0)
+		continue;
+
+	      auto& instrA = instrVec.at(aTag);
+	      if (not instrA.isMemory())
+		continue;
+
+	      if (not instrA.complete_ or byteTime <= aTime)
+		{
+		  cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
+		       << aTag << " tag2=" << instrB.tag_ << " mtag=" << mTag
+		       << " time1=" << aTime << " time2=" << byteTime << " dep=data\n";
+		  return false;
+		}
+	    }
 	}
     }
 

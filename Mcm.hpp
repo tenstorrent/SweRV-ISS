@@ -65,15 +65,29 @@ namespace WdRiscv
     uint64_t physAddr_ = 0;   // Physical data address for ld/st instruction.
     uint64_t physAddr2_ = 0;  // Additional data address for page crossing stores.
     uint64_t storeData_ = 0;  // Model (whisper) Data for sore instructions.
+
     uint64_t addrTime_ = 0;   // Time address register was produced (for ld/st/amo).
     uint64_t dataTime_ = 0;   // Time data register was produced (for st/amo).
     uint64_t retireTime_ = 0; // Time instruction was retired.
-    McmInstrIx addrProducer_ = 0;
-    McmInstrIx dataProducer_ = 0;
+    McmInstrIx addrProducer_ = 0;  // Producer of addr register (for ld/st/amo).
+    McmInstrIx dataProducer_ = 0;  // Producer of data register (for st/amo).
+
+    // Producer and time of the data register of a vector ld/st instuction.
+    struct VecProdTime
+    {
+      unsigned regIx_ = 0;
+      McmInstrIx tag_ = 0;
+      uint64_t time_ = 0;
+    };
+
+    // Time ld/st intruction vector data register(s) were produced.
+    std::array<VecProdTime, 8> vecProdTimes_;
+
     DecodedInst di_;
     McmInstrIx tag_ = 0;
     uint8_t hartIx_ : 8 = 0;
     uint8_t size_   : 8 = 0;        // Data size for load/store instructions.
+
     bool retired_   : 1 = false;
     bool canceled_  : 1 = false;
     bool isLoad_    : 1 = false;
@@ -718,7 +732,7 @@ namespace WdRiscv
     using McmInstrVec = std::vector<McmInstr>;
 
     using RegTimeVec = std::vector<uint64_t>;    // Map reg index to time.
-    using RegProducerVec = std::vector<uint64_t>;   // Map reg index to instr tag.
+    using RegProducerVec = std::vector<McmInstrIx>;   // Map reg index to instr tag.
 
     /// Vector reference (produced by Whisper) load/store physical addresses and
     /// corresponding data for store.
