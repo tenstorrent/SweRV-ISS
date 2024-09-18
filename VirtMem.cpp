@@ -689,6 +689,9 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
   for (unsigned j = ii; j < levels; ++j)
     pa = pa | pte.ppn(j) << pte.paPpnShift(j);
 
+  if (trace_)
+    walkVec.back().emplace_back(pa, WalkEntry::Type::RE);
+
   // Update tlb-entry with data found in page table entry.
   tlbEntry.virtPageNum_ = address >> pageBits_;
   tlbEntry.physPageNum_ = pa >> pageBits_;
@@ -851,6 +854,9 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 
   for (unsigned j = ii; j < levels; ++j)
     pa = pa | pte.ppn(j) << pte.paPpnShift(j);
+
+  if (trace_)
+    walkVec.back().emplace_back(pa, WalkEntry::Type::RE);
 
   // Update tlb-entry with data found in page table entry.
   tlbEntry.virtPageNum_ = address >> pageBits_;
@@ -1035,6 +1041,9 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 
   for (unsigned j = ii; j < levels; ++j)
     pa = pa | pte.ppn(j) << pte.paPpnShift(j);
+
+  if (trace_)
+    walkVec.back().emplace_back(pa, WalkEntry::Type::RE);
 
   // Update tlb-entry with data found in page table entry.
   tlbEntry.virtPageNum_ = address >> pageBits_;

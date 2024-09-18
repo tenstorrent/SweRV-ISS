@@ -210,6 +210,8 @@ constexpr std::string_view
 pageTableWalkType(VirtMem::WalkEntry::Type type, bool head)
 {
   using namespace std::string_view_literals;
+  if (head)
+    assert(type != VirtMem::WalkEntry::Type::RE);
   auto vec = (head)? std::array{"gva: "sv, " gpa: "sv, "  pa: "sv} :
     std::array{""sv, " "sv, "  "sv};
   return vec.at(size_t(type));
@@ -225,9 +227,19 @@ printPageTableWalk(FILE* out, const Hart<URV>& hart, const char* tag,
   fputs(tag, out);
   fputs(":", out);
   bool head = true;
+  VirtMem::WalkEntry::Type headType = entries.size() > 0? entries.at(0).type_ :
+                                                          VirtMem::WalkEntry::Type::GVA;
   for (auto& entry : entries)
     {
-      fputs("\n", out);
+      fputs("  +\n", out);
+      if (entry.type_ == VirtMem::WalkEntry::Type::RE)
+        {
+          fputs(pageTableWalkType(headType, head).data(), out);
+          fputs("res:", out);
+          fprintf(out, "0x%" PRIx64, entry.addr_);
+          continue;
+        }
+
       fputs(pageTableWalkType(entry.type_, head).data(), out);
       fprintf(out, "0x%" PRIx64, entry.addr_);
       if (entry.type_ == VirtMem::WalkEntry::Type::PA)
