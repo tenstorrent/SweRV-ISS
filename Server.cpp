@@ -982,7 +982,7 @@ Server<URV>::mcmBypassCommand(const WhisperMessage& req, WhisperMessage& reply,
   bool ok = true;
   uint32_t hartId = req.hart;
 
-  if (req.size <= 8)
+  if (req.size <= 8 or true)    // "or true" temporary until RTL is ready.
     {
       ok = system_.mcmBypass(hart, req.time, req.instrTag, req.address, req.size, req.value);
 
