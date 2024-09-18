@@ -9957,7 +9957,7 @@ Hart<URV>::execEbreak(const DecodedInst*)
   if (inDebugParkLoop_)
     {
       inDebugParkLoop_ = false;
-      return;
+      // return;  // Uncomment once RTL catches up.
     }
 
   // If in machine/supervisor/user mode and DCSR bit ebreakm/s/u is set, then enter debug
