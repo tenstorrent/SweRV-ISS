@@ -216,7 +216,7 @@ namespace WdRiscv
 
     struct WalkEntry
     {
-      enum Type { GVA = 0, GPA = 1, PA = 2};
+      enum Type { GVA = 0, GPA = 1, PA = 2, RE = 3 };
 
       WalkEntry(uint64_t addr, Type type)
         : addr_(addr), type_(type)
