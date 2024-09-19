@@ -636,11 +636,10 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
       instr.dataTime_ = regTime.at(dataReg);
     }
 
-#if 1
   if (di.isVectorStore())
     {
       unsigned base, count = 1;
-      if (hart.getLastVecLdStRegsUsed(di, 0, base, count))
+      if (hart.getLastVecLdStRegsUsed(di, 0, base, count)) // Operand 0 is data regiser
         {
           unsigned dataReg = base + vecRegOffset_;
           for (unsigned i = 0; i < count; ++i)
@@ -658,7 +657,26 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
             }
         }
     }
-#endif
+
+  if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
+    {
+      unsigned base, count = 1;
+      if (hart.getLastVecLdStRegsUsed(di, 2, base, count))  // Operand 2 is index regiser
+        {
+          unsigned ixReg = base + vecRegOffset_;
+          for (unsigned i = 0; i < count; ++i)
+            {
+              auto ixTime = regTime.at(ixReg + i);
+	      auto ixProducer = regProducer.at(ixReg + i);
+
+	      // We do not update addrProducer_ and addrTime_: those are for the scalar
+	      // address register.
+
+	      unsigned vec = base + i;  // Index vector.
+	      instr.ixProdTimes_.at(i) = McmInstr::VecProdTime{vec, ixProducer, ixTime};
+            }
+        }
+    }
 }
 
 
@@ -912,12 +930,13 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	  if (skip)
 	    continue;
 
-	  unsigned vecIx = hart.identifyDataRegister(info, elem);
+	  unsigned dataReg = hart.identifyDataRegister(info, elem);
+	  unsigned ixReg = info.isIndexed_ ? dataReg - elem.field_ : 0;
 
 	  uint64_t pa1 = elem.pa_, pa2 = elem.pa2_, value = elem.stData_;
 
 	  if (pa1 == pa2)
-	    vecRefs.add(pa1, value, elemSize, vecIx);
+	    vecRefs.add(pa1, value, elemSize, dataReg, ixReg);
 	  else
 	    {
 	      unsigned size1 = offsetToNextPage(pa1);
@@ -925,8 +944,8 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	      unsigned size2 = elemSize - size1;
 	      uint64_t val1 = (value <<  ((8 - size1)*8)) >> ((8 - size1)*8);
 	      uint64_t val2 = (value >> (size1*8));
-	      vecRefs.add(pa1, val1, size1, vecIx);
-	      vecRefs.add(pa2, val2, size2, vecIx);
+	      vecRefs.add(pa1, val1, size1, dataReg, ixReg);
+	      vecRefs.add(pa2, val2, size2, dataReg, ixReg);
 	    }
         }
 
@@ -2013,7 +2032,8 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
       unsigned size1 = elemSize, size2 = 0;
       uint64_t ea1 = elem.pa_, ea2 = elem.pa2_;
 
-      unsigned vecIx = hart.identifyDataRegister(info, elem);
+      unsigned dataReg = hart.identifyDataRegister(info, elem);
+      unsigned ixReg = info.isIndexed_ ? dataReg - elem.field_ : 0;
 
       if (ea1 != ea2 and pageNum(ea1) != pageNum(ea2))
 	{
@@ -2021,11 +2041,11 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 	  size2 = elemSize - size1;
 	  assert(size1 > 0 and size1 < elemSize);
 	  assert(size2 > 0 and size2 < elemSize);
-	  vecRefs.add(ea1, 0, size1, vecIx);
-	  vecRefs.add(ea2, 0, size2, vecIx);
+	  vecRefs.add(ea1, 0, size1, dataReg, ixReg);
+	  vecRefs.add(ea2, 0, size2, dataReg, ixReg);
 	}
       else
-	vecRefs.add(ea1, 0, size1, vecIx);
+	vecRefs.add(ea1, 0, size1, dataReg, ixReg);
 
       for (unsigned i = 0; i < size1; ++i)
 	{
@@ -3998,6 +4018,8 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	  if (iter == vecRefMap.end())
 	    continue;
 
+	  bool isIndexed = instrM.di_.isVectorStoreIndexed();
+
 	  auto& vecRefs = iter->second;
 
 	  // For each data vector of M.
@@ -4006,9 +4028,9 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	      // Identify vector writing to memory overlappin byte address of B.
 	      if (not vecRef.overlaps(byteAddr))
 		continue;
-	      unsigned dataVec = vecRef.regIx_;
+	      unsigned dataVec = vecRef.reg_;
 
-	      // Find the producer of identified vector.
+	      // Find the producer A of identified vector. M has data dep on A.
 	      McmInstrIx aTag = 0;
 	      uint64_t aTime = 0;
 	      for (auto& vpd : instrM.vecProdTimes_)
@@ -4026,11 +4048,46 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	      if (not instrA.isMemory())
 		continue;
 
+	      // Check B against A.
 	      if (not instrA.complete_ or byteTime <= aTime)
 		{
 		  cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
 		       << aTag << " tag2=" << instrB.tag_ << " mtag=" << mTag
 		       << " time1=" << aTime << " time2=" << byteTime << " dep=data\n";
+		  return false;
+		}
+
+	      if (not isIndexed)
+		continue;
+
+	      // Get index register correspondig to dataVec.
+	      unsigned ixVec = vecRef.ixReg_;
+
+	      // Find the producer AA of identifed index register. M has addr dep on AA.
+	      aTag = 0;
+	      aTime = 0;
+
+	      for (auto& vpd : instrM.ixProdTimes_)
+		if (vpd.regIx_ == ixVec)
+		  {
+		    aTag = vpd.tag_;
+		    aTime = vpd.time_;
+		    break;
+		  }
+
+	      if (aTag == 0)
+		continue;
+
+	      auto& instrAA = instrVec.at(aTag);
+	      if (not instrAA.isMemory())
+		continue;
+
+	      // Check B against AA.
+	      if (not instrAA.complete_ or byteTime <= aTime)
+		{
+		  cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
+		       << aTag << " tag2=" << instrB.tag_ << " mtag=" << mTag
+		       << " time1=" << aTime << " time2=" << byteTime << " dep=addr\n";
 		  return false;
 		}
 	    }

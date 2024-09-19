@@ -83,6 +83,9 @@ namespace WdRiscv
     // Time ld/st intruction vector data register(s) were produced.
     std::array<VecProdTime, 8> vecProdTimes_;
 
+    // Time ld/st instruction vector index register(s) were produced,
+    std::array<VecProdTime, 8> ixProdTimes_;
+
     DecodedInst di_;
     McmInstrIx tag_ = 0;
     uint8_t hartIx_ : 8 = 0;
@@ -738,17 +741,19 @@ namespace WdRiscv
     /// corresponding data for store.
     struct VecRef
     {
-      VecRef(uint64_t addr = 0, uint64_t data = 0, unsigned size = 0, unsigned regIx = 0)
-	: addr_(addr), data_(data), size_(size), regIx_(regIx)
+      VecRef(uint64_t addr = 0, uint64_t data = 0, unsigned size = 0, unsigned dataReg = 0,
+	     unsigned ixReg = 0)
+	: addr_(addr), data_(data), size_(size), reg_(dataReg), ixReg_(ixReg)
       { }
 
       bool overlaps(uint64_t addr) const
       { return addr >= addr_ && addr < addr_ + size_; }
 
-      uint64_t addr_ = 0;
-      uint64_t data_ = 0;
-      uint16_t size_ = 0;
-      uint16_t regIx_ = 0;
+      uint64_t addr_    = 0;
+      uint64_t data_    = 0;
+      uint16_t size_    = 0;
+      uint16_t reg_     = 0;   // Number of data register.
+      uint16_t ixReg_   = 0;   // Number of index register (if indexed).
     };
 
     /// Collection of vector load/store reference (Whisper) addresses for a single
@@ -789,7 +794,7 @@ namespace WdRiscv
 	return isOutOfBounds(ref.addr_, ref.addr_ + ref.size_ - 1);
       }
 
-      void add(uint64_t addr, uint64_t data, unsigned size, unsigned vecReg)
+      void add(uint64_t addr, uint64_t data, unsigned size, unsigned vecReg, unsigned ixReg)
       {
 	assert(size > 0);
 
@@ -804,7 +809,7 @@ namespace WdRiscv
 	    low_ = std::min(low_, l);
 	    high_ = std::max(high_, h);
 	  }
-	refs_.push_back(VecRef(addr, data, size, vecReg));
+	refs_.push_back(VecRef(addr, data, size, vecReg, ixReg));
       }
 
       std::vector<VecRef> refs_;

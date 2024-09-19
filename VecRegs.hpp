@@ -609,7 +609,7 @@ namespace WdRiscv
     }
 
     /// Return the data vector register number associated with the given ld/st element
-    /// info.  We return the individual register and not the base register of a group.
+    /// info. We return the individual register and not the base register of a group.
     unsigned identifyDataRegister(const VecLdStInfo& info, const VecLdStElem& elem) const
     {
       assert(info.elemSize_ != 0 and not info.elems_.empty());
@@ -617,7 +617,6 @@ namespace WdRiscv
       unsigned count = (elem.ix_ * info.elemSize_) / bytesPerReg_;
       return base + count + elem.field_;
     }
-
 
   protected:
 
