@@ -193,6 +193,10 @@ namespace WdRiscv
     bool isFence() const
     { return entry_ and entry_->instId() == InstId::fence; }
 
+    /// Return true if this a pause instruction.
+    bool isPause() const
+    { return entry_ and entry_->instId() == InstId::pause; }
+
     /// Return true if this a fence instruction (not fence.tso).
     bool isSfence_vma() const
     { return entry_ and entry_->instId() == InstId::sfence_vma; }
