@@ -4153,7 +4153,19 @@ Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
 	    return false;
 	  }
 
-      // TODO FIX : handle case where M is an indexed vector store.
+      if (instrM.di_.isVectorLoadIndexed() or instrM.di_.isVectorStoreIndexed())
+	{
+	  for (auto& ipt : instrM.ixProdTimes_)
+	    {
+	      if (ipt.time_ < earlyB)
+		continue;
+
+	      cerr << "Error: PPO rule 13 failed: hart-id=" << hart.hartId() << " tag1="
+		   << ipt.tag_ << " tag2=" << instrB.tag_ << " mtag=" << mTag
+		   << " time1=" << ipt.time_ << " time2=" << earlyB << '\n';
+	      return false;
+	    }
+	}
     }
 
   return true;
