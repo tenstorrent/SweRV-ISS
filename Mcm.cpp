@@ -854,6 +854,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 	  op.hartIx_ = hartIx;
 	  op.size_ = 8;
 	  op.isRead_ = false;
+	  op.bypass_ = true;
 
 	  // Associate write op with instruction.
 	  instr->addMemOp(sysMemOps_.size());
@@ -872,6 +873,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       op.hartIx_ = hartIx;
       op.size_ = size;
       op.isRead_ = false;
+      op.bypass_ = true;
 
       // Associate write op with instruction.
       instr->addMemOp(sysMemOps_.size());
@@ -1686,7 +1688,7 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
   assert(iter != vecRefMap.end());
   auto& vecRefs = iter->second;
 
-  // Collect refence byte values in an address to value map. Check for overlap
+  // Collect refrence byte values in an address to value map. Check for overlap
   std::unordered_map<uint64_t, uint8_t> refValues;  // Map byte address to value.
   bool overlap = false;
   for (auto& ref : vecRefs.refs_)
@@ -3143,11 +3145,11 @@ Mcm<URV>::effectiveMaxTime(const McmInstr& instr) const
 
 template <typename URV>
 bool
-Mcm<URV>::checkFence(Hart<URV>& hart, const McmInstr& instrB) const
+Mcm<URV>::checkFence(Hart<URV>& hart, const McmInstr& fence) const
 {
-  assert(instrB.isRetired());
+  assert(fence.isRetired());
 
-  const DecodedInst& bdi = instrB.di_;
+  const DecodedInst& bdi = fence.di_;
 
   // If fence instruction has predecessor write, then check that all preceding stores
   // have drained. This is stronger than what is required by PPO rule 4 but it makes
@@ -3157,11 +3159,28 @@ Mcm<URV>::checkFence(Hart<URV>& hart, const McmInstr& instrB) const
 
   unsigned hartIx = hart.sysHartIndex();
   auto& undrained = hartData_.at(hartIx).undrainedStores_;
-  if (not undrained.empty())
+  if (undrained.empty())
+    return true;
+
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
+
+  // We may have an early bypass ops (e.g. for an amoadd that has not yet retired). These
+  // should not count as they are drained but waiting for their instruction to retire.
+  for (auto tag : undrained)
     {
-      cerr << "Error: PPO rule 4 failed: Hart-id=" << hart.hartId() << " tag=" << instrB.tag_
-	   << " fence instruction with predecessor-write retired with undrained stores\n";
-      return false;
+      const auto& instr = instrVec.at(tag);
+      for (auto opIx : instr.memOps_)
+	{
+	  auto& op = sysMemOps_.at(opIx);
+	  if (op.canceled_ or op.isRead_ or op.bypass_)
+	    continue;
+
+	  cerr << "Error: PPO rule 4 failed: Hart-id=" << hart.hartId() << " fence-tag=" << fence.tag_
+	       << " fence with predecessor-write retired while write is pending for tag="
+	       << tag << '\n';
+
+	  return false;
+	}
     }
 
   return true;
