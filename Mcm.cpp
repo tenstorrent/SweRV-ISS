@@ -639,7 +639,7 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
   if (di.isVectorStore())
     {
       unsigned base, count = 1;
-      if (hart.getLastVecLdStRegsUsed(di, 0, base, count)) // Operand 0 is data regiser
+      if (hart.getLastVecLdStRegsUsed(di, 0, base, count)) // Operand 0 is data register
         {
           unsigned dataReg = base + vecRegOffset_;
           for (unsigned i = 0; i < count; ++i)
@@ -661,7 +661,7 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
   if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
     {
       unsigned base, count = 1;
-      if (hart.getLastVecLdStRegsUsed(di, 2, base, count))  // Operand 2 is index regiser
+      if (hart.getLastVecLdStRegsUsed(di, 2, base, count))  // Operand 2 is index register
         {
           unsigned ixReg = base + vecRegOffset_;
           for (unsigned i = 0; i < count; ++i)
@@ -3742,7 +3742,7 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
       if (hart.getLastVecLdStRegsUsed(bdi, 0, base, count))  // Dest reg is oeprand 0
 	{
 	  std::vector<uint64_t> dataEarlyTimes;  // Times when B wrote its registers.
-	  getVecRegEarlyTimes(hart, instrB, count, dataEarlyTimes);
+	  getVecRegEarlyTimes(hart, instrB, base, count, dataEarlyTimes);
 
           unsigned offsetReg = base + vecRegOffset_;
           for (unsigned i = 0; i < count; ++i)
@@ -4267,7 +4267,7 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
 	}
 
       std::vector<uint64_t> dataEarlyTimes;
-      getVecRegEarlyTimes(hart, instr, count, dataEarlyTimes);
+      getVecRegEarlyTimes(hart, instr, base, count, dataEarlyTimes);
 
       if (count <= ixCount)
 	{
@@ -4318,8 +4318,8 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
 
 template <typename URV>
 void
-Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned count,
-			      std::vector<uint64_t>& times) const
+Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned base,
+			      unsigned count, std::vector<uint64_t>& times) const
 {
   times.resize(count);
   for (auto& t : times)
@@ -4347,25 +4347,37 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned c
     return;  // Should not happen.
 
   unsigned elemsPerVec = hart.vecRegSize() / elemSize;
+  unsigned firstElemIx = elems.at(0).ix_;   // vstart.
 
-  for (unsigned ix = 0; ix < count; ++ix)
+  for (unsigned ii = 0; ii < count; ++ii)
     {
       uint64_t regTime = time_;  // Vector register time
 
-      unsigned offset = ix * elemsPerVec;
-      for (unsigned elemIx = 0; elemIx < elemsPerVec; ++elemIx)  // Elem ix in vec reg.
+      // If vstart > 0, base would be >= the destination register number. For example, in
+      // "vle8 v2, (a0)", destination register is v2 but base maybe v3.
+      assert(base >= info.vec_);
+      
+      unsigned vecOffset = base + ii - info.vec_;
+      unsigned offset = vecOffset * elemsPerVec;
+
+      for (unsigned eiv = 0; eiv < elemsPerVec; ++eiv)  // Elem ix in vec reg.
 	{
-	  unsigned ixInGroup = offset + elemIx;    // Elem ix in vec-reg-group
-	  if (ixInGroup >= elems.size())
+	  if (ii == 0 and eiv < firstElemIx)
+	    continue;
+
+	  unsigned elemIx = offset + eiv - firstElemIx;   // Elem at vstart has index 0.
+	  if (elemIx >= elems.size())
 	    continue;  // Should not happen
 
-	  if (elems.at(ixInGroup).masked_)
+	  auto& elem = elems.at(elemIx);
+
+	  if (elem.masked_)
 	    {
 	      regTime = time_;  // What if mask-policy is preserve?
 	      continue;
 	    }
 
-	  uint64_t pa1 = elems.at(ixInGroup).pa_, pa2 = elems.at(ixInGroup).pa2_;
+	  uint64_t pa1 = elem.pa_, pa2 = elem.pa2_;
 	  unsigned size1 = elemSize, size2 = 0;
 	  if (pa1 != pa2)
 	    {
@@ -4390,7 +4402,7 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned c
 	    }
 	}
 
-      times.at(ix) = regTime;
+      times.at(ii) = regTime;
     }
 }
 

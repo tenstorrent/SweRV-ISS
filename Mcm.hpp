@@ -414,8 +414,11 @@ namespace WdRiscv
     bool isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned& ixReg,
 			      McmInstrIx& producer, uint64_t& produerTime) const;
 
-    void getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned count,
-			     std::vector<uint64_t>& times) const;
+    /// Collect the earliest times the data registers of the given load/store instruction
+    /// were read/written. Base is the first vector register, count is the number of
+    /// registers.
+    void getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned base,
+			     unsigned count, std::vector<uint64_t>& times) const;
 
     /// Trim read operations to match reference (whisper). Mark replay read ops as
     /// canceled. Remove cancled ops.
