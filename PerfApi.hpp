@@ -476,6 +476,12 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     void restoreHartValues(Hart64& hart, const InstrPac& packet,
 			   const std::array<uint64_t, 4>& prevVal);
 
+    /// Helper to execute. Restore IMSIC top interrupt if csrn is one of M/S/VS TOPEI.
+    void restoreImsicTopei(Hart64& hart, WdRiscv::CsrNumber csrn, unsigned id, unsigned guest);
+
+    /// Helper to execute. Save IMSIC top interupt if csrn is one of M/S/VS TOPEI.
+    void saveImsicTopei(Hart64& hart, WdRiscv::CsrNumber csrn, unsigned& id, unsigned& guest);
+
     /// Record the results (register values) corresponding to the operands of the packet
     /// after the execution of the instruction of that packet.
     void recordExecutionResults(Hart64& hart, InstrPac& packet);

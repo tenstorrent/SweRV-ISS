@@ -18,6 +18,9 @@
 using namespace TT_PERF;
 
 
+using CSRN = WdRiscv::CsrNumber;
+
+
 PerfApi::PerfApi(System64& system)
   : system_(system)
 {
@@ -233,9 +236,11 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   if (not checkTime("Execute", time))
     return false;
 
-  auto hart = checkHart("Execute", hartIx);
-  if (not hart)
+  auto hartPtr = checkHart("Execute", hartIx);
+  if (not hartPtr)
     return false;
+
+  auto& hart = *hartPtr;
 
   auto pacPtr = checkTag("execute", hartIx, tag);
   if (not pacPtr)
@@ -292,7 +297,7 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
 	    }
 	}
       else
-	peekOk = peekRegister(*hart, di.ithOperandType(i), regNum, value) and peekOk;
+	peekOk = peekRegister(hart, di.ithOperandType(i), regNum, value) and peekOk;
 
       packet.opVal_.at(i) = value;
     }
@@ -359,6 +364,12 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   // into the hart registers.
   bool setOk = setHartValues(hart, packet);
 
+  auto& di = packet.decodedInst();
+
+  unsigned imsicId = 0, imsicGuest = 0;
+  if (di.isCsr())
+    saveImsicTopei(hart, CSRN(di.ithOperand(2)), imsicId, imsicGuest);
+
   // Execute
   hart.singleStep();
 
@@ -371,8 +382,6 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   // Record PC of subsequent packet.
   packet.nextIva_ = hart.peekPc();
-
-  auto& di = packet.decodedInst();
 
   if (not trap)
     recordExecutionResults(hart, packet);
@@ -390,7 +399,7 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
     }
 
   // Restore changed CSRs. This also restores hart sate for traps or Xrest-instructions.
-  std::vector<WdRiscv::CsrNumber> csrns;
+  std::vector<CSRN> csrns;
   hart.lastCsr(csrns);
   for (auto csrn : csrns)
     {
@@ -408,6 +417,9 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   // Restore hart registers.
   if (not trap and not di.isXRet())
     restoreHartValues(hart, packet, prevVal);
+
+  if (di.isCsr())
+    restoreImsicTopei(hart, CSRN(di.ithOperand(2)), imsicId, imsicGuest);
 
   hart.setTargetProgramFinished(false);
   hart.pokePc(prevPc);
@@ -973,7 +985,7 @@ PerfApi::saveHartValues(Hart64& hart, const InstrPac& packet,
 	  ok = hart.peekFpReg(operand, prevVal.at(i)) and ok;
 	  break;
 	case OT::CsReg:
-	  ok = hart.peekCsr(WdRiscv::CsrNumber(operand), prevVal.at(i)) and ok;
+	  ok = hart.peekCsr(CSRN(operand), prevVal.at(i)) and ok;
 	  break;
 	case OT::VecReg:
 	  assert(0);
@@ -987,6 +999,68 @@ PerfApi::saveHartValues(Hart64& hart, const InstrPac& packet,
     }
 
   return ok;
+}
+
+
+void
+PerfApi::saveImsicTopei(Hart64& hart, CSRN csrn, unsigned& id, unsigned& guest)
+{
+  id = 0;
+  guest = 0;
+
+  auto imsic = hart.imsic();
+  if (not imsic)
+    return;
+
+  if (csrn == CSRN::MTOPEI)
+    {
+      id = imsic->machineTopId();
+    }
+  else if (csrn == CSRN::STOPEI)
+    {
+      id = imsic->supervisorTopId();
+    }
+  else if (csrn == CSRN::VSTOPEI)
+    {
+      uint64_t hs = 0;
+      if (hart.peekCsr(CSRN::HSTATUS, hs))
+	{
+	  WdRiscv::HstatusFields<uint64_t> hsf(hs);
+	  unsigned gg = hsf.bits_.VGEIN;
+	  if (gg > 0 and gg < imsic->guestCount())
+	    {
+	      guest = gg;
+	      imsic->guestTopId(gg);
+	    }
+	}
+    }
+}
+
+
+
+void
+PerfApi::restoreImsicTopei(Hart64& hart, CSRN csrn, unsigned id, unsigned guest)
+{
+  auto imsic = hart.imsic();
+  if (not imsic)
+    return;
+
+  if (id == 0)
+    return;
+
+  if (csrn == CSRN::MTOPEI)
+    {
+      imsic->setMachinePending(id, true);
+    }
+  else if (csrn == CSRN::STOPEI)
+    {
+      imsic->setSupervisorPending(id, true);
+    }
+  else if (csrn == CSRN::VSTOPEI)
+    {
+      if (guest > 0 and guest < imsic->guestCount())
+	imsic->setGuestPending(guest, id, true);
+    }
 }
 
 
@@ -1014,17 +1088,24 @@ PerfApi::restoreHartValues(Hart64& hart, const InstrPac& packet,
 	  if (not hart.pokeIntReg(operand, prev))
 	    assert(0);
 	  break;
+
 	case OT::FpReg:
 	  if (not hart.pokeFpReg(operand, prev))
 	    assert(0);
 	  break;
+
 	case OT::CsReg:
-	  if (not hart.pokeCsr(WdRiscv::CsrNumber(operand), prev))
-	    assert(0);
+	  {
+	    auto csrn = CSRN(operand);
+	    if (not hart.pokeCsr(csrn, prev))
+	      assert(0);
+	  }
 	  break;
+
 	case OT::VecReg:
 	  assert(0);
 	  break;
+
 	default:
 	  assert(0);
 	  break;
@@ -1062,7 +1143,7 @@ PerfApi::setHartValues(Hart64& hart, const InstrPac& packet)
  	  ok = hart.pokeFpReg(operand, val) and ok;
  	  break;
  	case OT::CsReg:
- 	  ok = hart.pokeCsr(WdRiscv::CsrNumber(operand), val) and ok;
+ 	  ok = hart.pokeCsr(CSRN(operand), val) and ok;
  	  break;
  	case OT::VecReg:
  	  assert(0);
