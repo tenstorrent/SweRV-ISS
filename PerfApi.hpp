@@ -359,7 +359,8 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     /// Set data to the load value of the given instruction tag and return true on
     /// success. Return false on failure leaving data unmodified: tag is not valid or
     /// corresponding instruction is not executed or is not a load.
-    bool getLoadData(unsigned hart, uint64_t tag, uint64_t vaddr, unsigned size, uint64_t& data);
+    bool getLoadData(unsigned hart, uint64_t tag, uint64_t va, uint64_t pa1,
+		     uint64_t pa2, unsigned size, uint64_t& data);
 
     /// Set the data value of a store/amo instruction to be commited to memory
     /// at drain/retire time.
@@ -382,6 +383,19 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
     { traceFiles_ = files; }
 
   protected:
+
+    /// Return the page number corresponding to the given address
+    uint64_t pageNum(uint64_t addr) const
+    { return addr >> 12; }
+
+    /// Return the address of the page with the given page number.
+    uint64_t pageAddress(uint64_t pageNum) const
+    { return pageNum << 12; }
+
+    /// Return the difference between the next page boundary and the current
+    /// address. Return 0 if address is on a page boundary.
+    unsigned offsetToNextPage(uint64_t addr) const
+    { return pageSize_ - (addr & (pageSize_ - 1)); }
 
     bool commitMemoryWrite(Hart64& hart, uint64_t addr, unsigned size, uint64_t value);
 
@@ -446,6 +460,32 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
       return 0;
     }
 
+    /// Save hart register values corresponding to packet operands in prevVal.  Return
+    /// true on success. Return false if any of the required hart registers cannot be
+    /// read.
+    bool saveHartValues(Hart64& hart, const InstrPac& packet,
+			std::array<uint64_t, 4>& prevVal);
+
+    /// Install packet operand values (some obtained from previous in-flight instructions)
+    /// into the hart registers. Return true on success. Return false if any of the
+    /// required hart registers cannot be written.
+    bool setHartValues(Hart64& hart, const InstrPac& packet);
+
+    /// Restore the hart registers corresponding to the packet operands to the values in
+    /// the prevVal array.
+    void restoreHartValues(Hart64& hart, const InstrPac& packet,
+			   const std::array<uint64_t, 4>& prevVal);
+
+    /// Helper to execute. Restore IMSIC top interrupt if csrn is one of M/S/VS TOPEI.
+    void restoreImsicTopei(Hart64& hart, WdRiscv::CsrNumber csrn, unsigned id, unsigned guest);
+
+    /// Helper to execute. Save IMSIC top interupt if csrn is one of M/S/VS TOPEI.
+    void saveImsicTopei(Hart64& hart, WdRiscv::CsrNumber csrn, unsigned& id, unsigned& guest);
+
+    /// Record the results (register values) corresponding to the operands of the packet
+    /// after the execution of the instruction of that packet.
+    void recordExecutionResults(Hart64& hart, InstrPac& packet);
+
   private:
 
     /// Map an instruction tag to corresponding packet.
@@ -474,6 +514,8 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
 
     FILE* commandLog_ = nullptr;
     std::vector<FILE*> traceFiles_;   // One per hart.
+
+    unsigned pageSize_ = 4096;
 
     /// Global indexing for all registers.
     const unsigned intRegOffset_ = 0;

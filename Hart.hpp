@@ -2210,8 +2210,42 @@ namespace WdRiscv
     { return suspended_; }
 
     /// Set value to the value read from the device associated with the given physical
-    /// address. No effect if pa is not a device address.
+    /// address.
     void deviceRead(uint64_t pa, unsigned size, uint64_t& value);
+
+    /// Write the given value to the device associated with the given phyiscal address.
+    /// address.
+    template <typename STORE_TYPE>
+    void deviceWrite(uint64_t pa, STORE_TYPE value);
+
+    /// Set current privilege mode.
+    void setPrivilegeMode(PrivilegeMode m)
+    { privMode_ = m; }
+
+    /// Enable/disable virtual (V) mode.
+    void setVirtualMode(bool mode)
+    {
+      virtMode_ = mode;
+      csRegs_.setVirtualMode(mode);
+      if (mode)
+	updateCachedVsstatus();
+      updateAddressTranslation();
+    }
+
+    /// Increment time base and timer value.
+    void tickTime()
+    {
+      ++timeSample_;
+      time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+    }
+
+    /// Decrement time base and timer value. This is used by PerfApi to undo effects of
+    /// execute.
+    void untickTime()
+    {
+      time_ -= not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+      --timeSample_;
+    }
 
     /// Return the data vector register number associated with the given ld/st element
     /// info.  We return the individual register and not the base register of a group.
@@ -2363,10 +2397,6 @@ namespace WdRiscv
     bool getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
 			 bool isVec, uint64_t& value);
 
-    /// Set current privilege mode.
-    void setPrivilegeMode(PrivilegeMode m)
-    { privMode_ = m; }
-
     /// Helper to reset: reset floating point related structures.
     /// No-op if no  floating point extension is enabled.
     void resetFloat();
@@ -2460,16 +2490,6 @@ namespace WdRiscv
 #ifndef FAST_SLOPPY
       setVecStatus(VecStatus::Dirty);
 #endif
-    }
-
-    // Enable/disable virtual (V) mode.
-    void setVirtualMode(bool mode)
-    {
-      virtMode_ = mode;
-      csRegs_.setVirtualMode(mode);
-      if (mode)
-	updateCachedVsstatus();
-      updateAddressTranslation();
     }
 
     // Return true if it is legal to execute a vector instruction: V

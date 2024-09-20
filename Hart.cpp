@@ -815,10 +815,8 @@ namespace WdRiscv
   void
   Hart<uint32_t>::writeMstatus()
   {
-    csRegs_.poke(CsrNumber::MSTATUS, mstatus_.value_.low_);
-    csRegs_.poke(CsrNumber::MSTATUSH, mstatus_.value_.high_);
-    csRegs_.recordWrite(CsrNumber::MSTATUS);
-    csRegs_.recordWrite(CsrNumber::MSTATUSH);
+    csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, mstatus_.value_.low_);
+    csRegs_.write(CsrNumber::MSTATUSH, PrivilegeMode::Machine, mstatus_.value_.high_);
     updateCachedMstatus();
   }
 
@@ -827,8 +825,7 @@ namespace WdRiscv
   void
   Hart<uint64_t>::writeMstatus()
   {
-    csRegs_.poke(CsrNumber::MSTATUS, mstatus_.value_);
-    csRegs_.recordWrite(CsrNumber::MSTATUS);
+    csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, mstatus_.value_);
     updateCachedMstatus();
   }
 
@@ -947,6 +944,12 @@ Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
 
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
   invalidateDecodeCache(addr, sizeof(val));
+
+  if (isPciAddr(addr))
+    {
+      pci_->access<uint16_t>(addr, val, true);
+      return true;
+    }
 
   return memory_.poke(addr, val, usePma);
 }
@@ -1788,7 +1791,7 @@ Hart<URV>::getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2,
   if (mcm_)
     return mcm_->getCurrentLoadValue(*this, instCounter_, va, pa1, pa2, size, isVec, value);
   if (perfApi_)
-    return perfApi_->getLoadData(hartIx_, instCounter_, va, size, value);
+    return perfApi_->getLoadData(hartIx_, instCounter_, va, pa1, pa2, size, value);
   assert(0);
   return false;
 }
@@ -1845,13 +1848,17 @@ Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
     {
       val = time_;
       val = val >> (pa - 0xbff8) * 8;
+      return;
     }
-  else if (isImsicAddr(pa))
+
+  if (isImsicAddr(pa))
     {
       if (imsicRead_)
         imsicRead_(pa, sizeof(val), val);
+      return;
     }
-  else if (isPciAddr(pa))
+
+  if (isPciAddr(pa))
     {
       switch (size)
 	{
@@ -1890,7 +1897,40 @@ Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
 	default:
 	  assert(0);
 	}
+      return;
     }
+
+  assert(0);  // No device contains given address.
+}
+
+
+template <typename URV>
+template<typename STORE_TYPE>
+void
+Hart<URV>::deviceWrite(uint64_t pa, STORE_TYPE storeVal)
+{
+  if (isAclintAddr(pa))
+    {
+      URV val = storeVal;
+      processClintWrite(pa, ldStSize_, val);
+      storeVal = val;
+      memWrite(pa, pa, storeVal);
+      return;
+    }
+
+  if (isImsicAddr(pa))
+    {
+      imsicWrite_(pa, sizeof(storeVal), storeVal);
+      return;
+    }
+
+  if (isPciAddr(pa))
+    {
+      pci_->access<STORE_TYPE>(pa, storeVal, true);
+      return;
+    }
+
+  assert(0);
 }
 
 
@@ -1917,7 +1957,7 @@ Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr
 
   ULT uval = 0;   // Unsigned loaded value
 
-  bool isDevice = isAclintMtimeAddr(addr1) or isImsicAddr(addr1) or isPciAddr(addr1);
+  bool isDevice = isAclintAddr(addr1) or isImsicAddr(addr1) or isPciAddr(addr1);
 
   bool hasOooVal = false;
   if (ooo_)
@@ -3463,9 +3503,16 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
     updateCachedVsstatus();
 
   if (csRegs_.peekMstatus() != mstatus_.value())
-    { updateCachedMstatus(); csRegs_.recordWrite(CN::MSTATUS); }
+    {
+      updateCachedMstatus();
+      csRegs_.recordWrite(CN::MSTATUS);
+    }
   else if (isRvh() and csRegs_.peekHstatus() != hstatus_.value())
-    { updateCachedHstatus(); csRegs_.recordWrite(CN::HSTATUS); }
+    {
+      updateCachedHstatus();
+      if (csRegs_.peekHstatus() != hstatus_.value())
+	csRegs_.recordWrite(CN::HSTATUS);
+    }
 
   effectiveIe_ = csRegs_.effectiveInterruptEnable();
 }
@@ -4777,10 +4824,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	  auto lock = (ownTrace_)? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(execMutex);
 
           if (not hartIx_)
-            {
-              ++timeSample_;
-              time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
-            }
+	    tickTime();  // Hart 0 increments timer.
 
           if (suspended_)
             {
@@ -5083,10 +5127,7 @@ Hart<URV>::simpleRunWithLimit()
   while (noUserStop and instCounter_ < limit)
     {
       if (not hartIx_)
-        {
-          ++timeSample_;
-          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
-        }
+	tickTime();
 
       if (suspended_)
         {
@@ -5148,10 +5189,7 @@ Hart<URV>::simpleRunNoLimit()
   while (noUserStop)
     {
       if (not hartIx_)
-        {
-          ++timeSample_;
-          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
-        }
+	tickTime();
 
       if (suspended_)
         {
@@ -5720,10 +5758,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
   try
     {
       if (not hartIx_)
-        {
-          ++timeSample_;
-          time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
-        }
+	tickTime();
 
       if (suspended_)
         {

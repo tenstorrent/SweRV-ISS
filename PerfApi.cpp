@@ -18,6 +18,9 @@
 using namespace TT_PERF;
 
 
+using CSRN = WdRiscv::CsrNumber;
+
+
 PerfApi::PerfApi(System64& system)
   : system_(system)
 {
@@ -91,7 +94,7 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
     return false;
 
   if (tag == 0)
-    {    
+    {
       std::cerr << "Error in PerfApi::fetch: Hart-ix=" << hartIx << "tag=" << tag
 		<< " zero tag is reserved.\n";
       assert(0);
@@ -136,31 +139,27 @@ PerfApi::fetch(unsigned hartIx, uint64_t time, uint64_t tag, uint64_t vpc,
   uint64_t gpc = 0; // Guest physical pc.
   cause = hart->fetchInstNoTrap(vpc, ppc, ppc2, gpc, opcode);
 
-  if (cause == ExceptionCause::NONE)
-    {
-      packet = std::make_shared<InstrPac>(tag, vpc, ppc, ppc2);
-      assert(packet);
-      packet->fetched_ = true;
-      packet->opcode_= opcode;
-      insertPacket(hartIx, tag, packet);
-      if (not decode(hartIx, time, tag))
-	assert(0);
-      prevFetch_ = packet;
-      trap = false;
+  packet = std::make_shared<InstrPac>(tag, vpc, ppc, ppc2);
+  assert(packet);
+  packet->fetched_ = true;
+  packet->opcode_= opcode;
+  insertPacket(hartIx, tag, packet);
+  if (not decode(hartIx, time, tag))
+    assert(0);
+  prevFetch_ = packet;
 
-      if (prev and not prev->trapped() and prev->executed() and prev->nextIva_ != vpc)
-	{
-	  packet->shouldFlush_ = true;
-	  packet->flushVa_ = prev->nextIva_;
-	}
-    }
-  else
+  trap = cause != ExceptionCause::NONE;
+
+  if (prev and not prev->trapped() and prev->executed() and prev->nextIva_ != vpc)
     {
-      // TOOD: To support full system mode, the trapPc will be modified depending on the exception encountered
+      packet->shouldFlush_ = true;
+      packet->flushVa_ = prev->nextIva_;
+    }
+
+  if (trap)
+    {
       prevFetch_ = nullptr;
-      trap = true;
       trapPc = 0;
-      return false;
     }
 
   return true;
@@ -237,9 +236,11 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   if (not checkTime("Execute", time))
     return false;
 
-  auto hart = checkHart("Execute", hartIx);
-  if (not hart)
+  auto hartPtr = checkHart("Execute", hartIx);
+  if (not hartPtr)
     return false;
+
+  auto& hart = *hartPtr;
 
   auto pacPtr = checkTag("execute", hartIx, tag);
   if (not pacPtr)
@@ -247,6 +248,8 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
 
   auto& packet = *pacPtr;
   auto& di = packet.decodedInst();
+  if (di.isLr())
+    return true;   // LR is executed and retired at PerApi::retire.
 
   auto& packetMap = hartPacketMaps_.at(hartIx);
 
@@ -267,6 +270,7 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
     }
 
   // Collect register operand values.
+  bool peekOk = true;
   assert(di.operandCount() <= packet.opVal_.size());
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
@@ -292,8 +296,9 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
 	      return false;
 	    }
 	}
-      else if (not peekRegister(*hart, di.ithOperandType(i), regNum, value))
-	assert(0);
+      else
+	peekOk = peekRegister(hart, di.ithOperandType(i), regNum, value) and peekOk;
+
       packet.opVal_.at(i) = value;
     }
 
@@ -301,6 +306,9 @@ PerfApi::execute(unsigned hartIx, uint64_t time, uint64_t tag)
   // values.
   if (not execute(hartIx, packet))
     assert(0);
+
+  if (not peekOk)
+    assert(packet.trap_);
 
   packet.executed_ = true;
   packet.execTime_ = time;
@@ -341,9 +349,6 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
   assert(hartPtr);
   auto& hart = *hartPtr;
 
-  using OM = WdRiscv::OperandMode;
-  using OT = WdRiscv::OperandType;
-
   uint64_t prevPc = hart.peekPc();
   uint64_t prevInstrCount = hart.getInstructionCount();
 
@@ -352,186 +357,75 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   std::array<uint64_t, 4> prevVal;  // Previous operand values
 
-  // Save prev value of operands.
-  for (unsigned i = 0; i < packet.di_.operandCount(); ++i)
-    {
-      auto mode = packet.di_.ithOperandMode(i);
-      auto type = packet.di_.ithOperandType(i);
-      uint32_t operand = packet.di_.ithOperand(i);
-      if (mode == OM::None)
-	continue;
+  // Save hart register values corresponding to packet operands in prevVal.
+  bool saveOk = saveHartValues(hart, packet, prevVal);
 
-      switch (type)
-	{
-	case OT::IntReg:
-	  if (not hart.peekIntReg(operand, prevVal.at(i)))
-	    assert(0);
-	  break;
-	case OT::FpReg:
-	  if (not hart.peekFpReg(operand, prevVal.at(i)))
-	    assert(0);
-	  break;
-	case OT::CsReg:
-	  if (not hart.peekCsr(WdRiscv::CsrNumber(operand), prevVal.at(i)))
-	    assert(0);
-	  break;
-	case OT::VecReg:
-	  assert(0);
-	  break;
-	case OT::Imm:
-	  break;
-	default:
-	  assert(0);
-	  break;
-	}
-    }
+  // Install packet operand values (some obtained from previous in-flight instructions)
+  // into the hart registers.
+  bool setOk = setHartValues(hart, packet);
 
-  // Poke packet operands into hart.
-  for (unsigned i = 0; i < packet.di_.operandCount(); ++i)
-    {
-      auto mode = packet.di_.ithOperandMode(i);
-      auto type = packet.di_.ithOperandType(i);
-      uint32_t operand = packet.di_.ithOperand(i);
-      uint64_t val = packet.opVal_.at(i);
-      if (mode == OM::None)
-	continue;
+  auto& di = packet.decodedInst();
 
-      switch (type)
-	{
-	case OT::IntReg:
-	  if (not hart.pokeIntReg(operand, val))
-	    assert(0);
-	  break;
-	case OT::FpReg:
-	  if (not hart.pokeFpReg(operand, val))
-	    assert(0);
-	  break;
-	case OT::CsReg:
-	  if (not hart.pokeCsr(WdRiscv::CsrNumber(operand), val))
-	    assert(0);
-	  break;
-	case OT::VecReg:
-	  assert(0);
-	  break;
-	case OT::Imm:
-	  break;
-	default:
-	  assert(0);
-	  break;
-	}
-    }
+  unsigned imsicId = 0, imsicGuest = 0;
+  if (di.isCsr())
+    saveImsicTopei(hart, CSRN(di.ithOperand(2)), imsicId, imsicGuest);
 
+  // Execute
   hart.singleStep();
 
   bool trap = hart.lastInstructionTrapped();
   packet.trap_ = packet.trap_ or trap;
 
+  // If save fails or set fails, there must be a trap.
+  if (not saveOk or not setOk)
+    assert(trap);
+
+  // Record PC of subsequent packet.
+  packet.nextIva_ = hart.peekPc();
+
   if (not trap)
-    {
-      auto& di = packet.decodedInst();
-      if (di.isLoad())
-	{
-	  hart.lastLdStAddress(packet.dva_, packet.dpa_);  // FIX TODO : handle page corrsing
-	  packet.dsize_ = di.loadSize();
-	}
-      else if (di.isStore() or di.isAmo())
-	{
-	  uint64_t sva = 0, spa1 = 0, spa2 = 0, sval = 0;
-	  unsigned ssize = hart.lastStore(sva, spa1, spa2, sval);
-	  if (ssize == 0)
-	    assert(0);
+    recordExecutionResults(hart, packet);
 
-	  packet.dva_ = sva;
-	  packet.dpa_ = spa1;  // FIX TODO : handle page corrsing
-	  packet.dsize_ = ssize;
-	  assert(ssize == packet.dsize_);
-	  if (di.isStore())
-	    {
-	      auto& storeMap =  hartStoreMaps_.at(hartIx);
-	      storeMap[packet.tag()] = getInstructionPacket(hartIx, packet.tag());
-	    }
-	}
+  // Undo changes to the hart.
 
-      if (hart.hasTargetProgramFinished())
-	packet.nextIva_ = haltPc;
-      else
-	packet.nextIva_ = hart.peekPc();
+  hart.untickTime();  // Restore timer value.
 
-      if (di.isBranch()) packet.taken_ = hart.lastBranchTaken();
-
-      // Record the values of the destination register.
-      unsigned destIx = 0;
-      for (unsigned i = 0; i < di.operandCount(); ++i)
-	{
-	  auto mode = di.effectiveIthOperandMode(i);
-	  if (mode == OM::Write or mode == OM::ReadWrite)
-	    {
-	      unsigned regNum = di.ithOperand(i);
-	      unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
-	      uint64_t destVal = 0;
-	      if (not peekRegister(hart, di.ithOperandType(i), regNum, destVal))
-		assert(0);
-	      packet.destValues_.at(destIx) = InstrPac::DestValue(gri, destVal);
-	      destIx++;
-	    }
-	}
-
-      // Memory should not have changed.
+  // Restore CSRs modified by the instruction or trap. TODO: For vector ld/st we have to
+  // restore partially modified vectors.
+  if (not trap)
+    {   // Must be an MRET/SRET/... Privilege lowered.  Restore it before restoring CSRs.
+      hart.setVirtualMode(hart.lastVirtMode());
+      hart.setPrivilegeMode(hart.lastPrivMode());
     }
 
+  // Restore changed CSRs. This also restores hart sate for traps or Xrest-instructions.
+  std::vector<CSRN> csrns;
+  hart.lastCsr(csrns);
+  for (auto csrn : csrns)
+    {
+      uint64_t value = hart.lastCsrValue(csrn);
+      if (not hart.pokeCsr(csrn, value))
+	assert(0);
+    }
 
   if (trap)
-    {
-      // Restore CSRs modified by the trap. TODO: For vector ld/st we have to restore
-      // partially modified vectors.
-      std::vector<WdRiscv::CsrNumber> csrns;
-      hart.lastCsr(csrns);
-      for (auto csrn : csrns)
-	{
-	  uint64_t value = hart.lastCsrValue(csrn);
-	  if (not hart.pokeCsr(csrn, value))
-	    assert(0);
-	}
+    {  // Privilege raised.  Restore it after restoring CSRs.
+      hart.setVirtualMode(hart.lastVirtMode());
+      hart.setPrivilegeMode(hart.lastPrivMode());
     }
-  else
-    {
-      // Restore hart status.
-      for (unsigned i = 0; i < packet.di_.operandCount(); ++i)
-	{
-	  auto mode = packet.di_.ithOperandMode(i);
-	  auto type = packet.di_.ithOperandType(i);
-	  uint32_t operand = packet.di_.ithOperand(i);
-	  uint64_t prev = prevVal.at(i);
-	  if (mode == OM::None)
-	    continue;
 
-	  switch (type)
-	    {
-	    case OT::IntReg:
-	      if (not hart.pokeIntReg(operand, prev))
-		assert(0);
-	      break;
-	    case OT::FpReg:
-	      if (not hart.pokeFpReg(operand, prev))
-		assert(0);
-	      break;
-	    case OT::CsReg:
-	      if (not hart.pokeCsr(WdRiscv::CsrNumber(operand), prev))
-		assert(0);
-	      break;
-	    case OT::VecReg:
-	      assert(0);
-	      break;
-	    default:
-	      assert(0);
-	      break;
-	    }
-	}
-    }
+  // Restore hart registers.
+  if (not trap and not di.isXRet())
+    restoreHartValues(hart, packet, prevVal);
+
+  if (di.isCsr())
+    restoreImsicTopei(hart, CSRN(di.ithOperand(2)), imsicId, imsicGuest);
 
   hart.setTargetProgramFinished(false);
   hart.pokePc(prevPc);
   hart.setInstructionCount(prevInstrCount);
+
+  hart.clearTraceData();
 
   return true;
 }
@@ -570,6 +464,7 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
       return false;
     }
 
+
   if (packet.instrVa() != hart->peekPc())
     {
       std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag << std::hex
@@ -583,26 +478,35 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
 
   // Undo renaming of destination registers.
   auto& producers = hartRegProducers_.at(hartIx);
-  for (size_t i = 0; i < packet.destValues_.size(); ++i)
+  auto& di = packet.decodedInst();
+  for (size_t i = 0; i < di.operandCount(); ++i)
     {
-      auto gri = packet.destValues_.at(i).first;
-      auto& producer = producers.at(gri);
-      if (producer and producer->tag() == packet.tag())
-        producer = nullptr;
+      using OM = WdRiscv::OperandMode;
+      auto mode = di.ithOperandMode(i);
+      if (mode == OM::Write or mode == OM::ReadWrite)
+	{
+	  unsigned regNum = di.ithOperand(i);
+	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
+	  auto& producer = producers.at(gri);
+	  if (producer and producer->tag() == packet.tag())
+	    producer = nullptr;
+	}
     }
 
   packet.retired_ = true;
 
-  if (packet.isAmo())
+  if (packet.isAmo() or packet.isSc())
     {
       uint64_t sva = 0, spa1 = 0, spa2 = 0, sval = 0;
       unsigned size = hart->lastStore(sva, spa1, spa2, sval);
-      if (not commitMemoryWrite(*hart, spa1, size, packet.storeData_))
-	assert(0);
-    }
-  else if (packet.isSc())
-    {
-      hart->cancelLr(WdRiscv::CancelLrCause::SC);
+      if (size != 0)   // Could be zero for a failed sc
+	if (not commitMemoryWrite(*hart, spa1, size, packet.storeData_))
+	  assert(0);
+      if (packet.isSc())
+	hart->cancelLr(WdRiscv::CancelLrCause::SC);
+      auto& storeMap = hartStoreMaps_.at(hartIx);
+      packet.drained_ = true;
+      storeMap.erase(packet.tag());
     }
 
   // Clear dependency on other packets to expedite release of packet memory.
@@ -671,13 +575,6 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
 
   auto& packet = *pacPtr;
 
-  if (packet.drained())
-    {
-      std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag
-		<< " Instruction drained more than once\n";
-      return false;
-    }
-
   if (not packet.di_.isStore())
     {
       std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag
@@ -685,13 +582,24 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
       return false;
     }
 
-  uint64_t value = packet.opVal_.at(0);
-  uint64_t addr = packet.dpa_;    // FIX TODO : Handle page crossing store.
+  if (packet.isAmo() or packet.isSc())
+    assert(packet.drained());   // AMO/SC drained at retire.
+  else
+    {
+      if (packet.drained())
+	{
+	  std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag
+		    << " Instruction drained more than once\n";
+	}
 
-  if (not commitMemoryWrite(*hart, addr, packet.dsize_, value))
-    assert(0);
+      uint64_t value = packet.storeData_;
+      uint64_t addr = packet.dpa_;    // FIX TODO : Handle page crossing store.
 
-  packet.drained_ = true;
+      if (not commitMemoryWrite(*hart, addr, packet.dsize_, value))
+	assert(0);
+
+      packet.drained_ = true;
+    }
 
   // Clear dependency on other packets to expedite release of packet memory.
   for (auto& producer : packet.opProducers_)
@@ -708,7 +616,8 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
 
 
 bool
-PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned size, uint64_t& data)
+PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t va, uint64_t pa1,
+		     uint64_t pa2, unsigned size, uint64_t& data)
 {
   auto hart = checkHart("Get-load-data", hartIx);
   auto packet = checkTag("Get-load-Data", hartIx, tag);
@@ -721,12 +630,26 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
       return false;
     }
 
-  if (packet->executed())
+  // If AMO destination register is x0, we lose the loaded value: redo the read for AMOs
+  // to avoid that case. AMOs should not have a discrepancy between early read and read at
+  // excecute, so redoing the read is ok.
+  if (packet->executed() and not packet->isAmo())
     {
       assert(size == packet->dataSize());
       data = packet->destValues_.at(0).second;
       return true;
     }
+
+  bool isDev = hart->isAclintMtimeAddr(pa1) or hart->isImsicAddr(pa1) or hart->isPciAddr(pa1);
+  if (isDev)
+    {
+      hart->deviceRead(pa1, size, data);
+      return true;
+    }
+
+  data = 0;
+  if (uint64_t toHost = 0; hart->getToHostAddress(toHost) && toHost == pa1)
+    return true;  // Reading from toHost yields 0.
 
   auto& storeMap =  hartStoreMaps_.at(hartIx);
 
@@ -746,7 +669,7 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
 
       uint64_t stAddr = stPac->dataVa();
       unsigned stSize = stPac->dataSize();
-      if (stAddr + stSize < vaddr or vaddr + size < stSize)
+      if (stAddr + stSize < va or va + size < stSize)
 	continue;  // No overlap.
 
       uint64_t stData = stPac->opVal_.at(0);
@@ -754,7 +677,7 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
       for (unsigned i = 0; i < size; ++i)
 	{
 	  unsigned byteMask = 1 << i;
-	  uint64_t byteAddr = vaddr + i;
+	  uint64_t byteAddr = va + i;
 	  if (byteAddr >= stAddr and byteAddr < stAddr + stSize)
 	    {
 	      data &= ~(0xffull << (i * 8));
@@ -768,12 +691,24 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t vaddr, unsigned siz
   if (forwarded == mask)
     return true;
 
+  unsigned size1 = size;
+  if (pa1 != pa2 and pageNum(pa1) != pageNum(pa2))
+    size1 = offsetToNextPage(pa1);
+
   for (unsigned i = 0; i < size; ++i)
     if (not (forwarded & (1 << i)))
       {
 	uint8_t byte = 0;
-	if (not hart->peekMemory(vaddr + i, byte, true))
-	  assert(0);
+	if (i < size1)
+	  {
+	    if (not hart->peekMemory(pa1 + i, byte, true))
+	      assert(0);
+	  }
+	else
+	  {
+	    if (not hart->peekMemory(pa2 + (i-size1), byte, true))
+	      assert(0);
+	  }
 	data |= uint64_t(byte) << (i*8);
       }
 
@@ -943,7 +878,7 @@ InstrPac::getSourceOperands(std::array<Operand, 3>& ops)
   assert(decoded_);
   if (not decoded_)
     return 0;
-  
+
   unsigned count = 0;
 
   using OM = WdRiscv::OperandMode;
@@ -970,7 +905,7 @@ InstrPac::getDestOperands(std::array<Operand, 2>& ops)
   assert(decoded_);
   if (not decoded_)
     return 0;
-  
+
   unsigned count = 0;
 
   using OM = WdRiscv::OperandMode;
@@ -1019,4 +954,269 @@ InstrPac::branchTargetFromDecode() const
     default:
       return 0;
     }
+}
+
+
+bool
+PerfApi::saveHartValues(Hart64& hart, const InstrPac& packet,
+			std::array<uint64_t, 4>& prevVal)
+{
+  using OM = WdRiscv::OperandMode;
+  using OT = WdRiscv::OperandType;
+
+  auto& di = packet.decodedInst();
+  bool ok = true;
+
+  for (unsigned i = 0; i < di.operandCount(); ++i)
+    {
+      auto mode = di.ithOperandMode(i);
+      auto type = di.ithOperandType(i);
+      uint32_t operand = di.ithOperand(i);
+      if (mode == OM::None)
+	continue;
+
+      switch (type)
+	{
+	case OT::IntReg:
+	  if (not hart.peekIntReg(operand, prevVal.at(i)))
+	    assert(0);
+	  break;
+	case OT::FpReg:
+	  ok = hart.peekFpReg(operand, prevVal.at(i)) and ok;
+	  break;
+	case OT::CsReg:
+	  ok = hart.peekCsr(CSRN(operand), prevVal.at(i)) and ok;
+	  break;
+	case OT::VecReg:
+	  assert(0);
+	  break;
+	case OT::Imm:
+	  break;
+	default:
+	  assert(0);
+	  break;
+	}
+    }
+
+  return ok;
+}
+
+
+void
+PerfApi::saveImsicTopei(Hart64& hart, CSRN csrn, unsigned& id, unsigned& guest)
+{
+  id = 0;
+  guest = 0;
+
+  auto imsic = hart.imsic();
+  if (not imsic)
+    return;
+
+  if (csrn == CSRN::MTOPEI)
+    {
+      id = imsic->machineTopId();
+    }
+  else if (csrn == CSRN::STOPEI)
+    {
+      id = imsic->supervisorTopId();
+    }
+  else if (csrn == CSRN::VSTOPEI)
+    {
+      uint64_t hs = 0;
+      if (hart.peekCsr(CSRN::HSTATUS, hs))
+	{
+	  WdRiscv::HstatusFields<uint64_t> hsf(hs);
+	  unsigned gg = hsf.bits_.VGEIN;
+	  if (gg > 0 and gg < imsic->guestCount())
+	    {
+	      guest = gg;
+	      imsic->guestTopId(gg);
+	    }
+	}
+    }
+}
+
+
+
+void
+PerfApi::restoreImsicTopei(Hart64& hart, CSRN csrn, unsigned id, unsigned guest)
+{
+  auto imsic = hart.imsic();
+  if (not imsic)
+    return;
+
+  if (id == 0)
+    return;
+
+  if (csrn == CSRN::MTOPEI)
+    {
+      imsic->setMachinePending(id, true);
+    }
+  else if (csrn == CSRN::STOPEI)
+    {
+      imsic->setSupervisorPending(id, true);
+    }
+  else if (csrn == CSRN::VSTOPEI)
+    {
+      if (guest > 0 and guest < imsic->guestCount())
+	imsic->setGuestPending(guest, id, true);
+    }
+}
+
+
+void
+PerfApi::restoreHartValues(Hart64& hart, const InstrPac& packet,
+			   const std::array<uint64_t, 4>& prevVal)
+{
+  using OM = WdRiscv::OperandMode;
+  using OT = WdRiscv::OperandType;
+
+  auto& di = packet.decodedInst();
+
+  for (unsigned i = 0; i < di.operandCount(); ++i)
+    {
+      auto mode = di.ithOperandMode(i);
+      auto type = di.ithOperandType(i);
+      uint32_t operand = di.ithOperand(i);
+      uint64_t prev = prevVal.at(i);
+      if (mode == OM::None)
+	continue;
+
+      switch (type)
+	{
+	case OT::IntReg:
+	  if (not hart.pokeIntReg(operand, prev))
+	    assert(0);
+	  break;
+
+	case OT::FpReg:
+	  if (not hart.pokeFpReg(operand, prev))
+	    assert(0);
+	  break;
+
+	case OT::CsReg:
+	  {
+	    auto csrn = CSRN(operand);
+	    if (not hart.pokeCsr(csrn, prev))
+	      assert(0);
+	  }
+	  break;
+
+	case OT::VecReg:
+	  assert(0);
+	  break;
+
+	default:
+	  assert(0);
+	  break;
+	}
+    }
+}
+
+
+bool
+PerfApi::setHartValues(Hart64& hart, const InstrPac& packet)
+{
+  using OM = WdRiscv::OperandMode;
+  using OT = WdRiscv::OperandType;
+
+  auto& di = packet.decodedInst();
+
+  bool ok = true;
+
+  for (unsigned i = 0; i < di.operandCount(); ++i)
+    {
+      auto mode = di.ithOperandMode(i);
+      auto type = di.ithOperandType(i);
+      uint32_t operand = di.ithOperand(i);
+      uint64_t val = packet.opVal_.at(i);
+      if (mode == OM::None)
+ 	continue;
+
+      switch (type)
+ 	{
+ 	case OT::IntReg:
+ 	  if (not hart.pokeIntReg(operand, val))
+ 	    assert(0);
+ 	  break;
+ 	case OT::FpReg:
+ 	  ok = hart.pokeFpReg(operand, val) and ok;
+ 	  break;
+ 	case OT::CsReg:
+ 	  ok = hart.pokeCsr(CSRN(operand), val) and ok;
+ 	  break;
+ 	case OT::VecReg:
+ 	  assert(0);
+ 	  break;
+ 	case OT::Imm:
+ 	  break;
+ 	default:
+ 	  assert(0);
+ 	  break;
+ 	}
+    }
+
+  return ok;
+}
+
+
+void
+PerfApi::recordExecutionResults(Hart64& hart, InstrPac& packet)
+{
+  auto& di = packet.decodedInst();
+
+  auto hartIx = hart.sysHartIndex();
+
+  if (di.isLoad())
+    {
+      hart.lastLdStAddress(packet.dva_, packet.dpa_);  // FIX TODO : handle page corrsing
+      packet.dsize_ = di.loadSize();
+    }
+  else if (di.isStore() or di.isAmo())
+    {
+      uint64_t sva = 0, spa1 = 0, spa2 = 0, sval = 0;
+      unsigned ssize = hart.lastStore(sva, spa1, spa2, sval);
+      if (ssize == 0 and not di.isSc())
+	{
+	  std::cerr << "Hart=" << hartIx << " tag=" << packet.tag_
+		    << " store/AMO with zero size\n";
+	  assert(0);
+	}
+
+      packet.dva_ = sva;
+      packet.dpa_ = spa1;  // FIX TODO : handle page corrsing
+      packet.dsize_ = ssize;
+      assert(ssize == packet.dsize_);
+      if (di.isStore() and not di.isSc())
+	{
+	  auto& storeMap =  hartStoreMaps_.at(hartIx);
+	  storeMap[packet.tag()] = getInstructionPacket(hartIx, packet.tag());
+	}
+    }
+
+  if (hart.hasTargetProgramFinished())
+    packet.nextIva_ = haltPc;
+
+  if (di.isBranch()) packet.taken_ = hart.lastBranchTaken();
+
+  // Record the values of the destination register.
+  unsigned destIx = 0;
+  for (unsigned i = 0; i < di.operandCount(); ++i)
+    {
+      using OM = WdRiscv::OperandMode;
+
+      auto mode = di.effectiveIthOperandMode(i);
+      if (mode == OM::Write or mode == OM::ReadWrite)
+	{
+	  unsigned regNum = di.ithOperand(i);
+	  unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
+	  uint64_t destVal = 0;
+	  if (not peekRegister(hart, di.ithOperandType(i), regNum, destVal))
+	    assert(0);
+	  packet.destValues_.at(destIx) = InstrPac::DestValue(gri, destVal);
+	  destIx++;
+	}
+    }
+
+  // Memory should not have changed.
 }

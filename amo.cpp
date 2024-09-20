@@ -21,6 +21,7 @@
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
 #include "Mcm.hpp"
+#include "PerfApi.hpp"
 
 using namespace WdRiscv;
 
@@ -374,8 +375,12 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   ldStData_ = storeVal;
   ldStWrite_ = true;
 
-  if (mcm_)
-    return true;  // Memory updated when merge buffer is written.
+  if (ooo_)
+    {
+      if (perfApi_)
+	perfApi_->setStoreData(hartIx_, instCounter_, storeVal);
+      return true;  // Memory updated when merge-buffer written or when sc is retired.
+    }
 
   memWrite(addr1, addr1, storeVal);
 
