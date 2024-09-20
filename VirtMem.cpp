@@ -1116,6 +1116,8 @@ VirtMem::printPageTable(std::ostream& os) const
     printEntries<Pte39, Va39>(os, addr, path);
   else if (mode_ == Mode::Sv48)
     printEntries<Pte48, Va48>(os, addr, path);
+  else if (mode_ == Mode::Sv57)
+    printEntries<Pte57, Va57>(os, addr, path);
   else
     os << "Unsupported virtual memory mode\n";
   os << "TLB:\n";
