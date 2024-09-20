@@ -947,10 +947,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
 
   if (isPciAddr(addr))
     {
-      if (addr >= pciConfigBase_ and addr < pciConfigEnd_)
-        pci_->config_mmio<uint16_t>(addr, val, true);
-      else
-        pci_->mmio<uint16_t>(addr, val, true);
+      pci_->access<uint16_t>(addr, val, true);
       return true;
     }
 
@@ -1929,10 +1926,7 @@ Hart<URV>::deviceWrite(uint64_t pa, STORE_TYPE storeVal)
 
   if (isPciAddr(pa))
     {
-      if (pa >= pciConfigBase_ and pa < pciConfigEnd_)
-        pci_->config_mmio<STORE_TYPE>(pa, storeVal, true);
-      else
-        pci_->mmio<STORE_TYPE>(pa, storeVal, true);
+      pci_->access<STORE_TYPE>(pa, storeVal, true);
       return;
     }
 
