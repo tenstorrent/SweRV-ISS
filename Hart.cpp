@@ -10400,7 +10400,15 @@ Hart<URV>::execMnret(const DecodedInst* di)
 
   // Restore virtual mode
   if (savedMode != PrivilegeMode::Machine)
-    setVirtualMode(savedVirt);
+    {
+      setVirtualMode(savedVirt);
+
+      if (mstatus_.bits_.MPRV != 0)
+	{
+	  mstatus_.bits_.MPRV = 0;
+	  writeMstatus();
+	}
+    }
 
   // Restore privilege mode
   privMode_ = savedMode;
