@@ -1,11 +1,11 @@
 // Copyright 2024 Tenstorrent Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -49,7 +49,7 @@ Hart<URV>::execVqdot_vv(const DecodedInst* di)
       return;
     }
 
-  if (start >= elems)
+  if (start >= vecRegs_.elemCount())
     return;
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
@@ -96,6 +96,9 @@ Hart<URV>::execVqdot_vx(const DecodedInst* di)
       return;
     }
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
 
   int32_t e2 = intRegs_.read(rs);
@@ -141,7 +144,7 @@ Hart<URV>::execVqdotu_vv(const DecodedInst* di)
       return;
     }
 
-  if (start >= elems)
+  if (start >= vecRegs_.elemCount())
     return;
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
@@ -188,6 +191,9 @@ Hart<URV>::execVqdotu_vx(const DecodedInst* di)
       return;
     }
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
 
   uint32_t e2 = intRegs_.read(rs);
@@ -233,7 +239,7 @@ Hart<URV>::execVqdotsu_vv(const DecodedInst* di)
       return;
     }
 
-  if (start >= elems)
+  if (start >= vecRegs_.elemCount())
     return;
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
@@ -281,6 +287,9 @@ Hart<URV>::execVqdotsu_vx(const DecodedInst* di)
       return;
     }
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
 
   uint32_t e2 = intRegs_.read(rs);
@@ -325,6 +334,9 @@ Hart<URV>::execVqdotus_vx(const DecodedInst* di)
       postVecFail(di);
       return;
     }
+
+  if (start >= vecRegs_.elemCount())
+    return;
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
 
