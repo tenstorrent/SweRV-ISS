@@ -711,10 +711,10 @@ System<URV>::configPci(uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize
       return false;
     }
 
-  pci_ = std::make_shared<Pci>(configBase, mmioBase, mmioSize, buses, slots);
+  pci_ = std::make_shared<Pci>(configBase, (1ULL << 28), mmioBase, mmioSize, buses, slots);
 
   for (auto& hart : sysHarts_)
-    hart->attachPci(pci_, configBase, mmioBase, mmioSize);
+    hart->attachPci(pci_);
   return true;
 }
 

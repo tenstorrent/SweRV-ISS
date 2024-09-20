@@ -661,16 +661,12 @@ Server<URV>::processStepChanges(Hart<URV>& hart,
     }
   else
     {
-      std::vector<uint64_t> addr;
-      std::vector<uint64_t> paddr;
-      std::vector<uint64_t> paddr2;
-      std::vector<uint64_t> data;
-      std::vector<bool> masked;
-      unsigned elemSize = 0;
-      if (hart.getLastVectorMemory(addr, paddr, paddr2, data, masked, elemSize) and not data.empty())
-	for (size_t i = 0; i < data.size(); ++i)
+      auto& info = hart.getLastVectorMemory();
+      unsigned elemSize = info.elemSize_;
+      if (not info.empty() and not info.isLoad_)
+	for (auto& einfo : info.elems_)
 	  {
-	    WhisperMessage msg(0, Change, 'm', addr.at(i), data.at(i), elemSize);
+	    WhisperMessage msg(0, Change, 'm', einfo.va_, einfo.stData_, elemSize);
 	    pendingChanges.push_back(msg);
 	  }
     }
@@ -982,7 +978,7 @@ Server<URV>::mcmBypassCommand(const WhisperMessage& req, WhisperMessage& reply,
   bool ok = true;
   uint32_t hartId = req.hart;
 
-  if (req.size <= 8 or true)    // "or true" temporary until RTL is ready.
+  if (req.size <= 8)
     {
       ok = system_.mcmBypass(hart, req.time, req.instrTag, req.address, req.size, req.value);
 
@@ -1329,6 +1325,16 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 		    uint32_t(msg.value), timeStamp.c_str());
 	  break;
 	}
+
+      case ClearNmi:
+        {
+	  if (checkHart(msg, "nmi", reply))
+	    hart.clearPendingNmi();
+	  if (commandLog)
+            fprintf(commandLog, "hart=%" PRIu32 " clear_nmi # ts=%s\n", hartId,
+		    timeStamp.c_str());
+	  break;
+        }
 
       case EnterDebug:
         {

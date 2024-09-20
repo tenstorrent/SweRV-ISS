@@ -3972,28 +3972,6 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
                 value |= 255;
             }
         }
-      else
-        {
-          unsigned iid = highestIidPrio(vs);
-          if (iid)
-            {
-              value = iid << 16;
-              if (iid == unsigned(IC::S_EXTERNAL))
-                {
-                  unsigned id = 0;
-                  if (imsic_)
-                    {
-                      URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
-                      HstatusFields<URV> hsf(hsVal);
-                      unsigned vgein = hsf.bits_.VGEIN;
-
-                      if (vgein and not (vgein >= imsic_->guestCount()))
-                        id = imsic_->guestTopId(vgein);
-                    }
-                  value |= id? id : 255;
-                }
-            }
-        }
 
       return true;
     }

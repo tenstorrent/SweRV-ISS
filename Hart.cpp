@@ -383,6 +383,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableSvinval(true);
   if (isa_.isEnabled(RvExtension::Svpbmt))
     enableTranslationPbmt(true);
+  if (isa_.isEnabled(RvExtension::Svadu))
+    enableTranslationAdu(true);
   if (isa_.isEnabled(RvExtension::Smrnmi))
     enableSmrnmi(true);
   if (isa_.isEnabled(RvExtension::Zicntr))
@@ -688,6 +690,8 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 
   // Reflect initial state of menvcfg CSR on pbmt and sstc.
   updateTranslationPbmt();
+  updateTranslationAdu();
+  updateTranslationPmm();
   csRegs_.updateSstc();
 
   // If any PMACFG CSR is defined, change the default PMA to no access.
@@ -983,10 +987,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
     }
   else if (isPciAddr(addr))
     {
-      if (addr >= pciConfigBase_ and addr < pciConfigEnd_)
-        pci_->config_mmio<uint32_t>(addr, val, true);
-      else
-        pci_->mmio<uint32_t>(addr, val, true);
+      pci_->access<uint32_t>(addr, val, true);
       return true;
     }
 
@@ -1019,10 +1020,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
     }
   else if (isPciAddr(addr))
     {
-      if (addr >= pciConfigBase_ and addr < pciConfigEnd_)
-        pci_->config_mmio<uint64_t>(addr, val, true);
-      else
-        pci_->mmio<uint64_t>(addr, val, true);
+      pci_->access<uint64_t>(addr, val, true);
       return true;
     }
 
@@ -1870,10 +1868,7 @@ Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
 	case 1:
 	  {
 	    uint8_t pciVal = 0;
-	    if (pa >= pciConfigBase_ and pa < pciConfigEnd_)
-	      pci_->config_mmio<uint8_t>(pa, pciVal, false);
-	    else
-	      pci_->mmio<uint8_t>(pa, pciVal, false);
+            pci_->access<uint8_t>(pa, pciVal, false);
 	    val = pciVal;
 	  }
 	  break;
@@ -1881,10 +1876,7 @@ Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
 	case 2:
 	  {
 	    uint16_t pciVal = 0;
-	    if (pa >= pciConfigBase_ and pa < pciConfigEnd_)
-	      pci_->config_mmio<uint16_t>(pa, pciVal, false);
-	    else
-	      pci_->mmio<uint16_t>(pa, pciVal, false);
+            pci_->access<uint16_t>(pa, pciVal, false);
 	    val = pciVal;
 	  }
 	  break;
@@ -1892,10 +1884,7 @@ Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
 	case 4:
 	  {
 	    uint32_t pciVal = 0;
-	    if (pa >= pciConfigBase_ and pa < pciConfigEnd_)
-	      pci_->config_mmio<uint32_t>(pa, pciVal, false);
-	    else
-	      pci_->mmio<uint32_t>(pa, pciVal, false);
+            pci_->access<uint32_t>(pa, pciVal, false);
 	    val = pciVal;
 	  }
 	  break;
@@ -1903,10 +1892,7 @@ Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
 	case 8:
 	  {
 	    uint64_t pciVal = 0;
-	    if (pa >= pciConfigBase_ and pa < pciConfigEnd_)
-	      pci_->config_mmio<uint64_t>(pa, pciVal, false);
-	    else
-	      pci_->mmio<uint64_t>(pa, pciVal, false);
+            pci_->access<uint64_t>(pa, pciVal, false);
 	    val = pciVal;
 	  }
 	  break;
@@ -2247,10 +2233,7 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
     }
   else if (isPciAddr(pa1))
     {
-      if (pa1 >= pciConfigBase_ and pa1 < pciConfigEnd_)
-        pci_->config_mmio<STORE_TYPE>(pa1, storeVal, true);
-      else
-        pci_->mmio<STORE_TYPE>(pa1, storeVal, true);
+      pci_->access<STORE_TYPE>(pa1, storeVal, true);
       return true;
     }
 
@@ -2669,15 +2652,18 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
     }
 #endif
 
-  // In debug mode no exception is taken. If an ebreak exception and
-  // debug park loop is defined, we jump to it. If not an ebreak and
-  // debug trap entry point is defined, we jump to it.
+  // In debug mode no exception is taken. If we get an ebreak exception and debug park
+  // loop is defined, we jump to it. If we get a non-ebreak exception and debug trap entry
+  // point is defined, we jump to it.
   if (debugMode_)
     {
       if (cause == ExceptionCause::BREAKP)
 	{
 	  if (debugParkLoop_ != ~URV(0))
-	    setPc(debugParkLoop_);
+	    {
+	      inDebugParkLoop_ = true;
+	      setPc(debugParkLoop_);
+	    }
 	}
       else if (debugTrapAddr_ != ~URV(0))
 	setPc(debugTrapAddr_);
@@ -2792,7 +2778,7 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
     {
       bool s1ImplicitWrite;
       // FIXME: info2 should be checked non-zero first
-      if (virtMem_.implAccTrap(s1ImplicitWrite) and info2)
+      if (virtMem_.s1ImplAccTrap(s1ImplicitWrite) and info2)
         {
           /// From Table 8.12 of privileged spec.
           if constexpr (sizeof(URV) == 4)
@@ -2820,9 +2806,9 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
     }
 
   // Clear relevant fields.
-  if (di->isLoad() and not di->isHypervisor())
+  if (di->isLoad() and not di->isHypervisor() and not di->isLr())
     uncompressed &= 0x000fffff;
-  else if (di->isStore() and not di->isHypervisor())
+  else if (di->isStore() and not di->isHypervisor() and not di->isSc())
     uncompressed &= 0x01fff07f;
   else if (di->isCmo())
     uncompressed &= 0xfffff07f;
@@ -3487,6 +3473,7 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
   else if (csr == CN::MENVCFG or csr == CN::SENVCFG or csr == CN::HENVCFG)
     {
       updateTranslationPbmt();
+      updateTranslationAdu();
       updateTranslationPmm();
       csRegs_.updateSstc();
       stimecmpActive_ = csRegs_.menvcfgStce();
@@ -4663,13 +4650,8 @@ Hart<URV>::getLastVecLdStRegsUsed(const DecodedInst& di, unsigned opIx,
 
   unsigned group = vecOpEmul(opIx);
 
-  if (fieldCount)
-    {
-      if (opIx == 2 and isIndexed)
-	elemCount /= fieldCount;  // Adjust index vector element count.
-      else
-	group *= di.vecFieldCount();  // Adjust non index vector group.
-    }
+  if (fieldCount and opIx == 2 and isIndexed)  // Operand 2 in vector index register.
+    elemCount /= fieldCount;  // Adjust index vector element count.
 
   regCount = group;
   if (elemCount < elemsPerVec*group)
@@ -5595,7 +5577,7 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause) const
     }
 
   // MIP read value is ored with supervisor external interrupt pin.
-  mip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+  mip = overrideWithSeiPin(mip);
 
   mip &= ~deferredInterrupts_;  // Inhibited by test-bench.
 
@@ -5691,8 +5673,6 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
   if (nmiPending_ and initiateNmi(URV(nmiCause_), pc_))
     {
       // NMI was taken.
-      nmiPending_ = false;
-      nmiCause_ = NmiCause::UNKNOWN;
       uint32_t inst = 0; // Load interrupted inst.
       readInst(currPc_, inst);
       printInstTrace(inst, instCounter_, instStr, traceFile);
@@ -9525,10 +9505,11 @@ template <typename URV>
 void
 Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
 {
-  cancelLr(CancelLrCause::ENTER_DEBUG);  // Entering debug modes loses LR reservation.
+  if (cancelLrOnDebug_)
+    cancelLr(CancelLrCause::ENTER_DEBUG);  // Lose LR reservation.
 
   if (debugMode_)
-    std::cerr << "Error: Entering debug-mode while in debug-mode\n";
+    std::cerr << "Warning: Entering debug-mode while in debug-mode\n";
   debugMode_ = true;
   csRegs_.enterDebug(true);
 
@@ -10014,8 +9995,14 @@ Hart<URV>::execEbreak(const DecodedInst*)
       return;
     }
 
-  // If in machine/supervisor/user mode and DCSR bit ebreakm/s/u is
-  // set, then enter debug mode.
+  if (inDebugParkLoop_)
+    {
+      inDebugParkLoop_ = false;
+      // return;  // Uncomment once RTL catches up.
+    }
+
+  // If in machine/supervisor/user mode and DCSR bit ebreakm/s/u is set, then enter debug
+  // mode.
   URV dcsrVal = 0;
   if (peekCsr(CsrNumber::DCSR, dcsrVal))
     {
@@ -10029,8 +10016,8 @@ Hart<URV>::execEbreak(const DecodedInst*)
 
       if (debug)
         {
-          // The documentation (RISCV external debug support) does
-          // not say whether or not we set EPC and MTVAL.
+          // The documentation (RISCV external debug support) does not say whether or not
+          // we set EPC and MTVAL.
           enterDebugMode_(DebugModeCause::EBREAK, currPc_);
           ebreakInstDebug_ = true;
           recordCsrWrite(CsrNumber::DCSR);
@@ -10783,6 +10770,43 @@ Hart<URV>::imsicAccessible(const DecodedInst* di, CsrNumber csr, PrivilegeMode m
               return false;
             }
         }
+
+        // From section 5.3, When mvien.SEIP is set, 0x70-0xFF are reserved and stopei
+        // are reserved from S-mode.
+        bool isS = privMode_ == PrivilegeMode::Supervisor and not virtMode_;
+        if (isS and (csr == CN::STOPEI or csr == CN::SIREG))
+          {
+            URV mvien;
+            if (not peekCsr(CsrNumber::MVIEN, mvien))
+              return false;
+
+            if ((mvien >> 9) & 1)
+              {
+                if (csr == CN::STOPEI)
+                  {
+                    illegalInst(di);
+                    return false;
+                  }
+                else // sireg
+                  {
+                    CN iselect = CsRegs<URV>::advance(csr, -1);
+                    URV sel = 0;
+                    if (not peekCsr(iselect, sel))
+                      {
+                        std::cerr << "Failed to peek AIA select csr\n";
+                        return false;
+                      }
+
+                    using EIC = TT_IMSIC::File::ExternalInterruptCsr;
+                    if (sel >= EIC::DELIVERY and
+                        sel <= EIC::E63)
+                      {
+                        illegalInst(di);
+                        return false;
+                      }
+                  }
+              }
+          }
     }
   else if (csr == CN::MTOPEI or csr == CN::STOPEI or csr == CN::VSTOPEI or
            csr == CN::MIREG or csr == CN::SIREG or csr == CN::VSIREG)
@@ -11002,10 +11026,10 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
 
@@ -11053,10 +11077,10 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
 
   if (di->op1() == 0)
     {
@@ -11113,10 +11137,10 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
 
   if (di->op1() == 0)
     {
@@ -11165,10 +11189,10 @@ Hart<URV>::execCsrrwi(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
 
   doCsrWrite(di, csr, di->op1(), di->op0(), prev);
 
@@ -11218,10 +11242,10 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
 
   if (imm == 0)
     {
@@ -11280,10 +11304,10 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev |= seiPin_ << URV(IC::S_EXTERNAL);
+    prev = overrideWithSeiPin(prev);
 
   if (imm == 0)
     {

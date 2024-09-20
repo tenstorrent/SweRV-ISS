@@ -1342,6 +1342,8 @@ printInteractiveHelp()
   cout << "  Print the entries of the address tanslation table.\n\n";
   cout << "nmi [<cause-number>]\n";
   cout << "  Post a non-maskable interrupt with a given cause number (default 0).\n\n";
+  cout << "clear_nmi\n";
+  cout << "  Clear a pending non-maskable interrupt.\n\n";
   cout << "mread tag addr size data i|e\n";
   cout << "  Perform a memory model (out of order) read for load/amo instruction with\n";
   cout << "  given tag. Data is the RTL data to be compared with whisper data\n";
@@ -1816,6 +1818,14 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       hart.setPendingNmi(NmiCause(cause));
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "clear_nmi")
+    {
+      hart.clearPendingNmi();
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
 

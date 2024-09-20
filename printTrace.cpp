@@ -210,6 +210,8 @@ constexpr std::string_view
 pageTableWalkType(VirtMem::WalkEntry::Type type, bool head)
 {
   using namespace std::string_view_literals;
+  if (head)
+    assert(type != VirtMem::WalkEntry::Type::RE);
   auto vec = (head)? std::array{"gva: "sv, " gpa: "sv, "  pa: "sv} :
     std::array{""sv, " "sv, "  "sv};
   return vec.at(size_t(type));
@@ -225,9 +227,19 @@ printPageTableWalk(FILE* out, const Hart<URV>& hart, const char* tag,
   fputs(tag, out);
   fputs(":", out);
   bool head = true;
+  VirtMem::WalkEntry::Type headType = entries.size() > 0? entries.at(0).type_ :
+                                                          VirtMem::WalkEntry::Type::GVA;
   for (auto& entry : entries)
     {
-      fputs("\n", out);
+      fputs("  +\n", out);
+      if (entry.type_ == VirtMem::WalkEntry::Type::RE)
+        {
+          fputs(pageTableWalkType(headType, head).data(), out);
+          fputs("res:", out);
+          fprintf(out, "0x%" PRIx64, entry.addr_);
+          continue;
+        }
+
       fputs(pageTableWalkType(entry.type_, head).data(), out);
       fprintf(out, "0x%" PRIx64, entry.addr_);
       if (entry.type_ == VirtMem::WalkEntry::Type::PA)
@@ -305,20 +317,26 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 	oss << ":0x" << ldStPhysAddr1_;
       tmp += " [" + oss.str() + "]";
     }
-  else if (not vecRegs_.ldStVa_.empty())
+  else
     {
-      std::ostringstream oss;
-      for (uint64_t i = 0; i < vecRegs_.ldStVa_.size(); ++i)
-        {
-          if (i > 0)
-            oss << ";";
-          oss << "0x" << std::hex << vecRegs_.ldStVa_.at(i);
-          if (vecRegs_.ldStPa_.at(i) != vecRegs_.ldStVa_.at(i))
-            oss << ":0x" << vecRegs_.ldStPa_.at(i);
-          if (i < vecRegs_.stData_.size())
-            oss << '=' << "0x" << vecRegs_.stData_.at(i);
-        }
-      tmp += " [" + oss.str() + "]";
+      auto& vecInfo = getLastVectorMemory();
+      if (not vecInfo.empty())
+	{
+	  std::ostringstream oss;
+	  auto& elems = vecInfo.elems_;
+	  for (uint64_t i = 0; i < elems.size(); ++i)
+	    {
+	      auto& einfo = elems.at(i);
+	      if (i > 0)
+		oss << ";";
+	      oss << "0x" << std::hex << einfo.va_;
+	      if (einfo.pa_ != einfo.va_)
+		oss << ":0x" << einfo.pa_;
+	      if (not vecInfo.isLoad_)
+		oss << '=' << "0x" << einfo.stData_;
+	    }
+	  tmp += " [" + oss.str() + "]";
+	}
     }
 
   std::array<char, 128> instBuff;
@@ -718,19 +736,22 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   // Memory
   buffer.printChar(',');
   uint64_t virtDataAddr = 0, physDataAddr = 0;
-  if (not vecRegs_.ldStVa_.empty())
+  auto& vecInfo = getLastVectorMemory();
+  if (not vecInfo.empty())
     {
-      for (uint64_t i = 0; i < vecRegs_.ldStVa_.size(); ++i)
+      auto& elems = vecInfo.elems_;
+      for (uint64_t i = 0; i < elems.size(); ++i)
         {
+	  auto& einfo = elems.at(i);
           if (i > 0)
             buffer.printChar(';');
-          buffer.print(vecRegs_.ldStVa_.at(i));
-          if (vecRegs_.ldStPa_.at(i) != vecRegs_.ldStVa_.at(i))
-            buffer.printChar(':').print(vecRegs_.ldStPa_.at(i));
-          if (i < vecRegs_.maskedAddr_.size() and vecRegs_.maskedAddr_.at(i))
+          buffer.print(einfo.va_);
+          if (einfo.pa_ != einfo.va_)
+            buffer.printChar(':').print(einfo.pa_);
+          if (einfo.masked_)
             buffer.printChar('m');
-          if (i < vecRegs_.stData_.size())
-            buffer.printChar('=').print(vecRegs_.stData_.at(i));
+          if (not vecInfo.isLoad_)
+            buffer.printChar('=').print(einfo.stData_);
         }
     }
   else if (lastLdStAddress(virtDataAddr, physDataAddr))
@@ -761,7 +782,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
           if (di.isBranchToRegister() and
               di.op0() == 0 and di.op1() == IntRegNumber::RegRa and di.op2() == 0)
             buffer.printChar('r');
-          else if (di.op0() == IntRegNumber::RegRa)
+          else if (di.op0() == IntRegNumber::RegRa or di.op0() == IntRegNumber::RegX5)
             buffer.printChar('c');
           else
             buffer.printChar('j');

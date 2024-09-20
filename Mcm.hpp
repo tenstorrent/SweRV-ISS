@@ -32,6 +32,7 @@ namespace WdRiscv
     bool       isRead_    : 1  = false;
     bool       failRead_  : 1  = false;
     bool       canceled_  : 1  = false;
+    bool       bypass_    : 1  = false;   // True if a bypass operation.
 
     /// Return true if address range of this operation overlaps that of the given one.
     bool overlaps(const MemoryOp& other) const
@@ -65,15 +66,32 @@ namespace WdRiscv
     uint64_t physAddr_ = 0;   // Physical data address for ld/st instruction.
     uint64_t physAddr2_ = 0;  // Additional data address for page crossing stores.
     uint64_t storeData_ = 0;  // Model (whisper) Data for sore instructions.
+
     uint64_t addrTime_ = 0;   // Time address register was produced (for ld/st/amo).
     uint64_t dataTime_ = 0;   // Time data register was produced (for st/amo).
     uint64_t retireTime_ = 0; // Time instruction was retired.
-    McmInstrIx addrProducer_ = 0;
-    McmInstrIx dataProducer_ = 0;
+    McmInstrIx addrProducer_ = 0;  // Producer of addr register (for ld/st/amo).
+    McmInstrIx dataProducer_ = 0;  // Producer of data register (for st/amo).
+
+    // Producer and time of the data register of a vector ld/st instuction.
+    struct VecProdTime
+    {
+      unsigned regIx_ = 0;
+      McmInstrIx tag_ = 0;
+      uint64_t time_ = 0;
+    };
+
+    // Time ld/st intruction vector data register(s) were produced.
+    std::array<VecProdTime, 8> vecProdTimes_;
+
+    // Time ld/st instruction vector index register(s) were produced,
+    std::array<VecProdTime, 8> ixProdTimes_;
+
     DecodedInst di_;
     McmInstrIx tag_ = 0;
     uint8_t hartIx_ : 8 = 0;
     uint8_t size_   : 8 = 0;        // Data size for load/store instructions.
+
     bool retired_   : 1 = false;
     bool canceled_  : 1 = false;
     bool isLoad_    : 1 = false;
@@ -394,8 +412,14 @@ namespace WdRiscv
     /// an index register with a value produced after the instruction has used
     /// that index register. If out of order, set producer to the tag of the
     /// instruction producing the value of the ooo index register.
-    bool isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr,
+    bool isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned& ixReg,
 			      McmInstrIx& producer, uint64_t& produerTime) const;
+
+    /// Collect the earliest times the data registers of the given load/store instruction
+    /// were read/written. Base is the first vector register, count is the number of
+    /// registers.
+    void getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned base,
+			     unsigned count, std::vector<uint64_t>& times) const;
 
     /// Trim read operations to match reference (whisper). Mark replay read ops as
     /// canceled. Remove cancled ops.
@@ -438,6 +462,35 @@ namespace WdRiscv
     uint64_t lineAlign(uint64_t addr) const
     { return (addr >> lineShift_) << lineShift_; }
 
+    /// Set the tag of the instruction producing the latest data of the given vector
+    /// register.
+    void setVecRegProducer(unsigned hartIx, unsigned vecReg, McmInstrIx tag)
+    {
+      auto& regProducer = hartData_.at(hartIx).regProducer_;
+      regProducer.at(vecReg + vecRegOffset_) = tag;
+    }
+
+    /// Set the time the data of the given vector register was produced.
+    void setVecRegTime(unsigned hartIx, unsigned vecReg, uint64_t time)
+    {
+      auto& regTime = hartData_.at(hartIx).regTime_;
+      regTime.at(vecReg + vecRegOffset_) = time;
+    }
+
+    /// Return the time the data of the given vector register was produced.
+    uint64_t vecRegTime(unsigned hartIx, unsigned vecReg) const
+    {
+      const auto& regTime = hartData_.at(hartIx).regTime_;
+      return regTime.at(vecReg + vecRegOffset_);
+    }
+
+    /// Return the tag of the instruction producing the latest data in data of the given
+    /// vector register. Return 0 if no such instruction.
+    McmInstrIx vecRegProducer(unsigned hartIx, unsigned vecReg) const
+    {
+      const auto& regProducer = hartData_.at(hartIx).regProducer_;
+      return regProducer.at(vecReg + vecRegOffset_);
+    }
 
     /// Remove from hartPendingWrites_ the write ops falling with the given RTL
     /// line and masked by rtlMask (rtlMask bit is on for op bytes) and place
@@ -686,22 +739,25 @@ namespace WdRiscv
     using McmInstrVec = std::vector<McmInstr>;
 
     using RegTimeVec = std::vector<uint64_t>;    // Map reg index to time.
-    using RegProducerVec = std::vector<uint64_t>;   // Map reg index to instr tag.
+    using RegProducerVec = std::vector<McmInstrIx>;   // Map reg index to instr tag.
 
     /// Vector reference (produced by Whisper) load/store physical addresses and
     /// corresponding data for store.
     struct VecRef
     {
-      VecRef(uint64_t addr = 0, uint64_t data = 0, unsigned size = 0)
-	: addr_(addr), data_(data), size_(size)
+      VecRef(uint64_t addr = 0, uint64_t data = 0, unsigned size = 0, unsigned dataReg = 0,
+	     unsigned ixReg = 0)
+	: addr_(addr), data_(data), size_(size), reg_(dataReg), ixReg_(ixReg)
       { }
 
       bool overlaps(uint64_t addr) const
       { return addr >= addr_ && addr < addr_ + size_; }
 
-      uint64_t addr_ = 0;
-      uint64_t data_ = 0;
-      unsigned size_ = 0;
+      uint64_t addr_    = 0;
+      uint64_t data_    = 0;
+      uint16_t size_    = 0;
+      uint16_t reg_     = 0;   // Number of data register.
+      uint16_t ixReg_   = 0;   // Number of index register (if indexed).
     };
 
     /// Collection of vector load/store reference (Whisper) addresses for a single
@@ -742,7 +798,7 @@ namespace WdRiscv
 	return isOutOfBounds(ref.addr_, ref.addr_ + ref.size_ - 1);
       }
 
-      void add(uint64_t addr, uint64_t data, unsigned size)
+      void add(uint64_t addr, uint64_t data, unsigned size, unsigned vecReg, unsigned ixReg)
       {
 	assert(size > 0);
 
@@ -757,7 +813,7 @@ namespace WdRiscv
 	    low_ = std::min(low_, l);
 	    high_ = std::max(high_, h);
 	  }
-	refs_.push_back(VecRef(addr, data, size));
+	refs_.push_back(VecRef(addr, data, size, vecReg, ixReg));
       }
 
       std::vector<VecRef> refs_;

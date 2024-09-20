@@ -1656,6 +1656,10 @@ namespace WdRiscv
     void enableSvpbmt(bool flag)
     { enableMenvcfgPbmte(flag); }
 
+    /// Enable/disable svadu
+    void enableSvadu(bool flag)
+    { enableMenvcfgAdue(flag); }
+
     /// Enable/disable top-of-range mode in pmp configurations.
     void enablePmpTor(bool flag)
     { pmpTor_ = flag; }

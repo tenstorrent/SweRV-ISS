@@ -1845,6 +1845,14 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.enableCancelLrOnTrap(flag);
     }
 
+  tag = "cancel_lr_on_debug";
+  if (config_ -> contains(tag))
+    {
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.enableCancelLrOnDebug(flag);
+    }
 
   tag = "debug_park_loop";
   if (config_ -> contains(tag))

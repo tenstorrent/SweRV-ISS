@@ -5,8 +5,8 @@
 
 #include "Pci.hpp"
 
-Pci::Pci(uint32_t config_base, uint32_t mmio_base, size_t mmio_len, unsigned buses, unsigned slots)
-  : config_base_(config_base), mmio_base_(mmio_base), mmio_eol_(mmio_base), mmio_len_(mmio_len)
+Pci::Pci(uint32_t config_base, uint32_t config_len, uint32_t mmio_base, size_t mmio_len, unsigned buses, unsigned slots)
+  : config_base_(config_base), config_len_(config_len), mmio_base_(mmio_base), mmio_len_(mmio_len), mmio_eol_(mmio_base)
 {
   /* config needs 256MB of space minimum */
   buses_.resize(buses);
@@ -138,6 +138,8 @@ Pci::fixup_bars(std::shared_ptr<PciDev> dev)
         uint32_t base = (mmio_eol_ + size - 1) & ~(size - 1);
         auto mmio_blocks = std::make_shared<PciDev::mmio_blocks>(base, size, dev->memmap());
         mmio_.emplace_back(mmio_blocks);
+
+        // Assign MMIO region to BAR.
         dev->header().bits.bar[bar] = base | PCI_BASE_ADDRESS_SPACE_MEMORY;
         dev->bars().at(bar) = mmio_blocks;
         dev->bar_eols().at(bar) = mmio_blocks->bytes;
@@ -149,6 +151,7 @@ Pci::fixup_bars(std::shared_ptr<PciDev> dev)
       return false;
     }
 
+    // Mark as unused.
     dev->header().bits.bar[bar] = 0;
   }
   return true;
