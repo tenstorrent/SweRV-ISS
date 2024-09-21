@@ -2184,9 +2184,14 @@ Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr* instr)
       const auto& di = instr->di_;
       if (instr->size_ == 0)
 	instr->size_ = di.isAmo() ? di.amoSize() : di.loadSize();
-      cerr << "Error: hart-id=" << hart.hartId() << " time=" << time_ << " tag=" << instr->tag_
-	   << " load/amo instruction retires witout any memory read operation.\n";
-      return false;
+
+      if (not hart.inDebugMode())
+	{
+	  cerr << "Error: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
+	       << instr->tag_ << " load/amo instruction retires witout any memory "
+	       << "read operation.\n";
+	  return false;
+	}
     }
 
   // Mark replayed ops as cancled.
