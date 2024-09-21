@@ -1,7 +1,7 @@
 INSTALL_DIR := .
 
 PROJECT := whisper
-PY_PROJECT := $(PROJECT)$(shell python3-config --extension-suffix)
+PY_PROJECT := py$(PROJECT)$(shell python3-config --extension-suffix)
 
 # For Dynamic linking to Boost Library use:
 # make STATIC_LINK=0

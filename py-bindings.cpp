@@ -500,7 +500,7 @@ static void defineSystem(M m)
 }
 
 
-PYBIND11_MODULE(whisper, m) {
+PYBIND11_MODULE(pywhisper, m) {
   m.doc() = "Interactive module for whisper";
 
   using RV32 = uint32_t;

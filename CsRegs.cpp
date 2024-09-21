@@ -2009,10 +2009,11 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
 
   if (num == CN::MSTATUS or num == CN::SSTATUS or num == CN::VSSTATUS)
     {
-      value &= csr->getWriteMask();
+      value &= csr->getWriteMask() & csr->getReadMask();
       value = legalizeMstatusValue(value);
+      csr->write(value);  // Record write. Save previous value.
       csr->poke(value);   // Write cannot modify SD bit of status: poke it.
-      recordWrite(num);
+      recordWrite(csrn);
 
       // Cache interrupt enable from mstatus.mie.
       if (num == CN::MSTATUS)
@@ -2747,7 +2748,7 @@ CsRegs<URV>::defineMachineRegs()
   defineCsr("mncause", Csrn::MNCAUSE, !mand, !imp, 0, wam, wam);
 
   mask = 0b1100010001000;  // Fields MNPP, MNPV, and NMIE writeable.
-  defineCsr("mnstatus", Csrn::MNSTATUS, !mand, !imp, 0, mask, pokeMask);
+  defineCsr("mnstatus", Csrn::MNSTATUS, !mand, !imp, 0b1000, mask, pokeMask);
 
   // Define mhpmcounter3/mhpmcounter3h to mhpmcounter31/mhpmcounter31h
   // as write-anything/read-zero (user can change that in the config
@@ -3250,14 +3251,15 @@ CsRegs<URV>::defineVectorRegs()
   bool mand = true;  // Mndatory
   bool imp = true;   // Implemented
 
-  defineCsr("vstart", CsrNumber::VSTART, !mand, !imp, 0, 0, 0);
+  uint64_t mask = ~URV(0);
+  defineCsr("vstart", CsrNumber::VSTART, !mand, !imp, 0, mask, mask);  // All bits pokable.
   defineCsr("vxsat",  CsrNumber::VXSAT,  !mand, !imp, 0, 1, 1);  // 1 bit
   defineCsr("vxrm",   CsrNumber::VXRM,   !mand, !imp, 0, 3, 3);  // 2 bits
   defineCsr("vcsr",   CsrNumber::VCSR,   !mand, !imp, 0, 7, 7);  // 3 bits
   URV pokeMask = ~URV(0);
   defineCsr("vl",     CsrNumber::VL,     !mand, !imp, 0, 0, pokeMask);
 
-  uint64_t mask = 0x800000ff;
+  mask = 0x800000ff;
   if (not rv32_)
     mask = 0x80000000000000ffL;
   defineCsr("vtype",  CsrNumber::VTYPE,  !mand, !imp, mask & ~URV(0xff), mask, mask);
@@ -3609,7 +3611,7 @@ CsRegs<URV>::poke(CsrNumber num, URV value, bool virtMode)
     }
   else if (num == CN::MSTATUS or num == CN::SSTATUS or num == CN::VSSTATUS)
     {
-      value &= csr->getPokeMask();
+      value &= csr->getPokeMask() & csr->getReadMask();
       value = legalizeMstatusValue(value);
     }
   else if (num == CN::TSELECT)
@@ -3968,28 +3970,6 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
               assert((value & 0xff) == 0);
               if (not higherIidPrio(iid, unsigned(IC::S_EXTERNAL)))
                 value |= 255;
-            }
-        }
-      else
-        {
-          unsigned iid = highestIidPrio(vs);
-          if (iid)
-            {
-              value = iid << 16;
-              if (iid == unsigned(IC::S_EXTERNAL))
-                {
-                  unsigned id = 0;
-                  if (imsic_)
-                    {
-                      URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
-                      HstatusFields<URV> hsf(hsVal);
-                      unsigned vgein = hsf.bits_.VGEIN;
-
-                      if (vgein and not (vgein >= imsic_->guestCount()))
-                        id = imsic_->guestTopId(vgein);
-                    }
-                  value |= id? id : 255;
-                }
             }
         }
 

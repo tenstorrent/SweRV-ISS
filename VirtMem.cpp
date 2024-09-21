@@ -230,13 +230,13 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
 
   pa = va;
 
-  if (mode_ == Mode::Bare)
-    return ExceptionCause::NONE;
-
   // Apply pointer masking unless translation is for fetch.
   bool effExec = exec or (read and (xForR_ or execReadable_));
   if (not effExec)
     pa = va = applyPointerMaskVa(va, priv, false);
+
+  if (mode_ == Mode::Bare)
+    return ExceptionCause::NONE;
 
   // Lookup virtual page number in TLB.
   uint64_t virPageNum = va >> pageBits_;
@@ -505,7 +505,7 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
   if (vsMode_ == Mode::Sv32)
     {
       auto cause =  stage1PageTableWalk<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
-      stage1ImplicitAccessTrap_ = cause != ExceptionCause::NONE;
+      s1ImplAccTrap_ = cause != ExceptionCause::NONE;
       return cause;
     }
 
@@ -540,7 +540,7 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
     return stage1PageFaultType(read, write, exec);
 
   auto cause = (this->*walkFn)(va, priv, read, write, exec, pa, entry);
-  stage1ImplicitAccessTrap_ = cause != ExceptionCause::NONE;
+  s1ImplAccTrap_ = cause != ExceptionCause::NONE;
   return cause;
 }
 
@@ -688,6 +688,9 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 
   for (unsigned j = ii; j < levels; ++j)
     pa = pa | pte.ppn(j) << pte.paPpnShift(j);
+
+  if (trace_)
+    walkVec.back().emplace_back(pa, WalkEntry::Type::RE);
 
   // Update tlb-entry with data found in page table entry.
   tlbEntry.virtPageNum_ = address >> pageBits_;
@@ -852,6 +855,9 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   for (unsigned j = ii; j < levels; ++j)
     pa = pa | pte.ppn(j) << pte.paPpnShift(j);
 
+  if (trace_)
+    walkVec.back().emplace_back(pa, WalkEntry::Type::RE);
+
   // Update tlb-entry with data found in page table entry.
   tlbEntry.virtPageNum_ = address >> pageBits_;
   tlbEntry.physPageNum_ = pa >> pageBits_;
@@ -991,7 +997,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  // Or B
 	  saveUpdatedPte(pteAddr, sizeof(pte.data_), pte.data_);  // For logging
 
-          stage1AttemptedADUpdate_ = true;
+          s1ADUpdate_ = true;
 	  // B1. Check PMP. The privMode here is the effective one that
 	  // already accounts for MPRV.
 	  if (pmpMgr_.isEnabled())
@@ -1035,6 +1041,9 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 
   for (unsigned j = ii; j < levels; ++j)
     pa = pa | pte.ppn(j) << pte.paPpnShift(j);
+
+  if (trace_)
+    walkVec.back().emplace_back(pa, WalkEntry::Type::RE);
 
   // Update tlb-entry with data found in page table entry.
   tlbEntry.virtPageNum_ = address >> pageBits_;
@@ -1107,6 +1116,8 @@ VirtMem::printPageTable(std::ostream& os) const
     printEntries<Pte39, Va39>(os, addr, path);
   else if (mode_ == Mode::Sv48)
     printEntries<Pte48, Va48>(os, addr, path);
+  else if (mode_ == Mode::Sv57)
+    printEntries<Pte57, Va57>(os, addr, path);
   else
     os << "Unsupported virtual memory mode\n";
   os << "TLB:\n";

@@ -322,6 +322,65 @@ RFormInst::encodeAndn(unsigned rd, unsigned rs1, unsigned rs2)
 
 
 bool
+RFormInst::encodeFmvdx(uint32_t rd, uint32_t rs1)
+{
+  if (not encodeAdd(rd, rs1, 0))
+    return false;
+  bits.opcode = 0x53;
+  bits.funct3 = 0;
+  bits.funct7 = 0x39;
+  return true;
+}
+
+
+bool
+RFormInst::encodeFcvtdw(unsigned rd, unsigned rs1, unsigned rm)
+{
+  if (not encodeAdd(rd, rs1, 0))
+    return false;
+
+  if (rm > 7)
+    return false;
+
+  bits.opcode = 0x53;
+  bits.funct3 = rm;
+  bits.funct7 = 0x69;
+  bits.rs2 = 0x0;
+  return true;
+}
+
+
+bool
+RFormInst::encodeFcvtdwu(unsigned rd, unsigned rs1, unsigned rm)
+{
+  if (not encodeFcvtdw(rd, rs1, rm))
+    return false;
+  bits.rs2 = 0x1;
+  return true;
+}
+
+
+bool
+RFormInst::encodeFcvtdl(unsigned rd, unsigned rs1, unsigned rm)
+{
+  if (not encodeFcvtdw(rd, rs1, rm))
+    return false;
+  bits.rs2 = 0x2;
+  return true;
+}
+
+
+bool
+RFormInst::encodeFcvtdlu(unsigned rd, unsigned rs1, unsigned rm)
+{
+  if (not encodeFcvtdw(rd, rs1, rm))
+    return false;
+  bits.rs2 = 0x3;
+  return true;
+}
+
+
+bool
 BFormInst::encodeBeq(unsigned rs1v, unsigned rs2v, int imm)
 {
   if (imm & 0x1)
@@ -2265,4 +2324,60 @@ WdRiscv::encodeCbnez(uint32_t rs1p, uint32_t imm, uint32_t, uint32_t& inst)
     return false;
   inst = cb.code;
   return false;
+}
+
+
+bool
+WdRiscv::encodeFmvdx(uint32_t rd, uint32_t rs1, uint32_t& inst)
+{
+  RFormInst rfi(0);
+  if (not rfi.encodeFmvdx(rd, rs1))
+    return false;
+  inst = rfi.code;
+  return true;
+
+}
+
+
+bool
+WdRiscv::encodeFcvtdw(uint32_t rd, uint32_t rs1, uint32_t rm, uint32_t& inst)
+{
+  RFormInst rfi(0);
+  if (not rfi.encodeFcvtdw(rd, rs1, rm))
+    return false;
+  inst = rfi.code;
+  return true;
+}
+
+
+bool
+WdRiscv::encodeFcvtdwu(uint32_t rd, uint32_t rs1, uint32_t rm, uint32_t& inst)
+{
+  RFormInst rfi(0);
+  if (not rfi.encodeFcvtdwu(rd, rs1, rm))
+    return false;
+  inst = rfi.code;
+  return true;
+}
+
+
+bool
+WdRiscv::encodeFcvtdl(uint32_t rd, uint32_t rs1, uint32_t rm, uint32_t& inst)
+{
+  RFormInst rfi(0);
+  if (not rfi.encodeFcvtdw(rd, rs1, rm))
+    return false;
+  inst = rfi.code;
+  return true;
+}
+
+
+bool
+WdRiscv::encodeFcvtdlu(uint32_t rd, uint32_t rs1, uint32_t rm, uint32_t& inst)
+{
+  RFormInst rfi(0);
+  if (not rfi.encodeFcvtdlu(rd, rs1, rm))
+    return false;
+  inst = rfi.code;
+  return true;
 }

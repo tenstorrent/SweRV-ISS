@@ -93,6 +93,8 @@ namespace WdRiscv
   enum class NmiCause : uint32_t
     {
       UNKNOWN               = 0,
+      TT_EXT                = 1,          // Tenstorrent external NMI.
+      TT_CLA                = 2,          // Tenstorrent CLA NMI.
       STORE_EXCEPTION       = 0xf0000000,
       LOAD_EXCEPTION        = 0xf0000001,
       DOUBLE_BIT_ECC        = 0xf0001000

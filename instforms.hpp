@@ -138,6 +138,21 @@ namespace WdRiscv
     /// Encode "andn rd, rs1, rs2" into this object.
     bool encodeAndn(unsigned rd, unsigned rs1, unsigned rs2);
 
+    /// Encode "fmv.d.x rd, rs1" into this object.
+    bool encodeFmvdx(unsigned rd, unsigned rs1);
+
+    /// Encode "fcvt.d.w rd, rs1" into this object.
+    bool encodeFcvtdw(unsigned rd, unsigned rs1, unsigned rm);
+
+    /// Encode "fcvt.d.w.u rd, rs1" into this object.
+    bool encodeFcvtdwu(unsigned rd, unsigned rs1, unsigned rm);
+
+    /// Encode "fcvt.d.l rd, rs1" into this object.
+    bool encodeFcvtdl(unsigned rd, unsigned rs1, unsigned rm);
+
+    /// Encode "fcvt.d.l.u rd, rs1" into this object.
+    bool encodeFcvtdlu(unsigned rd, unsigned rs1, unsigned rm);
+
     uint32_t code;
 
     struct
@@ -1278,6 +1293,31 @@ namespace WdRiscv
   /// Return true on success and false if any of the arguments
   /// are out of bounds.
   bool encodeCbnez(uint32_t rs1p, uint32_t imm, uint32_t x, uint32_t& inst);
+
+  /// Encode "fmv.d.x rd, rs1" into inst: encodeFmvdx(rd, rs1, inst)
+  /// Return true on success and false if any of the arguments are
+  /// out of bounds.
+  bool encodeFmvdx(uint32_t rd, uint32_t rs1, uint32_t& inst);
+
+  /// Encode "fcvt.d.w rd, rs1" into this inst: encodeFcvtdw(rd, rs1, rm, inst).
+  /// The third argument is the rounding mode.
+  /// Return true on success and false if any of the arguments are out of bounds.
+  bool encodeFcvtdw(uint32_t rd, uint32_t rs1, uint32_t rm, uint32_t& inst);
+
+  /// Encode "fcvt.d.w.u rd, rs1" into this inst: encodeFcvtdwu(rd, rs1, rm, inst).
+  /// The third argument is the rounding mode.
+  /// Return true on success and false if any of the arguments are out of bounds.
+  bool encodeFcvtdwu(uint32_t rd, uint32_t rs1, uint32_t rm, uint32_t& inst);
+
+  /// Encode "fcvt.d.l rd, rs1" into this inst: encodeFcvtdl(rd, rs1, rm, inst).
+  /// The third argument is the rounding mode.
+  /// Return true on success and false if any of the arguments are out of bounds.
+  bool encodeFcvtdl(uint32_t rd, uint32_t rs1, uint32_t rm, uint32_t& inst);
+
+  /// Encode "fcvt.d.l.u rd, rs1" into this inst: encodeFcvtdlu(rd, rs1, rm, inst).
+  /// The third argument is the rounding mode.
+  /// Return true on success and false if any of the arguments are out of bounds.
+  bool encodeFcvtdlu(uint32_t rd, uint32_t rs1, uint32_t rm, uint32_t& inst);
 
   inline bool encodeSext_b(uint32_t rd, uint32_t rs1, uint32_t& inst)
   {

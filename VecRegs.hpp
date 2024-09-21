@@ -26,6 +26,7 @@
 #include <stdexcept>
 #include "FpRegs.hpp"
 #include "float-util.hpp"
+#include "VecLdStInfo.hpp"
 
 namespace WdRiscv
 {
@@ -302,18 +303,12 @@ namespace WdRiscv
     /// will be set to 2.
     static bool findReg(std::string_view name, unsigned& ix);
 
-    /// Get the addresses, data, and element size of the memory
-    /// locations accessed by the most recent instruction. Return true
-    /// on success and false if the most recent instruction was not a
-    /// memory-referencing vector instruction. If most recent instruction
-    /// was not a store, then data will be cleared; otherwise, it will have
-    /// as many entries as addresses.
-    bool getLastMemory(std::vector<uint64_t>& addresses,
-                       std::vector<uint64_t>& paddresses,
-                       std::vector<uint64_t>& paddresses2,
-		       std::vector<uint64_t>& data,
-                       std::vector<bool>& masked,
-		       unsigned& elementSize) const;
+    /// Return a reference to the vector ld/st element information. If last executed
+    /// instruction was not ld/st or if it did not update any element then the returned
+    /// reference will be to an empty object. Returned object is cleared before the
+    /// execution of each instruction.
+    const VecLdStInfo& getLastMemory() const
+    { return ldStInfo_; }
 
     /// Return true if the given element width and grouping
     /// combination is legal.
@@ -556,11 +551,9 @@ namespace WdRiscv
       return false;
     }
 
-    const std::vector<uint64_t>& ldStAddrs() const
-    { return ldStVa_; }
-
-    const std::vector<bool>& maskedAddrs() const
-    { return maskedAddr_; }
+    /// Information about ld/st instruction. Cleared before each instruction is executed.
+    const VecLdStInfo& ldStInfo() const
+    { return ldStInfo_; }
 
     struct Step
     {
@@ -605,17 +598,32 @@ namespace WdRiscv
     unsigned getOpEmul(unsigned op) const
     { return op < 3? opsEmul_.at(op) : 0; }
 
+    /// Set size to the elem size in byte and the count used in the last load/store
+    /// instruction. Return true on success. Return false if last exectued instruction was
+    /// not load/store.
+    bool vecLdStElemsUsed(unsigned& size, unsigned& count) const
+    {
+      size = ldStInfo_.elemSize_;
+      count = ldStInfo_.elems_.size();
+      return size != 0;
+    }
+
+    /// Return the data vector register number associated with the given ld/st element
+    /// info. We return the individual register and not the base register of a group.
+    unsigned identifyDataRegister(const VecLdStInfo& info, const VecLdStElem& elem) const
+    {
+      assert(info.elemSize_ != 0 and not info.elems_.empty());
+      unsigned base = info.vec_;
+      unsigned count = (elem.ix_ * info.elemSize_) / bytesPerReg_;
+      return base + count + elem.field_;
+    }
+
   protected:
 
     /// Clear load/address and store data used for logging/tracing.
     void clearTraceData()
     {
-      ldStSize_ = 0;
-      ldStVa_.clear();
-      ldStPa_.clear();
-      ldStPa2_.clear();
-      maskedAddr_.clear();
-      stData_.clear();
+      ldStInfo_.clear();
       fpFlags_.clear();
       vxsat_.clear();
       steps_.clear();
@@ -903,15 +911,11 @@ namespace WdRiscv
 
     // Following used for logging/tracing. Cleared before each instruction.
     // Collected by a vector load/store instruction.
-    unsigned ldStSize_ = 0;           // Vector load/store element size.
-    std::vector<uint64_t> ldStVa_;    // Virtual addresses of vector load/store instruction.
-    std::vector<uint64_t> ldStPa_;    // Phys addresses of vector load/store instruction.
-    std::vector<uint64_t> ldStPa2_;   // For page crossers: addr on 2nd page, otherwise same as ldStPa_.
+    VecLdStInfo ldStInfo_;
     std::vector<bool> maskedAddr_;    // True if address is masked off (element skipped).
     std::vector<Step> steps_;         // Incremental steps taken by previous instruction (useful for vector instruction debug).
     std::vector<uint8_t> fpFlags_;    // Incremental fp flags (useful for vector instruction debug).
     std::vector<uint8_t> vxsat_;      // VXSAT per-element operation (useful for vector instruction debug).
-    std::vector<uint64_t> stData_;    // Data of vector store instruction.
     std::vector<unsigned> opsEmul_;   // Effective grouping of vector operands.
   };
 }

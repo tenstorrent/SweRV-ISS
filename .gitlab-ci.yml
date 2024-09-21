@@ -98,10 +98,21 @@ linux-boot-job:
     - grep -q "Halt and catch fire!" output.log
   timeout: 2 hours
 
-notify-risc-p-cores:
-  <<: *notify-template
+notify_riscv_cluster:
+  stage: notify
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  variables:
+    UPDATE_REPO_POINTER: "True"
+    SHA_UPDATE_REPO: "whisper"
+    SHA_UPDATE_POINTER: $CI_COMMIT_SHA
+    GIT_STRATEGY: none
+    SKIP_BUILD: "True"
+    ANCESTRY: $ANCESTRY
+    ANCESTOR_COMMITS: $CI_COMMIT_TITLE # this is the previous HEAD, not the current branch? # why doesn't this need quotes
+    UPDATE_DIRECTORY: risc-p-cores
   trigger:
-    project: riscv/risc-p-cores
+      project: riscv/riscv_cluster
 
 notify-riescue:
   <<: *notify-template

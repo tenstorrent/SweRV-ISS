@@ -1497,7 +1497,7 @@ Hart<URV>::execVaesdf_vs(const DecodedInst* di)
 
 
   if (not isRvzvkned() or groupx8*vecRegs_.bitsPerRegister()/8 < egw or sew != EW::Word or
-      vd == vs2)
+      (vd <= vs2 and vd + group > vs2))
     {
       illegalInst(di);
       return;
@@ -1615,7 +1615,7 @@ Hart<URV>::execVaesef_vs(const DecodedInst* di)
     }
 
   if (not isRvzvkned() or groupx8*vecRegs_.bitsPerRegister()/8 < egw or sew != EW::Word or
-      vd == vs2)
+      (vd <= vs2 and vd + group > vs2))
     {
       illegalInst(di);
       return;
@@ -1728,7 +1728,7 @@ Hart<URV>::execVaesem_vs(const DecodedInst* di)
   unsigned vd = di->op0(),  vs2 = di->op1();
 
   if (not isRvzvkned() or groupx8*vecRegs_.bitsPerRegister()/8 < egw or sew != EW::Word or
-      vd == vs2)
+      (vd <= vs2 and vd + group > vs2))
     {
       illegalInst(di);
       return;
@@ -1848,7 +1848,7 @@ Hart<URV>::execVaesdm_vs(const DecodedInst* di)
     }
 
   if (not isRvzvkned() or groupx8*vecRegs_.bitsPerRegister()/8 < egw or sew != EW::Word or
-      vd == vs2)
+      (vd <= vs2 and vd + group > vs2))
     {
       illegalInst(di);
       return;
@@ -2040,7 +2040,7 @@ Hart<URV>::execVaesz_vs(const DecodedInst* di)
     }
 
   if (not isRvzvkned() or groupx8*vecRegs_.bitsPerRegister()/8 < egw or sew != EW::Word or
-      vd == vs2)
+      (vd <= vs2 and vd + group > vs2))
     {
       illegalInst(di);
       return;
@@ -2511,13 +2511,14 @@ Hart<URV>::execVsm4r_vs(const DecodedInst* di)
       return;
     }
 
-  if (not isRvzvksed() or groupx8*vecRegs_.bitsPerRegister()/8 < egw or sew != EW::Word)
+  unsigned vd = di->op0(),  vs1 = di->op1();
+
+  if (not isRvzvksed() or groupx8*vecRegs_.bitsPerRegister()/8 < egw or sew != EW::Word or
+      (vd <= vs1 and vd + group > vs1))
     {
       illegalInst(di);
       return;
     }
-
-  unsigned vd = di->op0(),  vs1 = di->op1();
 
   if (not checkVecOpsVsEmul(di, vd, groupx8))
     return;

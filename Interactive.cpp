@@ -29,7 +29,7 @@
 
 
 using namespace WdRiscv;
-
+using std::cerr;
 
 /// Return format string suitable for printing an integer of type URV
 /// in hexadecimal form.
@@ -67,7 +67,7 @@ parseCmdLineBool(const std::string& option,
     }
 
   if (not good)
-    std::cerr << "Invalid command line " << option << " value: " << boolStr << '\n';
+    cerr << "Invalid command line " << option << " value: " << boolStr << '\n';
 
   return good;
 }
@@ -95,8 +95,7 @@ parseCmdLineNumber(const std::string& option,
       number = static_cast<TYPE>(value);
       if (number != value)
 	{
-	  std::cerr << "parseCmdLineNumber: Number too large: " << numberStr
-		    << '\n';
+	  cerr << "parseCmdLineNumber: Number too large: " << numberStr << '\n';
 	  return false;
 	}
       if (end and *end)
@@ -104,8 +103,7 @@ parseCmdLineNumber(const std::string& option,
     }
 
   if (not good)
-    std::cerr << "Invalid command line " << option << " value: " << numberStr
-	      << '\n';
+    cerr << "Invalid command line " << option << " value: " << numberStr << '\n';
   return good;
 }
 
@@ -120,16 +118,14 @@ parseCmdLineVecData(std::string_view option,
 
   if (not (valStr.starts_with("0x") or valStr.starts_with("0X")))
     {
-      std::cerr << "Value of vector " << option << " must begin with 0x: "
-		<< valStr << '\n';
+      cerr << "Value of vector " << option << " must begin with 0x: " << valStr << '\n';
       return false;
     }
 
   std::string_view trimmed = valStr.substr(2); // Remove leading 0x
   if (trimmed.empty())
     {
-      std::cerr << "Empty value for vector " << option << ": "
-		<< valStr << '\n';
+      cerr << "Empty value for vector " << option << ": " << valStr << '\n';
       return false;
     }
 
@@ -141,8 +137,8 @@ parseCmdLineVecData(std::string_view option,
 
   if ((trimmed.size() & 1) != 0)
     {
-      std::cerr << "Value for vector " << option << " must have an even"
-		<< " number of hex digits: " << valStr << '\n';
+      cerr << "Value for vector " << option << " must have an even"
+	   << " number of hex digits: " << valStr << '\n';
       return false;
     }
 
@@ -153,8 +149,8 @@ parseCmdLineVecData(std::string_view option,
       unsigned value = strtoul(byteStr.c_str(), &end, 16);
       if (end and *end)
 	{
-	  std::cerr << "Invalid hex digit(s) in vector " << option << ": "
-		    << byteStr << '\n';
+	  cerr << "Invalid hex digit(s) in vector " << option << ": "
+	       << byteStr << '\n';
 	  return false;
 	}
       val.push_back(value);
@@ -186,8 +182,8 @@ Interactive<URV>::untilCommand(Hart<URV>& hart, const std::string& line,
 {
   if (tokens.size() != 2)
     {
-      std::cerr << "Invalid until command: " << line << '\n';
-      std::cerr << "Expecting: until address\n";
+      cerr << "Invalid until command: " << line << '\n';
+      cerr << "Expecting: until address\n";
       return false;
     }
 
@@ -196,7 +192,7 @@ Interactive<URV>::untilCommand(Hart<URV>& hart, const std::string& line,
     return false;
 
   if (addr >= hart.memorySize())
-    std::cerr << "Warning: Address outside memory range.\n";
+    cerr << "Warning: Address outside memory range: " << line << ".\n";
 
   if (hart.inDebugMode())
     {
@@ -490,8 +486,8 @@ peekMemory(Hart<URV>& hart, uint64_t addr0, uint64_t addr1, std::ostream& out)
     {
       if (not hart.peekMemory(addr, word, usePma))
         {
-          std::cerr << "Peek memory address out of bounds: 0x"
-                    << std::hex << addr << std::dec << '\n';
+          cerr << "Peek memory address out of bounds: 0x"
+	       << std::hex << addr << std::dec << '\n';
           return false;
         }
       out << (boost::format(hexForm) % addr) << ": ";
@@ -510,20 +506,20 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
 {
   if (tokens.size() < 2)
     {
-      std::cerr << "Invalid peek command: " << line << '\n';
-      std::cerr << "Expecting: peek <item> <addr>  or  peek pc  or  peek all\n";
-      std::cerr << "  Item is one of r, f, c, v, t , pc, m, or s for integer, floating point,\n";
-      std::cerr << "  CSR, vector, trigger register, program counter, memory location, or special respectively\n";
+      cerr << "Invalid peek command: " << line << '\n';
+      cerr << "Expecting: peek <item> <addr>  or  peek pc  or  peek all\n";
+      cerr << "  Item is one of r, f, c, v, t , pc, m, or s for integer, floating point,\n";
+      cerr << "  CSR, vector, trigger register, program counter, memory location, or special respectively\n";
 
-      std::cerr << "  example:  peek r x3\n";
-      std::cerr << "  example:  peek f f4\n";
-      std::cerr << "  example:  peek c mtval\n";
-      std::cerr << "  example:  peek c mtval 1\n";
-      std::cerr << "  example:  peek v v2\n";
-      std::cerr << "  example:  peek m 0x4096\n";
-      std::cerr << "  example:  peek t 0\n";
-      std::cerr << "  example:  peek pc\n";
-      std::cerr << "  example:  peek s pm\n";
+      cerr << "  example:  peek r x3\n";
+      cerr << "  example:  peek f f4\n";
+      cerr << "  example:  peek c mtval\n";
+      cerr << "  example:  peek c mtval 1\n";
+      cerr << "  example:  peek v v2\n";
+      cerr << "  example:  peek m 0x4096\n";
+      cerr << "  example:  peek t 0\n";
+      cerr << "  example:  peek pc\n";
+      cerr << "  example:  peek s pm\n";
       return false;
     }
 
@@ -563,8 +559,8 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
 
   if (tokens.size() < 3)
     {
-      std::cerr << "Invalid peek command: " << line << '\n';
-      std::cerr << "Expecting: peek <resource> <address>\n";
+      cerr << "Invalid peek command: " << line << '\n';
+      cerr << "Expecting: peek <resource> <address>\n";
       return false;
     }
 
@@ -586,7 +582,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
           std::ofstream out(tokens.at(4));
           if (not out)
             {
-              std::cerr << "Failed to open " << tokens.at(4) << " for write of peek command output\n";
+              cerr << "Failed to open " << tokens.at(4) << " for write of peek command output\n";
               return false;
             }
           return peekMemory(hart, addr0, addr1, out);
@@ -606,7 +602,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
       unsigned intReg = 0;
       if (not hart.findIntReg(addrStr, intReg))
 	{
-	  std::cerr << "No such integer register: " << addrStr << '\n';
+	  cerr << "No such integer register: " << addrStr << '\n';
 	  return false;
 	}
       if (hart.peekIntReg(intReg, val))
@@ -614,7 +610,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
 	  out << (boost::format(hexForm) % val) << std::endl;
 	  return true;
 	}
-      std::cerr << "Failed to read integer register: " << addrStr << '\n';
+      cerr << "Failed to read integer register: " << addrStr << '\n';
       return false;
     }
 
@@ -622,7 +618,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
     {
       if (not hart.isRvf())
 	{
-	  std::cerr << "Floating point extension is no enabled\n";
+	  cerr << "Floating point extension is no enabled\n";
 	  return false;
 	}
 
@@ -635,7 +631,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
       unsigned fpReg = 0;
       if (not hart.findFpReg(addrStr, fpReg))
 	{
-	  std::cerr << "No such integer register: " << addrStr << '\n';
+	  cerr << "No such integer register: " << addrStr << '\n';
 	  return false;
 	}
       uint64_t fpVal = 0;
@@ -644,7 +640,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
 	  out << (boost::format("0x%016x") % fpVal) << std::endl;
 	  return true;
 	}
-      std::cerr << "Failed to read fp register: " << addrStr << '\n';
+      cerr << "Failed to read fp register: " << addrStr << '\n';
       return false;
     }
 
@@ -659,7 +655,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
       auto csr = hart.findCsr(addrStr);
       if (not csr)
 	{
-	  std::cerr << "No such CSR: " << addrStr << '\n';
+	  cerr << "No such CSR: " << addrStr << '\n';
 	  return false;
 	}
 
@@ -673,7 +669,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
           out << (boost::format(hexForm) % val) << std::endl;
 	  return true;
 	}
-      std::cerr << "Failed to read CSR: " << addrStr << '\n';
+      cerr << "Failed to read CSR: " << addrStr << '\n';
       return false;
     }
 
@@ -681,7 +677,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
     {
       if (not hart.isRvv())
 	{
-	  std::cerr << "Vector extension is no enabled\n";
+	  cerr << "Vector extension is no enabled\n";
 	  return false;
 	}
 
@@ -694,7 +690,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
       unsigned vecReg = 0;
       if (not hart.findVecReg(addrStr, vecReg))
 	{
-	  std::cerr << "No such vector register: " << addrStr << '\n';
+	  cerr << "No such vector register: " << addrStr << '\n';
 	  return false;
 	}
       std::vector<uint8_t> data;
@@ -707,7 +703,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
 	  out << '\n';
 	  return true;
 	}
-      std::cerr << "Failed to read vector register: " << addrStr << '\n';
+      cerr << "Failed to read vector register: " << addrStr << '\n';
       return false;
     }
 
@@ -730,7 +726,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
               << (boost::format(hexForm) % v3) << std::endl;
 	  return true;
 	}
-      std::cerr << "Trigger number out of bounds: " << addrStr << '\n';
+      cerr << "Trigger number out of bounds: " << addrStr << '\n';
       return false;
     }
 
@@ -795,12 +791,11 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
       if (ok)
 	return true;
 
-      std::cerr << "Invalid special resource: " << addrStr << '\n';
+      cerr << "Invalid special resource: " << addrStr << '\n';
       return false;
     }
 
-  std::cerr << "No such resource: " << resource
-	    << " -- expecting r, f, v, c, t, m , s, or pc\n";
+  cerr << "No such resource: " << resource << " -- expecting r, f, v, c, t, m , s, or pc\n";
   return false;
 }
 
@@ -812,12 +807,12 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 {
   if (tokens.size() < 3)
     {
-      std::cerr << "Invalid poke command: " << line << '\n';
-      std::cerr << "  Expecting: poke pc <value>\n";
-      std::cerr << "    or       poke <resource> <address> <value>\n";
-      std::cerr << "    or       poke c <address> <value> <virt>\n";
-      std::cerr << "    or       poke t <number> <value1> <value2> <value3>\n";
-      std::cerr << "  where <resource> is one of r, f, c, t, pc or m\n";
+      cerr << "Invalid poke command: " << line << '\n';
+      cerr << "  Expecting: poke pc <value>\n";
+      cerr << "    or       poke <resource> <address> <value>\n";
+      cerr << "    or       poke c <address> <value> <virt>\n";
+      cerr << "    or       poke t <number> <value1> <value2> <value3>\n";
+      cerr << "  where <resource> is one of r, f, c, t, pc or m\n";
       return false;
     }
 
@@ -836,10 +831,10 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
   size_t count = tokens.size();
   if ((resource == "t" and count < 6) or (resource != "t" and count < 4))
     {
-      std::cerr << "Invalid poke command: " << line << '\n';
-      std::cerr << "  Expecting: poke <resource> <address> <value>\n";
-      std::cerr << "    or       poke t <number> <value1> <value2> <value3>\n";
-      std::cerr << "  where <resource> is one of r, f, c, t, pc, or m\n";
+      cerr << "Invalid poke command: " << line << '\n';
+      cerr << "  Expecting: poke <resource> <address> <value>\n";
+      cerr << "    or       poke t <number> <value1> <value2> <value3>\n";
+      cerr << "  where <resource> is one of r, f, c, t, pc, or m\n";
       return false;
     }
 
@@ -851,12 +846,18 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
   if (resource == "v")
     {
       if (not parseCmdLineVecData("poke", valueStr, vecVal))
-	return false;
+	{
+	  return false;
+	  cerr << "  " << line << '\n';
+	}
     }
   else
     {
       if (not parseCmdLineNumber("poke", valueStr, value))
-	return false;
+	{
+	  return false;
+	  cerr << " " << line << '\n';
+	}
     }
 
   if (resource == "r")
@@ -866,11 +867,11 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 	{
 	  if (hart.pokeIntReg(intReg, value))
 	    return true;
-	  std::cerr << "Failed to write integer register " << addrStr << '\n';
+	  cerr << "Failed to write integer register " << addrStr << '\n';
 	  return false;
 	}
 
-      std::cerr << "No such integer register " << addrStr << '\n';
+      cerr << "No such integer register " << addrStr << '\n';
       return false;
     }
 
@@ -881,11 +882,11 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 	{
 	  if (hart.pokeFpReg(fpReg, value))
 	    return true;
-	  std::cerr << "Failed to write FP register " << addrStr << '\n';
+	  cerr << "Failed to write FP register " << addrStr << '\n';
 	  return false;
 	}
 
-      std::cerr << "No such FP register " << addrStr << '\n';
+      cerr << "No such FP register " << addrStr << '\n';
       return false;
     }
 
@@ -896,11 +897,11 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 	{
 	  if (hart.pokeVecReg(vecReg, vecVal))
 	    return true;
-	  std::cerr << "Failed to write vec register " << addrStr << '\n';
+	  cerr << "Failed to write vec register " << addrStr << '\n';
 	  return false;
 	}
 
-      std::cerr << "No such vector register " << addrStr << '\n';
+      cerr << "No such vector register " << addrStr << '\n';
       return false;
     }
 
@@ -916,11 +917,11 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 
 	  if (hart.externalPokeCsr(csr->getNumber(), value, virtMode))
 	    return true;
-	  std::cerr << "Failed to write CSR " << addrStr << '\n';
+	  cerr << "Failed to write CSR " << addrStr << '\n';
 	  return false;
 	}
 
-      std::cerr << "No such CSR " << addrStr << '\n';
+      cerr << "No such CSR " << addrStr << '\n';
       return false;
     }
 
@@ -937,7 +938,7 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 	return false;
       if (hart.pokeTrigger(trigger, v1, v2, v3))
 	return true;
-      std::cerr << "Trigger out of bounds: " << addrStr << '\n';
+      cerr << "Trigger out of bounds: " << addrStr << '\n';
       return false;
     }
 
@@ -970,10 +971,10 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 	    return true;
 	  break;
 	default:
-	  std::cerr << "Invalid poke memory size " << size << '\n';
+	  cerr << "Invalid poke memory size " << size << '\n';
 	  return false;
 	}
-      std::cerr << "Address out of bounds: " << addrStr << '\n';
+      cerr << "Address out of bounds: " << addrStr << '\n';
       return false;
     }
 
@@ -998,8 +999,7 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
       return true;
     }
 
-  std::cerr << "No such resource: " << resource <<
-    " -- expecting r, c, m, s, or pc\n";
+  cerr << "No such resource: " << resource << " -- expecting r, c, m, s, or pc\n";
   return false;
 }
 
@@ -1046,8 +1046,7 @@ Interactive<URV>::disassCommand(Hart<URV>& hart, const std::string& line,
 
       if (name.empty())
 	{
-	  std::cerr << "Not a function or an address withing a function: " << item
-		    << '\n';
+	  cerr << "Not a function or an address withing a function: " << item << '\n';
 	  return false;
 	}
 
@@ -1060,8 +1059,8 @@ Interactive<URV>::disassCommand(Hart<URV>& hart, const std::string& line,
           bool usePma = false;
 	  if (not hart.peekMemory(addr, inst, usePma))
 	    {
-	      std::cerr << "Address out of bounds: 0x" << std::hex << addr
-			<< '\n' << std::dec;
+	      cerr << "Address out of bounds: 0x" << std::hex << addr
+		   << '\n' << std::dec;
 	      return false;
 	    }
 
@@ -1081,11 +1080,11 @@ Interactive<URV>::disassCommand(Hart<URV>& hart, const std::string& line,
 
   if (tokens.size() != 3)
     {
-      std::cerr << "Invalid disass command: " << line << '\n';
-      std::cerr << "Expecting: disass opcode <number> ...\n";
-      std::cerr << "       or: disass function <name>\n";
-      std::cerr << "       or: disass function <addr>\n";
-      std::cerr << "       or: disass <addr1> <addr2>\n";
+      cerr << "Invalid disass command: " << line << '\n';
+      cerr << "Expecting: disass opcode <number> ...\n";
+      cerr << "       or: disass function <name>\n";
+      cerr << "       or: disass function <addr>\n";
+      cerr << "       or: disass <addr1> <addr2>\n";
       return false;
     }
 
@@ -1102,8 +1101,8 @@ Interactive<URV>::disassCommand(Hart<URV>& hart, const std::string& line,
       bool usePma = false;
       if (not hart.peekMemory(addr, inst, usePma))
 	{
-	  std::cerr << "Address out of bounds: 0x" << std::hex << addr
-		    << '\n' << std::dec;
+	  cerr << "Address out of bounds: 0x" << std::hex << addr
+	       << '\n' << std::dec;
 	  return false;
 	}
 
@@ -1131,8 +1130,8 @@ Interactive<URV>::elfCommand(Hart<URV>& hart, const std::string& line,
 {
   if (tokens.size() != 2)
     {
-      std::cerr << "Invalid elf command: " << line << '\n';
-      std::cerr << "Expecting: elf <file-name>\n";
+      cerr << "Invalid elf command: " << line << '\n';
+      cerr << "Expecting: elf <file-name>\n";
       return false;
     }
 
@@ -1157,8 +1156,8 @@ Interactive<URV>::hexCommand(Hart<URV>& , const std::string& line,
 {
   if (tokens.size() != 2)
     {
-      std::cerr << "Invalid hex command: " << line << '\n';
-      std::cerr << "Expecting: hex <file-name>\n";
+      cerr << "Invalid hex command: " << line << '\n';
+      cerr << "Expecting: hex <file-name>\n";
       return false;
     }
 
@@ -1175,8 +1174,8 @@ Interactive<URV>::lz4Command(Hart<URV>& , const std::string& line,
 {
   if (tokens.size() != 2)
     {
-      std::cerr << "Invalid lz4 command: " << line << '\n';
-      std::cerr << "Expecting: lz4 <file-name>\n";
+      cerr << "Invalid lz4 command: " << line << '\n';
+      cerr << "Expecting: lz4 <file-name>\n";
       return false;
     }
 
@@ -1208,7 +1207,7 @@ Interactive<URV>::resetCommand(Hart<URV>& hart, const std::string& /*line*/,
       return true;
     }
 
-  std::cerr << "Invalid reset command (extra arguments)\n";
+  cerr << "Invalid reset command (extra arguments)\n";
   return false;
 }
 
@@ -1221,8 +1220,8 @@ Interactive<URV>::replayFileCommand(const std::string& line,
 {
   if (tokens.size() != 2)
     {
-      std::cerr << "Invalid replay_file command: " << line << '\n';
-      std::cerr << "Expecting: replay_file <file-name>\n";
+      cerr << "Invalid replay_file command: " << line << '\n';
+      cerr << "Expecting: replay_file <file-name>\n";
       return false;
     }
 
@@ -1232,7 +1231,7 @@ Interactive<URV>::replayFileCommand(const std::string& line,
   stream.open(fileName.c_str());
   if (not stream.good())
     {
-      std::cerr << "Failed to open replay-file '" << fileName << "'\n";
+      cerr << "Failed to open replay-file '" << fileName << "'\n";
       return false;
     }
 
@@ -1247,8 +1246,8 @@ Interactive<URV>::dumpMemoryCommand(const std::string& line,
 {
   if (tokens.size() != 2)
     {
-      std::cerr << "Invalid dump_memory command: " << line << '\n';
-      std::cerr << "  Expecting: dump_memory path\n";
+      cerr << "Invalid dump_memory command: " << line << '\n';
+      cerr << "  Expecting: dump_memory path\n";
       return false;
     }
 
@@ -1343,6 +1342,8 @@ printInteractiveHelp()
   cout << "  Print the entries of the address tanslation table.\n\n";
   cout << "nmi [<cause-number>]\n";
   cout << "  Post a non-maskable interrupt with a given cause number (default 0).\n\n";
+  cout << "clear_nmi\n";
+  cout << "  Clear a pending non-maskable interrupt.\n\n";
   cout << "mread tag addr size data i|e\n";
   cout << "  Perform a memory model (out of order) read for load/amo instruction with\n";
   cout << "  given tag. Data is the RTL data to be compared with whisper data\n";
@@ -1546,7 +1547,7 @@ Interactive<URV>::helpCommand(const std::vector<std::string>& tokens)
       return;
     }
 
-  std::cerr << "No such command: " << tag	<< '\n';
+  cerr << "No such command: " << tag	<< '\n';
 }
 
 
@@ -1577,9 +1578,9 @@ Interactive<URV>::processKeywords(const StringMap& strMap)
       else
 	{
 	  if (key.empty())
-	    std::cerr << "Empty key -- ignored\n";
+	    cerr << "Empty key -- ignored\n";
 	  else
-	    std::cerr << "Unknown key: " << key << "  -- ignored\n";
+	    cerr << "Unknown key: " << key << "  -- ignored\n";
 	}
     }
 
@@ -1641,7 +1642,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
   auto hartPtr = system_.findHartByHartId(hartId_);
   if (not hartPtr)
     {
-      std::cerr << "Hart id out of bounds: " << hartId_ << '\n';
+      cerr << "Hart id out of bounds: " << hartId_ << '\n';
       return false;
     }
 
@@ -1766,7 +1767,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
   if (command == "cancel_div")
     {
       if (not hart.cancelLastDiv())
-        std::cerr << "Warning: Unexpected cancel_div\n";
+        cerr << "Warning: Unexpected cancel_div\n";
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
       return true;
@@ -1789,7 +1790,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
     {
       if (not replayStream.is_open())
 	{
-	  std::cerr << "No replay file defined. Use the replay_file to define one\n";
+	  cerr << "No replay file defined. Use the replay_file to define one\n";
 	  return false;
 	}
       bool replayDone = false;
@@ -1817,6 +1818,14 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       hart.setPendingNmi(NmiCause(cause));
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "clear_nmi")
+    {
+      hart.clearPendingNmi();
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
 
@@ -1997,7 +2006,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       return true;
     }
 
-  std::cerr << "No such command: " << line << '\n';
+  cerr << "No such command: " << line << '\n';
   return false;
 }
 
@@ -2035,8 +2044,8 @@ Interactive<URV>::replayCommand(const std::string& line,
     {
       if (tokens.at(1) != "step")
 	{
-	  std::cerr << "Invalid command: " << line << '\n';
-	  std::cerr << "Expecting: replay <step> <count>\n";
+	  cerr << "Invalid command: " << line << '\n';
+	  cerr << "Expecting: replay <step> <count>\n";
 	  return false;
 	}
 
@@ -2062,8 +2071,8 @@ Interactive<URV>::replayCommand(const std::string& line,
       return true;
     }
 
-  std::cerr << "Invalid command: " << line << '\n';
-  std::cerr << "Expecting: replay, replay <count>, or replay step <count>\n";
+  cerr << "Invalid command: " << line << '\n';
+  cerr << "Expecting: replay, replay <count>, or replay step <count>\n";
   return false;    
 }
 
@@ -2076,8 +2085,8 @@ Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
   // Format: mread <instr-tag> <physical-address> <size> <rtl-data>
   if (tokens.size() != 5)
     {
-      std::cerr << "Invalid mread command: " << line << '\n';
-      std::cerr << "  Expecting: mread <tag> <addr> <size> <data>\n";
+      cerr << "Invalid mread command: " << line << '\n';
+      cerr << "  Expecting: mread <tag> <addr> <size> <data>\n";
       return false;
     }
 
@@ -2095,7 +2104,7 @@ Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
 
   if (size == 0)
     {
-      std::cerr << "Invalid mread size: 0\n";
+      cerr << "Invalid mread size: 0\n";
       return false;
     }
 
@@ -2112,20 +2121,25 @@ Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
 
   std::vector<uint8_t> bytes;
   if (not parseCmdLineVecData("data", tokens.at(4), bytes))
-    return false;
+    {
+      cerr << "  " << line << '\n';
+      return false;
+    }
 
   if (bytes.size() != size)
     {
-      std::cerr << "Invalid mread command: size (" << size << ") does not match number "
-		<< " of bytes in data (" << bytes.size() << "\n";
+      cerr << "Invalid mread command: size (" << size << ") does not match number "
+	   << " of bytes in data (" << bytes.size() << "\n";
+      std::cerr << "  " << line << '\n';
       return false;
     }
 
   unsigned clz = hart.cacheLineSize();
   if (size > clz)
     {
-      std::cerr << "Invalid size for mread command for vector: " << size << ", must be "
-		<< "less than cache line size (" << clz << ")\n";
+      cerr << "Invalid size for mread command for vector: " << size << ", must be "
+	   << "less than cache line size (" << clz << ")\n";
+      cerr << "  " << line << '\n';
       return false;
     }
 
@@ -2167,8 +2181,8 @@ Interactive<URV>::mbwriteCommand(Hart<URV>& hart, const std::string& line,
   // byte (rightmost two hex digits) corresponding to smallest address.
   if (tokens.size() != 3 and tokens.size() != 4)
     {
-      std::cerr << "Invalid mbwrite command: " << line << '\n';
-      std::cerr << "  Expecting: mbwrite <addr> <data>\n";
+      cerr << "Invalid mbwrite command: " << line << '\n';
+      cerr << "  Expecting: mbwrite <addr> <data>\n";
       return false;
     }
 
@@ -2182,14 +2196,14 @@ Interactive<URV>::mbwriteCommand(Hart<URV>& hart, const std::string& line,
   if (not (hexDigits.starts_with("0x") or
 	   hexDigits.starts_with("0X")))
     {
-      std::cerr << "Error: mbwrite data must begin with 0x: " << hexDigits << '\n';
+      cerr << "Error: mbwrite data must begin with 0x: " << hexDigits << '\n';
       return false;
     }
   hexDigits = hexDigits.substr(2);
 
   if ((hexDigits.size() & 1) == 1)
     {
-      std::cerr << "Error: mbwrite hex digit count must be even\n";
+      cerr << "Error: mbwrite hex digit count must be even\n";
       return false;
     }
 
@@ -2200,8 +2214,7 @@ Interactive<URV>::mbwriteCommand(Hart<URV>& hart, const std::string& line,
       unsigned value = strtoul(byteStr.c_str(), &end, 16);
       if (end and *end)
 	{
-	  std::cerr << "Error: Invalid hex digit(s) in mbwrite data: "
-		    << byteStr << '\n';
+	  cerr << "Error: Invalid hex digit(s) in mbwrite data: " << byteStr << '\n';
 	  return false;
 	}
       data.push_back(value);
@@ -2211,7 +2224,7 @@ Interactive<URV>::mbwriteCommand(Hart<URV>& hart, const std::string& line,
   std::reverse(data.begin(), data.end()); // Least sig byte now first
   if (data.size() > lineSize)
     {
-      std::cerr << "Mbwrite data too long -- truncating\n";
+      cerr << "Mbwrite data too long -- truncating\n";
       data.resize(lineSize);
     }
 		     
@@ -2222,13 +2235,13 @@ Interactive<URV>::mbwriteCommand(Hart<URV>& hart, const std::string& line,
       if (not (hexDigits.starts_with("0x")) or
 	  not (hexDigits.starts_with("0x")))
 	{
-	  std::cerr << "Error mbwrtie mask myst begin with 0x: " << hexDigits << '\n';
+	  cerr << "Error mbwrtie mask myst begin with 0x: " << hexDigits << '\n';
 	  return false;
 	}
       hexDigits = hexDigits.substr(2);
       if ((hexDigits.size() & 1) == 1)
 	{
-	  std::cerr << "Error: mbwrite hex digit count must be even\n";
+	  cerr << "Error: mbwrite hex digit count must be even\n";
 	  return false;
 	}
       for (size_t i = 0; i < hexDigits.size(); i += 2)
@@ -2238,8 +2251,7 @@ Interactive<URV>::mbwriteCommand(Hart<URV>& hart, const std::string& line,
 	  unsigned value = strtoul(byteStr.c_str(), &end, 16);
 	  if (end and *end)
 	    {
-	      std::cerr << "Error: Invalid hex digit(s) in mbwrite data: "
-			<< byteStr << '\n';
+	      cerr << "Error: Invalid hex digit(s) in mbwrite data: " << byteStr << '\n';
 	      return false;
 	    }
 	  for (unsigned j = 0; j < 8; ++j)
@@ -2263,8 +2275,8 @@ Interactive<URV>::mbinsertCommand(Hart<URV>& hart, const std::string& line,
   // Format: mbinsert <instr-tag> <physical-address> <size> <rtl-data>
   if (tokens.size() != 5)
     {
-      std::cerr << "Invalid mbinsert command: " << line << '\n';
-      std::cerr << "  Expecting: mbinsert <tag> <addr> size> <data>\n";
+      cerr << "Invalid mbinsert command. Expecting: mbinsert <tag> <addr> size> <data>\n";
+      cerr << "  " << line << '\n';
       return false;
     }
 
@@ -2299,16 +2311,18 @@ Interactive<URV>::mbinsertCommand(Hart<URV>& hart, const std::string& line,
 
   if (bytes.size() != size)
     {
-      std::cerr << "Invalid mbinsert command: size (" << size << ") does not match number "
-		<< " of bytes in data (" << bytes.size() << "\n";
+      cerr << "Invalid mbinsert command: size (" << size << ") does not match number "
+	   << " of bytes in data (" << bytes.size() << ")\n";
+      cerr << "  " << line << '\n';
       return false;
     }
 
   unsigned clz = hart.cacheLineSize();
   if (size > clz)
     {
-      std::cerr << "Invalid size for mbinsert command for vector: " << size << ", must be "
-		<< "less than cache line size (" << clz << ")\n";
+      cerr << "Invalid size for mbinsert command for vector: " << size << ", must be "
+	   << "less than cache line size (" << clz << ")\n";
+      cerr << "  " << line << '\n';
       return false;
     }
 
@@ -2348,8 +2362,8 @@ Interactive<URV>::mbbypassCommand(Hart<URV>& hart, const std::string& line,
   // Format: mbbypass <instr-tag> <physical-address> <size> <data>
   if (tokens.size() != 5)
     {
-      std::cerr << "Invalid mbbypass command: " << line << '\n';
-      std::cerr << "  Expecting: mbbypass <tag> <addr> size> <data>\n";
+      cerr << "Invalid mbbypass command. Expecting: mbbypass <tag> <addr> size> <data>\n";
+      cerr << "  " << line << '\n';
       return false;
     }
 
@@ -2368,21 +2382,70 @@ Interactive<URV>::mbbypassCommand(Hart<URV>& hart, const std::string& line,
   // For the cbo.zero instruction the size may be 8, 32, or 64. Data value must be zero.
   if (size > 8 and (size % 8) != 0)
     {
-      std::cerr << "Invalid mbbypass size: " << size << " -- Expecting 0 to 8 or a multiple of 8\n";
+      cerr << "Invalid mbbypass size: " << size << " -- Expecting 0 to 8 or a multiple of 8\n";
+      cerr << "  " << line << '\n';
       return false;
     }
 
-  uint64_t data = 0;
-  if (not parseCmdLineNumber("data", tokens.at(4), data))
+  if (size <= 8)
+    {
+      uint64_t data = 0;
+      if (not parseCmdLineNumber("data", tokens.at(4), data))
+	return false;
+      return system_.mcmBypass(hart, this->time_, tag, addr, size, data);
+    }
+
+  // mbbypass for a vector load, expected size is less than that of cache line (64).
+  std::vector<uint8_t> bytes;
+  if (not parseCmdLineVecData("data", tokens.at(4), bytes))
     return false;
 
-  if (size > 8 and data != 0)
+  // Expand a zero to the required number of bytes. Backward ccompatibility.
+  if (bytes.size() == 1 and bytes.at(0) == 0)
+    bytes.resize(size);
+
+  if (bytes.size() != size)
     {
-      std::cerr << "Invalid mbbypass data: " << data << " -- Expecting 0 for size grater than 8\n";
+      cerr << "Invalid mbbypass command: size (" << size << ") does not match number "
+	   << " of bytes in data (" << bytes.size() << ")\n";
+      cerr << "  " << line << '\n';
       return false;
     }
 
-  return system_.mcmBypass(hart, this->time_, tag, addr, size, data);
+  unsigned clz = hart.cacheLineSize();
+  if (size > clz)
+    {
+      cerr << "Invalid size for mbbbypass command for vector: " << size << ", must be "
+	   << "less than cache line size (" << clz << ")\n";
+      cerr << "  " << line << '\n';
+      return false;
+    }
+
+  bool ok = true;
+
+  std::reverse(bytes.begin(), bytes.end());
+
+  // For speed, use double-word bypass when possible, else word, else byte.
+  if ((size & 0x7) == 0 and (addr & 0x7) == 0)
+    {
+      const uint64_t* vdata = reinterpret_cast<const uint64_t*> (bytes.data());
+      for (unsigned i = 0; i < size and ok; i += 8, ++vdata, addr += 8)
+	ok = system_.mcmBypass(hart, this->time_, tag, addr, 8, *vdata);
+    }
+  else if ((size & 0x3) == 0 and (addr & 0x3) == 0)
+    {
+      const uint32_t* vdata = reinterpret_cast<const uint32_t*> (bytes.data());
+      for (unsigned i = 0; i < size and ok; i += 4, ++vdata, addr += 4)
+	ok = system_.mcmBypass(hart, this->time_, tag, addr, 4, *vdata);
+    }
+  else
+    {
+      const uint8_t* vdata = bytes.data();
+      for (unsigned i = 0; i < size and ok; ++i, ++vdata, ++addr)
+	ok = system_.mcmBypass(hart, this->time_, tag, addr, 1, *vdata);
+    }
+
+  return ok;
 }
 
 
@@ -2394,8 +2457,8 @@ Interactive<URV>::mifetchCommand(Hart<URV>& hart, const std::string& line,
   // Format: mifetch <physical-address>
   if (tokens.size() != 2)
     {
-      std::cerr << "Invalid mifetch command: " << line << '\n';
-      std::cerr << "  Expecting: mifetch <addr>\n";
+      cerr << "Invalid mifetch command: " << line << '\n';
+      cerr << "  Expecting: mifetch <addr>\n";
       return false;
     }
 
@@ -2415,8 +2478,8 @@ Interactive<URV>::mievictCommand(Hart<URV>& hart, const std::string& line,
   // Format: mievict <physical-address>
   if (tokens.size() != 2)
     {
-      std::cerr << "Invalid mievict command: " << line << '\n';
-      std::cerr << "  Expecting: mievict <addr>\n";
+      cerr << "Invalid mievict command: " << line << '\n';
+      cerr << "  Expecting: mievict <addr>\n";
       return false;
     }
 
@@ -2436,8 +2499,8 @@ Interactive<URV>::translateCommand(Hart<URV>& hart, const std::string& line,
   // translate va [r|w|x [s|u]]. Mode defaults to r, privilege to u.
   if (tokens.size() < 3)
     {
-      std::cerr << "Invalid translate command: " << line << '\n';
-      std::cerr << "Expecting: translate <vaddr> [r|w|x [s|u|vs|vu]]\n";
+      cerr << "Invalid translate command: " << line << '\n';
+      cerr << "Expecting: translate <vaddr> [r|w|x [s|u|vs|vu]]\n";
     }
 
   uint64_t va = 0;
@@ -2452,7 +2515,7 @@ Interactive<URV>::translateCommand(Hart<URV>& hart, const std::string& line,
       else if (tokens.at(2) == "x") exec  = true;
       else
 	{
-	  std::cerr << "Invalid protection mode: " << tokens.at(2) << " -- expecting r, w, or x\n";
+	  cerr << "Invalid protection mode: " << tokens.at(2) << " -- expecting r, w, or x\n";
 	  return false;
 	}
     }
@@ -2470,7 +2533,7 @@ Interactive<URV>::translateCommand(Hart<URV>& hart, const std::string& line,
       else if (tokens.at(3) == "vs") { pm = PrivilegeMode::Supervisor; twoStage = true; }
       else
 	{
-	  std::cerr << "Invalid privilege mode: " << tokens.at(3) << " -- expecting u, s, vu, or vs\n";
+	  cerr << "Invalid privilege mode: " << tokens.at(3) << " -- expecting u, s, vu, or vs\n";
 	  return false;
 	}
     }
@@ -2483,7 +2546,7 @@ Interactive<URV>::translateCommand(Hart<URV>& hart, const std::string& line,
       return true;
     }
 
-  std::cerr << "Translation failed -- exception code: " << unsigned(ec) << '\n';
+  cerr << "Translation failed -- exception code: " << unsigned(ec) << '\n';
   return false;
 }
 
@@ -2504,8 +2567,8 @@ Interactive<URV>::checkInterruptCommand(Hart<URV>& hart, const std::string& line
     }
   else
     {
-      std::cerr << "Invalid check_interupt command: " << line << '\n';
-      std::cerr << "Expecting: check_interrupt [<mip-value>]\n";
+      cerr << "Invalid check_interupt command: " << line << '\n';
+      cerr << "Expecting: check_interrupt [<mip-value>]\n";
       return false;
     }
 
@@ -2536,15 +2599,15 @@ Interactive<URV>::seiPinCommand(Hart<URV>& hart, const std::string& line,
 	return false;
       if (val != 0 and val != 1)
 	{
-	  std::cerr << "Invalid pin-value: " << tokens.at(1) << '\n';
+	  cerr << "Invalid pin-value: " << tokens.at(1) << '\n';
 	  return false;
 	}
       hart.setSeiPin(val);
     }
   else
     {
-      std::cerr << "Invalid sei_pin command: " << line << '\n';
-      std::cerr << "Expecting: sei_pin 0|1\n";
+      cerr << "Invalid sei_pin command: " << line << '\n';
+      cerr << "Expecting: sei_pin 0|1\n";
       return false;
     }
 
@@ -2570,8 +2633,8 @@ Interactive<URV>::pmpCommand(Hart<URV>& hart, const std::string& line,
     }
   else
     {
-      std::cerr << "Invalid pmp command: " << line << '\n';
-      std::cerr << "Expecting: pmp [<address>]\n";
+      cerr << "Invalid pmp command: " << line << '\n';
+      cerr << "Expecting: pmp [<address>]\n";
       return false;
     }
 
@@ -2597,8 +2660,8 @@ Interactive<URV>::pmaCommand(Hart<URV>& hart, const std::string& line,
     }
   else
     {
-      std::cerr << "Invalid pma command: " << line << '\n';
-      std::cerr << "Expecting: pma [<address>]\n";
+      cerr << "Invalid pma command: " << line << '\n';
+      cerr << "Expecting: pma [<address>]\n";
       return false;
     }
 
@@ -2623,8 +2686,8 @@ Interactive<URV>::perfModelFetchCommand(const std::string& line,
     }
   else
     {
-      std::cerr << "Invalid perf_model_fetch command: " << line << '\n';
-      std::cerr << "Expecting: perf_model_fetch <tag> <vpc>\n";
+      cerr << "Invalid perf_model_fetch command: " << line << '\n';
+      cerr << "Expecting: perf_model_fetch <tag> <vpc>\n";
       return false;
     }
 }
@@ -2644,8 +2707,8 @@ Interactive<URV>::perfModelDecodeCommand(const std::string& line,
     }
   else
     {
-      std::cerr << "Invalid perf_model_decode command: " << line << '\n';
-      std::cerr << "Expecting: perf_model_decode <tag>\n";
+      cerr << "Invalid perf_model_decode command: " << line << '\n';
+      cerr << "Expecting: perf_model_decode <tag>\n";
       return false;
     }
 }
@@ -2666,8 +2729,8 @@ Interactive<URV>::perfModelExecuteCommand(const std::string& line,
     }
   else
     {
-      std::cerr << "Invalid perf_model_execute command: " << line << '\n';
-      std::cerr << "Expecting: perf_model_execute <tag>\n";
+      cerr << "Invalid perf_model_execute command: " << line << '\n';
+      cerr << "Expecting: perf_model_execute <tag>\n";
       return false;
     }
 }
@@ -2688,8 +2751,8 @@ Interactive<URV>::perfModelRetireCommand(const std::string& line,
     }
   else
     {
-      std::cerr << "Invalid perf_model_retire command: " << line << '\n';
-      std::cerr << "Expecting: perf_model_retire <tag>\n";
+      cerr << "Invalid perf_model_retire command: " << line << '\n';
+      cerr << "Expecting: perf_model_retire <tag>\n";
       return false;
     }
 }
@@ -2710,8 +2773,8 @@ Interactive<URV>::perfModelDrainStoreCommand(const std::string& line,
     }
   else
     {
-      std::cerr << "Invalid perf_model_drain_store command: " << line << '\n';
-      std::cerr << "Expecting: perf_model_drain_store <tag>\n";
+      cerr << "Invalid perf_model_drain_store command: " << line << '\n';
+      cerr << "Expecting: perf_model_drain_store <tag>\n";
       return false;
     }
 }
@@ -2740,8 +2803,8 @@ Interactive<URV>::perfModelPredictBranch(const std::string& line,
     }
   else
     {
-      std::cerr << "Invalid perf_model_predict_branch command: " << line << '\n';
-      std::cerr << "Expecting: perf_model_predict_branch <tag> <flag> <addr>\n";
+      cerr << "Invalid perf_model_predict_branch command: " << line << '\n';
+      cerr << "Expecting: perf_model_predict_branch <tag> <flag> <addr>\n";
       return false;
     }
 }
@@ -2762,8 +2825,8 @@ Interactive<URV>::perfModelFlushCommand(const std::string& line,
     }
   else
     {
-      std::cerr << "Invalid perf_model_flush command: " << line << '\n';
-      std::cerr << "Expecting: perf_model_flush <tag>\n";
+      cerr << "Invalid perf_model_flush command: " << line << '\n';
+      cerr << "Expecting: perf_model_flush <tag>\n";
       return false;
     }
 }
@@ -2791,8 +2854,8 @@ Interactive<URV>::perfModelShouldFlushCommand(const std::string& line,
     }
   else
     {
-      std::cerr << "Invalid perf_model_flush command: " << line << '\n';
-      std::cerr << "Expecting: perf_model_flush <tag>\n";
+      cerr << "Invalid perf_model_flush command: " << line << '\n';
+      cerr << "Expecting: perf_model_flush <tag>\n";
       return false;
     }
 }

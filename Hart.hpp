@@ -398,6 +398,10 @@ namespace WdRiscv
     void enableSvinval(bool flag)
     { enableExtension(RvExtension::Svinval, flag); }
 
+    /// Enable Svadu extension.
+    void enableTranslationAdu(bool flag)
+    { enableExtension(RvExtension::Svadu, flag); updateTranslationAdu(); }
+
     /// Called when Svpbmt configuration changes. Enable/disable pbmt in
     /// virtual memory class.
     void updateTranslationPbmt()
@@ -407,21 +411,34 @@ namespace WdRiscv
 
       auto menv = csRegs_.getImplementedCsr(CsrNumber::MENVCFG);
       if (menv)
+	flag = flag and csRegs_.menvcfgPbmte();
+      virtMem_.enablePbmt(flag);
+      auto henv = csRegs_.getImplementedCsr(CsrNumber::HENVCFG);
+      if (henv)
+        flag = flag and csRegs_.henvcfgPbmte();
+      virtMem_.enableVsPbmt(flag);
+    }
+
+    /// Called when Svadu configuration changes. Enable/disable A/D
+    /// hardware updates.
+    void updateTranslationAdu()
+    {
+      bool flag = extensionIsEnabled(RvExtension::Svadu);
+      csRegs_.enableSvadu(flag);
+
+      auto menv = csRegs_.getImplementedCsr(CsrNumber::MENVCFG);
+      if (menv)
 	{
-	  flag = flag and csRegs_.menvcfgPbmte();
 	  bool adu = csRegs_.menvcfgAdue();
 	  virtMem_.setFaultOnFirstAccess(not adu);
 	  virtMem_.setFaultOnFirstAccessStage2(not adu);
 	}
-      virtMem_.enablePbmt(flag);
       auto henv = csRegs_.getImplementedCsr(CsrNumber::HENVCFG);
       if (henv)
 	{
-          flag = flag and csRegs_.henvcfgPbmte();
 	  bool adu = csRegs_.henvcfgAdue();
 	  virtMem_.setFaultOnFirstAccessStage1(not adu);
 	}
-      virtMem_.enableVsPbmt(flag);
     }
 
     /// Called when pointer masking configuration changes.
@@ -776,6 +793,21 @@ namespace WdRiscv
     bool getSeiPin() const
     { return seiPin_; }
 
+    /// Peek MIP/SIP and modify by supervisor external interrupt pin. This is
+    /// OR-ed when mvien does not exist or is set to zero. Otherwise,
+    /// the value of SEIP is solely the value of the pin.
+    URV overrideWithSeiPin(URV ip) const
+    {
+      if (isRvaia())
+        {
+          URV mvien;
+          if (peekCsr(CsrNumber::MVIEN, mvien) and
+              (mvien >> URV(InterruptCause::S_EXTERNAL) & 1))
+            ip &= ~URV(1 << URV(InterruptCause::S_EXTERNAL));
+        }
+      return ip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+    }
+
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
     /// address of the instruction is identical to the given address.
@@ -930,15 +962,14 @@ namespace WdRiscv
     unsigned cacheLineSize() const
     { return cacheLineSize_; }
 
-    bool getLastVectorMemory(std::vector<uint64_t>& addresses,
-                             std::vector<uint64_t>& paddresses,
-                             std::vector<uint64_t>& paddresses2,
-			     std::vector<uint64_t>& data,
-                             std::vector<bool>& masked,
-			     unsigned& elementSize) const
-    { return vecRegs_.getLastMemory(addresses, paddresses,
-                                    paddresses2, data, masked, elementSize); }
+    const VecLdStInfo& getLastVectorMemory() const
+    { return vecRegs_.getLastMemory(); }
 
+    /// Computes the base register and registers used of a vector load/store
+    /// instruction. This helper trims by vstart/vl (not vm). This is for MCM
+    /// dependency tracking.
+    bool getLastVecLdStRegsUsed(const DecodedInst& di, unsigned opIx,
+                                unsigned& regBase, unsigned& regCount) const;
 
     void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const
     { syscall_.getMemoryChanges(v); }
@@ -1586,9 +1617,13 @@ namespace WdRiscv
     void enableClearMtvalOnEbreak(bool flag)
     { clearMtvalOnEbreak_ = flag; }
 
-    /// Disable clearing of reservation set after xRET
+    /// Enable/disable clearing of reservation set after xRET
     void enableCancelLrOnTrap(bool flag)
     { cancelLrOnTrap_ = flag; }
+
+    /// Enable/disable clearing of reservation set on entering debug mode.
+    void enableCancelLrOnDebug(bool flag)
+    { cancelLrOnDebug_ = flag; }
 
     /// Enable/disable misaligned access. If disabled then misaligned
     /// ld/st will trigger an exception.
@@ -1883,6 +1918,13 @@ namespace WdRiscv
     void tracePtw(bool flag)
     { tracePtw_ = flag; }
 
+    // PC after an NMI is nmi_vec when flag is false; otherwise, it is nmi_vec +
+    // cause*4. Similarly after an exception while in the nmi interrupt handler, the PC is
+    // is nmi_excetion_vec when flag is false; otherwise, it is nmi_exception_vec +
+    // cause*4.
+    void indexedNmi(bool flag)
+    { indexedNmi_ = flag; }
+
     /// Enable/disable PMP access trace
     void tracePmp(bool flag)
     { pmpManager_.enableTrace(flag); }
@@ -1931,11 +1973,16 @@ namespace WdRiscv
     /// to the interrupt cause; otherwise, leave cause unmodified.
     bool isInterruptPossible(URV mipValue, InterruptCause& cause) const;
 
-    /// Configure this hart to set its program counter to the given
-    /// addr on entering debug mode. If addr bits are all set, then
-    /// the PC is not changed on entering debug mode.
+    /// Configure this hart to set its program counter to the given addr on entering debug
+    /// mode. If addr bits are all set, then the PC is not changed on entering debug mode.
     void setDebugParkLoop(URV addr)
     { debugParkLoop_ = addr; }
+
+    /// Return true if the hart is in the debug park loop (DPL): debug park loop is
+    /// defined and an EBREAK exception was seen. We leave DPL when ebreak instruction is
+    /// executed.
+    bool inDebugParkLoop() const
+    { return inDebugParkLoop_; }
 
     /// Configure this hart to set its program counter to the given
     /// addr on encountering a trap (except breakpoint) during debug
@@ -1997,14 +2044,8 @@ namespace WdRiscv
         });
     }
 
-    void attachPci(std::shared_ptr<Pci> pci, uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize)
-    {
-      pci_ = pci;
-      pciConfigBase_ = configBase;
-      pciConfigEnd_ = pciConfigBase_ + (1ULL << 28);
-      pciMmioBase_ = mmioBase;
-      pciMmioEnd_ = mmioBase + mmioSize;
-    }
+    void attachPci(std::shared_ptr<Pci> pci)
+    { pci_ = pci; }
 
     /// Return true if given extension is enabled.
     constexpr bool extensionIsEnabled(RvExtension ext) const
@@ -2143,10 +2184,7 @@ namespace WdRiscv
     }
 
     bool isPciAddr(uint64_t addr) const
-    {
-      return (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
-			(addr >= pciMmioBase_ and addr < pciMmioEnd_)));
-    }
+    { return pci_ and pci_->contains_addr(addr); }
 
     /// Return true if there is one or more active performance counter (a counter that is
     /// assigned a valid event).
@@ -2172,8 +2210,47 @@ namespace WdRiscv
     { return suspended_; }
 
     /// Set value to the value read from the device associated with the given physical
-    /// address. No effect if pa is not a device address.
+    /// address.
     void deviceRead(uint64_t pa, unsigned size, uint64_t& value);
+
+    /// Write the given value to the device associated with the given phyiscal address.
+    /// address.
+    template <typename STORE_TYPE>
+    void deviceWrite(uint64_t pa, STORE_TYPE value);
+
+    /// Set current privilege mode.
+    void setPrivilegeMode(PrivilegeMode m)
+    { privMode_ = m; }
+
+    /// Enable/disable virtual (V) mode.
+    void setVirtualMode(bool mode)
+    {
+      virtMode_ = mode;
+      csRegs_.setVirtualMode(mode);
+      if (mode)
+	updateCachedVsstatus();
+      updateAddressTranslation();
+    }
+
+    /// Increment time base and timer value.
+    void tickTime()
+    {
+      ++timeSample_;
+      time_ += not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+    }
+
+    /// Decrement time base and timer value. This is used by PerfApi to undo effects of
+    /// execute.
+    void untickTime()
+    {
+      time_ -= not (timeSample_ & ((URV(1) << timeDownSample_) - 1));
+      --timeSample_;
+    }
+
+    /// Return the data vector register number associated with the given ld/st element
+    /// info.  We return the individual register and not the base register of a group.
+    unsigned identifyDataRegister(const VecLdStInfo& info, const VecLdStElem& elem) const
+    { return vecRegs_.identifyDataRegister(info, elem); }
 
   protected:
 
@@ -2320,10 +2397,6 @@ namespace WdRiscv
     bool getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
 			 bool isVec, uint64_t& value);
 
-    /// Set current privilege mode.
-    void setPrivilegeMode(PrivilegeMode m)
-    { privMode_ = m; }
-
     /// Helper to reset: reset floating point related structures.
     /// No-op if no  floating point extension is enabled.
     void resetFloat();
@@ -2417,16 +2490,6 @@ namespace WdRiscv
 #ifndef FAST_SLOPPY
       setVecStatus(VecStatus::Dirty);
 #endif
-    }
-
-    // Enable/disable virtual (V) mode.
-    void setVirtualMode(bool mode)
-    {
-      virtMode_ = mode;
-      csRegs_.setVirtualMode(mode);
-      if (mode)
-	updateCachedVsstatus();
-      updateAddressTranslation();
     }
 
     // Return true if it is legal to execute a vector instruction: V
@@ -5095,6 +5158,7 @@ namespace WdRiscv
 
     bool instrLineTrace_ = false;
     bool dataLineTrace_ = false;
+    bool indexedNmi_ = false;  // NMI handler is at a cause-scaled offset when true.
 
     unsigned cacheLineSize_ = 64;
 
@@ -5158,7 +5222,8 @@ namespace WdRiscv
     URV effectiveIe_ = 0;           // Effective interrupt enable.
 
     bool clearMprvOnRet_ = true;
-    bool cancelLrOnTrap_ = true;    // Cancel reservation on traps when true.
+    bool cancelLrOnTrap_ = false;   // Cancel reservation on traps when true.
+    bool cancelLrOnDebug_ = false;  // Cancel
 
     // Make hfence.gvma ignore huest physical addresses when true.
     bool hfenceGvmaIgnoresGpa_ = false;
@@ -5173,6 +5238,8 @@ namespace WdRiscv
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
     URV debugParkLoop_ = ~URV(0);    // Jump to this address on entering debug mode.
     URV debugTrapAddr_ = ~URV(0);    // Jump to this address on exception in debug mode.
+
+    bool inDebugParkLoop_ = false;    // True if BREAKP exception goes to DPL.
 
     bool clearMtvalOnIllInst_ = true;
     bool clearMtvalOnEbreak_ = true;
@@ -5242,10 +5309,6 @@ namespace WdRiscv
     std::function<bool(uint64_t, unsigned, uint64_t&)> imsicRead_ = nullptr;
     std::function<bool(uint64_t, unsigned, uint64_t)> imsicWrite_ = nullptr;
     std::shared_ptr<Pci> pci_;
-    uint64_t pciConfigBase_ = 0;
-    uint64_t pciConfigEnd_ = 0;
-    uint64_t pciMmioBase_ = 0;
-    uint64_t pciMmioEnd_ = 0;
 
     // Callback invoked before a CSR instruction accesses a CSR.
     std::function<void(unsigned, CsrNumber)> preCsrInst_ = nullptr;
