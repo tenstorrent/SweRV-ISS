@@ -1095,6 +1095,9 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   instr->di_ = di;
 
   bool ok = true;
+  if (di.isLoad() or di.isAmo())
+    instr->isLoad_ = true;
+
   if (instr->isLoad_)
     ok = commitReadOps(hart, instr);
 
@@ -1999,6 +2002,8 @@ template <typename URV>
 bool
 Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 {
+  // FIX TODO : complain about vector loads without read ops unless all elems masked.
+
   const VecLdStInfo& info = hart.getLastVectorMemory();
   const std::vector<VecLdStElem>& elems = info.elems_;
 
@@ -2173,6 +2178,16 @@ Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr* instr)
 {
   if (instr->di_.isVector())
     return commitVecReadOps(hart, instr);
+
+  if (instr->memOps_.empty())
+    {
+      const auto& di = instr->di_;
+      if (instr->size_ == 0)
+	instr->size_ = di.isAmo() ? di.amoSize() : di.loadSize();
+      cerr << "Error: hart-id=" << hart.hartId() << " time=" << time_ << " tag=" << instr->tag_
+	   << " load/amo instruction retires witout any memory read operation.\n";
+      return false;
+    }
 
   // Mark replayed ops as cancled.
   assert(instr->size_ > 0 and instr->size_ <= 8);
@@ -2814,8 +2829,7 @@ Mcm<URV>::printPpo1Error(unsigned hartId, McmInstrIx tag1, McmInstrIx tag2, uint
 
 template <typename URV>
 bool
-Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB, uint64_t& t1,
-		   uint64_t& t2, uint64_t& physAddr) const
+Mcm<URV>::ppoRule1(unsigned hartId, const McmInstr& instrA, const McmInstr& instrB) const
 {
   if (instrA.isCanceled())
     return true;
@@ -2836,17 +2850,47 @@ Mcm<URV>::ppoRule1(const McmInstr& instrA, const McmInstr& instrB, uint64_t& t1,
 	  uint64_t addr = op.physAddr_ + byteIx;
 	  if (not overlapsRefPhysAddr(instrA, addr))
 	    continue;
+
 	  uint64_t ta = latestByteTime(instrA, addr);
 	  uint64_t tb = earliestByteTime(instrB, addr);
-	  bool ok = ta < tb or (ta == tb and instrA.isStore_);
-	  if (not ok)
-	    {
-	      t1 = ta;
-	      t2 = tb;
-	      physAddr = addr;
-	      return false;
-	    }
+	  if (ta < tb or (ta == tb and instrA.isStore_))
+	    continue;
+
+	  printPpo1Error(hartId, instrA.tag_, instrB.tag_, ta, tb, addr);
+	  return false;
 	}
+    }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule1(unsigned hartId, const McmInstr& instrA, const MemoryOp& opA,
+		   const McmInstr& instrB) const
+{
+  if (instrA.isCanceled() or not instrA.isMemory())
+    return true;
+
+  assert(instrA.isRetired());
+
+  // Check memory ops of B overlapping opA.
+  for (unsigned i = 0; i < instrB.memOps_.size(); ++i)
+    {
+      auto opIx = instrB.memOps_.at(i);
+      auto& opB = sysMemOps_.at(opIx);
+
+      if (not opA.overlaps(opB))
+	continue;
+
+      uint64_t ta = opA.time_;
+      uint64_t tb = opB.time_;
+      if (ta < tb or (ta == tb and not opB.isRead_))
+	continue;
+
+      printPpo1Error(hartId, instrA.tag_, instrB.tag_, ta, tb, opB.physAddr_);
+      return false;
     }
 
   return true;
@@ -2868,23 +2912,26 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 
   auto earlyB = earliestOpTime(instrB);
 
+  auto hartId = hart.hartId();
+
+  // Process all the memory operations that may have beein reordered with respect to B. If
+  // an instruction A, preceding B in program order, is missing a memory operation, we
+  // will catch it when we process the undrained stores below.
   for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
       const auto& op = *iter;
       if (op.isCanceled()  or  op.hartIx_ != hartIx  or  op.instrTag_ >= instrB.tag_)
 	continue;
+
       if (op.time_ < earlyB)
 	break;
+
       const auto& instrA =  instrVec.at(op.instrTag_);
       if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory())
 	continue;
 
-      uint64_t physAddr = 0, t1 = 0, t2 = 0;
-      if (ppoRule1(instrA, instrB, t1, t2, physAddr))
-	continue;
-
-      printPpo1Error(hart.hartId(), instrA.tag_, instrB.tag_, t1, t2, physAddr);
-      return false;
+      if (not ppoRule1(hartId, instrA, op, instrB))
+	return false;
     }
 
   const auto& undrained = hartData_.at(hartIx).undrainedStores_;
@@ -2895,12 +2942,8 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 	break;
 
       const auto& instrA =  instrVec.at(tag);
-      uint64_t physAddr = 0, t1 = 0, t2 = 0;
-      if (ppoRule1(instrA, instrB, t1, t2, physAddr))
-	continue;
-
-      printPpo1Error(hart.hartId(), tag, instrB.tag_, t1, t2, physAddr);
-      return false;
+      if (not ppoRule1(hartId, instrA, instrB))
+	return false;
     }
 
   return true;

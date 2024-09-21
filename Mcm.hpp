@@ -296,9 +296,12 @@ namespace WdRiscv
     /// Check PPO rule13. See ppoRule1.
     bool ppoRule13(Hart<URV>& hart, const McmInstr& instr) const;
 
-    /// Helper to above ppoRule1.
-    bool ppoRule1(const McmInstr& instrA, const McmInstr& instrB, uint64_t& t1,
-		  uint64_t& t2, uint64_t& physAddr) const;
+    /// Helper to main ppoRule1. Check A against B.
+    bool ppoRule1(unsigned hartId, const McmInstr& instrA, const McmInstr& instrB) const;
+
+    /// Helper to main ppoRule1. Check memory operation of A against B.
+    bool ppoRule1(unsigned hartId, const McmInstr& instrA, const MemoryOp& opA,
+		  const McmInstr& instrB) const;
 
     /// Helper to above ppoRule5.
     bool ppoRule5(Hart<URV>&, const McmInstr& instrA, const McmInstr& instrB) const;
