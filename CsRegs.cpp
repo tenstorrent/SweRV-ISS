@@ -1295,10 +1295,6 @@ CsRegs<URV>::enableSmmpm(bool flag)
       MseccfgFields<URV> rm{regs_.at(size_t(CN::MSECCFG)).getReadMask()};
       rm.bits_.PMM = mask;
       regs_.at(size_t(CN::MSECCFG)).setReadMask(rm.value_);
-
-      MseccfgFields<URV> wm{regs_.at(size_t(CN::MSECCFG)).getWriteMask()};
-      wm.bits_.PMM = mask;
-      regs_.at(size_t(CN::MSECCFG)).setWriteMask(wm.value_);
     }
 }
 
@@ -2720,7 +2716,9 @@ CsRegs<URV>::defineMachineRegs()
       c->markAsHighHalf(true);
     }
 
-  uint32_t mseMask = 0x300;
+  URV mseMask = 0x300;
+  if constexpr (sizeof(URV) == 8)
+    mseMask |= 0x300000000;
   defineCsr("mseccfg", Csrn::MSECCFG, !mand, imp, 0, mseMask, mseMask);
   if (rv32_)
     {
