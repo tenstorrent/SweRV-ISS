@@ -968,23 +968,10 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
   invalidateDecodeCache(addr, sizeof(val));
 
-  if (hasAclint() and ((addr >= aclintSwStart_ and addr < aclintSwEnd_) or
-      (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_)))
+  bool isDevice = isAclintAddr(addr) or isImsicAddr(addr) or isPciAddr(addr);
+  if (isDevice)
     {
-      URV adjusted = val;
-      processClintWrite(addr, sizeof(val), adjusted);
-      val = adjusted;
-    }
-  else if ((addr >= imsicMbase_ and addr < imsicMend_) or
-	   (addr >= imsicSbase_ and addr < imsicSend_))
-    {
-      if (imsicWrite_)
-        imsicWrite_(addr, sizeof(val), val);
-      return true;
-    }
-  else if (isPciAddr(addr))
-    {
-      pci_->access<uint32_t>(addr, val, true);
+      deviceWrite(addr, val);
       return true;
     }
 
@@ -1001,23 +988,10 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
   invalidateDecodeCache(addr, sizeof(val));
 
-  if (hasAclint() and ((addr >= aclintSwStart_ and addr < aclintSwEnd_) or
-      (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_)))
+  bool isDevice = isAclintAddr(addr) or isImsicAddr(addr) or isPciAddr(addr);
+  if (isDevice)
     {
-      URV adjusted = val;
-      processClintWrite(addr, sizeof(val), adjusted);
-      val = adjusted;
-    }
-  else if ((addr >= imsicMbase_ and addr < imsicMend_) or
-	   (addr >= imsicSbase_ and addr < imsicSend_))
-    {
-      if (imsicWrite_)
-        imsicWrite_(addr, sizeof(val), val);
-      return true;
-    }
-  else if (isPciAddr(addr))
-    {
-      pci_->access<uint64_t>(addr, val, true);
+      deviceWrite(addr, val);
       return true;
     }
 
@@ -2216,23 +2190,12 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
       return true;  // Memory updated & lr-canceled when merge buffer is written.
     }
 
-  if (isAclintAddr(pa1))
+  bool isDevice = isAclintAddr(pa1) or isImsicAddr(pa1) or isPciAddr(pa1);
+
+  if (isDevice)
     {
       assert(pa1 == pa2);
-      URV val = storeVal;
-      processClintWrite(pa1, ldStSize_, val);
-      storeVal = val;
-      memWrite(pa1, pa2, storeVal);
-      return true;
-    }
-  else if (isImsicAddr(pa1))
-    {
-      imsicWrite_(pa1, sizeof(storeVal), storeVal);
-      return true;
-    }
-  else if (isPciAddr(pa1))
-    {
-      pci_->access<STORE_TYPE>(pa1, storeVal, true);
+      deviceWrite(pa1, storeVal);
       return true;
     }
 
