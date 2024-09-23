@@ -1844,10 +1844,15 @@ void
 Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
 {
   val = 0;
-  if (isAclintMtimeAddr(pa))
+  if (isAclintAddr(pa))
     {
-      val = time_;
-      val = val >> (pa - 0xbff8) * 8;
+      if (isAclintMtimeAddr(pa))
+	{
+	  val = time_;
+	  val = val >> (pa - 0xbff8) * 8;
+	  return;
+	}
+      memRead(pa, pa, val);
       return;
     }
 
