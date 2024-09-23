@@ -5181,9 +5181,10 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode pm, bool vm) const
     return true;
 
   using CN = CsrNumber;
-  // sstateen not applicable for now
   CN csrn = rv32_? CN::MSTATEEN0H : CN::MSTATEEN0;
-  if (vm)
+  if (pm == PrivilegeMode::User)
+    csrn = rv32_? CN::SSTATEEN0H : CN::SSTATEEN0;
+  else if (vm)
     csrn = rv32_? CN::HSTATEEN0H : CN::HSTATEEN0;
 
   int enableBit = -1;
@@ -5192,7 +5193,6 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode pm, bool vm) const
     enableBit = 55;
   if (num == CN::HCONTEXT or num == CN::SCONTEXT)
     enableBit = 57;
-  // hgeip hgeie
   else if (num == CN::MISELECT or num == CN::MIREG or num == CN::MTOPEI or num == CN::MTOPI or
 	   num == CN::MVIEN or num == CN::MVIP or num == CN::MIDELEGH or num == CN::MIEH or
 	   num == CN::MVIENH or num == CN::MVIPH or num == CN::MIPH or num == CN::STOPEI or
