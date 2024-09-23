@@ -5183,7 +5183,7 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode pm, bool vm) const
   using CN = CsrNumber;
   CN csrn = rv32_? CN::MSTATEEN0H : CN::MSTATEEN0;
   if (pm == PrivilegeMode::User)
-    csrn = rv32_? CN::SSTATEEN0H : CN::SSTATEEN0;
+    csrn = CN::SSTATEEN0;
   else if (vm)
     csrn = rv32_? CN::HSTATEEN0H : CN::HSTATEEN0;
 
