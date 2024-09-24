@@ -412,12 +412,15 @@ namespace WdRiscv
 
     bool referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64_t& val);
 
-    /// Return true if given instruction is an indexed load/store and it has
-    /// an index register with a value produced after the instruction has used
-    /// that index register. If out of order, set producer to the tag of the
-    /// instruction producing the value of the ooo index register.
+    /// Return true if given instruction is an indexed load/store and it has an index
+    /// register with a value produced after the instruction has used that index
+    /// register. If out of order, set producer to the tag of the instruction producing
+    /// the value of the ooo index register, also set dataTime to the time of the
+    /// corrsponding data register instr. This works only for the instruction being
+    /// retired.
     bool isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned& ixReg,
-			      McmInstrIx& producer, uint64_t& produerTime) const;
+			      McmInstrIx& producer, uint64_t& produerTime,
+			      uint64_t& dataTime) const;
 
     /// Collect the earliest times the data registers of the given load/store instruction
     /// were read/written. Base is the first vector register, count is the number of

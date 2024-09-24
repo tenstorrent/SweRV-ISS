@@ -3753,14 +3753,13 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
 
   McmInstrIx ixTag = 0; // Producer of vector index register.
   uint64_t ixTime = 0;  // Producer time of vector index register.
+  uint64_t dataTime = 0;
   unsigned ixReg = 0;   // Vector index register.
-  if (isVecIndexOutOfOrder(hart, instrB, ixReg, ixTag, ixTime))
+  if (isVecIndexOutOfOrder(hart, instrB, ixReg, ixTag, ixTime, dataTime))
     {
-      auto t0 = earliestOpTime(instrB);
-
       cerr << "Error: PPO rule 9 failed: hart-id=" << hart.hartId() << " tag1="
 	   << ixTag << " tag2=" << instrB.tag_ << " time1=" << ixTime
-	   << " time2=" << t0 << " vec-ix-reg=" << ixReg << '\n';
+	   << " time2=" << dataTime << " vec-ix-reg=" << ixReg << '\n';
       return false;
     }
 
@@ -3818,7 +3817,7 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
 	      auto atag = regProducer.at(offsetReg + i);
 	      if (atag == 0)
 		continue;
-              auto atime = regTime.at(offsetReg + i);  // Time B data reg was produced.
+              auto atime = regTime.at(offsetReg + i);  // Time A data reg was produced.
 	      auto btime = dataEarlyTimes.at(i);       // Time B data reg was written.
 	      if (btime <= atime)
 		{
@@ -4329,7 +4328,8 @@ Mcm<URV>::checkSfenceWInval(Hart<URV>& hart, const McmInstr& instr) const
 template <typename URV>
 bool
 Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned& ixReg,
-			       McmInstrIx& producerTag, uint64_t& producerTime) const
+			       McmInstrIx& producerTag, uint64_t& producerTime,
+			       uint64_t& dataTime) const
 {
   const auto& di = instr.di_;
 
@@ -4358,8 +4358,8 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
 	    {
 	      uint64_t ixTime = vecRegTime(hartIx, ixBase + ii);
 	      unsigned di = ii * count / ixCount;
-	      uint64_t dataTime = dataEarlyTimes.at(di);
-	      if (ixTime < dataTime)
+	      uint64_t det = dataEarlyTimes.at(di);
+	      if (ixTime < det)
 		continue;
 
 	      producerTag = vecRegProducer(hartIx, ixBase + ii);
@@ -4367,6 +4367,7 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
 		continue;
 	      producerTime = ixTime;
 	      ixReg = ixBase + ii;
+	      dataTime = det;
 	      return true;
 	    }
 	}
@@ -4380,8 +4381,8 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
 
 	      for (unsigned di = ii*factor; di < (ii+1)*factor; ++di)
 		{
-		  uint64_t dataTime = dataEarlyTimes.at(di);
-		  if (ixTime < dataTime)
+		  uint64_t det = dataEarlyTimes.at(di);
+		  if (ixTime < det)
 		    continue;
 
 		  producerTag = vecRegProducer(hartIx, ixBase + ii);
@@ -4389,6 +4390,7 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
 		    continue;
 		  producerTime = ixTime;
 		  ixReg = ixBase + ii;
+		  dataTime = det;
 		  return true;
 		}
 	    }
@@ -4404,19 +4406,21 @@ void
 Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned base,
 			      unsigned count, std::vector<uint64_t>& times) const
 {
+  uint64_t maxVal = ~uint64_t(0);
+
   times.resize(count);
-  for (auto& t : times)
-    t = time_;   // Use retire time as default.
+  for (auto& time : times)
+    time = maxVal;   // In case no memory ops or all elements masked.
 
   if (instr.memOps_.empty())
     return;
 
   if (count == 1)
     {
-      uint64_t mint = time_;
+      uint64_t mint = maxVal;
       for (const auto& opIx : instr.memOps_)
-	if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ < mint)
-	  mint = sysMemOps_.at(opIx).time_;
+	if (opIx < sysMemOps_.size())
+	  mint = std::min(mint, sysMemOps_.at(opIx).time_);
 
       times.at(0) = mint;
       return;
@@ -4434,7 +4438,7 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned b
 
   for (unsigned ii = 0; ii < count; ++ii)
     {
-      uint64_t regTime = ~uint64_t(0);
+      uint64_t regTime = maxVal;
 
       // If vstart > 0, base would be >= the destination register number. For example, in
       // "vle8 v2, (a0)", destination register is v2 but base maybe v3.
@@ -4481,9 +4485,6 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned b
 	      regTime = std::min(byteTime, regTime);
 	    }
 	}
-
-      if (regTime == ~uint64_t(0))
-	regTime = time_;  // All elements masked. Use retire time.
 
       times.at(ii) = regTime;
     }
