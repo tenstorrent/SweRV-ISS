@@ -2034,13 +2034,7 @@ namespace WdRiscv
 	  URV gip = csRegs_.peekHgeip();
 	  gip = flag ? (gip | (URV(1) << guest)) :  (gip & ~(URV(1) << guest));
 	  csRegs_.poke(CsrNumber::HGEIP, gip);
-
-	  URV gie = csRegs_.peekHgeie();
-	  URV gmask = URV(1) << URV(IC::G_EXTERNAL);
-	  URV mipVal = csRegs_.peekMip();
-          mipVal = (gip & gie) ? (mipVal | gmask) : (mipVal & ~gmask);
-
-	  csRegs_.poke(CsrNumber::MIP, mipVal);
+          recordCsrWrite(CsrNumber::HGEIP);
         });
     }
 

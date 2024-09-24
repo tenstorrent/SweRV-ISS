@@ -4839,6 +4839,9 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
   auto vsie = getImplementedCsr(CsrNumber::VSIE);
   auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
   auto hvien = getImplementedCsr(CsrNumber::HVIEN);
+  auto hstatus = getImplementedCsr(CsrNumber::HSTATUS);
+  auto hgeip = getImplementedCsr(CsrNumber::HGEIP); // HGEIP isn't write-able
+  auto hgeie = getImplementedCsr(CsrNumber::HGEIE);
 
   URV prevHipVal = hip->prevValue();
 
@@ -4885,32 +4888,32 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	{
 	  // Bit 10 (VSEIP) of HIP is the or of bit 10 of HVIP and HGEIP bit
 	  // selected by GVEIN.
-	  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
-	  HstatusFields<URV> hsf(hsVal);
+	  HstatusFields<URV> hsf(hstatus->read());
 	  unsigned vgein = hsf.bits_.VGEIN;
-	  URV hgeipVal = regs_.at(size_t(CsrNumber::HGEIP)).read();
-	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
+	  unsigned bit = (hgeip->read() >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
 	  value = value | (bit << 10);  // Or HGEIP bit selected by GVEIN.
 	  hip->poke(value);
 	}
 
       updateCsr(vsip, vsInterruptToS(value));
     }
-  else if (num == CsrNumber::HGEIP or num == CsrNumber::HSTATUS)
+  else if (num == CsrNumber::HSTATUS or num == CsrNumber::HGEIE)
     {
       // Updating HGEIP or HSTATUS.VGEIN is reflected in HIP
       if (hip)
         {
-	  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
-	  HstatusFields<URV> hsf(hsVal);
+	  HstatusFields<URV> hsf(hstatus->read());
 	  unsigned vgein = hsf.bits_.VGEIN;
-	  URV hgeipVal = regs_.at(size_t(CsrNumber::HGEIP)).read();
+          URV hgeipVal = hgeip->read();
+
 	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
 	  // Update bit VSEIP (10) of HIP.
 	  hip->poke(hip->read() & ~(URV(1) << 10));  // Clear bit 10 of HIP
 	  URV mask = bit << 10;
 	  if (hvip)
 	    mask |= (hvip->read() & (1 << 10));  // Or bit 10 of HVIP.
+          // Update bit SGEIP (12) of HIP.
+          mask |= ((hgeipVal & hgeie->read()) != 0) << 12;
           hip->poke(hip->read() | mask);  // Set HIP bit 10 to or of HVIP and HGEIP bits.
         }
     }
@@ -5008,6 +5011,9 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
   auto vsip = getImplementedCsr(CsrNumber::VSIP);
   auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
   auto hvien = getImplementedCsr(CsrNumber::HVIEN);
+  auto hstatus = getImplementedCsr(CsrNumber::HSTATUS);
+  auto hgeip = getImplementedCsr(CsrNumber::HGEIP);
+  auto hgeie = getImplementedCsr(CsrNumber::HGEIE);
 
   bool hipUpdated = num == CsrNumber::HIP;
   URV hieMask = 0x1444; // SGEIE, VSEIE, VSTIE and VSSIE.
@@ -5049,11 +5055,9 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
       // logical-or external values for VSEIP and VSTIP.
       if (hip)
         {
-	  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
-	  HstatusFields<URV> hsf(hsVal);
+	  HstatusFields<URV> hsf(hstatus->read());
 	  unsigned vgein = hsf.bits_.VGEIN;
-	  URV hgeipVal = regs_.at(size_t(CsrNumber::HGEIP)).read();
-	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
+	  unsigned bit = (hgeip->read() >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
 	  value = value | (bit << 10);
           hip->poke(value);
           hipUpdated = true;
@@ -5074,20 +5078,23 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 	  vsip->poke(vsInterruptToS(value));
 	}
     }
-  else if (num == CsrNumber::HGEIP or num == CsrNumber::HSTATUS)
+  else if (num == CsrNumber::HGEIP or num == CsrNumber::HGEIE or
+           num == CsrNumber::HSTATUS)
     {
       // Updating HGEIP or HSTATUS.VGEIN is reflected in HIP
       // FIX: only do this when VGEIN is updated
       if (hip)
         {
-	  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
-	  HstatusFields<URV> hsf(hsVal);
+	  HstatusFields<URV> hsf(hstatus->read());
 	  unsigned vgein = hsf.bits_.VGEIN;
-	  URV hgeipVal = regs_.at(size_t(CsrNumber::HGEIP)).read();
+          URV hgeipVal = hgeip->read();
+
 	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
 	  // Update bit VSEIP (10) of HIP.
 	  hip->poke(hip->read() & ~(URV(1) << 10));  // Clear bit 10 of HIP
 	  URV mask = bit << 10;
+          // Update bit SGEIP (12) of HIP.
+          mask |= ((hgeipVal & hgeie->read()) != 0) << 12;
           hip->poke(hip->read() | mask);  // Set bit 10 to HGEIP bit selected by VGEIN.
           hipUpdated = true;
         }
