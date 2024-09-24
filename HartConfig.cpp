@@ -1627,6 +1627,14 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       errors += trigErrors;
     }
 
+  tag = "trigger_napot_maskmax";
+  if (config_ -> contains(tag))
+    {
+      unsigned bits;
+      getJsonUnsigned(tag, config_ -> at(tag), bits) or errors++;
+      hart.configTriggerNapotMaskMax(bits);
+    }
+
   tag = "memmap";
   if (config_ -> contains(tag))
     {
