@@ -92,11 +92,12 @@ namespace WdRiscv
     uint8_t hartIx_ : 8 = 0;
     uint8_t size_   : 8 = 0;        // Data size for load/store instructions.
 
-    bool retired_   : 1 = false;
-    bool canceled_  : 1 = false;
-    bool isLoad_    : 1 = false;
-    bool isStore_   : 1 = false;
-    bool complete_  : 1 = false;
+    bool retired_    : 1 = false;
+    bool canceled_   : 1 = false;
+    bool isLoad_     : 1 = false;
+    bool isStore_    : 1 = false;
+    bool complete_   : 1 = false;
+    bool hasOverlap_ : 1 = false;   // For vector load instructions.
 
     /// Return true if this a load/store instruction.
     bool isMemory() const { return isLoad_ or isStore_; }

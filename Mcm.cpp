@@ -300,10 +300,7 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 	    continue;  // Should not happen
 
 	  if (elems.at(ixInGroup).masked_)
-	    {
-	      regTime = time_;  // What if mask-policy is preserve?
-	      continue;
-	    }
+	    continue;
 
 	  uint64_t pa1 = elems.at(ixInGroup).pa_, pa2 = elems.at(ixInGroup).pa2_;
 	  unsigned size1 = elemSize, size2 = 0;
@@ -329,8 +326,10 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 	    }
 	}
 
-      setVecRegProducer(hartIx, base + ix, instr.tag_);
       setVecRegTime(hartIx, base + ix, regTime);
+
+      McmInstrIx regProd = (regTime == 0)? 0 : instr.tag_;
+      setVecRegProducer(hartIx, base + ix, regProd);
     }
 }
 
@@ -2066,6 +2065,8 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 	  addrMap[ea2 + i] = RefByte{0, false};
 	}
     }
+
+  instr->hasOverlap_ = hasOverlap;
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
@@ -4081,6 +4082,9 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	}
       else    // M is a vector store
 	{
+	  if (instrM.hasOverlap_)
+	    continue;  // Not enough info to associate ops with elements.
+
 	  auto iter = vecRefMap.find(mTag);
 	  if (iter == vecRefMap.end())
 	    continue;
@@ -4112,7 +4116,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 		continue;
 
 	      auto& instrA = instrVec.at(aTag);
-	      if (not instrA.isMemory())
+	      if (not instrA.isMemory() or instrA.hasOverlap_)
 		continue;
 
 	      // Check B against A.
@@ -4430,7 +4434,7 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned b
 
   for (unsigned ii = 0; ii < count; ++ii)
     {
-      uint64_t regTime = time_;  // Vector register time
+      uint64_t regTime = ~uint64_t(0);
 
       // If vstart > 0, base would be >= the destination register number. For example, in
       // "vle8 v2, (a0)", destination register is v2 but base maybe v3.
@@ -4451,10 +4455,7 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned b
 	  auto& elem = elems.at(elemIx);
 
 	  if (elem.masked_)
-	    {
-	      regTime = time_;  // What if mask-policy is preserve?
-	      continue;
-	    }
+	    continue;
 
 	  uint64_t pa1 = elem.pa_, pa2 = elem.pa2_;
 	  unsigned size1 = elemSize, size2 = 0;
@@ -4480,6 +4481,9 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned b
 	      regTime = std::min(byteTime, regTime);
 	    }
 	}
+
+      if (regTime == ~uint64_t(0))
+	regTime = time_;  // All elements masked. Use retire time.
 
       times.at(ii) = regTime;
     }
