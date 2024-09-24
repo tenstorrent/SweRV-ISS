@@ -2845,20 +2845,22 @@ Mcm<URV>::ppoRule1(unsigned hartId, const McmInstr& instrA, const McmInstr& inst
   if (not instrA.isMemory() or not overlaps(instrA, instrB))
     return true;
 
-  // Check overlapped bytes.
+  // Check overlapped bytes. We check at the byte level since A may be a vector
+  // instruction with overlapping elements. Same for B.
   for (unsigned i = 0; i < instrB.memOps_.size(); ++i)
     {
       auto opIx = instrB.memOps_.at(i);
-      auto& op = sysMemOps_.at(opIx);
+      auto& bop = sysMemOps_.at(opIx);
 
-      for (unsigned byteIx = 0; byteIx < op.size_; ++byteIx)
+      uint64_t tb = bop.time_;
+
+      for (unsigned byteIx = 0; byteIx < bop.size_; ++byteIx)
 	{
-	  uint64_t addr = op.physAddr_ + byteIx;
+	  uint64_t addr = bop.physAddr_ + byteIx;
 	  if (not overlapsRefPhysAddr(instrA, addr))
 	    continue;
 
 	  uint64_t ta = latestByteTime(instrA, addr);
-	  uint64_t tb = earliestByteTime(instrB, addr);
 	  if (ta < tb or (ta == tb and instrA.isStore_))
 	    continue;
 
@@ -2920,7 +2922,7 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 
   auto hartId = hart.hartId();
 
-  // Process all the memory operations that may have beein reordered with respect to B. If
+  // Process all the memory operations that may have been reordered with respect to B. If
   // an instruction A, preceding B in program order, is missing a memory operation, we
   // will catch it when we process the undrained stores below.
   for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
