@@ -1445,8 +1445,9 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	  undrained.erase(instr->tag_);
 	  checkStoreData(hart.hartId(), *instr);
 	  if (isEnabled(PpoRule::R1))
-	    if (not ppoRule1(hart, *instr))
-	      result = false;
+	    result = ppoRule1(hart, *instr) and result;
+	  if (isEnabled(PpoRule::R3) and instr->di_.isAmo())
+	    result = ppoRule1(hart, *instr) and result;
 	}
       if (instr->retired_ and instr->di_.isSc())
 	{
