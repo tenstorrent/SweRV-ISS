@@ -2165,18 +2165,26 @@ namespace WdRiscv
     ExceptionCause fetchInstNoTrap(uint64_t& virAddr, uint64_t& physAddr, uint64_t& physAddr2,
 				   uint64_t& gPhysAddr, uint32_t& instr);
 
+    /// Return true if the given address is that of tohost.
+    bool isToHostAddr(uint64_t addr) const
+    { return toHostValid_ and addr == toHost_; }
+
+    /// Return true if the given address is in the range of the ACLINT device.
     bool isAclintAddr(uint64_t addr) const
     { return hasAclint() and addr >= aclintBase_ and addr < aclintBase_ + aclintSize_; }
 
+    /// Return true if the given adress is that of the timer of the ACLINT device.
     bool isAclintMtimeAddr(uint64_t addr) const
     { return addr >= aclintMtimeStart_ and addr < aclintMtimeEnd_; }
 
+    /// Return true if given address is in the range of the IMSIC device.
     bool isImsicAddr(uint64_t addr) const
     {
       return (imsic_ and ((addr >= imsicMbase_ and addr < imsicMend_) or
 			  (addr >= imsicSbase_ and addr < imsicSend_)));
     }
 
+    /// Return true if the given address is in the range of the PCI decice.
     bool isPciAddr(uint64_t addr) const
     { return pci_ and pci_->contains_addr(addr); }
 

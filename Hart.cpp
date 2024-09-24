@@ -2171,7 +2171,7 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
     }
 
   // If we write to special location, end the simulation.
-  if (toHostValid_ and pa1 == toHost_)
+  if (isToHostAddr(pa1))
     {
       handleStoreToHost(pa1, storeVal);
       return true;
