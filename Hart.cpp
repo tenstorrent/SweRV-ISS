@@ -2764,7 +2764,7 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
   else
     {
       uncompressed = decoder_.expandCompressedInst(di->inst() & 0xffff);
-      uncompressed &= ~2; // Clear bit 1 to indicate expanded compressed instruction
+      uncompressed &= ~uint32_t(2); // Clear bit 1 to indicate expanded compressed instruction
     }
 
   // Clear relevant fields.
