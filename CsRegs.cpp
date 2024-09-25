@@ -4908,7 +4908,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 
 	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
 	  // Update bit VSEIP (10) of HIP.
-	  hip->poke(hip->read() & ~(URV(1) << 10));  // Clear bit 10 of HIP
+	  hip->poke(hip->read() & ~(URV(5) << 10));  // Clear bit 10/12 of HIP
 	  URV mask = bit << 10;
 	  if (hvip)
 	    mask |= (hvip->read() & (1 << 10));  // Or bit 10 of HVIP.
@@ -5091,7 +5091,7 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 
 	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
 	  // Update bit VSEIP (10) of HIP.
-	  hip->poke(hip->read() & ~(URV(1) << 10));  // Clear bit 10 of HIP
+	  hip->poke(hip->read() & ~(URV(5) << 10));  // Clear bit 10/12 of HIP
 	  URV mask = bit << 10;
           // Update bit SGEIP (12) of HIP.
           mask |= ((hgeipVal & hgeie->read()) != 0) << 12;
