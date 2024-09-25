@@ -841,6 +841,10 @@ can be included with in "trigger_types" are:
    "tmexttriger", and "disabled"
 ```
 
+### trigger_napot_maskmax
+Define the number of maximum bits that the NAPOT mask can support. The maximum
+possible value of this number is 63 for an RV64 configuration.
+
 ### perf_count_fp_load_store
 When true, the floating point load/store instructions will be counted
 as load/store by the performance counters.
