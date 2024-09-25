@@ -345,6 +345,10 @@ namespace WdRiscv
     void configTriggerUseTcontrol(bool flag)
     { csRegs_.triggers_.enableTcontrol(flag); }
 
+    /// Set the maximum NAPOT range with maskmax.
+    void configTriggerNapotMaskMax(unsigned bits)
+    { csRegs_.triggers_.configNapotMaskMax(bits); }
+
     /// Configure machine mode performance counters returning true on
     /// success and false on failure. N consecutive counters starting
     /// at MHPMCOUNTER3/MHPMCOUNTER3H are made read/write. The
