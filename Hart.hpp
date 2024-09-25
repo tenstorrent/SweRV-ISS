@@ -2254,6 +2254,9 @@ namespace WdRiscv
     unsigned identifyDataRegister(const VecLdStInfo& info, const VecLdStElem& elem) const
     { return vecRegs_.identifyDataRegister(info, elem); }
 
+    /// Report the number of retired instruction count and the simulation rate.
+    void reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop);
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
@@ -2990,10 +2993,6 @@ namespace WdRiscv
     /// operands: Signal an illegal instruction if immediate value is
     /// greater than XLEN-1 returning false; otherwise return true.
     bool checkShiftImmediate(const DecodedInst* di, URV imm);
-
-    /// Report the number of retired instruction count and the simulation
-    /// rate.
-    void reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop);
 
     /// Helper to the run methods: Log (on the standard error) the
     /// cause of a stop signaled with an exception. Return true if
