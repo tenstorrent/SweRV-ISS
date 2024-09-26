@@ -2365,21 +2365,18 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 	  if ((byteMask & mask) == 0)
 	    continue;  // Byte forwarded by another instruction.
 
-	  // Check if read-op byte overlaps drained write-op of instruction
+	  // Check if read-op byte overlaps and preceded a drained write-op of
+	  // instruction. If it overlaps more than one write-op, check the latest.
 	  bool drained = false;
 	  for (const auto wopIx : store.memOps_)
 	    {
 	      const auto& wop = sysMemOps_.at(wopIx);
 	      if (wop.isRead_ or not wop.overlaps(byteAddr))
 		continue;  // Not a write op (may happen for AMO), or does not overlap byte addr.
-	      if (wop.time_ < readOp.time_)
-		{
-		  drained = true; // Write op cannot forward.
-		  break;
-		}
+	      drained = wop.time_ < readOp.time_;
 	    }
 
-	  if (drained)
+	  if (drained)   // All overlapped write ops drained.
 	    {
 	      // Check if read-op byte overlaps undrained write-op of instruction.
 	      for (auto& pw : pendingWrites)
