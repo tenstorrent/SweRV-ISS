@@ -2348,6 +2348,8 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
   if (vecRefs.isOutOfBounds(readOp))
     return false;
 
+  auto& pendingWrites = hartData_.at(store.hartIx_).pendingWrites_;
+
   for (auto& vecRef : vecRefs.refs_)
     {
       if (not rangesOverlap(vecRef.addr_, vecRef.size_, readOp.physAddr_, readOp.size_))
@@ -2375,6 +2377,17 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 		  drained = true; // Write op cannot forward.
 		  break;
 		}
+	    }
+
+	  if (drained)
+	    {
+	      // Check if read-op byte overlaps undrained write-op of instruction.
+	      for (auto& pw : pendingWrites)
+		if (pw.instrTag_ == store.tag_ and pw.overlaps(byteAddr))
+		  {
+		    drained = false;
+		    break;
+		  }
 	    }
 
 	  if (drained)
