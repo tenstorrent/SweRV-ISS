@@ -27,6 +27,7 @@ namespace WdRiscv
     uint64_t   rtlData_        = 0;  // RTL data.
     McmInstrIx instrTag_       = 0;
     uint64_t   forwardTime_    = 0;  // Time of store instruction forwarding to this op.
+    uint64_t   insertTime_     = 0;  // Time of merge buffer insert (if applicable).
     uint8_t    hartIx_    : 8  = 0;
     uint8_t    size_      : 8  = 0;
     bool       isRead_    : 1  = false;
