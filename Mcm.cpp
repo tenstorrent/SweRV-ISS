@@ -185,7 +185,7 @@ Mcm<URV>::findOrAddInstr(unsigned hartIx, uint32_t tag)
   auto& vec = hartData_.at(hartIx).instrVec_;
   if (tag >= vec.size())
     {
-      if (tag > 100000000)
+      if (tag > 500000000)
 	{
 	  cerr << "MCM: Instruction tag way too large: " << tag << '\n';
 	  cerr << "MCM: Code expects dense consecutive tags starting at 0\n";
@@ -683,6 +683,9 @@ template <typename URV>
 static bool
 pokeHartMemory(Hart<URV>& hart, uint64_t physAddr, uint64_t data, unsigned size)
 {
+  if (physAddr >= 0x80018620 && physAddr <= 0x80018640)
+    std::cerr << "here\n";
+
   if (size == 1)
     return hart.pokeMemory(physAddr, uint8_t(data), true);
 
