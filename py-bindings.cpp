@@ -372,18 +372,14 @@ static void defineHart(M m)
             }
           else
             {
-              std::vector<uint64_t> addr;
-              std::vector<uint64_t> paddr;
-              std::vector<uint64_t> paddr2;
-              std::vector<uint64_t> data;
-              std::vector<bool> masked;
-              unsigned elemSize = 0;
-              if (self.getLastVectorMemory(addr, paddr, paddr2, data, masked, elemSize) and not data.empty())
-                for (size_t i = 0; i < data.size(); ++i)
+              const VecLdStInfo & vec_ld_st_info = self.getLastVectorMemory();
+              if (not vec_ld_st_info.elems_.empty()) {
+                for (size_t i = 0; i < vec_ld_st_info.elems_.size(); ++i)
                   {
-                    auto p = std::make_pair("m" + std::to_string(addr.at(i)), elemSize);
+                    auto p = std::make_pair("m" + std::to_string(vec_ld_st_info.elems_.at(i).va_), vec_ld_st_info.elemSize_);
                     changes.push_back(py::cast(p));
                   }
+              }
             }
 
           return std::make_tuple(self.hasTargetProgramFinished(), di, changes);

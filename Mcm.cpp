@@ -741,6 +741,7 @@ Mcm<URV>::mergeBufferInsertScalar(Hart<URV>& hart, uint64_t time, uint64_t instr
 
   MemoryOp op = {};
   op.time_ = time;
+  op.insertTime_ = time;
   op.physAddr_ = physAddr;
   op.rtlData_ = rtlData;
   op.instrTag_ = instrTag;
@@ -3242,7 +3243,7 @@ Mcm<URV>::checkFence(Hart<URV>& hart, const McmInstr& fence) const
 
 	  cerr << "Error: PPO rule 4 failed: Hart-id=" << hart.hartId() << " fence-tag=" << fence.tag_
 	       << " fence with predecessor-write retired while write is pending for tag="
-	       << tag << '\n';
+	       << tag << " at time=" << op.insertTime_ << '\n';
 
 	  return false;
 	}
