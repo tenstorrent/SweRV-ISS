@@ -3927,7 +3927,9 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
                   value2 = (unsigned(IC::S_EXTERNAL) << 16) | 255;
                 }
 
-              value2 |= hvf.bits_.IPRIOM? (value2 & 0xff) : 1;
+              URV reportedPrio = value2 & 0xff;
+              value2 &= ~URV(0xff);
+              value2 |= hvf.bits_.IPRIOM? reportedPrio : 1;
             }
 
           if (value and value2)
