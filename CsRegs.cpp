@@ -4426,6 +4426,14 @@ CsRegs<URV>::addMachineFields()
   setCsrFields(CsrNumber::MCYCLE, {{"mcycle", xlen}});
   setCsrFields(CsrNumber::MINSTRET, {{"minstret", xlen}});
 
+  // smrnmi
+  setCsrFields(CsrNumber::MNSCRATCH,{{"MNSCRATCH", xlen}});
+  setCsrFields(CsrNumber::MNEPC,    {{"MNEPC", xlen}});
+  setCsrFields(CsrNumber::MNCAUSE,  {{"CODE", xlen - 1}, {"INT", 1}});
+  setCsrFields(CsrNumber::MNSTATUS,
+      {{"res0", 3}, {"NMIE",   1}, {"res1", 3}, {"MNPV", 1},
+       {"res2", 1}, {"MNPELP", 2}, {"res3", 1}, {"MNPP", 2}});
+
   if (rv32_)
     {
       setCsrFields(CsrNumber::MSTATUS,
