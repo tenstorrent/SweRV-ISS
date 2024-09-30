@@ -683,9 +683,6 @@ template <typename URV>
 static bool
 pokeHartMemory(Hart<URV>& hart, uint64_t physAddr, uint64_t data, unsigned size)
 {
-  if (physAddr >= 0x80018620 && physAddr <= 0x80018640)
-    std::cerr << "here\n";
-
   if (size == 1)
     return hart.pokeMemory(physAddr, uint8_t(data), true);
 
@@ -2343,56 +2340,57 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
   if (iter == vecRefMap.end())
     return false;
 
-  unsigned count = 0;  // Count of forwarded bytes.
-
   auto& vecRefs = iter->second;
-
-  uint64_t forwardMask = 0;  // Mask of bits forwarded by vector store instruction
-
   if (vecRefs.isOutOfBounds(readOp))
     return false;
 
-  auto& pendingWrites = hartData_.at(store.hartIx_).pendingWrites_;
+  unsigned count = 0;  // Count of forwarded bytes.
+  uint64_t forwardMask = 0;  // Mask of bits forwarded by vector store instruction
 
-  for (auto& vecRef : vecRefs.refs_)
+  for (unsigned rix = 0; rix < readOp.size_; ++rix)
     {
-      if (not rangesOverlap(vecRef.addr_, vecRef.size_, readOp.physAddr_, readOp.size_))
-	continue;
+      uint64_t byteAddr = readOp.physAddr_ + rix;
 
-      for (unsigned rix = 0; rix < readOp.size_; ++rix)
+      uint64_t byteMask = uint64_t(0xff) << (rix * 8);
+      if ((byteMask & mask) == 0)
+	continue;  // Byte forwarded by another instruction.
+
+      // Count write ops overlapping byte addr. Identify last overlapping write op.
+      unsigned writeCount = 0;
+      unsigned lastWopIx = 0;
+      for (const auto wopIx : store.memOps_)
 	{
-	  uint64_t byteAddr = readOp.physAddr_ + rix;
+	  const auto& wop = sysMemOps_.at(wopIx);
+	  if (wop.isRead_ or not wop.overlaps(byteAddr))
+	    continue;  // Not a write op (may happen for AMO), or does not overlap byte addr.
+	  writeCount++;
+	  lastWopIx = wopIx;
+	}
+
+      // Count reference elements overlapping byte
+      unsigned refCount = 0;
+      for (auto& vecRef : vecRefs.refs_)
+	if (vecRef.overlaps(byteAddr))
+	  refCount++;
+
+      // We cannot forward if last overlapping write drains before read.
+      bool drained = false;
+      if (refCount == writeCount and writeCount != 0)
+	{
+	  const auto& lastWop = sysMemOps_.at(lastWopIx);
+	  assert(not lastWop.isRead_);
+	  drained = lastWop.time_ < readOp.time_;
+	}
+
+      if (drained)
+	continue;   // Cannot forward from a drained write.
+
+      // Process reference model wirtes in reverse order so that later ones forward first.
+      for (auto iter = vecRefs.refs_.rbegin(); iter != vecRefs.refs_.rend(); ++iter)
+	{
+	  auto& vecRef = *iter;
 	  if (not vecRef.overlaps(byteAddr))
 	    continue;
-
-	  uint64_t byteMask = uint64_t(0xff) << (rix * 8);
-	  if ((byteMask & mask) == 0)
-	    continue;  // Byte forwarded by another instruction.
-
-	  // Check if read-op byte overlaps and preceded a drained write-op of
-	  // instruction. If it overlaps more than one write-op, check the latest.
-	  bool drained = false;
-	  for (const auto wopIx : store.memOps_)
-	    {
-	      const auto& wop = sysMemOps_.at(wopIx);
-	      if (wop.isRead_ or not wop.overlaps(byteAddr))
-		continue;  // Not a write op (may happen for AMO), or does not overlap byte addr.
-	      drained = wop.time_ < readOp.time_;
-	    }
-
-	  if (drained)   // All overlapped write ops drained.
-	    {
-	      // Check if read-op byte overlaps undrained write-op of instruction.
-	      for (auto& pw : pendingWrites)
-		if (pw.instrTag_ == store.tag_ and pw.overlaps(byteAddr))
-		  {
-		    drained = false;
-		    break;
-		  }
-	    }
-
-	  if (drained)
-	    continue;   // Cannot forward from a drained write.
 
 	  uint8_t byteVal = vecRef.data_ >> ((byteAddr - vecRef.addr_)*8);
 	  uint64_t aligned = uint64_t(byteVal) << 8*rix;
@@ -2401,6 +2399,7 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 	  count++;
 
 	  forwardMask = forwardMask | byteMask;
+	  break;
 	}
     }
 
