@@ -3154,11 +3154,11 @@ CsRegs<URV>::defineHypervisorRegs()
 
   csr = defineCsr("vsatp",       Csrn::VSATP,       !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
-  csr = defineCsr("vsstimecmp",  Csrn::VSTIMECMP,   !mand, !imp, 0, wam, wam);
+  csr = defineCsr("vstimecmp",  Csrn::VSTIMECMP,   !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
   if (rv32_)
     {
-      csr = defineCsr("vsstimecmph",  Csrn::VSTIMECMPH,   !mand, !imp, 0, wam, wam);
+      csr = defineCsr("vstimecmph",  Csrn::VSTIMECMPH,   !mand, !imp, 0, wam, wam);
       if (csr)
 	{
 	  csr->setHypervisor(true);
