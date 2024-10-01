@@ -2385,7 +2385,7 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
       if (drained)
 	continue;   // Cannot forward from a drained write.
 
-      // Process reference model wirtes in reverse order so that later ones forward first.
+      // Process reference model writes in reverse order so that later ones forward first.
       for (auto iter = vecRefs.refs_.rbegin(); iter != vecRefs.refs_.rend(); ++iter)
 	{
 	  auto& vecRef = *iter;
