@@ -1794,17 +1794,32 @@ Mcm<URV>::checkStoreComplete(unsigned hartIx, const McmInstr& instr) const
       auto iter = vecRefMap.find(instr.tag_);
       if (iter == vecRefMap.end())
 	return false;
+
       auto& vecRefs = iter->second;
+
+      // Map address to number of times address is covered by an element.
+      std::unordered_map<uint64_t, unsigned> byteCover;
+
       for (const auto& ref : vecRefs.refs_)
+	for (unsigned i = 0; i < ref.size_; ++i)
+	  byteCover[ref.addr_ + i]++;
+	  
+      // There must be a write op for each element.
+      for (auto opIx : instr.memOps_)
 	{
-	  for (unsigned i = 0; i < ref.size_; ++i)
+	  const auto& op = sysMemOps_.at(opIx);
+	  for (unsigned i = 0; i < op.size_; ++i)
 	    {
-	      uint64_t byteAddr = ref.addr_ + i;
-	      if (not vecOverlapsRtlPhysAddr(instr, byteAddr))
-		return false;
+	      auto& cover = byteCover[op.physAddr_ + i];
+	      if (cover)
+		cover--;
 	    }
 	}
-      return true;
+
+      unsigned missing = 0;
+      for (auto& [addr, count] : byteCover)
+	missing += count;
+      return missing == 0;
     }
 
   unsigned expectedMask = (1 << instr.size_) - 1;  // Mask of bytes covered by instruction.
