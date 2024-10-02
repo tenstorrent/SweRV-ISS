@@ -1097,8 +1097,14 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   instr->di_ = di;
 
   bool ok = true;
-  if (di.isLoad() or di.isAmo())
+  if (di.isLoad() or di.isAmo() or di.isVectorLoad())
     instr->isLoad_ = true;
+  else if (instr->isLoad_)
+    {
+      cerr << "Error: Read ops associated with non-load instruction "
+           << "hart-id=" << hartIx << " tag="  << tag << " time=" << time << '\n';
+      return false;
+    }
 
   if (instr->isLoad_)
     ok = commitReadOps(hart, instr);
