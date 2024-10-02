@@ -197,18 +197,11 @@ namespace WdRiscv
 			  const std::vector<uint8_t>& rtlData,
 			  const std::vector<bool>& mask);
 
-    /// Interface for sizes greated than 8 (for cbo instructions and vector instructions).
-    /// FIX. Make rtlData a vector of double words.
+    /// Insert a write operation for the given instruction into the merge buffer removing
+    /// it from the store buffer. Return true on success. Size is expected to be less than
+    /// or equal to 8. Larger inserts must be split by the caller.
     bool mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-			   uint64_t physAddr, unsigned size,
-			   uint64_t rtlData);
-
-    /// Helper to mergeBufferInster. Insert a write operation for the given instruction
-    /// into the merge buffer removing it from the store buffer. Return true on
-    /// success. Return false if no such operation is in the store buffer.
-    bool mergeBufferInsertScalar(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-				 uint64_t physAddr, unsigned size,
-				 uint64_t rtlData);
+			   uint64_t physAddr, unsigned size, uint64_t rtlData);
 
     /// Cancel all the memory operations associated with the given tag. This is
     /// done when a speculative instruction is canceled or when an instruction

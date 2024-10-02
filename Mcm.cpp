@@ -713,27 +713,11 @@ pokeHartMemory(Hart<URV>& hart, uint64_t physAddr, uint64_t data, unsigned size)
 template <typename URV>
 bool
 Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-			    uint64_t physAddr, unsigned size,
-			    uint64_t rtlData)
+			    uint64_t physAddr, unsigned size, uint64_t rtlData)
 {
   if (not updateTime("Mcm::mergeBufferInsert", time))
     return false;
 
-  if (size <= 8)
-    return mergeBufferInsertScalar(hart, time, instrTag, physAddr, size, rtlData);
-
-  assert(0);
-
-  return false;
-}
-
-
-template <typename URV>
-bool
-Mcm<URV>::mergeBufferInsertScalar(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-				  uint64_t physAddr, unsigned size,
-				  uint64_t rtlData)
-{
   assert(size <= 8);
 
   unsigned hartIx = hart.sysHartIndex();
