@@ -4028,6 +4028,9 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isLoad_)
     return true;  // NA: B is not a load.
 
+  if (instrB.hasOverlap_)
+    return true;  // TODO FIX once we have enough info from test-bench.
+
   unsigned hartIx = hart.sysHartIndex();
 
   auto minTag = getMinReadTagWithLargerTime(hartIx, instrB);
@@ -4039,6 +4042,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
   {
     McmInstrIx storeTag_ = 0;  // Closest store writing byte.
     uint64_t time_ = 0;        // Time byte was loaded by B.
+    unsigned reg_= 0;          // Vector register of B overlapping byte.
   };
 
   std::unordered_map<uint64_t, ByteInfo> byteMap;
@@ -4059,6 +4063,15 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	}
     }
 
+  auto& vecRefMap = hartData_.at(hartIx).vecRefMap_;
+  if (instrB.di_.isVector())
+    {
+      auto& bvecRefs = vecRefMap.at(instrB.tag_);
+      for (auto& vecRef : bvecRefs.refs_)
+	for (unsigned i = 0; i < vecRef.size_; ++i)
+	  byteMap[vecRef.addr_ + i].reg_ = vecRef.reg_;
+    }
+
   for (McmInstrIx mTag = instrB.tag_ - 1; mTag >= minTag; --mTag)
     {
       const auto& instrM = instrVec.at(mTag);
@@ -4069,8 +4082,6 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	if (byteInfo.storeTag_ == 0 and overlapsRefPhysAddr(instrM, addr))
 	  byteInfo.storeTag_ = mTag;
     }
-
-  auto& vecRefMap = hartData_.at(hartIx).vecRefMap_;
 
   // 2. Process the bytes of B.
   for (auto& [byteAddr, byteInfo] : byteMap)
@@ -4123,13 +4134,15 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 
 	  auto& vecRefs = iter->second;
 
-	  // For each data vector of M.
+	  // For each data elem of M.
 	  for (auto& vecRef : vecRefs.refs_)
 	    {
-	      // Identify vector writing to memory overlappin byte address of B.
+	      // Identify vector writing to memory overlapping byte address of B.
 	      if (not vecRef.overlaps(byteAddr))
 		continue;
 	      unsigned dataVec = vecRef.reg_;
+	      if (dataVec != byteInfo.reg_)
+		continue;
 
 	      // Find the producer A of identified vector. M has data dep on A.
 	      McmInstrIx aTag = 0;
