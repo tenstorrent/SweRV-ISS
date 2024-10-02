@@ -22,10 +22,10 @@ namespace WdRiscv
   struct MemoryOp
   {
     uint64_t   time_           = 0;
-    uint64_t   physAddr_       = 0;
+    uint64_t   pa_             = 0;  // Physical address.
     uint64_t   data_           = 0;  // Model (Whisper) data for ld/st instructions.
     uint64_t   rtlData_        = 0;  // RTL data.
-    McmInstrIx instrTag_       = 0;
+    McmInstrIx tag_            = 0;  // Instruction tag.
     uint64_t   forwardTime_    = 0;  // Time of store instruction forwarding to this op.
     uint64_t   insertTime_     = 0;  // Time of merge buffer insert (if applicable).
     uint8_t    hartIx_    : 8  = 0;
@@ -37,11 +37,11 @@ namespace WdRiscv
 
     /// Return true if address range of this operation overlaps that of the given one.
     bool overlaps(const MemoryOp& other) const
-    { return physAddr_ + size_ > other.physAddr_ and physAddr_ < other.physAddr_ + other.size_; }
+    { return pa_ + size_ > other.pa_ and pa_ < other.pa_ + other.size_; }
 
     /// Return true if address range of this operation overlaps given address.
     bool overlaps(uint64_t addr) const
-    { return addr >= physAddr_ and addr < physAddr_ + size_; }
+    { return addr >= pa_ and addr < pa_ + size_; }
 
     bool isCanceled() const { return canceled_; }
     void cancel() { canceled_ = true; }
@@ -51,9 +51,9 @@ namespace WdRiscv
     /// operation or if this is not a read operation.
     bool getModelReadOpByte(uint64_t pa, uint8_t& byte) const
     {
-      if (not isRead_ or pa < physAddr_ or pa >= physAddr_ + size_)
+      if (not isRead_ or pa < pa_ or pa >= pa_ + size_)
 	return false;
-      byte = data_ >> ((pa - physAddr_) * 8);
+      byte = data_ >> ((pa - pa_) * 8);
       return true;
     }
   };
@@ -556,7 +556,7 @@ namespace WdRiscv
 	return false;
 
       for (auto& vecRef : vecRefs.refs_)
-        if (rangesOverlap(vecRef.addr_, vecRef.size_, other.physAddr_, other.size_))
+        if (rangesOverlap(vecRef.addr_, vecRef.size_, other.pa_, other.size_))
 	  return true;
 
       return false;
@@ -572,20 +572,20 @@ namespace WdRiscv
     {
       if (instr.size_ == 0 or op.size_ == 0)
 	std::cerr << "Mcm::overlaps: Error: tag1=" << instr.tag_
-		  << " tag2=" << op.instrTag_ << " zero data size\n";
+		  << " tag2=" << op.tag_ << " zero data size\n";
 
       if (instr.di_.isVector())
 	return vecOverlaps(instr, op);
 
       if (instr.physAddr_ == instr.physAddr2_)   // Non-page-crossing
-	return rangesOverlap(instr.physAddr_, instr.size_, op.physAddr_, op.size_);
+	return rangesOverlap(instr.physAddr_, instr.size_, op.pa_, op.size_);
 
       // Page crossing.
       unsigned size1 = offsetToNextPage(instr.physAddr_);
-      if (rangesOverlap(instr.physAddr_, size1, op.physAddr_, op.size_))
+      if (rangesOverlap(instr.physAddr_, size1, op.pa_, op.size_))
 	return true;
       unsigned size2 = instr.size_ - size1;
-      return rangesOverlap(instr.physAddr2_, size2, op.physAddr_, op.size_);
+      return rangesOverlap(instr.physAddr2_, size2, op.pa_, op.size_);
     }
 
     /// Return true if the given address ranges overlap one another.
@@ -675,7 +675,7 @@ namespace WdRiscv
 	  const auto& op = sysMemOps_.at(opIx);
 	  for (unsigned i = 0; i < op.size_; ++i)
 	    {
-	      uint64_t addr = op.physAddr_ + i;
+	      uint64_t addr = op.pa_ + i;
 	      if (overlapsRefPhysAddr(storeInstr, addr))
 		written.insert(addr);
 	    }
@@ -795,7 +795,7 @@ namespace WdRiscv
 	if (empty())
 	  return true;
 	assert(op.size_ > 0);
-	return isOutOfBounds(op.physAddr_, op.physAddr_ + op.size_ - 1);
+	return isOutOfBounds(op.pa_, op.pa_ + op.size_ - 1);
       }
 
       bool isOutOfBounds(const VecRef& ref) const
