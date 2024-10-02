@@ -453,7 +453,7 @@ namespace WdRiscv
       if (isRvSmmpm())
         {
           uint8_t pmm = csRegs_.mseccfgPmm();
-          mPmBits_ = VirtMem::pointerMaskBits(VirtMem::Pmm(pmm));
+          virtMem_.enablePointerMasking(VirtMem::Pmm(pmm), PM::Machine, false);
         }
 
       if (isRvSsnpm())
@@ -475,6 +475,40 @@ namespace WdRiscv
           else if (isRvu())
             virtMem_.enablePointerMasking(VirtMem::Pmm(pmm), PM::User, false);
         }
+    }
+
+    /// Applies pointer mask w.r.t. effective privilege mode, effective
+    /// virtual mode, and type of load/store instruction.
+    uint64_t applyPointerMask(uint64_t addr, bool isLoad,
+                              bool hyper = false) const
+    {
+      auto [pm, virt] = effLdStMode(hyper);
+      return virtMem_.applyPointerMask(addr, pm, virt, isLoad);
+    }
+
+    /// Determines the load/store instruction's effective privilege mode
+    /// and effective virtual mode.
+    std::pair<PrivilegeMode, bool> effLdStMode(bool hyper = false) const
+    {
+      using PM = PrivilegeMode;
+      PM pm = privMode_;
+      bool virt = virtMode_;
+      if (isRvs())
+        {
+          if (mstatusMprv() and not nmieOverridesMprv())
+            {
+              pm = mstatusMpp();
+              virt = mstatus_.bits_.MPV;
+            }
+
+          if (hyper)
+            {
+              assert(not virtMode_);
+              pm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
+              virt = true;
+            }
+        }
+      return {pm, virt};
     }
 
     /// Enable page translation naturally aligned power of 2 page sizes.
@@ -2721,7 +2755,7 @@ namespace WdRiscv
 		     uint64_t paddr2, uint64_t& data);
 
     /// Helper to the cache block operation (cbo) instructions.
-    ExceptionCause determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa,
+    ExceptionCause determineCboException(uint64_t& addr, uint64_t& gpa, uint64_t& pa,
 					 bool isZero);
 
     /// Implement part of TIF protocol for writing the "tohost" magical
@@ -5298,9 +5332,6 @@ namespace WdRiscv
     TT_STEE::Stee stee_;
     bool steeInsec1_ = false;  // True if insecure access to a secure region.
     bool steeInsec2_ = false;  // True if insecure access to a secure region.
-
-    // Pointer masking
-    unsigned mPmBits_ = 0;
 
     VirtMem virtMem_;
     Isa isa_;

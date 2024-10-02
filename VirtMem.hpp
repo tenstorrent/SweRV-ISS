@@ -197,20 +197,29 @@ namespace WdRiscv
       return ix < supportedPmms_.size() ? supportedPmms_.at(ix) : false;
     }
 
-    uint64_t applyPointerMask(uint64_t addr, PrivilegeMode priv, bool twoStage) const
+    uint64_t applyPointerMask(uint64_t addr, PrivilegeMode priv, bool twoStage, bool load) const
     {
+      if (priv == PrivilegeMode::Machine)
+        return applyPointerMaskPa(addr, priv, twoStage);
+
       if (twoStage)
         {
-          if (vsMode_ != Mode::Bare)
+          bool exec = load and (xForR_ or execReadable_ or s1ExecReadable_);
+          if (not exec and vsMode_ != Mode::Bare)
             return applyPointerMaskVa(addr, priv, twoStage);
-          else if (modeStage2_ != Mode::Bare)
+          exec = load and (xForR_ or execReadable_);
+          if (not exec)
             return applyPointerMaskPa(addr, priv, twoStage);
-          else
-            return addr;
+          return addr;
         }
 
-      if (mode_ != Mode::Bare)
-        return applyPointerMaskVa(addr, priv, twoStage);
+      bool exec = load and (xForR_ or execReadable_);
+      if (not exec)
+        {
+          if (mode_ != Mode::Bare)
+            return applyPointerMaskVa(addr, priv, twoStage);
+          return applyPointerMaskPa(addr, priv, twoStage);
+        }
       return addr;
     }
 
@@ -611,6 +620,8 @@ namespace WdRiscv
     /// Enable/disable pointer masking for corresponding mode.
     void enablePointerMasking(Pmm pmm, PrivilegeMode priv, bool twoStage)
     {
+      if (priv == PrivilegeMode::Machine)
+        mPmBits_ = pointerMaskBits(pmm);
       if (priv == PrivilegeMode::Supervisor and not twoStage)
         sPmBits_ = pointerMaskBits(pmm);
       if (priv == PrivilegeMode::Supervisor and twoStage)
@@ -622,6 +633,8 @@ namespace WdRiscv
     Pmm pmMode(PrivilegeMode priv, bool twoStage) const
     {
       unsigned bits = 0;
+      if (priv == PrivilegeMode::Machine)
+        bits = mPmBits_;
       if (priv == PrivilegeMode::Supervisor and not twoStage)
         bits = sPmBits_;
       if (priv == PrivilegeMode::Supervisor and twoStage)
@@ -650,13 +663,13 @@ namespace WdRiscv
     /// only necessary for the effective address for load/stores.
     uint64_t applyPointerMaskVa(uint64_t va, PrivilegeMode priv, bool twoStage) const
     {
+      assert(priv != PrivilegeMode::Machine);
       if (sPmBits_ and priv == PrivilegeMode::Supervisor and not twoStage)
         return applyPointerMaskVa(va, sPmBits_);
       if (vsPmBits_ and priv == PrivilegeMode::Supervisor and twoStage)
         return applyPointerMaskVa(va, vsPmBits_);
       if (uPmBits_ and priv == PrivilegeMode::User)
         return applyPointerMaskVa(va, uPmBits_);
-
       return va;
     }
 
@@ -668,6 +681,8 @@ namespace WdRiscv
     /// also applies to GPAs (see section 3.5 of the spec).
     uint64_t applyPointerMaskPa(uint64_t pa, PrivilegeMode priv, bool twoStage) const
     {
+      if (mPmBits_ and priv == PrivilegeMode::Machine)
+        return applyPointerMaskPa(pa, mPmBits_);
       if (sPmBits_ and priv == PrivilegeMode::Supervisor and not twoStage)
         return applyPointerMaskPa(pa, sPmBits_);
       if (vsPmBits_ and priv == PrivilegeMode::Supervisor and twoStage)
@@ -800,9 +815,10 @@ namespace WdRiscv
     uint32_t asid_ = 0;
     uint32_t vsAsid_ = 0;
     uint32_t vmid_ = 0;
-    unsigned sPmBits_ = 0;          // Pointer masking for HS translation
-    unsigned vsPmBits_ = 0;         // Pointer masking for VS translation
-    unsigned uPmBits_ = 0;          // Pointer masking for U/VU translation
+    unsigned mPmBits_ = 0;          // Pointer asking for M mode.
+    unsigned sPmBits_ = 0;          // Pointer masking for HS translation.
+    unsigned vsPmBits_ = 0;         // Pointer masking for VS translation.
+    unsigned uPmBits_ = 0;          // Pointer masking for U/VU translation.
     unsigned pageSize_ = 4096;
     unsigned pageBits_ = 12;
     uint64_t pageMask_ = 0xfff;

@@ -1508,6 +1508,11 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
   using EC = ExceptionCause;
   using PM = PrivilegeMode;
 
+  auto [pm, virt] = effLdStMode(hyper);
+
+  ldStFaultAddr_ = addr1 = gaddr1 = va1 = applyPointerMask(va1, true, hyper);
+  addr2 = gaddr2 = va2 = va1;
+
   // If misaligned exception has priority take exception.
   if (misal)
     {
@@ -1519,33 +1524,14 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
   // Address translation
   if (isRvs())     // Supervisor extension
     {
-      PrivilegeMode pm = privMode_;
-      bool virt = virtMode_;
-      if (mstatusMprv() and not nmieOverridesMprv())
-	{
-	  pm = mstatusMpp();
-	  virt = mstatus_.bits_.MPV;
-	}
-
-      if (hyper)
-	{
-	  assert(not virtMode_);
-	  pm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-	  virt = true;
-	}
       if (pm != PM::Machine)
         {
 	  auto cause = virtMem_.translateForLoad2(va1, ldSize, pm, virt, gaddr1, addr1, gaddr2, addr2);
           if (cause != EC::NONE)
-	    {
-	      ldStFaultAddr_ = addr1;
-	      return cause;
-	    }
-        }
-      else
-        {
-          addr1 = VirtMem::applyPointerMaskPa(addr1, mPmBits_);
-          addr2 = VirtMem::applyPointerMaskPa(addr2, mPmBits_);
+            {
+              ldStFaultAddr_ = addr1;
+              return cause;
+            }
         }
     }
 
@@ -11352,6 +11338,10 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   using EC = ExceptionCause;
   using PM = PrivilegeMode;
 
+  auto [pm, virt] = effLdStMode(hyper);
+
+  ldStFaultAddr_ = addr1 = gaddr1 = va1 = applyPointerMask(va1, false, hyper);
+  addr2 = gaddr2 = va2 = va1;
 
   // If misaligned exception has priority take exception.
   if (misal)
@@ -11364,33 +11354,14 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   // Address translation
   if (isRvs())     // Supervisor extension
     {
-      PrivilegeMode pm = privMode_;
-      bool virt = virtMode_;
-      if (mstatusMprv() and not nmieOverridesMprv())
-	{
-	  pm = mstatusMpp();
-	  virt = mstatus_.bits_.MPV;
-	}
-
-      if (hyper)
-	{
-	  assert(not virtMode_);
-	  pm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-	  virt = true;
-	}
       if (pm != PM::Machine)
         {
 	  auto cause = virtMem_.translateForStore2(va1, stSize, pm, virt, gaddr1, addr1, gaddr2, addr2);
           if (cause != EC::NONE)
-	    {
-	      ldStFaultAddr_ = addr1;
-	      return cause;
-	    }
-        }
-      else
-        {
-          addr1 = VirtMem::applyPointerMaskPa(addr1, mPmBits_);
-          addr2 = VirtMem::applyPointerMaskPa(addr2, mPmBits_);
+            {
+              ldStFaultAddr_ = addr1;
+              return cause;
+            }
         }
     }
 
