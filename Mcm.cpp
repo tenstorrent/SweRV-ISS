@@ -115,8 +115,8 @@ Mcm<URV>::referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64
 
 template <typename URV>
 bool
-Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa,
-		 unsigned size, uint64_t rtlData)
+Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsigned size,
+		 uint64_t rtlData, unsigned elemIx, unsigned field)
 {
   if (not updateTime("Mcm::readOp", time))
     return false;
@@ -148,6 +148,8 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa,
   op.size_ = size;
   op.isRead_ = true;
   op.canceled_ = true; // To be later marked as false if used.
+  op.elemIx_ = elemIx;
+  op.field_ = field;
 
   // Read Whisper memory and keep it in memory op.
   uint64_t refVal = 0;

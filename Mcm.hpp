@@ -28,6 +28,8 @@ namespace WdRiscv
     McmInstrIx tag_            = 0;  // Instruction tag.
     uint64_t   forwardTime_    = 0;  // Time of store instruction forwarding to this op.
     uint64_t   insertTime_     = 0;  // Time of merge buffer insert (if applicable).
+    uint16_t   elemIx_         = 0;  // Vector element index.
+    uint16_t   field_          = 0;  // Vector element field (for segment load).
     uint8_t    hartIx_    : 8  = 0;
     uint8_t    size_      : 8  = 0;
     bool       isRead_    : 1  = false;
@@ -169,15 +171,14 @@ namespace WdRiscv
     /// Destructor.
     ~Mcm();
 
-    /// Initiate an out of order read for a load instruction. If a
-    /// preceding overlapping store has not yet left the merge/store
-    /// buffer then forward data from that store to the read operation;
-    /// otherwise, get the data from global memory. Return true on
-    /// success and false if global memory is not readable (in the
-    /// case where we do not forward).
-    bool readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-		uint64_t physAddr, unsigned size, uint64_t rtlData);
-
+    /// Initiate an out of order read for a load instruction. If a preceding overlapping
+    /// store has not yet left the merge/store buffer then forward data from that store to
+    /// the read operation; otherwise, get the data from global memory. Return true on
+    /// success and false if global memory is not readable (in the case where we do not
+    /// forward). For vector load elemIx is the element index and field is the segment
+    /// field number (0 if non segment).
+    bool readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag, uint64_t physAddr,
+		unsigned size, uint64_t rtlData, unsigned elemIx, unsigned field);
 
     /// This is a write operation bypassing the merge buffer.
     bool bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,

@@ -872,12 +872,12 @@ System<URV>::enableTso(bool flag)
 
 template <typename URV>
 bool
-System<URV>::mcmRead(Hart<URV>& hart, uint64_t time, uint64_t tag,
-		     uint64_t addr, unsigned size, uint64_t data)
+System<URV>::mcmRead(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
+		     unsigned size, uint64_t data, unsigned elemIx, unsigned field)
 {
   if (not mcm_)
     return false;
-  return mcm_->readOp(hart, time, tag, addr, size, data);
+  return mcm_->readOp(hart, time, tag, addr, size, data, elemIx, field);
 }
 
 
