@@ -430,6 +430,10 @@ namespace WdRiscv
     /// Similar to above but for vector instructions.
     bool commitVecReadOps(Hart<URV>& hart, McmInstr*);
 
+    /// Helper to commitVecReadOps: Collect the reference (Whisper) element info:
+    /// address, index, field, data-reg, index-reg.
+    void collectVecRefElems(Hart<URV>& hart, McmInstr*);
+
     /// Compute a mask of the instruction data bytes covered by the
     /// given memory operation. Return 0 if the operation does not
     /// overlap the given instruction.
@@ -550,7 +554,7 @@ namespace WdRiscv
 	return false;
 
       for (auto& vecRef : vecRefs.refs_)
-        if (rangesOverlap(vecRef.addr_, vecRef.size_, other.pa_, other.size_))
+        if (rangesOverlap(vecRef.pa_, vecRef.size_, other.pa_, other.size_))
 	  return true;
 
       return false;
@@ -744,22 +748,25 @@ namespace WdRiscv
     using RegProducerVec = std::vector<McmInstrIx>;   // Map reg index to instr tag.
 
     /// Vector reference (produced by Whisper) load/store physical addresses and
-    /// corresponding data for store.
+    /// corresponding data.
     struct VecRef
     {
-      VecRef(uint64_t addr = 0, uint64_t data = 0, unsigned size = 0, unsigned dataReg = 0,
-	     unsigned ixReg = 0)
-	: addr_(addr), data_(data), size_(size), reg_(dataReg), ixReg_(ixReg)
+      VecRef(unsigned ix, uint64_t pa = 0, uint64_t data = 0, unsigned size = 0,
+	     unsigned dataReg = 0, unsigned ixReg = 0, unsigned field = 0)
+	: pa_(pa), data_(data), ix_(ix), size_(size), reg_(dataReg), ixReg_(ixReg),
+	  field_(field)
       { }
 
       bool overlaps(uint64_t addr) const
-      { return addr >= addr_ && addr < addr_ + size_; }
+      { return addr >= pa_ && addr < pa_ + size_; }
 
-      uint64_t addr_    = 0;
-      uint64_t data_    = 0;
-      uint16_t size_    = 0;
-      uint16_t reg_     = 0;   // Number of data register.
-      uint16_t ixReg_   = 0;   // Number of index register (if indexed).
+      uint64_t pa_     = 0;   // Physical address.
+      uint64_t data_   = 0;   // Reference value.
+      uint8_t ix_      = 0;   // Index of element in regiser group.
+      uint8_t size_    = 0;   // Number of bytes of element covered by this object.
+      uint8_t reg_     = 0;   // Number of data register.
+      uint8_t ixReg_   = 0;   // Number of index register (if indexed).
+      uint8_t field_   = 0;   // Field (if segmented load).
     };
 
     /// Collection of vector load/store reference (Whisper) addresses for a single
@@ -797,10 +804,11 @@ namespace WdRiscv
 	if (empty())
 	  return true;
 	assert(ref.size_ > 0);
-	return isOutOfBounds(ref.addr_, ref.addr_ + ref.size_ - 1);
+	return isOutOfBounds(ref.pa_, ref.pa_ + ref.size_ - 1);
       }
 
-      void add(uint64_t addr, uint64_t data, unsigned size, unsigned vecReg, unsigned ixReg)
+      void add(unsigned ix, uint64_t addr, uint64_t data, unsigned size, unsigned vecReg,
+	       unsigned ixReg, unsigned field)
       {
 	assert(size > 0);
 
@@ -815,7 +823,7 @@ namespace WdRiscv
 	    low_ = std::min(low_, l);
 	    high_ = std::max(high_, h);
 	  }
-	refs_.push_back(VecRef(addr, data, size, vecReg, ixReg));
+	refs_.push_back(VecRef(ix, addr, data, size, vecReg, ixReg, field));
       }
 
       std::vector<VecRef> refs_;

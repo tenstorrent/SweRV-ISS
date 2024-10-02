@@ -924,7 +924,7 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	  uint64_t pa1 = elem.pa_, pa2 = elem.pa2_, value = elem.stData_;
 
 	  if (pa1 == pa2)
-	    vecRefs.add(pa1, value, elemSize, dataReg, ixReg);
+	    vecRefs.add(elem.ix_, pa1, value, elemSize, dataReg, ixReg, elem.field_);
 	  else
 	    {
 	      unsigned size1 = offsetToNextPage(pa1);
@@ -932,8 +932,8 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	      unsigned size2 = elemSize - size1;
 	      uint64_t val1 = (value <<  ((8 - size1)*8)) >> ((8 - size1)*8);
 	      uint64_t val2 = (value >> (size1*8));
-	      vecRefs.add(pa1, val1, size1, dataReg, ixReg);
-	      vecRefs.add(pa2, val2, size2, dataReg, ixReg);
+	      vecRefs.add(elem.ix_, pa1, val1, size1, dataReg, ixReg, elem.field_);
+	      vecRefs.add(elem.ix_, pa2, val2, size2, dataReg, ixReg, elem.field_);
 	    }
         }
 
@@ -1685,7 +1685,7 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
     {
       for (unsigned i = 0; i < ref.size_; ++i)
 	{
-	  uint64_t addr = ref.addr_ + i;
+	  uint64_t addr = ref.pa_ + i;
 	  overlap = overlap or refValues.contains(addr);
 	  refValues[addr] = ref.data_ >> (i*8);
 	}
@@ -1788,7 +1788,7 @@ Mcm<URV>::checkStoreComplete(unsigned hartIx, const McmInstr& instr) const
 
       for (const auto& ref : vecRefs.refs_)
 	for (unsigned i = 0; i < ref.size_; ++i)
-	  byteCover[ref.addr_ + i]++;
+	  byteCover[ref.pa_ + i]++;
 	  
       // There must be a write op for each element.
       for (auto opIx : instr.memOps_)
@@ -2001,38 +2001,16 @@ Mcm<URV>::trimMemoryOp(const McmInstr& instr, MemoryOp& op)
 
 
 template <typename URV>
-bool
-Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
+void
+Mcm<URV>::collectVecRefElems(Hart<URV>& hart, McmInstr* instr)
 {
-  // FIX TODO : complain about vector loads without read ops unless all elems masked.
+  auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr->tag_];
 
   const VecLdStInfo& info = hart.getLastVectorMemory();
   const std::vector<VecLdStElem>& elems = info.elems_;
 
   unsigned elemSize = info.elemSize_;
 
-  if (elemSize == 0)
-    {
-      std::cerr << "Error: Mcm::commitVecReadOps: hart-id=" << hart.hartId()
-		<< " tag=" << instr->tag_ << " instruction is not a vector load\n";
-      return false;
-    }
-
-  assert(instr->size_ == elemSize);
-
-  // Map a reference address to a reference value and a flag indicating if address is
-  // covered by a read op.
-  struct RefByte
-  {
-    uint8_t value = 0;
-    bool covered = false;
-  };
-  std::unordered_map<uint64_t, RefByte> addrMap;
-
-  // Collect reference (Whisper) addresses in addrMap. Check if there is overlap between
-  // elements. Associated reference addresses with instruction.
-  auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr->tag_];
-  bool hasOverlap = false;
   for (auto& elem : elems)
     {
       if (elem.masked_)
@@ -2050,25 +2028,54 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 	  size2 = elemSize - size1;
 	  assert(size1 > 0 and size1 < elemSize);
 	  assert(size2 > 0 and size2 < elemSize);
-	  vecRefs.add(ea1, 0, size1, dataReg, ixReg);
-	  vecRefs.add(ea2, 0, size2, dataReg, ixReg);
+	  vecRefs.add(elem.ix_, ea1, 0, size1, dataReg, ixReg, elem.field_);
+	  vecRefs.add(elem.ix_, ea2, 0, size2, dataReg, ixReg, elem.field_);
 	}
       else
-	vecRefs.add(ea1, 0, size1, dataReg, ixReg);
+	vecRefs.add(elem.ix_, ea1, 0, size1, dataReg, ixReg, elem.field_);
+    }
+}
 
-      for (unsigned i = 0; i < size1; ++i)
-	{
-	  hasOverlap = hasOverlap or addrMap.find(ea1 + i) != addrMap.end();
-	  addrMap[ea1 + i] = RefByte{0, false};
-	}
+template <typename URV>
+bool
+Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
+{
+  const VecLdStInfo& info = hart.getLastVectorMemory();
 
-      for (unsigned i = 0; i < size2; ++i)
-	{
-	  hasOverlap = hasOverlap or addrMap.find(ea2 + i) != addrMap.end();
-	  addrMap[ea2 + i] = RefByte{0, false};
-	}
+  unsigned elemSize = info.elemSize_;
+  if (elemSize == 0)
+    {
+      std::cerr << "Error: Mcm::commitVecReadOps: hart-id=" << hart.hartId()
+		<< " tag=" << instr->tag_ << " instruction is not a vector load\n";
+      return false;
     }
 
+  assert(instr->size_ == elemSize);
+
+  // Collect reference (Whisper) elements and associated with instruction.
+  collectVecRefElems(hart, instr);
+
+  // Map a reference address to a reference value and a flag indicating if address is
+  // covered by a read op.
+  struct RefByte
+  {
+    uint8_t value = 0;
+    bool covered = false;
+  };
+  std::unordered_map<uint64_t, RefByte> addrMap;
+
+  // Check for overlap between elements. Collect reference byte addresses in addrMap.
+  auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr->tag_];
+  bool hasOverlap = false;
+  for (auto& ref : vecRefs.refs_)
+    {
+      for (unsigned i = 0; i < ref.size_; ++i)
+	{
+	  uint64_t pa  = ref.pa_ + i;
+	  hasOverlap = hasOverlap or addrMap.find(pa) != addrMap.end();
+	  addrMap[pa] = RefByte{0, false};
+	}
+    }
   instr->hasOverlap_ = hasOverlap;
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
@@ -2393,7 +2400,7 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 	  if (not vecRef.overlaps(byteAddr))
 	    continue;
 
-	  uint8_t byteVal = vecRef.data_ >> ((byteAddr - vecRef.addr_)*8);
+	  uint8_t byteVal = vecRef.data_ >> ((byteAddr - vecRef.pa_)*8);
 	  uint64_t aligned = uint64_t(byteVal) << 8*rix;
 
 	  readOp.data_ = (readOp.data_ & ~byteMask) | aligned;
@@ -2702,7 +2709,7 @@ Mcm<URV>::overlaps(const McmInstr& i1, const McmInstr& i2) const
 	{
 	  if (not vecRefs2.isOutOfBounds(ref1))
 	    for (auto& ref2 : vecRefs2.refs_)
-	      if (rangesOverlap(ref1.addr_, ref1.size_, ref2.addr_, ref2.size_))
+	      if (rangesOverlap(ref1.pa_, ref1.size_, ref2.pa_, ref2.size_))
 		return true;
 	}
 
@@ -3996,7 +4003,7 @@ Mcm<URV>::overlaps(const McmInstr& instr, const std::unordered_set<uint64_t>& ad
 
   for (auto refOp : vecRefs.refs_)
     for (unsigned i = 0; i < refOp.size_; ++i)
-      if (addrSet.contains(refOp.addr_ + i))
+      if (addrSet.contains(refOp.pa_ + i))
 	return true;
 
   return false;
@@ -4055,7 +4062,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
       auto& bvecRefs = vecRefMap.at(instrB.tag_);
       for (auto& vecRef : bvecRefs.refs_)
 	for (unsigned i = 0; i < vecRef.size_; ++i)
-	  byteMap[vecRef.addr_ + i].reg_ = vecRef.reg_;
+	  byteMap[vecRef.pa_ + i].reg_ = vecRef.reg_;
     }
 
   for (McmInstrIx mTag = instrB.tag_ - 1; mTag >= minTag; --mTag)
