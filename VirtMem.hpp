@@ -199,23 +199,26 @@ namespace WdRiscv
 
     uint64_t applyPointerMask(uint64_t addr, PrivilegeMode priv, bool twoStage, bool load) const
     {
+      if (execReadable_)
+        return addr;
+
       if (priv == PrivilegeMode::Machine)
         return applyPointerMaskPa(addr, priv, twoStage);
 
-      if (twoStage)
-        {
-          bool exec = load and (xForR_ or execReadable_ or s1ExecReadable_);
-          if (not exec and vsMode_ != Mode::Bare)
-            return applyPointerMaskVa(addr, priv, twoStage);
-          exec = load and (xForR_ or execReadable_);
-          if (not exec)
-            return applyPointerMaskPa(addr, priv, twoStage);
-          return addr;
-        }
-
-      bool exec = load and (xForR_ or execReadable_);
+      bool exec = load and xForR_;
       if (not exec)
         {
+          if (twoStage)
+            {
+              if (vsMode_ != Mode::Bare)
+                {
+                  if (s1ExecReadable_)
+                    return addr;
+                  return applyPointerMaskVa(addr, priv, twoStage);
+                }
+              return applyPointerMaskPa(addr, priv, twoStage);
+            }
+
           if (mode_ != Mode::Bare)
             return applyPointerMaskVa(addr, priv, twoStage);
           return applyPointerMaskPa(addr, priv, twoStage);
