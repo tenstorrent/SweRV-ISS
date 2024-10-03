@@ -2605,6 +2605,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
   // point is defined, we jump to it.
   if (debugMode_)
     {
+      hasException_ = true;  // Instruction did no retire. This is for MCM.
       if (cause == ExceptionCause::BREAKP)
 	{
 	  if (debugParkLoop_ != ~URV(0))
