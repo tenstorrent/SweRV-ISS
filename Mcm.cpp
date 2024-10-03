@@ -2008,7 +2008,7 @@ Mcm<URV>::trimMemoryOp(const McmInstr& instr, MemoryOp& op)
 
 template <typename URV>
 void
-Mcm<URV>::collectVecRefElems(Hart<URV>& hart, McmInstr* instr)
+Mcm<URV>::collectVecRefElems(Hart<URV>& hart, McmInstr* instr, unsigned& activeCount)
 {
   auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr->tag_];
 
@@ -2017,10 +2017,14 @@ Mcm<URV>::collectVecRefElems(Hart<URV>& hart, McmInstr* instr)
 
   unsigned elemSize = info.elemSize_;
 
+  activeCount = 0;
+
   for (auto& elem : elems)
     {
       if (elem.masked_)
 	continue;  // Masked off element.
+
+      activeCount++;
 
       unsigned size1 = elemSize, size2 = 0;
       uint64_t ea1 = elem.pa_, ea2 = elem.pa2_;
@@ -2056,10 +2060,14 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
       return false;
     }
 
+  if (instr->memOps_.empty() and instr->size_ == 0)
+    instr->size_ = elemSize;
+
   assert(instr->size_ == elemSize);
 
   // Collect reference (Whisper) elements and associated with instruction.
-  collectVecRefElems(hart, instr);
+  unsigned activeCount = 0;
+  collectVecRefElems(hart, instr, activeCount);
 
   // Map a reference address to a reference value and a flag indicating if address is
   // covered by a read op.
@@ -2083,6 +2091,16 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 	}
     }
   instr->hasOverlap_ = hasOverlap;
+
+  bool ok = true;
+  if (activeCount > 0 and instr->memOps_.empty() and not hart.inDebugMode())
+    {
+      cerr << "Error: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
+	   << instr->tag_ << " vector load instruction retires without any memory "
+	   << "read operation.\n";
+      ok = false;
+    }
+
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
@@ -2142,7 +2160,6 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   // Check read operations comparing RTL values to reference (whisper) values.
   // We currently do not get enough information from the test-bench to do this
   // correctly for overlapping elements.
-  bool ok = true;
   if (not hasOverlap)
     {
       for (auto opIx : instr->memOps_)

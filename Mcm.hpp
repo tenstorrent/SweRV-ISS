@@ -431,8 +431,9 @@ namespace WdRiscv
     bool commitVecReadOps(Hart<URV>& hart, McmInstr*);
 
     /// Helper to commitVecReadOps: Collect the reference (Whisper) element info:
-    /// address, index, field, data-reg, index-reg.
-    void collectVecRefElems(Hart<URV>& hart, McmInstr*);
+    /// address, index, field, data-reg, index-reg. Determine the number of
+    /// active (non-masked) elements.
+    void collectVecRefElems(Hart<URV>& hart, McmInstr*, unsigned& activeCount);
 
     /// Compute a mask of the instruction data bytes covered by the
     /// given memory operation. Return 0 if the operation does not
