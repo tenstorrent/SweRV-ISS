@@ -9954,15 +9954,17 @@ Hart<URV>::execEbreak(const DecodedInst*)
   URV dcsrVal = 0;
   if (peekCsr(CsrNumber::DCSR, dcsrVal))
     {
-      bool ebm = (dcsrVal >> 15) & 1;
-      bool ebs = (dcsrVal >> 13) & 1;
-      bool ebu = (dcsrVal >> 12) & 1;
+      DcsrFields<URV> fields{dcsrVal};
+      bool ebm = fields.bits_.EBREAKM;  // Break in M-privilege enabled.
+      bool ebs = fields.bits_.EBREAKS;  // Break in S-privilege enabled.
+      bool ebu = fields.bits_.EBREAKU;  // Break in U-privilege enabled.
 
-      bool debug = ( (ebm and privMode_ == PrivilegeMode::Machine) or
-                     (ebs and privMode_ == PrivilegeMode::Supervisor) or
-                     (ebu and privMode_ == PrivilegeMode::User) );
+      bool hit = ( (ebm and privMode_ == PrivilegeMode::Machine) or
+		   (ebs and privMode_ == PrivilegeMode::Supervisor) or
+		   (ebu and privMode_ == PrivilegeMode::User) );
 
-      if (debug)
+      // Should we do if we are debug-mode single stepping?
+      if (hit)
         {
           // The documentation (RISCV external debug support) does not say whether or not
           // we set EPC and MTVAL.
