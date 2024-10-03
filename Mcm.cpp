@@ -2040,6 +2040,9 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
       return false;
     }
 
+  if (instr->memOps_.empty() and instr->size_ == 0)
+    instr->size_ = elemSize;
+
   assert(instr->size_ == elemSize);
 
   // Map a reference address to a reference value and a flag indicating if address is
@@ -2055,10 +2058,13 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   // elements. Associated reference addresses with instruction.
   auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr->tag_];
   bool hasOverlap = false;
+  unsigned activeCount = 0;
   for (auto& elem : elems)
     {
       if (elem.masked_)
 	continue;  // Masked off element.
+
+      activeCount++;
 
       unsigned size1 = elemSize, size2 = 0;
       uint64_t ea1 = elem.pa_, ea2 = elem.pa2_;
@@ -2092,6 +2098,16 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
     }
 
   instr->hasOverlap_ = hasOverlap;
+
+  bool ok = true;
+  if (activeCount > 0 and instr->memOps_.empty() and not hart.inDebugMode())
+    {
+      cerr << "Error: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
+	   << instr->tag_ << " vector load instruction retires without any memory "
+	   << "read operation.\n";
+      ok = false;
+    }
+
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
@@ -2151,7 +2167,6 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   // Check read operations comparing RTL values to reference (whisper) values.
   // We currently do not get enough information from the test-bench to do this
   // correctly for overlapping elements.
-  bool ok = true;
   if (not hasOverlap)
     {
       for (auto opIx : instr->memOps_)
