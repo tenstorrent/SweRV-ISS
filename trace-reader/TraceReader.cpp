@@ -210,6 +210,8 @@ TraceRecord::clear()
   physAddrs.clear();
   memVals.clear();
   maskedAddrs.clear();
+  dpteAddrs.clear();
+  ipteAddrs.clear();
   contextCSRs.clear();
   priv = PrivMode::Machine;
   virt = false;
@@ -309,6 +311,30 @@ TraceRecord::print(std::ostream& os) const
 	    os << " masked";
 	  os << '\n';
 	}
+    }
+
+  if (not ipteAddrs.empty())
+    {
+      const char* sep = "";
+      os << "  ipte addrs:";
+      for (auto addr : ipteAddrs)
+        {
+          os << sep << " " << addr;
+          sep = ",";
+        }
+      os << '\n';
+    }
+
+  if (not dpteAddrs.empty())
+    {
+      const char* sep = "";
+      os << "  dpte addrs:";
+      for (auto addr : dpteAddrs)
+        {
+          os << sep << " " << addr;
+          sep = ",";
+        }
+      os << '\n';
     }
 }
 
@@ -894,6 +920,58 @@ TraceReader::parseLine(std::string& line, uint64_t lineNum, TraceRecord& record)
 	if (*str == ';')
 	  *str = ',';
       record.assembly = fields_.at(ix);
+    }
+
+  // I-page table walk.
+  ix = indices_.at(size_t(HeaderTag::Iptw));
+  if (ix >= 0)
+    {
+      char* ptw = fields_.at(ix);
+      if (*ptw)
+        {
+          mySplit(subfields_, ptw, ';');
+          for (const auto& addr : subfields_)
+            {
+	      mySplit(keyvals_, addr, '=');
+              if (keyvals_.size() == 1)
+                continue;
+              if (strcmp(keyvals_.at(0), "ma") == 0)
+                continue;
+              if (keyvals_.size() > 2)
+                {
+		  std::cerr << "Line " << lineNum << ": Bad ptw field: " << addr
+			    << ", expecting: <addr>=<pte> or <addr>\n";
+                  return false;
+                }
+              record.ipteAddrs.push_back(hexStrToNum(keyvals_.at(0)));
+            }
+        }
+    }
+
+  // D-page table walk
+  ix = indices_.at(size_t(HeaderTag::Dptw));
+  if (ix >= 0)
+    {
+      char* ptw = fields_.at(ix);
+      if (*ptw)
+        {
+          mySplit(subfields_, ptw, ';');
+          for (const auto& addr : subfields_)
+            {
+	      mySplit(keyvals_, addr, '=');
+              if (keyvals_.size() == 1)
+                continue;
+              if (strcmp(keyvals_.at(0), "ma") == 0)
+                continue;
+              if (keyvals_.size() > 2)
+                {
+		  std::cerr << "Line " << lineNum << ": Bad ptw field: " << addr
+			    << ", expecting: <addr>=<pte> or <addr>\n";
+                  return false;
+                }
+              record.dpteAddrs.push_back(hexStrToNum(keyvals_.at(0)));
+            }
+        }
     }
 
   return true;

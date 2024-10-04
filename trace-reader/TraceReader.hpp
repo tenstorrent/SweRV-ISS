@@ -52,6 +52,9 @@ namespace WhisperUtil  {
     std::vector<uint64_t> physAddrs;  // Memory addresses
     std::vector<uint64_t> memVals;    // Correspondign data for store
     std::vector<bool> maskedAddrs;    // Maked addresses (for vector instructions).
+    std::vector<uint64_t> dpteAddrs;  // PTE addresses address translation.
+    std::vector<uint64_t> ipteAddrs;
+
     PrivMode priv = PrivMode::Machine;
     bool virt = false;
     bool hasTrap = false;
@@ -181,7 +184,7 @@ namespace WhisperUtil  {
     // Return true on success and false on failure (we fail if addr
     // is not a multiple of the page size, if arenaSize is not
     // a multiple of the page size or is smaller than 1 page).
-    template<class Mode> 
+    template<class Mode>
     bool definePageTableMaker(uint64_t addr,
 			      /* PageTableMaker:: */ Mode mode,
 			      uint64_t arenaSize);
