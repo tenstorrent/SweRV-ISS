@@ -9473,7 +9473,7 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
       if (nmiPending_)
         dcsr.bits_.NMIP = 1;
       csRegs_.poke(CsrNumber::DCSR, dcsr.value_);
-
+      hasException_ = true;  // Instruction did no retire. This is for MCM.
     }
 
   csRegs_.poke(CsrNumber::DPC, pc);
