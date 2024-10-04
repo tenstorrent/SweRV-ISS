@@ -395,10 +395,10 @@ static void defineHart(M m)
     .def("__getattr__", py::overload_cast<Hart<T>&, const std::string&>(&attr<T>))
     .def("__setattr__", py::overload_cast<Hart<T>&, const std::string&, const py::object&>(&attr<T>))
     .def("mcm_read", [](Hart<T>& self, uint64_t time, uint64_t tag, uint64_t addr,
-                        unsigned size, uint64_t data) {
+                        unsigned size, uint64_t data, unsigned elemIx, unsigned field) {
           if (not self.mcm())
             return false;
-          return self.mcm()->readOp(self, time, tag, addr, size, data);
+          return self.mcm()->readOp(self, time, tag, addr, size, data, elemIx, field);
         }, py::doc("MCM read operation."))
     .def("mcm_mb_write", [](Hart<T>& self, uint64_t time, uint64_t addr,
                             const std::vector<uint8_t>& data,

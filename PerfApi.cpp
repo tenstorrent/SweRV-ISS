@@ -493,6 +493,20 @@ PerfApi::retire(unsigned hartIx, uint64_t time, uint64_t tag)
 	}
     }
 
+  if (di.isLr())
+    {
+      bool trap = hart->lastInstructionTrapped();
+      packet.trap_ = packet.trap_ or trap;
+
+      // Record PC of subsequent packet.
+      packet.nextIva_ = hart->peekPc();
+
+      if (not trap)
+        recordExecutionResults(*hart, packet);
+
+      packet.executed_ = true;
+    }
+
   packet.retired_ = true;
 
   if (packet.isAmo() or packet.isSc())
