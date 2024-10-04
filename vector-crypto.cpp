@@ -1912,7 +1912,7 @@ Hart<URV>::execVaeskf1_vi(const DecodedInst* di)
       return;
     }
 
-  unsigned vd = di->op0(),  vs1 = di->op1(),  round = di->op2();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  round = di->op2() & 0xf;
   if (round > 10 or round == 0)
     round ^= 0x8; // Flip bit 3.
   unsigned r = round - 1;
@@ -1976,7 +1976,7 @@ Hart<URV>::execVaeskf2_vi(const DecodedInst* di)
       return;
     }
 
-  unsigned vd = di->op0(),  vs1 = di->op1(),  round = di->op2();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  round = di->op2() & 0xf;
   if (round > 14 or round < 2)
     round ^= 0x8; // Flip bit 3.
 
