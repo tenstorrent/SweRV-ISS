@@ -5756,7 +5756,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 	  if (doStats)
 	    accumulateInstructionStats(di);
 	  printDecodedInstTrace(di, instCounter_, instStr, traceFile);
-	  if (dcsrStep_ and not ebreakInstDebug_)
+	  if (dcsrStep_ and not debugMode_ and not ebreakInstDebug_)
 	    enterDebugMode_(DebugModeCause::STEP, pc_);
 	  return;
 	}
@@ -5779,7 +5779,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       printInstTrace(inst, instCounter_, instStr, traceFile);
 
       // If step bit set in dcsr then enter debug mode unless already there.
-      if (dcsrStep_ and not ebreakInstDebug_)
+      if (dcsrStep_ and not debugMode_ and not ebreakInstDebug_)
 	enterDebugMode_(DebugModeCause::STEP, pc_);
 
       prevPerfControl_ = perfControl_;
@@ -5788,7 +5788,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
     {
       // If step bit set in dcsr then enter debug mode unless already there.
       // This is for the benefit of the test bench.
-      if (dcsrStep_ and not ebreakInstDebug_)
+      if (dcsrStep_ and not debugMode_ and not ebreakInstDebug_)
 	enterDebugMode_(DebugModeCause::STEP, pc_);
 
       stepResult_ = logStop(ce, instCounter_, traceFile);
@@ -9479,8 +9479,8 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
   csRegs_.poke(CsrNumber::DPC, pc);
   setPrivilegeMode(PrivilegeMode::Machine);
 
-  // If hart is configured to jump to a special target on enetering
-  // debug mode, then set the pc to that target.
+  // If hart is configured to jump to a special target on enetering debug mode, then set
+  // the pc to that target.
   if (debugParkLoop_ != ~URV(0))
     pc_ = debugParkLoop_;
 }
