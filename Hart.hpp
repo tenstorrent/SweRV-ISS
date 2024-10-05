@@ -2438,7 +2438,8 @@ namespace WdRiscv
 
     /// Get the data value for an out of order read (mcm or perfApi).
     bool getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
-			 bool isVec, uint64_t& value);
+			 bool isVec, uint64_t& value, unsigned elemIx = 0,
+			 unsigned field = 0);
 
     /// Helper to reset: reset floating point related structures.
     /// No-op if no  floating point extension is enabled.
@@ -2752,7 +2753,8 @@ namespace WdRiscv
     /// is the physical address on the other page.
     template<typename LOAD_TYPE>
     bool readForLoad(const DecodedInst* di, uint64_t vaddr, uint64_t paddr1,
-		     uint64_t paddr2, uint64_t& data);
+		     uint64_t paddr2, uint64_t& data, unsigned elemIx = 0,
+		     unsigned field = 0);
 
     /// Helper to the cache block operation (cbo) instructions.
     ExceptionCause determineCboException(uint64_t& addr, uint64_t& gpa, uint64_t& pa,

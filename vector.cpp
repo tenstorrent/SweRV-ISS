@@ -11136,7 +11136,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
       if (cause == ExceptionCause::NONE)
         {
 	  uint64_t data = 0;
-          if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data))
+          if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
 	  elem = data;
           ldStInfo.setLastElem(pa1, pa2);
@@ -11530,7 +11530,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
       if (cause == ExceptionCause::NONE)
 	{
 	  uint64_t data = 0;
-	  if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data))
+	  if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
 	  elem = data;
 	}
@@ -11869,7 +11869,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
       if (cause == ExceptionCause::NONE)
         {
 	  uint64_t data = 0;
-	  if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data))
+	  if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
 	  elem = data;
           ldStInfo.setLastElem(pa1, pa2);
@@ -12180,7 +12180,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
       if (cause == ExceptionCause::NONE)
 	{
 	  uint64_t data = 0;
-	  if (not readForLoad<ELEM_TYPE>(di, vaddr, pa1, pa2, data))
+	  if (not readForLoad<ELEM_TYPE>(di, vaddr, pa1, pa2, data, ix))
 	    assert(0);
 	  elem = data;
 	  vecRegs_.write(vd, ix, destGroup, elem);
@@ -12633,7 +12633,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	  if (cause == ExceptionCause::NONE)
             {
 	      uint64_t data = 0;
-	      if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data))
+	      if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data, ix, field))
 		assert(0);
 	      elem = data;
               ldStInfo.setLastElem(pa1, pa2);
@@ -13168,7 +13168,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	  if (cause == ExceptionCause::NONE)
 	    {
 	      uint64_t data = 0;
-	      if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data))
+	      if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data, ix, field))
 		assert(0);
 	      elem = data;
 	      vecRegs_.write(dvg, ix, destGroup, elem);

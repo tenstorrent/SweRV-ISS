@@ -2276,8 +2276,11 @@ Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr* instr)
 template <typename URV>
 bool
 Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64_t pa1,
-			      uint64_t pa2, unsigned size, bool isVector, uint64_t& value)
+			      uint64_t pa2, unsigned size, bool isVector, uint64_t& value,
+			      unsigned elemIx, unsigned field)
 {
+  // elemIx = 0, field = 0;
+
   value = 0;
   if (size == 0 or size > 8)
     {
@@ -2309,7 +2312,8 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
 
   for (auto opIx : instr->memOps_)
     if (auto& op = sysMemOps_.at(opIx); op.isRead_)
-      forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
+      if (op.elemIx_ == elemIx and op.field_ == field)
+	forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
 
   instr->size_ = size;
   instr->virtAddr_ = va;
@@ -2338,6 +2342,8 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
       for (auto iter = instr->memOps_.rbegin(); iter  != instr->memOps_.rend(); ++iter)
 	{
 	  const auto& op = sysMemOps_.at(*iter);
+	  if (op.elemIx_ != elemIx or op.field_ != field)
+	    continue;
 	  uint8_t byte = 0;
 	  if (op.getModelReadOpByte(byteAddr, byte))
 	    {

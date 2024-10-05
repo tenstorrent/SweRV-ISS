@@ -1743,13 +1743,14 @@ readCharNonBlocking(int fd)
 
 template <typename URV>
 bool
-Hart<URV>::getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2,
-			   unsigned size, bool isVec, uint64_t& value)
+Hart<URV>::getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
+			   bool isVec, uint64_t& value, unsigned elemIx, unsigned field)
 {
   if (not ooo_)
     return false;
   if (mcm_)
-    return mcm_->getCurrentLoadValue(*this, instCounter_, va, pa1, pa2, size, isVec, value);
+    return mcm_->getCurrentLoadValue(*this, instCounter_, va, pa1, pa2, size, isVec,
+				     value, elemIx, field);
   if (perfApi_)
     return perfApi_->getLoadData(hartIx_, instCounter_, va, pa1, pa2, size, value);
   assert(0);
@@ -1904,7 +1905,7 @@ template <typename LOAD_TYPE>
 bool
 Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 		       [[maybe_unused]] uint64_t addr1, [[maybe_unused]] uint64_t addr2,
-		       uint64_t& data)
+		       uint64_t& data, unsigned elemIx, unsigned field)
 {
 #ifdef FAST_SLOPPY
   return fastLoad<LOAD_TYPE>(di, virtAddr, data);
@@ -1928,7 +1929,8 @@ Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr
   if (ooo_)
     {
       uint64_t val = 0;
-      hasOooVal = getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), di->isVector(), val);
+      hasOooVal = getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), di->isVector(),
+				  val, elemIx, field);
       if (hasOooVal)
 	uval = val;
     }
@@ -12361,59 +12363,59 @@ WdRiscv::Hart<uint64_t>::store<uint64_t>(const DecodedInst*, uint64_t, bool, uin
 
 template
 bool
-WdRiscv::Hart<uint32_t>::readForLoad<uint8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::readForLoad<uint8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::readForLoad<int8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::readForLoad<int8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::readForLoad<uint16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::readForLoad<uint16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::readForLoad<int16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::readForLoad<int16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::readForLoad<uint32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::readForLoad<uint32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::readForLoad<int32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::readForLoad<int32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::readForLoad<uint64_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::readForLoad<uint64_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::readForLoad<uint8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint64_t>::readForLoad<uint8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::readForLoad<int8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint64_t>::readForLoad<int8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::readForLoad<uint16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint64_t>::readForLoad<uint16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::readForLoad<int16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint64_t>::readForLoad<int16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::readForLoad<uint32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint64_t>::readForLoad<uint32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::readForLoad<int32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint64_t>::readForLoad<int32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::readForLoad<uint64_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint64_t>::readForLoad<uint64_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 
 template
