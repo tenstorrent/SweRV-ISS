@@ -2275,6 +2275,46 @@ Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr* instr)
 
 template <typename URV>
 bool
+Mcm<URV>::vecReadOpOverlapsElemByte(const MemoryOp& op, uint64_t addr, unsigned elemIx,
+				    unsigned field) const
+{
+  if (op.elemIx_ > elemIx)
+    return false;
+
+  if (op.elemIx_ == elemIx and op.field_ > field)
+    return false;
+
+  return op.overlaps(addr);
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::vecReadOpOverlapsElem(const MemoryOp& op, uint64_t pa1, uint64_t pa2,
+				unsigned size, unsigned elemIx, unsigned field) const
+{
+  unsigned size1 = size;
+  if (pa1 != pa2)
+    {
+      size1 = offsetToNextPage(pa1);
+      assert(size1 > 0 and size1 <= 8);
+    }
+
+  for (unsigned i = 0; i < size; ++i)
+    {
+      uint64_t addr = pa1 + i;
+      if (i >= size1)
+	addr = pa2 + i - size1;
+      if (vecReadOpOverlapsElemByte(op, addr, elemIx, field))
+	return true;
+    }
+
+  return false;
+}
+
+
+template <typename URV>
+bool
 Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64_t pa1,
 			      uint64_t pa2, unsigned size, bool isVector, uint64_t& value,
 			      unsigned elemIx, unsigned field)
@@ -2308,7 +2348,10 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
       hartData.currentLoadTag_ = tag;
     }
 
-  bool bc = true;  // Backward compatible all elemIx/field are zeros.
+  if (pa2 == pa1 and pageNum(pa1 + size - 1) != pageNum(pa1))
+    pa2 = pageAddress(pageNum(pa2) + 1);
+
+  bool bc = true;  // Backward compatible all mread elemIx/field are zeros.
   if (isVector)
     for (auto opIx : instr->memOps_)
       if (auto& op = sysMemOps_.at(opIx); op.elemIx_ != 0 or op.field_ != 0)
@@ -2316,14 +2359,12 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
 
   for (auto opIx : instr->memOps_)
     if (auto& op = sysMemOps_.at(opIx); op.isRead_)
-      if ((op.elemIx_ == elemIx and op.field_ == field) or bc)
+      if (not isVector or bc or vecReadOpOverlapsElem(op, pa1, pa2, size, elemIx, field))
 	forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
 
   instr->size_ = size;
   instr->virtAddr_ = va;
   instr->physAddr_ = pa1;
-  if (pa2 == pa1 and pageNum(pa1 + size - 1) != pageNum(pa1))
-    pa2 = pageAddress(pageNum(pa2) + 1);
   instr->physAddr2_ = pa2;
 
   value = 0;
@@ -2346,7 +2387,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
       for (auto iter = instr->memOps_.rbegin(); iter  != instr->memOps_.rend(); ++iter)
 	{
 	  const auto& op = sysMemOps_.at(*iter);
-	  if ((op.elemIx_ == elemIx and op.field_ == field) or bc)
+	  if (not isVector or bc or vecReadOpOverlapsElemByte(op, byteAddr, elemIx, field))
 	    {
 	      uint8_t byte = 0;
 	      if (op.getModelReadOpByte(byteAddr, byte))

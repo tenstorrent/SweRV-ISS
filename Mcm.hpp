@@ -406,7 +406,14 @@ namespace WdRiscv
     void printPpo1Error(unsigned hartId, McmInstrIx tag1, McmInstrIx tag2, uint64_t t1,
 			uint64_t t2, uint64_t pa) const;
 
+    /// Read up to a double word (size <= 8) from the reference model memory.
     bool referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64_t& val);
+
+    bool vecReadOpOverlapsElemByte(const MemoryOp& op, uint64_t addr, unsigned elemIx,
+				   unsigned field) const;
+
+    bool vecReadOpOverlapsElem(const MemoryOp& op, uint64_t pa1, uint64_t pa2,
+			       unsigned size, unsigned elemIx, unsigned field) const;
 
     /// Return true if given instruction is an indexed load/store and it has an index
     /// register with a value produced after the instruction has used that index
