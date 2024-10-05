@@ -289,6 +289,10 @@ namespace WdRiscv
     /// Similar to preceding method but with all PPO rules enabled/disabled.
     bool enableMcm(unsigned mbSize, bool mbLineCheckAll, bool enablePpos = true);
 
+    /// Terminate MCM. Experimental. This unlikely to be useful except for executing one
+    /// extra instruction at the end of a test to simplify some debugging.
+    void endMcm();
+
     /// Enable the performance mode API.
     bool enablePerfApi(std::vector<FILE*>& traceFiles);
 

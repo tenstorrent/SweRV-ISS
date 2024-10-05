@@ -1892,6 +1892,13 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       return true;
     }
 
+  if (command == "end_mcm")
+    {
+      system_.endMcm();
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+    }
+
   if (command == "translate")
     {
       if (not translateCommand(hart, line, tokens))
