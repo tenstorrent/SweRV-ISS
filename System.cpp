@@ -846,6 +846,7 @@ System<URV>::endMcm()
 {
   for (auto& hart :  sysHarts_)
     hart->setMcm(nullptr);
+  mcm_ = nullptr;
 }
   
 

@@ -1897,6 +1897,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       system_.endMcm();
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
     }
 
   if (command == "translate")
