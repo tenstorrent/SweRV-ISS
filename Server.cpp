@@ -1391,6 +1391,12 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 	mcmInsertCommand(msg, reply, hart, commandLog);
 	break;
 
+      case McmEnd:
+	system_.endMcm();
+	if (commandLog)
+	  fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " end_mcm\n", hartId, msg.time);
+	break;
+
       case McmWrite:
         if (msg.size > msg.buffer.size())
           {

@@ -19,14 +19,14 @@
 #include <cstdint>
 
 
-enum WhisperMessageType { Peek, Poke, Step, Until, Change, ChangeCount,
-                          Quit, Invalid, Reset, Nmi, ClearNmi, EnterDebug,
-                          ExitDebug, LoadFinished, CancelDiv, CancelLr,
-                          DumpMemory, McmRead, McmInsert, McmWrite,
-			  PageTableWalk, Translate, CheckInterrupt,
-                          McmBypass, SeiPin, McmIFetch, McmIEvict,
-                          PmpEntry, PmaEntry
- };
+enum WhisperMessageType
+  {
+    Peek, Poke, Step, Until, Change, ChangeCount, Quit, Invalid, Reset, Nmi, ClearNmi,
+    EnterDebug, ExitDebug, LoadFinished, CancelDiv, CancelLr, DumpMemory, McmRead,
+    McmInsert, McmWrite, McmEnd, PageTableWalk, Translate, CheckInterrupt, McmBypass,
+    SeiPin, McmIFetch, McmIEvict, PmpEntry, PmaEntry
+  };
+
 
 /// Resource identifiers for peek special.
 enum WhisperSpecialResource { PrivMode, PrevPrivMode, FpFlags, IncrementalVec, Trap,

@@ -841,6 +841,16 @@ System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll, bool enablePpos
 
 
 template <typename URV>
+void
+System<URV>::endMcm()
+{
+  for (auto& hart :  sysHarts_)
+    hart->setMcm(nullptr);
+  mcm_ = nullptr;
+}
+  
+
+template <typename URV>
 bool
 System<URV>::enablePerfApi(std::vector<FILE*>& traceFiles)
 {
