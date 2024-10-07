@@ -105,7 +105,7 @@ namespace WdRiscv
   /// of dcsr)
   enum class DebugModeCause
     {
-      EBREAK = 1, TRIGGER = 2, DEBUGGER = 3, STEP = 4
+      EBREAK = 1, TRIGGER = 2, HALTREQ = 3, STEP = 4
     };
 
 

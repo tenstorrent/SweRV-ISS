@@ -9482,7 +9482,10 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
   // If hart is configured to jump to a special target on enetering debug mode, then set
   // the pc to that target.
   if (debugParkLoop_ != ~URV(0))
-    pc_ = debugParkLoop_;
+    {
+      pc_ = debugParkLoop_;
+      inDebugParkLoop_ = true;
+    }
 }
 
 
@@ -9490,13 +9493,12 @@ template <typename URV>
 void
 Hart<URV>::enterDebugMode(URV pc)
 {
-  // This method is used by the test-bench to make the simulator
-  // follow it into debug-mode. Do nothing if the simulator got into
-  // debug-mode on its own.
+  // This method is used by the test-bench to make the simulator follow it into
+  // debug-mode. Do nothing if the simulator got into debug-mode on its own.
   if (debugMode_)
     return;   // Already in debug mode.
 
-  enterDebugMode_(DebugModeCause::DEBUGGER, pc);
+  enterDebugMode_(DebugModeCause::HALTREQ, pc);
 }
 
 
@@ -9944,16 +9946,27 @@ Hart<URV>::execEbreak(const DecodedInst*)
       return;
     }
 
+  URV dcsrVal = 0;
+  bool hasDcsr = peekCsr(CsrNumber::DCSR, dcsrVal);
+
+  auto dmCause = DebugModeCause::EBREAK;
+
   if (inDebugParkLoop_)
     {
-      inDebugParkLoop_ = false;
-      // return;  // Uncomment once RTL catches up.
+      if (hasDcsr)
+	{
+	  DcsrFields<URV> fields{dcsrVal};
+	  fields.bits_.CAUSE = unsigned(DebugModeCause::HALTREQ);
+	  csRegs_.poke(CsrNumber::DCSR, fields.value_);
+	  csRegs_.recordWrite(CsrNumber::DCSR);
+	  pc_ = debugParkLoop_;
+	  return;
+	}
     }
 
   // If in machine/supervisor/user mode and DCSR bit ebreakm/s/u is set, then enter debug
   // mode.
-  URV dcsrVal = 0;
-  if (peekCsr(CsrNumber::DCSR, dcsrVal))
+  if (hasDcsr)
     {
       DcsrFields<URV> fields{dcsrVal};
       bool ebm = fields.bits_.EBREAKM;  // Break in M-privilege enabled.
@@ -9969,7 +9982,7 @@ Hart<URV>::execEbreak(const DecodedInst*)
         {
           // The documentation (RISCV external debug support) does not say whether or not
           // we set EPC and MTVAL.
-          enterDebugMode_(DebugModeCause::EBREAK, currPc_);
+          enterDebugMode_(dmCause, currPc_);
           ebreakInstDebug_ = true;
           recordCsrWrite(CsrNumber::DCSR);
           return;
