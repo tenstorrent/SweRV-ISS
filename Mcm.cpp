@@ -289,8 +289,9 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
     return;  // Should not happen.
 
   unsigned elemsPerVec = hart.vecRegSize() / elemSize;
+  unsigned nfields = di.vecFieldCount();
 
-  for (unsigned ix = 0; ix < group; ++ix)
+  for (unsigned ix = 0; ix < group * nfields; ++ix)
     {
       uint64_t regTime = 0;  // Vector register time
 
