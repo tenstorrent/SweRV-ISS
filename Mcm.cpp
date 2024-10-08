@@ -3328,6 +3328,9 @@ Mcm<URV>::checkFence(Hart<URV>& hart, const McmInstr& fence) const
   for (auto tag : undrained)
     {
       const auto& instr = instrVec.at(tag);
+      if (instr.tag_ > fence.tag_)
+	continue;
+
       for (auto opIx : instr.memOps_)
 	{
 	  auto& op = sysMemOps_.at(opIx);
