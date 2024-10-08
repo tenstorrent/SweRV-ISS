@@ -3037,19 +3037,23 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	continue;
       if (op.time_ < earlyB)
 	break;
-      const auto& instrA =  instrVec.at(op.tag_);
-      if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory()  or
-	  not overlaps(instrA, instrB))
+
+      const auto& prev =  instrVec.at(op.tag_);   // Instruction preceeding B in prog order.
+      if (prev.isCanceled()  or  not prev.isRetired()  or  not prev.isMemory()  or
+	  not overlaps(prev, instrB))
 	continue;
 
-      if (not instrA.isLoad_)
+      // If a byte of B is written by prev, then put its physical address in
+      // locallyWriten.
+      identifyWrittenBytes(prev, instrB, locallyWritten);
+
+      if (not prev.isLoad_)
 	continue;
+
+      auto& instrA = prev;
 
       if (effectiveMinTime(instrB) >= effectiveMaxTime(instrA))
 	continue;  // In order.
-
-      // If a byte of B is written by A, then put its physical address in locallyWriten.
-      identifyWrittenBytes(instrA, instrB, locallyWritten);
 
       if (instrA.memOps_.empty() or instrB.memOps_.empty())
 	{
