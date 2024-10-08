@@ -3078,8 +3078,8 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	      if (locallyWritten.contains(addr))
 		continue;    // Byte of B covered by local store.
 
-	      auto earlyB = earliestByteTime(instrB, addr);
-	      auto lateA = latestByteTime(instrA, addr);
+	      auto earlyB = effectiveMinByteTime(instrB, addr);
+	      auto lateA = effectiveMaxByteTime(instrA, addr);
 
 	      auto rot = remoteOp.time_;
 	      if (earlyB <= lateA and earlyB <= rot and rot <= lateA)
@@ -3198,7 +3198,6 @@ template <typename URV>
 uint64_t
 Mcm<URV>::effectiveMinTime(const McmInstr& instr) const
 {
-
   if (not instr.isLoad_)
     return earliestOpTime(instr);
 
@@ -3224,7 +3223,6 @@ template <typename URV>
 uint64_t
 Mcm<URV>::effectiveMaxTime(const McmInstr& instr) const
 {
-
   if (not instr.isLoad_)
     return latestOpTime(instr);
 
@@ -3236,6 +3234,60 @@ Mcm<URV>::effectiveMaxTime(const McmInstr& instr) const
     if (opIx < sysMemOps_.size())
       {
 	auto& op = sysMemOps_.at(opIx);
+	uint64_t t = op.time_;
+	if (op.isRead_ and op.forwardTime_ and op.forwardTime_ > t)
+	  t = op.forwardTime_;
+	maxt = std::max(maxt, t);
+      }
+
+  return maxt;
+}
+
+
+template <typename URV>
+uint64_t
+Mcm<URV>::effectiveMinByteTime(const McmInstr& instr, uint64_t addr) const
+{
+  if (not instr.isLoad_)
+    return earliestByteTime(instr, addr);
+
+  if (not instr.complete_ and instr.memOps_.empty())
+    return time_;
+
+  uint64_t mint = ~uint64_t(0);
+  for (auto opIx : instr.memOps_)
+    if (opIx < sysMemOps_.size())
+      {
+	auto& op = sysMemOps_.at(opIx);
+	if (not op.overlaps(addr))
+	  continue;
+	uint64_t t = op.time_;
+	if (op.isRead_ and op.forwardTime_ and op.forwardTime_ > t)
+	  t = op.forwardTime_;
+	mint = std::min(mint, t);
+      }
+
+  return mint;
+}
+
+
+template <typename URV>
+uint64_t
+Mcm<URV>::effectiveMaxByteTime(const McmInstr& instr, uint64_t addr) const
+{
+  if (not instr.isLoad_)
+    return latestByteTime(instr, addr);
+
+  if (not instr.complete_ and instr.memOps_.empty())
+    return time_;
+
+  uint64_t maxt = 0;
+  for (auto opIx : instr.memOps_)
+    if (opIx < sysMemOps_.size())
+      {
+	auto& op = sysMemOps_.at(opIx);
+	if (not op.overlaps(addr))
+	  continue;
 	uint64_t t = op.time_;
 	if (op.isRead_ and op.forwardTime_ and op.forwardTime_ > t)
 	  t = op.forwardTime_;

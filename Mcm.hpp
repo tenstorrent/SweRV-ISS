@@ -246,6 +246,16 @@ namespace WdRiscv
     /// instruction.
     uint64_t latestByteTime(const McmInstr& instr, uint64_t addr) const;
 
+    /// Return the effective earliest memory time for the byte at the given
+    /// address. Return 0 if address is not covered by given instruction.
+    /// The effective time it the max of the mread-time and the forward-time.
+    uint64_t effectiveMinByteTime(const McmInstr& instr, uint64_t addr) const;
+
+    /// Return the effective latest memory time for the byte at the given address. Return
+    /// max value if address is not covered by given instruction. The effective time it
+    /// the max of the mread-time and the forward-time.
+    uint64_t effectiveMaxByteTime(const McmInstr& instr, uint64_t addr) const;
+
     /// Skip checking preserve program order (PPO) rules if flag is false.
     void enablePpo(bool flag)
     { std::fill(ppoEnabled_.begin(), ppoEnabled_.end(), flag); }
