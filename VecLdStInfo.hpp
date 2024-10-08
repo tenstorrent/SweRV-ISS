@@ -79,10 +79,11 @@ namespace WdRiscv
       ixVec_ = ixReg;
     }
 
-    /// Set the field count. Used for load/store segment.
-    void setFieldCount(unsigned fields)
+    /// Set the field count. Used for ld/st segment and ld/st whole regs.
+    void setFieldCount(unsigned fields, bool isSeg = false)
     {
       fields_ = fields;
+      isSegmented_ = isSeg;
     }
 
     /// Add element information to this object.

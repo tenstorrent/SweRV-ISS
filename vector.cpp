@@ -12596,7 +12596,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   unsigned elemSize = sizeof(ELEM_TYPE);
   auto& ldStInfo = vecRegs_.ldStInfo_;
   ldStInfo.init(elemSize, vd, true /*isLoad*/);
-  ldStInfo.setFieldCount(fieldCount);
+  ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   if (start >= vecRegs_.elemCount())
     return true;
@@ -12799,7 +12799,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
   ldStInfo.init(elemSize, vd, false /*isLoad*/);
-  ldStInfo.setFieldCount(fieldCount);
+  ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
     {
@@ -13126,7 +13126,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
   ldStInfo.initIndexed(elemSize, vd, vi, true /*isLoad*/);
-  ldStInfo.setFieldCount(fieldCount);
+  ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   if (start >= vecRegs_.elemCount())
     return true;
@@ -13298,7 +13298,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
   ldStInfo.initIndexed(elemSize, vd, vi, false /*isLoad*/);
-  ldStInfo.setFieldCount(fieldCount);
+  ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
