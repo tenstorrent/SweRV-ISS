@@ -289,8 +289,9 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
     return;  // Should not happen.
 
   unsigned elemsPerVec = hart.vecRegSize() / elemSize;
+  unsigned nfields = di.vecFieldCount();
 
-  for (unsigned ix = 0; ix < group; ++ix)
+  for (unsigned ix = 0; ix < group * nfields; ++ix)
     {
       uint64_t regTime = 0;  // Vector register time
 
@@ -3373,6 +3374,9 @@ Mcm<URV>::checkFence(Hart<URV>& hart, const McmInstr& fence) const
   for (auto tag : undrained)
     {
       const auto& instr = instrVec.at(tag);
+      if (instr.tag_ > fence.tag_)
+	continue;
+
       for (auto opIx : instr.memOps_)
 	{
 	  auto& op = sysMemOps_.at(opIx);

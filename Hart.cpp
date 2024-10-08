@@ -10501,6 +10501,7 @@ Hart<URV>::execDret(const DecodedInst* di)
   pc_ = peekCsr(CsrNumber::DPC);  // Restore PC
 
   debugMode_ = false;
+  inDebugParkLoop_ = false;
   csRegs_.enterDebug(false);
 
   // If pending nmi bit is set in dcsr, set pending nmi in the hart
