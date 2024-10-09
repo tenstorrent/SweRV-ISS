@@ -56,11 +56,13 @@ namespace WdRiscv
       elems_.clear();
     }
 
-    /// Set element size (in bytes), data vector register, and type (load or store).
-    void init(unsigned elemSize, unsigned vecReg, bool isLoad)
+    /// Set element size (in bytes), data vector register, group multiplier, and type
+    /// (load or store).
+    void init(unsigned elemSize, unsigned vecReg, unsigned gm, bool isLoad)
     {
       elemSize_ = elemSize;
       vec_ = vecReg;
+      gm_ = gm;
       isLoad_ = isLoad;
       
       isIndexed_ = false;
@@ -72,9 +74,10 @@ namespace WdRiscv
 
     /// Set element size (in bytes), data vector register, index vector register, and type
     /// (load or store).
-    void initIndexed(unsigned elemSize, unsigned vecReg, unsigned ixReg, bool isLoad)
+    void initIndexed(unsigned elemSize, unsigned vecReg, unsigned ixReg, unsigned gm,
+		     bool isLoad)
     {
-      init(elemSize, vecReg, isLoad);
+      init(elemSize, vecReg, gm, isLoad);
       isIndexed_ = true;
       ixVec_ = ixReg;
     }
@@ -118,6 +121,7 @@ namespace WdRiscv
     unsigned vec_ = 0;                // Base data vector register.
     unsigned ixVec_ = 0;              // Base index vector register.
     unsigned fields_ = 0;             // For load/store segment.
+    unsigned gm_ = 0;                 // Group multiplier or 1 if fractional.
     bool isLoad_ = false;             // True for load instructions.
     bool isIndexed_ = false;          // True for indexed instructions.
     bool isSegmented_ = false;        // True for load/store segment.

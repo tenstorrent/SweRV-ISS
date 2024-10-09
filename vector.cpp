@@ -11082,11 +11082,10 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
-  GroupMultiplier lmul = GroupMultiplier::One;
-  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, lmul);
-  badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
+  GroupMultiplier emul = GroupMultiplier::One;
+  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, emul);
+  badConfig = badConfig or not vecRegs_.legalConfig(eew, emul);
 
-  unsigned start = csRegs_.peekVstart();
   if (not preVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
@@ -11101,25 +11100,28 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 
   unsigned elemSize = sizeof(ELEM_TYPE);
   unsigned elemMax = vecRegs_.elemMax(eew); // Includes tail elems.
+  unsigned start = csRegs_.peekVstart();
   uint64_t addr = intRegs_.read(rs1) + start*elemSize;
 
+  // Effective group. If group is fractional, snap to 1.
+  groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
+  unsigned group = groupX8 / 8;
+
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, true /*isLoad*/);
+  ldStInfo.init(elemSize, vd, group, true /*isLoad*/);
 
   if (start >= vecRegs_.elemCount())
     return true;
 
-  unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
-
   for (unsigned ix = start; ix < elemMax; ++ix, addr += elemSize)
     {
       ELEM_TYPE elem = 0;
-      bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
+      bool skip = not vecRegs_.isDestActive(vd, ix, groupX8, masked, elem);
       if (ix < vecRegs_.elemCount())
 	ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
       if (skip)
 	{
-          vecRegs_.write(vd, ix, destGroup, elem);
+          vecRegs_.write(vd, ix, groupX8, elem);
 	  continue;
 	}
 
@@ -11162,7 +11164,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 		  ELEM_TYPE ones = ~ ELEM_TYPE{0};
 		  if (vecRegs_.isTailAgnostic() and vecRegs_.isTailAgnosticOnes())
 		    for (unsigned ti = vecRegs_.elemCount(); ti < elemMax; ti++)
-		      vecRegs_.write(vd, ti, destGroup, ones);
+		      vecRegs_.write(vd, ti, groupX8, ones);
                 }
 	    }
 	  else
@@ -11173,7 +11175,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
           return false;
         }
 
-      vecRegs_.write(vd, ix, destGroup, elem);
+      vecRegs_.write(vd, ix, groupX8, elem);
     }
   return true;
 }
@@ -11262,12 +11264,10 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
-  GroupMultiplier lmul = GroupMultiplier::One;
-  bool badConfig = false;
-  if (not VecRegs::groupNumberX8ToSymbol(groupX8, lmul))
-    badConfig = true;
-  else
-    badConfig = not vecRegs_.legalConfig(eew, lmul);
+
+  GroupMultiplier emul = GroupMultiplier::One;
+  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, emul);
+  badConfig = badConfig or not vecRegs_.legalConfig(eew, emul);
 
   if (not preVecExec() or badConfig or not vecRegs_.legalConfig())
     {
@@ -11276,7 +11276,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
     }
 
   bool masked = di->isMasked();
-  uint32_t vd = di->op0(), rs1 = di->op1();
+  unsigned vd = di->op0(), rs1 = di->op1();
 
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
@@ -11286,8 +11286,12 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   unsigned start = csRegs_.peekVstart();
   uint64_t addr = intRegs_.read(rs1) + start*elemSize;
 
+  // Effective group. If group is fractional, snap to 1.
+  groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
+  unsigned group = groupX8 / 8;
+
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, false /*isLoad*/);
+  ldStInfo.init(elemSize, vd, group, false /*isLoad*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += elemSize)
     {
@@ -11510,7 +11514,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   URV addr = intRegs_.read(rs1) + start*elemBytes;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemBytes, vd, true /*isLoad*/);
+  ldStInfo.init(elemBytes, vd, group, true /*isLoad*/);
 
   if (start >= elemCount)
     return true;
@@ -11660,7 +11664,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di)
   URV addr = intRegs_.read(rs1) + start*elemBytes;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemBytes, vd, false /*isLoad*/);
+  ldStInfo.init(elemBytes, vd, group, false /*isLoad*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += elemBytes)
     {
@@ -11812,12 +11816,10 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
-  GroupMultiplier lmul = GroupMultiplier::One;
-  bool badConfig = false;
-  if (not VecRegs::groupNumberX8ToSymbol(groupX8, lmul))
-    badConfig = true;
-  else
-    badConfig = not vecRegs_.legalConfig(eew, lmul);
+  GroupMultiplier emul = GroupMultiplier::One;
+
+  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, emul);
+  badConfig = badConfig or not vecRegs_.legalConfig(eew, emul);
 
   if (not preVecExec() or badConfig or not vecRegs_.legalConfig())
     {
@@ -11836,25 +11838,27 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   unsigned elemMax = vecRegs_.elemMax(eew);   // Includes tail elements.
   uint64_t addr = intRegs_.read(rs1) + start*stride;
 
+  // Effective group. If group is fractional, snap to 1.
+  groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
+  unsigned group = groupX8 / 8;
+
   unsigned elemSize = sizeof(ELEM_TYPE);
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, true /*isLoad*/);
+  ldStInfo.init(elemSize, vd, group, true /*isLoad*/);
 
   if (start >= vecRegs_.elemCount())
     return true;
 
-  unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
-
   for (unsigned ix = start; ix < elemMax; ++ix, addr += stride)
     {
       ELEM_TYPE elem = 0;
-      bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
+      bool skip = not vecRegs_.isDestActive(vd, ix, groupX8, masked, elem);
       if (ix < vecRegs_.elemCount())
 	ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
 
       if (skip)
 	{
-	  vecRegs_.write(vd, ix, destGroup, elem);
+	  vecRegs_.write(vd, ix, groupX8, elem);
 	  continue;
 	}
 
@@ -11882,7 +11886,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
           return false;
         }
 
-      vecRegs_.write(vd, ix, destGroup, elem);
+      vecRegs_.write(vd, ix, groupX8, elem);
     }
 
   return true;
@@ -11972,14 +11976,11 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
-  GroupMultiplier lmul = GroupMultiplier::One;
-  bool badConfig = false;
-  if (not VecRegs::groupNumberX8ToSymbol(groupX8, lmul))
-    badConfig = true;
-  else
-    badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  unsigned start = csRegs_.peekVstart();
+  GroupMultiplier emul = GroupMultiplier::One;
+  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, emul);
+  badConfig = badConfig or not vecRegs_.legalConfig(eew, emul);
+
   if (not preVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
@@ -11994,11 +11995,16 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 
   uint64_t stride = intRegs_.read(rs2);
   unsigned elemCount = vecRegs_.elemCount();
+  unsigned elemSize = sizeof(ELEM_TYPE);
+  unsigned start = csRegs_.peekVstart();
   uint64_t addr = intRegs_.read(rs1) + start*stride;
 
-  unsigned elemSize = sizeof(ELEM_TYPE);
+  // Effective group. If group is fractional, snap to 1.
+  groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
+  unsigned group = groupX8 / 8;
+
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, false /*isLoad*/);
+  ldStInfo.init(elemSize, vd, group, false /*isLoad*/);
 
   // TODO check permissions, translate, ....
   for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
@@ -12121,6 +12127,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not VecRegs::groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
+
   if (not preVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
@@ -12142,19 +12149,20 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   unsigned elemMax = vecRegs_.elemMax();  // Includes tail elements.
   unsigned elemSize = elemWidth / 8;
 
+  groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
+  unsigned group = groupX8 / 8;
+
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.initIndexed(elemSize, vd, vi, true /*isLoad*/);
+  ldStInfo.initIndexed(elemSize, vd, vi, group, true /*isLoad*/);
 
   if (start >= vecRegs_.elemCount())
     return true;
-
-  unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
 
   for (unsigned ix = start; ix < elemMax; ++ix)
     {
       uint64_t vaddr = 0;
       ELEM_TYPE elem = 0;
-      bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
+      bool skip = not vecRegs_.isDestActive(vd, ix, groupX8, masked, elem);
       if (ix < vecRegs_.elemCount())
         {
           uint64_t offset = 0;
@@ -12164,7 +12172,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
         }
       if (skip)
 	{
-          vecRegs_.write(vd, ix, destGroup, elem);
+          vecRegs_.write(vd, ix, groupX8, elem);
 	  continue;
 	}
 
@@ -12183,7 +12191,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  if (not readForLoad<ELEM_TYPE>(di, vaddr, pa1, pa2, data))
 	    assert(0);
 	  elem = data;
-	  vecRegs_.write(vd, ix, destGroup, elem);
+	  vecRegs_.write(vd, ix, groupX8, elem);
           ldStInfo.setLastElem(pa1, pa2);
 	}
       else
@@ -12332,6 +12340,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not VecRegs::groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
+
   if (not preVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
@@ -12351,8 +12360,12 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount(), elemSize = elemWidth / 8;
 
+  // Effective group. If group is fractional, snap to 1.
+  groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
+  unsigned group = groupX8 / 8;
+
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.initIndexed(elemSize, vd, vi, false /*isLoad*/);
+  ldStInfo.initIndexed(elemSize, vd, vi, group, false /*isLoad*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
@@ -12564,9 +12577,9 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
-  GroupMultiplier lmul = GroupMultiplier::One;
-  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, lmul);
-  badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
+  GroupMultiplier emul = GroupMultiplier::One;
+  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, emul);
+  badConfig = badConfig or not vecRegs_.legalConfig(eew, emul);
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
   if (not preVecExec() or badConfig or not vecRegs_.legalConfig())
@@ -12594,8 +12607,13 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
     }
 
   unsigned elemSize = sizeof(ELEM_TYPE);
+
+  // Effective group. If group is fractional, snap to 1.
+  groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
+  unsigned group = groupX8 / 8;
+
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, true /*isLoad*/);
+  ldStInfo.init(elemSize, vd, group, true /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   if (start >= vecRegs_.elemCount())
@@ -12766,11 +12784,11 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
-  GroupMultiplier lmul = GroupMultiplier::One;
-  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, lmul);
-  badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
+  GroupMultiplier emul = GroupMultiplier::One;
+  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, emul);
+  badConfig = badConfig or not vecRegs_.legalConfig(eew, emul);
 
-  // lmul*fieldcount cannot be larger than 8 registers.
+  // emul*fieldcount cannot be larger than 8 registers.
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
   unsigned start = csRegs_.peekVstart();
@@ -12797,8 +12815,12 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
       return false;
     }
 
+  // Effective group. If group is fractional, snap to 1.
+  groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
+  unsigned group = groupX8 / 8;
+
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, false /*isLoad*/);
+  ldStInfo.init(elemSize, vd, group, false /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
@@ -13124,8 +13146,12 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
       return false;
     }
 
+  // Effective group. If group is fractional, snap to 1.
+  groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
+  unsigned group = groupX8 / 8;
+
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.initIndexed(elemSize, vd, vi, true /*isLoad*/);
+  ldStInfo.initIndexed(elemSize, vd, vi, group, true /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   if (start >= vecRegs_.elemCount())
@@ -13296,8 +13322,12 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
       return false;
     }
 
+  // Effective group. If group is fractional, snap to 1.
+  groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
+  unsigned group = groupX8 / 8;
+
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.initIndexed(elemSize, vd, vi, false /*isLoad*/);
+  ldStInfo.initIndexed(elemSize, vd, vi, group, false /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix)
@@ -13310,7 +13340,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
       for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
 	{
-	  unsigned dvg = vd + field*eg;  // Source vector grop.
+	  unsigned dvg = vd + field*eg;  // Source vector group.
 	  bool skip = masked and not vecRegs_.isActive(0, ix);
 	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
 	  if (skip)
