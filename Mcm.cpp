@@ -249,6 +249,45 @@ Mcm<URV>::setBranchMemTime(const Hart<URV>& hart, const McmInstr& instr)
 }
 
 
+/// Put the in the given array the indices of the vector data registers of the crrently
+/// retiring vector load/store instruction, each index is associated with a bool
+/// indicating whether or not the whole vector is masked. by the currently retiring vector
+/// ld/st Return 0 if no vector register is referenced or if the instruction is not a
+/// vector ld/st.
+template <typename URV>
+unsigned
+Mcm<URV>::getLdStDataVectors(const Hart<URV>& hart, const McmInstr& instr,
+			     std::array<std::pair<unsigned,bool>, 32>& vecs) const
+{
+  if (not instr.di_.isVectorLoad() and not instr.di_.isVectorStore())
+    return 0;
+
+  auto& info = hart.getLastVectorMemory();
+  auto& elems = info.elems_;
+  unsigned elemSize = info.elemSize_;
+  assert(elemSize != 0);
+  unsigned elemsPerVec = hart.vecRegSize() / elemSize;
+
+  std::array<bool, 32> vecReferenced;  for (auto& x : vecReferenced) x = false;
+  std::array<bool, 32> vecUsed;        for (auto& x : vecUsed) x = false;
+
+  for (auto& elem : elems)
+    {
+      unsigned regNum = info.vec_ + elem.field_*info.group_ + elem.ix_ / elemsPerVec;
+      vecReferenced.at(regNum) = true;
+      if (not elem.masked_)
+	vecUsed.at(regNum) = true;
+    }
+
+  unsigned count = 0;
+  for (unsigned regNum = 0; regNum < 32; ++regNum)
+    if (vecReferenced.at(regNum))
+      vecs.at(count++) = std::pair<unsigned, bool>{regNum, not vecUsed.at(regNum)};
+
+  return count;
+}
+
+
 template <typename URV>
 void
 Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr)
@@ -263,22 +302,16 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 
   unsigned hartIx = hart.sysHartIndex();
 
-  // In case no vec register was loaded: Initialize producer/time to 0.
+  // In case a vec reg is all masked: Initialize producer/time to 0.
   // FIX: if mask policy is preserve, time and producer should not be changed.
-  std::array<bool, 32> usedRegs;
-  for (auto& elem : elems)
-    if (not elem.masked_)
-      {
-	unsigned regNum = info.vec_ + elem.field_*info.group_ + elem.ix_ / elemsPerVec;
-	usedRegs.at(regNum) = true;
-      }
-
-  for (unsigned regNum = 0; regNum < 32; ++regNum)
-    if (usedRegs.at(regNum))
-      {
-	setVecRegTime(hartIx, regNum, 0);
-	setVecRegProducer(hartIx, regNum, 0);
-      }
+  std::array<std::pair<unsigned, bool>, 32> dataRegs;
+  unsigned count = getLdStDataVectors(hart, instr, dataRegs);
+  for (unsigned i = 0; i < count; ++i)
+    {
+      auto [regNum, masked] = dataRegs.at(i);
+      setVecRegTime(hartIx, regNum, 0);
+      setVecRegProducer(hartIx, regNum, 0);
+    }
 
   if (elemSize == 0 or elems.empty())
     return;  // Should not happen.
@@ -620,23 +653,23 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
 
   if (di.isVectorStore())
     {
-      unsigned base, count = 1;
-      if (hart.getLastVecLdStRegsUsed(di, 0, base, count)) // Operand 0 is data register
+      std::array<std::pair<unsigned, bool>, 32> dataVecs;  // reg-num/masked pairs
+      unsigned count = getLdStDataVectors(hart, instr, dataVecs);
+      for (unsigned i = 0; i < count; ++i)
         {
-          unsigned dataReg = base + vecRegOffset_;
-          for (unsigned i = 0; i < count; ++i)
-            {
-              auto dataTime = regTime.at(dataReg + i);
-	      auto dataProducer = regProducer.at(dataReg + i);
-              if (dataTime >= instr.dataTime_)
-                {
-                  instr.dataProducer_ = dataProducer;
-                  instr.dataTime_ = dataTime;
-                }
+	  auto [dataReg, masked] = dataVecs.at(i);
+	  //if (masked)
+	  //  continue;
 
-	      unsigned vecIx = base + i;
-	      instr.vecProdTimes_.at(i) = McmInstr::VecProdTime{vecIx, dataProducer, dataTime};
-            }
+	  auto dataTime = regTime.at(dataReg + vecRegOffset_);
+	  auto dataProducer = regProducer.at(dataReg + vecRegOffset_);
+	  if (dataTime >= instr.dataTime_)
+	    {
+	      instr.dataProducer_ = dataProducer;
+	      instr.dataTime_ = dataTime;
+	    }
+
+	  instr.vecProdTimes_.at(i) = McmInstr::VecProdTime{dataReg, dataProducer, dataTime};
         }
     }
 

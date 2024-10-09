@@ -727,6 +727,14 @@ namespace WdRiscv
     /// This is a helper to updateDependencies.
     void updateVecRegTimes(const Hart<URV>& hart, const McmInstr& instr);
 
+    /// Put the in the given array the indices of the vector data registers of the
+    /// crrently retiring vector load/store instruction, each index is associated with a
+    /// bool indicating whether or not the whole vector is masked. by the currently
+    /// retiring vector ld/st Return 0 if no vector register is referenced or if the
+    /// instruction is not a vector ld/st.
+    unsigned getLdStDataVectors(const Hart<URV>& hart, const McmInstr& instr,
+				std::array<std::pair<unsigned,bool>, 32>& vecs) const;
+
     /// Set the memory time of the given branch instruction to the latest time (data was
     /// produced) of its registers. This branch memory time is used for checking
     /// the control dependency rule (rule 11). No-op if instr is not a branch.
