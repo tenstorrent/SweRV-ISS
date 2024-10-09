@@ -12151,11 +12151,16 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   unsigned elemMax = vecRegs_.elemMax();  // Includes tail elements.
   unsigned elemSize = elemWidth / 8;
 
+  // Effective group. If group is fractional, snap to 1.
   groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
   unsigned group = groupX8 / 8;
 
+  // Effective index reg group. If group is fractional, snap to 1.
+  offsetGroupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), offsetGroupX8);
+  unsigned ixGroup = offsetGroupX8 / 8;
+
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.initIndexed(elemSize, vd, vi, group, true /*isLoad*/);
+  ldStInfo.initIndexed(elemSize, vd, vi, group, ixGroup, true /*isLoad*/);
 
   if (start >= vecRegs_.elemCount())
     return true;
@@ -12366,8 +12371,12 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
   unsigned group = groupX8 / 8;
 
+  // Effective index reg group. If group is fractional, snap to 1.
+  offsetGroupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), offsetGroupX8);
+  unsigned ixGroup = offsetGroupX8 / 8;
+
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.initIndexed(elemSize, vd, vi, group, false /*isLoad*/);
+  ldStInfo.initIndexed(elemSize, vd, vi, group, ixGroup, false /*isLoad*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
@@ -13152,8 +13161,12 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
   unsigned group = groupX8 / 8;
 
+  // Effective index reg group. If group is fractional, snap to 1.
+  offsetGroupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), offsetGroupX8);
+  unsigned ixGroup = offsetGroupX8 / 8;
+
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.initIndexed(elemSize, vd, vi, group, true /*isLoad*/);
+  ldStInfo.initIndexed(elemSize, vd, vi, group, ixGroup, true /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   if (start >= vecRegs_.elemCount())
@@ -13328,8 +13341,12 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
   unsigned group = groupX8 / 8;
 
+  // Effective index reg group. If group is fractional, snap to 1.
+  offsetGroupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), offsetGroupX8);
+  unsigned ixGroup = offsetGroupX8 / 8;
+
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.initIndexed(elemSize, vd, vi, group, false /*isLoad*/);
+  ldStInfo.initIndexed(elemSize, vd, vi, group, ixGroup, false /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix)

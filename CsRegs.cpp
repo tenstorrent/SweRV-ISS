@@ -3303,7 +3303,7 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("mtopei",     CN::MTOPEI,     !mand, !imp, 0, wam, wam);
   defineCsr("mtopi",      CN::MTOPI,      !mand, !imp, 0, wam, wam);
   
-  URV mask = 0b10'000'0010;  // Bits 9 and 1 (SEI, SSI).
+  URV mask = 0b10'0000'0010;  // Bits 9 and 1 (SEI, SSI).
   defineCsr("mvien",      CN::MVIEN,      !mand, !imp, 0, mask, mask);
 
   defineCsr("mvip",       CN::MVIP,       !mand, !imp, 0, mask, mask);
