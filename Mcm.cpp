@@ -253,86 +253,65 @@ template <typename URV>
 void
 Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr)
 {
-  const DecodedInst& di = instr.di_;
-  assert(di.isVectorLoad());
-
-  uint64_t time = 0;
-
-  unsigned base, group = 1;  // First register and group of destination vec register.
-  if (not hart.getLastVecLdStRegsUsed(di, 0, base, group))  // Operand 0 is destination reg.
-    return; // No register was written by vector load.
-
-  unsigned hartIx = hart.sysHartIndex();
-
-  // In case no vec register was written.
-  for (unsigned ix = 0; ix < group; ++ix)
-    {
-      setVecRegTime(hartIx, base + ix, 0);
-      setVecRegProducer(hartIx, base + ix, 0);
-    }
-
-  if (group == 1)
-    {
-      for (const auto& opIx : instr.memOps_)
-	if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ > time)
-	  time = sysMemOps_.at(opIx).time_;
-
-      setVecRegProducer(hartIx, base, instr.tag_);
-      setVecRegTime(hartIx, base, time);
-      return;
-    }
+  assert(instr.di_.isVectorLoad());
 
   auto& info = hart.getLastVectorMemory();
   auto& elems = info.elems_;
   unsigned elemSize = info.elemSize_;
+  assert(elemSize != 0);
+  unsigned elemsPerVec = hart.vecRegSize() / elemSize;
+
+  unsigned hartIx = hart.sysHartIndex();
+
+  // In case no vec register was loaded: Initialize producer/time to 0.
+  // FIX: if mask policy is preserve, time and producer should not be changed.
+  std::array<bool, 32> usedRegs;
+  for (auto& elem : elems)
+    if (not elem.masked_)
+      {
+	unsigned regNum = info.vec_ + elem.field_*info.gm_ + elem.ix_ / elemsPerVec;
+	usedRegs.at(regNum) = true;
+      }
+
+  for (unsigned regNum = 0; regNum < 32; ++regNum)
+    if (usedRegs.at(regNum))
+      {
+	setVecRegTime(hartIx, regNum, 0);
+	setVecRegProducer(hartIx, regNum, 0);
+      }
+
   if (elemSize == 0 or elems.empty())
     return;  // Should not happen.
 
-  unsigned elemsPerVec = hart.vecRegSize() / elemSize;
-  unsigned nfields = di.vecFieldCount();
-
-  for (unsigned ix = 0; ix < group * nfields; ++ix)
+  for (auto& elem : elems)
     {
-      uint64_t regTime = 0;  // Vector register time
+      if (elem.masked_)
+	continue;
 
-      unsigned offset = ix * elemsPerVec;
-      for (unsigned elemIx = 0; elemIx < elemsPerVec; ++elemIx)  // Elem ix in vec reg.
+      uint64_t pa1 = elem.pa_, pa2 = elem.pa2_;
+      unsigned size = elemSize, size1 = elemSize;
+      
+      if (pa1 != pa2)
 	{
-	  unsigned ixInGroup = offset + elemIx;    // Elem ix in vec-reg-group
-	  if (ixInGroup >= elems.size())
-	    continue;  // Should not happen
-
-	  if (elems.at(ixInGroup).masked_)
-	    continue;
-
-	  uint64_t pa1 = elems.at(ixInGroup).pa_, pa2 = elems.at(ixInGroup).pa2_;
-	  unsigned size1 = elemSize, size2 = 0;
-	  if (pa1 != pa2)
-	    {
-	      size1 = offsetToNextPage(pa1);
-	      assert(size1 > 0 and size1 < 8);
-	      size2 = elemSize - size1;
-	    }
-
-	  for (unsigned i = 0; i < size1; ++i)
-	    {
-	      uint64_t addr = pa1 + i;
-	      uint64_t byteTime = latestByteTime(instr, addr);
-	      regTime = std::max(byteTime, regTime);
-	    }
-
-	  for (unsigned i = 0; i < size2; ++i)
-	    {
-	      uint64_t addr = pa2 + i;
-	      uint64_t byteTime = latestByteTime(instr, addr);
-	      regTime = std::max(byteTime, regTime);
-	    }
+	  size1 = offsetToNextPage(pa1);
+	  assert(size1 > 0 and size1 < 8);
 	}
 
-      setVecRegTime(hartIx, base + ix, regTime);
+      unsigned regNum = info.vec_ + elem.field_*info.gm_ + elem.ix_ / elemsPerVec;
+
+      auto regTime = vecRegTime(hartIx, regNum);
+
+      for (unsigned i = 0; i < size; ++i)
+	{
+	  uint64_t addr = (pa1 == pa2) ? pa1 + i : pa2 + (i - size1);
+	  auto byteTime = latestByteTime(instr, addr);
+	  regTime = std::max(byteTime, regTime);
+	}
+
+      setVecRegTime(hartIx, regNum, regTime);
 
       McmInstrIx regProd = (regTime == 0)? 0 : instr.tag_;
-      setVecRegProducer(hartIx, base + ix, regProd);
+      setVecRegProducer(hartIx, regNum, regProd);
     }
 }
 

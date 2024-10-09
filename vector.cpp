@@ -11513,8 +11513,9 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   unsigned elemCount = (group*vecRegs_.bytesPerRegister()*fieldCount) / elemBytes;
   URV addr = intRegs_.read(rs1) + start*elemBytes;
 
+  // We don't set the field count for whole register load, we scale group instead.
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemBytes, vd, group, true /*isLoad*/);
+  ldStInfo.init(elemBytes, vd, group*fieldCount, true /*isLoad*/);
 
   if (start >= elemCount)
     return true;
@@ -11663,8 +11664,9 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di)
   unsigned elemCount = (group*vecRegs_.bytesPerRegister()*fieldCount) / elemBytes;
   URV addr = intRegs_.read(rs1) + start*elemBytes;
 
+  // We don't set the field count for whole register store, we scale group instead.
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemBytes, vd, group, false /*isLoad*/);
+  ldStInfo.init(elemBytes, vd, group*fieldCount, false /*isLoad*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += elemBytes)
     {
