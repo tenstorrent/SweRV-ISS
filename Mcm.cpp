@@ -3132,13 +3132,15 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 	      uint64_t addr = op.pa_ + i;
 	      if (locallyWritten.contains(addr))
 		continue;
+              if (not overlaps(instrA, op))
+                continue;
 	      if (not instrA.di_.isAtomic())
 		locallyWritten.insert(addr);
-	      else if (not isBeforeInMemoryTime(instrA, instrB))
+              else if (op.time_ < latestOpTime(instrA))
 		{
 		  cerr << "Error: PPO rule 3 failed: hart-id=" << hart.hartId() << " tag1="
 		       << instrA.tag_ << " tag2=" << instrB.tag_ << " time1="
-		       << latestOpTime(instrA) << " time2=" << earlyB
+		       << latestOpTime(instrA) << " time2=" << op.time_
 		       << '\n';
 		  return false;
 		}
