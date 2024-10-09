@@ -264,8 +264,12 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 
   unsigned hartIx = hart.sysHartIndex();
 
+  unsigned nfields = di.vecFieldCount();
+  if (nfields == 0)
+    nfields = 1;
+
   // In case no vec register was written.
-  for (unsigned ix = 0; ix < group; ++ix)
+  for (unsigned ix = 0; ix < group * nfields; ++ix)
     {
       setVecRegTime(hartIx, base + ix, 0);
       setVecRegProducer(hartIx, base + ix, 0);
@@ -277,8 +281,11 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 	if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ > time)
 	  time = sysMemOps_.at(opIx).time_;
 
-      setVecRegProducer(hartIx, base, instr.tag_);
-      setVecRegTime(hartIx, base, time);
+      for (unsigned i = 0; i < nfields; ++i)
+	{
+	  setVecRegProducer(hartIx, base + i, instr.tag_);
+	  setVecRegTime(hartIx, base + i, time);
+	}
       return;
     }
 
@@ -289,7 +296,6 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
     return;  // Should not happen.
 
   unsigned elemsPerVec = hart.vecRegSize() / elemSize;
-  unsigned nfields = di.vecFieldCount();
 
   for (unsigned ix = 0; ix < group * nfields; ++ix)
     {
