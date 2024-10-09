@@ -269,7 +269,7 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
   for (auto& elem : elems)
     if (not elem.masked_)
       {
-	unsigned regNum = info.vec_ + elem.field_*info.gm_ + elem.ix_ / elemsPerVec;
+	unsigned regNum = info.vec_ + elem.field_*info.group_ + elem.ix_ / elemsPerVec;
 	usedRegs.at(regNum) = true;
       }
 
@@ -297,7 +297,7 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 	  assert(size1 > 0 and size1 < 8);
 	}
 
-      unsigned regNum = info.vec_ + elem.field_*info.gm_ + elem.ix_ / elemsPerVec;
+      unsigned regNum = info.vec_ + elem.field_*info.group_ + elem.ix_ / elemsPerVec;
 
       auto regTime = vecRegTime(hartIx, regNum);
 

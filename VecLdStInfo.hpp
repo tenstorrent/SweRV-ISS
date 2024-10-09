@@ -58,11 +58,11 @@ namespace WdRiscv
 
     /// Set element size (in bytes), data vector register, group multiplier, and type
     /// (load or store).
-    void init(unsigned elemSize, unsigned vecReg, unsigned gm, bool isLoad)
+    void init(unsigned elemSize, unsigned vecReg, unsigned group, bool isLoad)
     {
       elemSize_ = elemSize;
       vec_ = vecReg;
-      gm_ = gm;
+      group_ = group;
       isLoad_ = isLoad;
       
       isIndexed_ = false;
@@ -72,14 +72,15 @@ namespace WdRiscv
       fields_ = 0;
     }
 
-    /// Set element size (in bytes), data vector register, index vector register, and type
-    /// (load or store).
-    void initIndexed(unsigned elemSize, unsigned vecReg, unsigned ixReg, unsigned gm,
-		     bool isLoad)
+    /// Set element size (in bytes), data vector register, index vector register, data
+    // group multiplier, index group multiplier, and type (load or store).
+    void initIndexed(unsigned elemSize, unsigned vecReg, unsigned ixReg, unsigned group,
+		     unsigned ixGroup, bool isLoad)
     {
-      init(elemSize, vecReg, gm, isLoad);
+      init(elemSize, vecReg, group, isLoad);
       isIndexed_ = true;
       ixVec_ = ixReg;
+      ixGroup_ = ixGroup;
     }
 
     /// Set the field count. Used for ld/st segment and ld/st whole regs.
@@ -121,7 +122,8 @@ namespace WdRiscv
     unsigned vec_ = 0;                // Base data vector register.
     unsigned ixVec_ = 0;              // Base index vector register.
     unsigned fields_ = 0;             // For load/store segment.
-    unsigned gm_ = 0;                 // Group multiplier or 1 if fractional.
+    unsigned group_ = 0;              // Group multiplier or 1 if fractional.
+    unsigned ixGroup_ = 0;            // Group multiplier of index vec or 1 if fractional.
     bool isLoad_ = false;             // True for load instructions.
     bool isIndexed_ = false;          // True for indexed instructions.
     bool isSegmented_ = false;        // True for load/store segment.
