@@ -283,6 +283,7 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
   if (elemSize == 0 or elems.empty())
     return;  // Should not happen.
 
+
   for (auto& elem : elems)
     {
       if (elem.masked_)
