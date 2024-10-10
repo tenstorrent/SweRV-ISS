@@ -604,12 +604,13 @@ PerfApi::drainStore(unsigned hartIx, uint64_t time, uint64_t tag)
 	{
 	  std::cerr << "Hart=" << hartIx << " time=" << time << " tag=" << tag
 		    << " Instruction drained more than once\n";
+	  assert(0);
 	}
 
       uint64_t value = packet.storeData_;
       uint64_t addr = packet.dpa_;    // FIX TODO : Handle page crossing store.
 
-      if (not commitMemoryWrite(*hart, addr, packet.dsize_, value))
+      if (packet.dsize_ and not commitMemoryWrite(*hart, addr, packet.dsize_, value))
 	assert(0);
 
       packet.drained_ = true;
