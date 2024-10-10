@@ -11100,6 +11100,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 
   unsigned elemSize = sizeof(ELEM_TYPE);
   unsigned elemMax = vecRegs_.elemMax(eew); // Includes tail elems.
+  unsigned elemCount = vecRegs_.elemCount();  // Does not include tail elems.
   unsigned start = csRegs_.peekVstart();
   uint64_t addr = intRegs_.read(rs1) + start*elemSize;
 
@@ -11108,17 +11109,18 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   unsigned group = groupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, group, true /*isLoad*/);
+  ldStInfo.init(elemCount, elemSize, vd, group, true /*isLoad*/);
 
-  if (start >= vecRegs_.elemCount())
+  if (start >= elemCount)
     return true;
 
   for (unsigned ix = start; ix < elemMax; ++ix, addr += elemSize)
     {
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, groupX8, masked, elem);
-      if (ix < vecRegs_.elemCount())
-	ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
+
+      ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
+
       if (skip)
 	{
           vecRegs_.write(vd, ix, groupX8, elem);
@@ -11291,12 +11293,14 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   unsigned group = groupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, group, false /*isLoad*/);
+  ldStInfo.init(elemCount, elemSize, vd, group, false /*isLoad*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += elemSize)
     {
       bool skip = masked and not vecRegs_.isActive(0, ix);
+
       ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
+
       if (skip)
 	continue;
 
@@ -11515,7 +11519,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
   // We don't set the field count for whole register load, we scale group instead.
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemBytes, vd, group*fieldCount, true /*isLoad*/);
+  ldStInfo.init(elemCount, elemBytes, vd, group*fieldCount, true /*isLoad*/);
 
   if (start >= elemCount)
     return true;
@@ -11666,7 +11670,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di)
 
   // We don't set the field count for whole register store, we scale group instead.
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemBytes, vd, group*fieldCount, false /*isLoad*/);
+  ldStInfo.init(elemCount, elemBytes, vd, group*fieldCount, false /*isLoad*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += elemBytes)
     {
@@ -11838,6 +11842,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   uint64_t stride = intRegs_.read(rs2);
   unsigned start = csRegs_.peekVstart();
   unsigned elemMax = vecRegs_.elemMax(eew);   // Includes tail elements.
+  unsigned elemCount = vecRegs_.elemCount();  // Does not include tail elements.
   uint64_t addr = intRegs_.read(rs1) + start*stride;
 
   // Effective group. If group is fractional, snap to 1.
@@ -11846,17 +11851,16 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
   unsigned elemSize = sizeof(ELEM_TYPE);
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, group, true /*isLoad*/);
+  ldStInfo.init(elemCount, elemSize, vd, group, true /*isLoad*/);
 
-  if (start >= vecRegs_.elemCount())
+  if (start >= elemCount)
     return true;
 
   for (unsigned ix = start; ix < elemMax; ++ix, addr += stride)
     {
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, groupX8, masked, elem);
-      if (ix < vecRegs_.elemCount())
-	ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
+      ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
 
       if (skip)
 	{
@@ -12006,7 +12010,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   unsigned group = groupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, group, false /*isLoad*/);
+  ldStInfo.init(elemCount, elemSize, vd, group, false /*isLoad*/);
 
   // TODO check permissions, translate, ....
   for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
@@ -12149,6 +12153,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
   unsigned start = csRegs_.peekVstart();
   unsigned elemMax = vecRegs_.elemMax();  // Includes tail elements.
+  unsigned elemCount = vecRegs_.elemCount();  // Does not include tail elements.
   unsigned elemSize = elemWidth / 8;
 
   // Effective group. If group is fractional, snap to 1.
@@ -12160,9 +12165,9 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   unsigned ixGroup = offsetGroupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.initIndexed(elemSize, vd, vi, group, ixGroup, true /*isLoad*/);
+  ldStInfo.initIndexed(elemCount, elemSize, vd, vi, group, ixGroup, true /*isLoad*/);
 
-  if (start >= vecRegs_.elemCount())
+  if (start >= elemCount)
     return true;
 
   for (unsigned ix = start; ix < elemMax; ++ix)
@@ -12175,8 +12180,10 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
           uint64_t offset = 0;
           vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset);
           vaddr = addr + offset;
-	  ldStInfo.addElem(VecLdStElem{vaddr, vaddr, vaddr, 0, ix, skip});
         }
+
+      ldStInfo.addElem(VecLdStElem{vaddr, vaddr, vaddr, 0, ix, skip});
+
       if (skip)
 	{
           vecRegs_.write(vd, ix, groupX8, elem);
@@ -12376,7 +12383,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   unsigned ixGroup = offsetGroupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.initIndexed(elemSize, vd, vi, group, ixGroup, false /*isLoad*/);
+  ldStInfo.initIndexed(elemCount, elemSize, vd, vi, group, ixGroup, false /*isLoad*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
@@ -12608,6 +12615,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   unsigned start = csRegs_.peekVstart();
   uint64_t addr = intRegs_.read(rs1) + start*stride;
   unsigned elemMax = vecRegs_.elemMax(eew);  // Includes tail elements.
+  unsigned elemCount = vecRegs_.elemCount();  // Does not include tail elements.
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
   // Used registers must not exceed 32.
@@ -12624,10 +12632,10 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   unsigned group = groupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, group, true /*isLoad*/);
+  ldStInfo.init(elemCount, elemSize, vd, group, true /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
-  if (start >= vecRegs_.elemCount())
+  if (start >= elemCount)
     return true;
 
   unsigned destGroup = 8*eg;
@@ -12641,8 +12649,8 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	  unsigned dvg = vd + field*eg;   // Destination vector gorup.
 	  ELEM_TYPE elem(0);
 	  bool skip = not vecRegs_.isDestActive(dvg, ix, destGroup, masked, elem);
-          if (ix < vecRegs_.elemCount())
-	    ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
+
+	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
 
 	  if (skip)
 	    {
@@ -12831,7 +12839,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   unsigned group = groupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemSize, vd, group, false /*isLoad*/);
+  ldStInfo.init(elemCount, elemSize, vd, group, false /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
@@ -13148,6 +13156,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   uint64_t addr = intRegs_.read(rs1);
   unsigned start = csRegs_.peekVstart(), elemSize = elemWidth / 8;
   unsigned elemMax = vecRegs_.elemMax();  // Includes tail elements.
+  unsigned elemCount = vecRegs_.elemCount();  // Does not include tail elements.
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
   // Used registers must not exceed 32.
@@ -13166,10 +13175,10 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   unsigned ixGroup = offsetGroupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.initIndexed(elemSize, vd, vi, group, ixGroup, true /*isLoad*/);
+  ldStInfo.initIndexed(elemCount, elemSize, vd, vi, group, ixGroup, true /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
-  if (start >= vecRegs_.elemCount())
+  if (start >= elemCount)
     return true;
 
   unsigned destGroup = 8*eg;
@@ -13189,8 +13198,10 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
                 assert(0);
 
               faddr = addr + offset + field*elemSize;
-              ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
             }
+
+	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
+
 	  if (skip)
 	    {
 	      vecRegs_.write(dvg, ix, destGroup, elem);
@@ -13346,7 +13357,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   unsigned ixGroup = offsetGroupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.initIndexed(elemSize, vd, vi, group, ixGroup, false /*isLoad*/);
+  ldStInfo.initIndexed(elemCount, elemSize, vd, vi, group, ixGroup, false /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   for (unsigned ix = start; ix < elemCount; ++ix)

@@ -274,7 +274,7 @@ Mcm<URV>::getLdStDataVectors(const Hart<URV>& hart, const McmInstr& instr,
     {
       unsigned regNum = info.vec_ + elem.field_*info.group_ + elem.ix_ / elemsPerVec;
       vecReferenced.at(regNum) = true;
-      if (not elem.masked_)
+      if (not elem.skip_)
 	vecUsed.at(regNum) = true;
     }
 
@@ -315,7 +315,7 @@ Mcm<URV>::getLdStIndexVectors(const Hart<URV>& hart, const McmInstr& instr,
     {
       unsigned regNum = info.ixVec_ + elem.ix_ / elemsPerVec;
       vecReferenced.at(regNum) = true;
-      if (not elem.masked_)
+      if (not elem.skip_)
 	vecUsed.at(regNum) = true;
     }
 
@@ -359,8 +359,8 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 
   for (auto& elem : elems)
     {
-      if (elem.masked_)
-	continue;
+      if (elem.skip_)
+	continue;  // Non active element
 
       uint64_t pa1 = elem.pa_, pa2 = elem.pa2_;
       unsigned size = elemSize, size1 = elemSize;
@@ -969,9 +969,8 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 
       for (auto& elem : elems)
         {
-          bool skip = elem.masked_;
-	  if (skip)
-	    continue;
+	  if (elem.skip_)
+	    continue;  // Non-active element
 
 	  unsigned dataReg = hart.identifyDataRegister(info, elem);
 	  unsigned ixReg = info.isIndexed_ ? dataReg - elem.field_ : 0;
@@ -2076,8 +2075,8 @@ Mcm<URV>::collectVecRefElems(Hart<URV>& hart, McmInstr* instr, unsigned& activeC
 
   for (auto& elem : elems)
     {
-      if (elem.masked_)
-	continue;  // Masked off element.
+      if (elem.skip_)
+	continue;  // Non-active element.
 
       activeCount++;
 
@@ -4696,8 +4695,8 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned b
 
 	  auto& elem = elems.at(elemIx);
 
-	  if (elem.masked_)
-	    continue;
+	  if (elem.skip_)
+	    continue;  // Non-active element.
 
 	  uint64_t pa1 = elem.pa_, pa2 = elem.pa2_;
 	  unsigned size1 = elemSize, size2 = 0;
@@ -4748,8 +4747,8 @@ Mcm<URV>::getVecRegEarlyTime(Hart<URV>& hart, const McmInstr& instr, unsigned re
 
   for (auto& elem : elems)
     {
-      if (elem.masked_ or elem.ix_ != regNum)
-	continue;
+      if (elem.skip_ or elem.ix_ != regNum)
+	continue;  // Non active element or wrong vec register
 
       uint64_t pa1 = elem.pa_, pa2 = elem.pa2_;
       unsigned size = elemSize, size1 = elemSize;

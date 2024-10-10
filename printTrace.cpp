@@ -750,7 +750,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
           buffer.print(einfo.va_);
           if (einfo.pa_ != einfo.va_)
             buffer.printChar(':').print(einfo.pa_);
-          if (einfo.masked_)
+          if (einfo.skip_)
             buffer.printChar('m');
           if (not vecInfo.isLoad_)
             buffer.printChar('=').print(einfo.stData_);

@@ -28,15 +28,15 @@ namespace WdRiscv
     uint64_t stData_ = 0;  // Store data.
     unsigned ix_ = 0;      // Index of element in vector register group.
     unsigned field_ = 0;   // For segment load store: field of element.
-    bool masked_ = false;  // True if element is masked off (element skipped).
+    bool skip_ = false;    // True if element is not active (masked off or tail).
 
     VecLdStElem()
     { }
 
     VecLdStElem(uint64_t va, uint64_t pa, uint64_t pa2, uint64_t data, unsigned ix,
-		bool masked, unsigned field = 0)
+		bool skipped, unsigned field = 0)
       : va_{va}, pa_{pa}, pa2_{pa2}, stData_{data}, ix_{ix}, field_{field},
-	masked_{masked}
+	skip_{skipped}
     { }
   };
 
@@ -58,8 +58,9 @@ namespace WdRiscv
 
     /// Set element size (in bytes), data vector register, group multiplier, and type
     /// (load or store).
-    void init(unsigned elemSize, unsigned vecReg, unsigned group, bool isLoad)
+    void init(unsigned elemCount, unsigned elemSize, unsigned vecReg, unsigned group, bool isLoad)
     {
+      elemCount_ = elemCount;
       elemSize_ = elemSize;
       vec_ = vecReg;
       group_ = group;
@@ -74,10 +75,10 @@ namespace WdRiscv
 
     /// Set element size (in bytes), data vector register, index vector register, data
     // group multiplier, index group multiplier, and type (load or store).
-    void initIndexed(unsigned elemSize, unsigned vecReg, unsigned ixReg, unsigned group,
-		     unsigned ixGroup, bool isLoad)
+    void initIndexed(unsigned elemCount, unsigned elemSize, unsigned vecReg, unsigned ixReg,
+		     unsigned group, unsigned ixGroup, bool isLoad)
     {
-      init(elemSize, vecReg, group, isLoad);
+      init(elemCount, elemSize, vecReg, group, isLoad);
       isIndexed_ = true;
       ixVec_ = ixReg;
       ixGroup_ = ixGroup;
@@ -118,6 +119,7 @@ namespace WdRiscv
       elems_.resize(elems_.size() - 1);
     }
 
+    unsigned elemCount_ = 0;          // VL, elems with ix >= elemCount_ are tail elems.
     unsigned elemSize_ = 0;           // Elem size in bytes.
     unsigned vec_ = 0;                // Base data vector register.
     unsigned ixVec_ = 0;              // Base index vector register.
