@@ -377,7 +377,7 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 
       for (unsigned i = 0; i < size; ++i)
 	{
-	  uint64_t addr = (pa1 == pa2) ? pa1 + i : pa2 + (i - size1);
+	  uint64_t addr = i < size1 ? pa1 + i : pa2 + i - size1;
 	  auto byteTime = latestByteTime(instr, addr);
 	  regTime = std::max(byteTime, regTime);
 	}
@@ -2357,9 +2357,7 @@ Mcm<URV>::vecReadOpOverlapsElem(const MemoryOp& op, uint64_t pa1, uint64_t pa2,
 
   for (unsigned i = 0; i < size; ++i)
     {
-      uint64_t addr = pa1 + i;
-      if (i >= size1)
-	addr = pa2 + i - size1;
+      uint64_t addr = i < size1 ? pa1 + i : pa2 + i - size1;
       if (vecReadOpOverlapsElemByte(op, addr, elemIx, field))
 	return true;
     }
@@ -4020,26 +4018,27 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
       const auto& regTime = hartData_.at(hartIx).regTime_;
       const auto& regProducer = hartData_.at(hartIx).regProducer_;
 
-      unsigned base = 0, count = 1;
-      if (hart.getLastVecLdStRegsUsed(bdi, 0, base, count))  // Dest reg is oeprand 0
-	{
-	  std::vector<uint64_t> dataEarlyTimes;  // Times when B wrote its registers.
-	  getVecRegEarlyTimes(hart, instrB, base, count, dataEarlyTimes);
+      std::array<std::pair<unsigned, bool>, 32> dataVecs;  // reg-num/masked pairs
+      unsigned count = getLdStDataVectors(hart, instrB, dataVecs);
 
-          unsigned offsetReg = base + vecRegOffset_;
-          for (unsigned i = 0; i < count; ++i)
-            {
-	      auto atag = regProducer.at(offsetReg + i);
-	      if (atag == 0)
-		continue;
-              auto atime = regTime.at(offsetReg + i);  // Time A data reg was produced.
-	      auto btime = dataEarlyTimes.at(i);       // Time B data reg was written.
-	      if (btime <= atime)
-		{
-		  cerr << "Error: PPO rule 10 failed: hart-id=" << hart.hartId()
-		       << " tag1=" << atag << " tag2=" << instrB.tag_ << " time1="
-		       << atime << " time2=" << btime << '\n';
-		}
+      for (unsigned i = 0; i < count; ++i)
+	{
+	  auto [dataReg, masked] = dataVecs.at(i);
+	  //if (masked)
+	  //  continue;
+
+	  auto atag = regProducer.at(dataReg + vecRegOffset_);
+	  if (atag == 0)
+	    continue;
+
+	  auto atime = regTime.at(dataReg + vecRegOffset_);  // Time A data reg was produced.
+	  auto btime = getVecRegEarlyTime(hart, instrB, dataReg);
+
+	  if (btime <= atime)
+	    {
+	      cerr << "Error: PPO rule 10 failed: hart-id=" << hart.hartId()
+		   << " tag1=" << atag << " tag2=" << instrB.tag_ << " time1="
+		   << atime << " time2=" << btime << '\n';
 	      return false;
 	    }
 	}
@@ -4629,6 +4628,7 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
 }
 
 
+// TODO FIX: remove
 template <typename URV>
 void
 Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned base,
@@ -4718,6 +4718,50 @@ Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned b
     }
 }
 
+
+template <typename URV>
+uint64_t
+Mcm<URV>::getVecRegEarlyTime(Hart<URV>& hart, const McmInstr& instr, unsigned regNum) const
+{
+  uint64_t maxVal = ~uint64_t(0);
+  uint64_t time = maxVal;   // In case no memory ops or all elements masked.
+
+  if (instr.memOps_.empty())
+    return time;
+
+  const VecLdStInfo& info = hart.getLastVectorMemory();
+  auto elemSize = info.elemSize_;
+  const auto& elems = info.elems_;
+
+  if (elemSize == 0 or info.elems_.empty())
+    return time;  // Should not happen.
+
+  for (auto& elem : elems)
+    {
+      if (elem.masked_ or elem.ix_ != regNum)
+	continue;
+
+      uint64_t pa1 = elem.pa_, pa2 = elem.pa2_;
+      unsigned size = elemSize, size1 = elemSize;
+      if (pa1 != pa2)
+	{
+	  size1 = offsetToNextPage(pa1);
+	  assert(size1 > 0 and size1 < 8);
+	}
+
+      for (unsigned i = 0; i < size; ++i)
+	{
+	  uint64_t addr = i < size1 ? pa1 + i : pa2 + i - size1;
+
+	  // FIX match element index and field.
+	  uint64_t byteTime = earliestByteTime(instr, addr);
+	  if (byteTime > 0)  // Byte time is zero for undrained writes.
+	    time = std::min(byteTime, time);
+	}
+    }
+
+  return time;
+}
 
 template class WdRiscv::Mcm<uint32_t>;
 template class WdRiscv::Mcm<uint64_t>;

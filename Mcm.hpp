@@ -441,6 +441,8 @@ namespace WdRiscv
     void getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned base,
 			     unsigned count, std::vector<uint64_t>& times) const;
 
+    uint64_t getVecRegEarlyTime(Hart<URV>& hart, const McmInstr& instr, unsigned regNum) const;
+
     /// Trim read operations to match reference (whisper). Mark replay read ops as
     /// canceled. Remove cancled ops.
     bool commitReadOps(Hart<URV>& hart, McmInstr*);
