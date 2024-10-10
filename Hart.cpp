@@ -9953,6 +9953,8 @@ Hart<URV>::execEbreak(const DecodedInst*)
 
   if (inDebugParkLoop_)
     {
+      pc_ = debugParkLoop_;
+      return;
       if (hasDcsr)
 	{
 	  DcsrFields<URV> fields{dcsrVal};
