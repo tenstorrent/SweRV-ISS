@@ -249,11 +249,10 @@ Mcm<URV>::setBranchMemTime(const Hart<URV>& hart, const McmInstr& instr)
 }
 
 
-/// Put the in the given array the indices of the vector data registers of the crrently
+/// Put in the given array the indices of the vector data registers of the currently
 /// retiring vector load/store instruction, each index is associated with a bool
-/// indicating whether or not the whole vector is masked. by the currently retiring vector
-/// ld/st Return 0 if no vector register is referenced or if the instruction is not a
-/// vector ld/st.
+/// indicating whether or not the whole vector is masked. Return 0 if no vector register
+/// is referenced or if the instruction is not a vector ld/st.
 template <typename URV>
 unsigned
 Mcm<URV>::getLdStDataVectors(const Hart<URV>& hart, const McmInstr& instr,
@@ -274,6 +273,47 @@ Mcm<URV>::getLdStDataVectors(const Hart<URV>& hart, const McmInstr& instr,
   for (auto& elem : elems)
     {
       unsigned regNum = info.vec_ + elem.field_*info.group_ + elem.ix_ / elemsPerVec;
+      vecReferenced.at(regNum) = true;
+      if (not elem.masked_)
+	vecUsed.at(regNum) = true;
+    }
+
+  unsigned count = 0;
+  for (unsigned regNum = 0; regNum < 32; ++regNum)
+    if (vecReferenced.at(regNum))
+      vecs.at(count++) = std::pair<unsigned, bool>{regNum, not vecUsed.at(regNum)};
+
+  return count;
+}
+
+
+/// Put in the given array the indices of the vector index registers of the currently
+/// retiring vector load/store indexed instruction, each index is associated with a bool
+/// indicating whether or not the whole vector is masked. Return 0 if no vector register
+/// is referenced or if the instruction is not a vector ld/st.
+template <typename URV>
+unsigned
+Mcm<URV>::getLdStIndexVectors(const Hart<URV>& hart, const McmInstr& instr,
+			      std::array<std::pair<unsigned,bool>, 32>& vecs) const
+{
+  if (not instr.di_.isVectorLoad() and not instr.di_.isVectorStore())
+    return 0;
+
+  auto& info = hart.getLastVectorMemory();
+  if (not info.isIndexed_)
+    return 0;
+
+  auto& elems = info.elems_;
+  unsigned elemSize = info.elemSize_;
+  assert(elemSize != 0);
+  unsigned elemsPerVec = hart.vecRegSize() / elemSize;
+
+  std::array<bool, 32> vecReferenced;  for (auto& x : vecReferenced) x = false;
+  std::array<bool, 32> vecUsed;        for (auto& x : vecUsed) x = false;
+
+  for (auto& elem : elems)
+    {
+      unsigned regNum = info.ixVec_ + elem.ix_ / elemsPerVec;
       vecReferenced.at(regNum) = true;
       if (not elem.masked_)
 	vecUsed.at(regNum) = true;
@@ -655,41 +695,42 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
     {
       std::array<std::pair<unsigned, bool>, 32> dataVecs;  // reg-num/masked pairs
       unsigned count = getLdStDataVectors(hart, instr, dataVecs);
+      unsigned active = 0;
       for (unsigned i = 0; i < count; ++i)
         {
 	  auto [dataReg, masked] = dataVecs.at(i);
 	  //if (masked)
 	  //  continue;
 
-	  auto dataTime = regTime.at(dataReg + vecRegOffset_);
-	  auto dataProducer = regProducer.at(dataReg + vecRegOffset_);
-	  if (dataTime >= instr.dataTime_)
+	  auto time = regTime.at(dataReg + vecRegOffset_);
+	  auto producer = regProducer.at(dataReg + vecRegOffset_);
+	  if (time >= instr.dataTime_)
 	    {
-	      instr.dataProducer_ = dataProducer;
-	      instr.dataTime_ = dataTime;
+	      instr.dataProducer_ = producer;
+	      instr.dataTime_ = time;
 	    }
 
-	  instr.vecProdTimes_.at(i) = McmInstr::VecProdTime{dataReg, dataProducer, dataTime};
+	  instr.vecProdTimes_.at(active++) = McmInstr::VecProdTime{dataReg, producer, time};
         }
     }
 
   if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
     {
-      unsigned base, count = 1;
-      if (hart.getLastVecLdStRegsUsed(di, 2, base, count))  // Operand 2 is index register
-        {
-          unsigned ixReg = base + vecRegOffset_;
-          for (unsigned i = 0; i < count; ++i)
-            {
-              auto ixTime = regTime.at(ixReg + i);
-	      auto ixProducer = regProducer.at(ixReg + i);
+      std::array<std::pair<unsigned, bool>, 32> ixRegs;  // reg-num/masked pairs
+      unsigned count = getLdStIndexVectors(hart, instr, ixRegs);
+      unsigned active = 0;
+      for (unsigned i = 0; i < count; ++i)
+	{
+	  auto [ixReg, masked] = ixRegs.at(i);
+	  // if (masked)
+	  //   continue;
 
-	      // We do not update addrProducer_ and addrTime_: those are for the scalar
-	      // address register.
+	  auto time = regTime.at(ixReg);
+	  auto producer = regProducer.at(ixReg);
 
-	      unsigned vec = base + i;  // Index vector.
-	      instr.ixProdTimes_.at(i) = McmInstr::VecProdTime{vec, ixProducer, ixTime};
-            }
+	  // We do not update addrProducer_ and addrTime_: those are for the scalar
+	  // address register.
+	  instr.ixProdTimes_.at(active++) = McmInstr::VecProdTime{ixReg, producer, time};
         }
     }
 }
