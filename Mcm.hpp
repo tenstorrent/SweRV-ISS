@@ -412,6 +412,13 @@ namespace WdRiscv
 
     using MemoryOpVec = std::vector<MemoryOp>;
 
+    enum VecKind
+      {
+	Skip,     // No active elements, all elements have agnostic mask/tail policy.
+	Active,   // Vector has at least one active element.
+	Preserve  // Vector has at least one element with preserve mask/tail policy.
+      };
+
     /// Helper to ppoRule1.
     void printPpo1Error(unsigned hartId, McmInstrIx tag1, McmInstrIx tag2, uint64_t t1,
 			uint64_t t2, uint64_t pa) const;
@@ -725,18 +732,20 @@ namespace WdRiscv
     void updateVecRegTimes(const Hart<URV>& hart, const McmInstr& instr);
 
     /// Put in the given array the indices of the vector data registers of the currently
-    /// retiring vector load/store instruction, each index is associated with a bool
-    /// indicating whether or not the whole vector is masked. Return 0 if no vector
+    /// retiring vector load/store instruction, each index is associated with a VecKind
+    /// indicating whether or not the vector is active (has one or more active element),
+    /// is preserved (has one or more masked/tail element with a preserve policy), or
+    /// skipped (all elements masked/tail with an agnostic policy). Return 0 if no vector
     /// register is referenced or if the instruction is not a vector ld/st.
     unsigned getLdStDataVectors(const Hart<URV>& hart, const McmInstr& instr,
-				std::array<std::pair<unsigned,bool>, 32>& vecs) const;
+				std::array<std::pair<unsigned,VecKind>, 32>& vecs) const;
 
     /// Put in the given array the indices of the vector index registers of the currently
     /// retiring vector load/store indexed instruction, each index is associated with a
-    /// bool indicating whether or not the whole vector is masked. Return 0 if no vector
-    /// register is referenced or if the instruction is not a vector ld/st.
+    /// VecKind (see previous method). Return 0 if no vector register is not referenced or
+    /// if the instruction is not a vector ld/st.
     unsigned getLdStIndexVectors(const Hart<URV>& hart, const McmInstr& instr,
-				 std::array<std::pair<unsigned,bool>, 32>& vecs) const;
+				 std::array<std::pair<unsigned,VecKind>, 32>& vecs) const;
 
     /// Set the memory time of the given branch instruction to the latest time (data was
     /// produced) of its registers. This branch memory time is used for checking

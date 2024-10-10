@@ -249,14 +249,10 @@ Mcm<URV>::setBranchMemTime(const Hart<URV>& hart, const McmInstr& instr)
 }
 
 
-/// Put in the given array the indices of the vector data registers of the currently
-/// retiring vector load/store instruction, each index is associated with a bool
-/// indicating whether or not the whole vector is masked. Return 0 if no vector register
-/// is referenced or if the instruction is not a vector ld/st.
 template <typename URV>
 unsigned
 Mcm<URV>::getLdStDataVectors(const Hart<URV>& hart, const McmInstr& instr,
-			     std::array<std::pair<unsigned,bool>, 32>& vecs) const
+			     std::array<std::pair<unsigned,VecKind>, 32>& vecs) const
 {
   if (not instr.di_.isVectorLoad() and not instr.di_.isVectorStore())
     return 0;
@@ -267,34 +263,48 @@ Mcm<URV>::getLdStDataVectors(const Hart<URV>& hart, const McmInstr& instr,
   assert(elemSize != 0);
   unsigned elemsPerVec = hart.vecRegSize() / elemSize;
 
-  std::array<bool, 32> vecReferenced;  for (auto& x : vecReferenced) x = false;
-  std::array<bool, 32> vecUsed;        for (auto& x : vecUsed) x = false;
+  std::array<bool, 32> referenced;  for (auto& x : referenced) x = false;
+  std::array<bool, 32> active;      for (auto& x : active)     x = false;
+  std::array<bool, 32> preserve;    for (auto& x : preserve)   x = true;
+
+  bool maskAgn = hart.isVectorMaskAgnostic();
+  bool tailAgn = hart.isVectorTailAgnostic();
 
   for (auto& elem : elems)
     {
       unsigned regNum = info.vec_ + elem.field_*info.group_ + elem.ix_ / elemsPerVec;
-      vecReferenced.at(regNum) = true;
-      if (not elem.skip_)
-	vecUsed.at(regNum) = true;
+      referenced.at(regNum) = true; // Vector covers one or more element of instr.
+
+      if (elem.skip_)
+	{
+	  bool masked = elem.ix_ < info.elemCount_;
+	  bool drop = masked ? maskAgn : tailAgn;
+	  preserve.at(regNum) = preserve.at(regNum) and not drop;
+	}
+      else
+	active.at(regNum) = true;   // Vector has one or more active element.
     }
 
   unsigned count = 0;
   for (unsigned regNum = 0; regNum < 32; ++regNum)
-    if (vecReferenced.at(regNum))
-      vecs.at(count++) = std::pair<unsigned, bool>{regNum, not vecUsed.at(regNum)};
+    if (referenced.at(regNum))
+      {
+	VecKind kind = VecKind::Skip;
+	if (active.at(regNum))
+	  kind = VecKind::Active;
+	else if (preserve.at(regNum))
+	  kind = VecKind::Preserve;
+	vecs.at(count++) = std::pair<unsigned, VecKind>{regNum, kind};
+      }
 
   return count;
 }
 
 
-/// Put in the given array the indices of the vector index registers of the currently
-/// retiring vector load/store indexed instruction, each index is associated with a bool
-/// indicating whether or not the whole vector is masked. Return 0 if no vector register
-/// is referenced or if the instruction is not a vector ld/st.
 template <typename URV>
 unsigned
 Mcm<URV>::getLdStIndexVectors(const Hart<URV>& hart, const McmInstr& instr,
-			      std::array<std::pair<unsigned,bool>, 32>& vecs) const
+			      std::array<std::pair<unsigned,VecKind>, 32>& vecs) const
 {
   if (not instr.di_.isVectorLoad() and not instr.di_.isVectorStore())
     return 0;
@@ -308,21 +318,39 @@ Mcm<URV>::getLdStIndexVectors(const Hart<URV>& hart, const McmInstr& instr,
   assert(elemSize != 0);
   unsigned elemsPerVec = hart.vecRegSize() / elemSize;
 
-  std::array<bool, 32> vecReferenced;  for (auto& x : vecReferenced) x = false;
-  std::array<bool, 32> vecUsed;        for (auto& x : vecUsed) x = false;
+  std::array<bool, 32> referenced;  for (auto& x : referenced) x = false;
+  std::array<bool, 32> active;      for (auto& x : active)     x = false;
+  std::array<bool, 32> preserve;    for (auto& x : preserve)   x = true;
+
+  bool maskAgn = hart.isVectorMaskAgnostic();
+  bool tailAgn = hart.isVectorTailAgnostic();
 
   for (auto& elem : elems)
     {
       unsigned regNum = info.ixVec_ + elem.ix_ / elemsPerVec;
-      vecReferenced.at(regNum) = true;
-      if (not elem.skip_)
-	vecUsed.at(regNum) = true;
+      referenced.at(regNum) = true;
+
+      if (elem.skip_)
+	{
+	  bool masked = elem.ix_ < info.elemCount_;
+	  bool drop = masked ? maskAgn : tailAgn;
+	  preserve.at(regNum) = preserve.at(regNum) and not drop;
+	}
+      else
+	active.at(regNum) = true;   // Vector has one or more active element.
     }
 
   unsigned count = 0;
   for (unsigned regNum = 0; regNum < 32; ++regNum)
-    if (vecReferenced.at(regNum))
-      vecs.at(count++) = std::pair<unsigned, bool>{regNum, not vecUsed.at(regNum)};
+    if (referenced.at(regNum))
+      {
+	VecKind kind = VecKind::Skip;
+	if (active.at(regNum))
+	  kind = VecKind::Active;
+	else if (preserve.at(regNum))
+	  kind = VecKind::Preserve;
+	vecs.at(count++) = std::pair<unsigned, VecKind>{regNum, kind};
+      }
 
   return count;
 }
@@ -342,15 +370,17 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 
   unsigned hartIx = hart.sysHartIndex();
 
-  // In case a vec has no active elements : Initialize producer/time to 0.
-  // FIX: if mask policy is preserve, time and producer should not be changed.
-  std::array<std::pair<unsigned, bool>, 32> dataRegs;
+  // Initialize producer/time to 0 unless whole vector is preserved.
+  std::array<std::pair<unsigned, VecKind>, 32> dataRegs;
   unsigned count = getLdStDataVectors(hart, instr, dataRegs);
   for (unsigned i = 0; i < count; ++i)
     {
-      auto [regNum, skip] = dataRegs.at(i);
-      setVecRegTime(hartIx, regNum, 0);
-      setVecRegProducer(hartIx, regNum, 0);
+      auto [regNum, kind] = dataRegs.at(i);
+      if (kind != VecKind::Preserve)
+	{
+	  setVecRegTime(hartIx, regNum, 0);
+	  setVecRegProducer(hartIx, regNum, 0);
+	}
     }
 
   if (elemSize == 0 or elems.empty())
@@ -693,14 +723,14 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
 
   if (di.isVectorStore())
     {
-      std::array<std::pair<unsigned, bool>, 32> dataVecs;  // reg-num/masked pairs
+      std::array<std::pair<unsigned, VecKind>, 32> dataVecs;  // reg-num/masked pairs
       unsigned count = getLdStDataVectors(hart, instr, dataVecs);
       unsigned active = 0;
       for (unsigned i = 0; i < count; ++i)
         {
-	  auto [dataReg, masked] = dataVecs.at(i);
-	  //if (masked)
-	  //  continue;
+	  auto [dataReg, kind] = dataVecs.at(i);
+	  if (kind != VecKind::Active)
+	    continue;  // Preserve does not apply to store.
 
 	  auto time = regTime.at(dataReg + vecRegOffset_);
 	  auto producer = regProducer.at(dataReg + vecRegOffset_);
@@ -716,14 +746,14 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
 
   if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
     {
-      std::array<std::pair<unsigned, bool>, 32> ixRegs;  // reg-num/masked pairs
+      std::array<std::pair<unsigned, VecKind>, 32> ixRegs;  // reg-num/masked pairs
       unsigned count = getLdStIndexVectors(hart, instr, ixRegs);
       unsigned active = 0;
       for (unsigned i = 0; i < count; ++i)
 	{
-	  auto [ixReg, masked] = ixRegs.at(i);
-	  // if (masked)
-	  //   continue;
+	  auto [ixReg, kind] = ixRegs.at(i);
+	  if (kind == VecKind::Skip)   // Should we check Preserve as well.
+	    continue;
 
 	  auto time = regTime.at(ixReg);
 	  auto producer = regProducer.at(ixReg);
@@ -4017,7 +4047,7 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
       const auto& regTime = hartData_.at(hartIx).regTime_;
       const auto& regProducer = hartData_.at(hartIx).regProducer_;
 
-      std::array<std::pair<unsigned, bool>, 32> dataVecs;  // reg-num/masked pairs
+      std::array<std::pair<unsigned, VecKind>, 32> dataVecs;  // reg-num/kind pairs
       unsigned count = getLdStDataVectors(hart, instrB, dataVecs);
 
       for (unsigned i = 0; i < count; ++i)
@@ -4566,13 +4596,13 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
   auto hartIx = hart.sysHartIndex();
 
   // Identify index registers.
-  std::array<std::pair<unsigned, bool>, 32> ixRegs;  // reg-num/masked pairs
+  std::array<std::pair<unsigned, VecKind>, 32> ixRegs;  // reg-num/kind pairs
   unsigned ixCount = getLdStIndexVectors(hart, instr, ixRegs);
   if (not ixCount)
     return false;
 
   // Identify data registers.
-  std::array<std::pair<unsigned, bool>, 32> dataRegs;
+  std::array<std::pair<unsigned, VecKind>, 32> dataRegs;  // reg-num/kind pairs
   unsigned dataCount = getLdStDataVectors(hart, instr, dataRegs);
   if (not dataCount)
     return false;

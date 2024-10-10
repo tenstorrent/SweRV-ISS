@@ -2295,6 +2295,14 @@ namespace WdRiscv
     /// Report the number of retired instruction count and the simulation rate.
     void reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop);
 
+    /// Return true if vector component currently has mask-agnositic policy.
+    bool isVectorMaskAgnostic() const
+    { return vecRegs_.isMaskAgnostic(); }
+
+    /// Return true if vector component currently has tail-agnositic policy.
+    bool isVectorTailAgnostic() const
+    { return vecRegs_.isTailAgnostic(); }
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
