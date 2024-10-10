@@ -4566,60 +4566,70 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
 
   auto hartIx = hart.sysHartIndex();
 
-  unsigned ixBase = 0, ixCount = 1;  // First vec and count of index registers
-  if (hart.getLastVecLdStRegsUsed(di, 2, ixBase, ixCount))  // Index reg is operand 2
+  // Identify index registers.
+  std::array<std::pair<unsigned, bool>, 32> ixRegs;  // reg-num/masked pairs
+  unsigned ixCount = getLdStIndexVectors(hart, instr, ixRegs);
+  if (not ixCount)
+    return false;
+
+  // Identify data registers.
+  std::array<std::pair<unsigned, bool>, 32> dataRegs;
+  unsigned dataCount = getLdStDataVectors(hart, instr, dataRegs);
+  if (not dataCount)
+    return false;
+
+  // Determine memory times of data registers.
+  std::array<std::uint64_t, 32> dataTimes;
+  for (unsigned i = 0; i < dataCount; ++i)
     {
-      unsigned base = 0, count = 1;  // First vec and count of data registers
-      if (not hart.getLastVecLdStRegsUsed(di, 0, base, count)) // Data reg is operand 0
+      auto [dataReg, masked] = dataRegs.at(i);
+      dataTimes.at(i) = getVecRegEarlyTime(hart, instr, dataReg);
+    }
+
+  // FIX this will not work for segment load/store
+  if (dataCount <= ixCount)
+    {         // One or more index registers for each data register.
+      for (unsigned ii = 0; ii < ixCount; ++ii)  // for each index-reg index
 	{
-	  assert(0);
-	  return false;
+	  auto [ixr, masked] = ixRegs.at(ii);      // Index reg
+	  uint64_t ixt = vecRegTime(hartIx, ixr);  // Index reg time
+	  unsigned di = ii * dataCount / ixCount;
+	  uint64_t dt = dataTimes.at(di);          // Data reg time
+	  if (ixt < dt)
+	    continue;
+
+	  producerTag = vecRegProducer(hartIx, ixr);
+	  if (producerTag == 0)
+	    continue;
+	  producerTime = ixt;
+	  ixReg = ixr;
+	  dataTime = dt;
+	  return true;
 	}
+    }
+  else   // For each index register there are muliple data register
+    {
+      unsigned factor = dataCount / ixCount;  // Data regs per index reg.
+      assert(factor * ixCount == dataCount);
 
-      std::vector<uint64_t> dataEarlyTimes;
-      getVecRegEarlyTimes(hart, instr, base, count, dataEarlyTimes);
-
-      if (count <= ixCount)
+      for (unsigned ii = 0; ii < ixCount; ++ii)  // for each index-reg index
 	{
-	  for (unsigned ii = 0; ii < ixCount; ++ii)  // for each index-reg index
+	  auto [ixr, masked] = ixRegs.at(ii);      // Index reg
+	  uint64_t ixt = vecRegTime(hartIx, ixr);  // Index reg time
+
+	  for (unsigned di = ii*factor; di < (ii+1)*factor; ++di)
 	    {
-	      uint64_t ixTime = vecRegTime(hartIx, ixBase + ii);
-	      unsigned di = ii * count / ixCount;
-	      uint64_t det = dataEarlyTimes.at(di);
-	      if (ixTime < det)
+	      uint64_t dt = dataTimes.at(di);      // Data reg time
+	      if (ixt < dt)
 		continue;
 
-	      producerTag = vecRegProducer(hartIx, ixBase + ii);
+	      producerTag = vecRegProducer(hartIx, ixr);
 	      if (producerTag == 0)
 		continue;
-	      producerTime = ixTime;
-	      ixReg = ixBase + ii;
-	      dataTime = det;
+	      producerTime = ixt;
+	      ixReg = ixr;
+	      dataTime = dt;
 	      return true;
-	    }
-	}
-      else   // For each index register there are muliple data register
-	{
-	  unsigned factor = count / ixCount;  // Data regs per index reg.
-
-	  for (unsigned ii = 0; ii < ixCount; ++ii)  // for each index-reg index
-	    {
-	      uint64_t ixTime = vecRegTime(hartIx, ixBase + ii);
-
-	      for (unsigned di = ii*factor; di < (ii+1)*factor; ++di)
-		{
-		  uint64_t det = dataEarlyTimes.at(di);
-		  if (ixTime < det)
-		    continue;
-
-		  producerTag = vecRegProducer(hartIx, ixBase + ii);
-		  if (producerTag == 0)
-		    continue;
-		  producerTime = ixTime;
-		  ixReg = ixBase + ii;
-		  dataTime = det;
-		  return true;
-		}
 	    }
 	}
     }
