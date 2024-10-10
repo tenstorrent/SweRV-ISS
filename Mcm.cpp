@@ -752,7 +752,7 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
       for (unsigned i = 0; i < count; ++i)
 	{
 	  auto [ixReg, kind] = ixRegs.at(i);
-	  if (kind == VecKind::Skip)   // Should we check Preserve as well.
+	  if (kind != VecKind::Active) // If we preserve data reg, index reg is not used.
 	    continue;
 
 	  auto time = regTime.at(ixReg);
