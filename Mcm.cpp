@@ -342,13 +342,13 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
 
   unsigned hartIx = hart.sysHartIndex();
 
-  // In case a vec reg is all masked: Initialize producer/time to 0.
+  // In case a vec has no active elements : Initialize producer/time to 0.
   // FIX: if mask policy is preserve, time and producer should not be changed.
   std::array<std::pair<unsigned, bool>, 32> dataRegs;
   unsigned count = getLdStDataVectors(hart, instr, dataRegs);
   for (unsigned i = 0; i < count; ++i)
     {
-      auto [regNum, masked] = dataRegs.at(i);
+      auto [regNum, skip] = dataRegs.at(i);
       setVecRegTime(hartIx, regNum, 0);
       setVecRegProducer(hartIx, regNum, 0);
     }
@@ -4634,97 +4634,6 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
     }
 
   return false;
-}
-
-
-// TODO FIX: remove
-template <typename URV>
-void
-Mcm<URV>::getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned base,
-			      unsigned count, std::vector<uint64_t>& times) const
-{
-  uint64_t maxVal = ~uint64_t(0);
-
-  times.resize(count);
-  for (auto& time : times)
-    time = maxVal;   // In case no memory ops or all elements masked.
-
-  if (instr.memOps_.empty())
-    return;
-
-  if (count == 1)
-    {
-      uint64_t mint = maxVal;
-      for (const auto& opIx : instr.memOps_)
-	if (opIx < sysMemOps_.size())
-	  mint = std::min(mint, sysMemOps_.at(opIx).time_);
-
-      times.at(0) = mint;
-      return;
-    }
-
-  const VecLdStInfo& info = hart.getLastVectorMemory();
-  auto elemSize = info.elemSize_;
-  const auto& elems = info.elems_;
-
-  if (elemSize == 0 or info.elems_.empty())
-    return;  // Should not happen.
-
-  unsigned elemsPerVec = hart.vecRegSize() / elemSize;
-  unsigned firstElemIx = elems.at(0).ix_;   // vstart.
-
-  for (unsigned ii = 0; ii < count; ++ii)
-    {
-      uint64_t regTime = maxVal;
-
-      // If vstart > 0, base would be >= the destination register number. For example, in
-      // "vle8 v2, (a0)", destination register is v2 but base maybe v3.
-      assert(base >= info.vec_);
-      
-      unsigned vecOffset = base + ii - info.vec_;
-      unsigned offset = vecOffset * elemsPerVec;
-
-      for (unsigned eiv = 0; eiv < elemsPerVec; ++eiv)  // Elem ix in vec reg.
-	{
-	  if (ii == 0 and eiv < firstElemIx)
-	    continue;
-
-	  unsigned elemIx = offset + eiv - firstElemIx;   // Elem at vstart has index 0.
-	  if (elemIx >= elems.size())
-	    continue;  // Should not happen
-
-	  auto& elem = elems.at(elemIx);
-
-	  if (elem.skip_)
-	    continue;  // Non-active element.
-
-	  uint64_t pa1 = elem.pa_, pa2 = elem.pa2_;
-	  unsigned size1 = elemSize, size2 = 0;
-	  if (pa1 != pa2)
-	    {
-	      size1 = offsetToNextPage(pa1);
-	      assert(size1 > 0 and size1 < 8);
-	      size2 = elemSize - size1;
-	    }
-
-	  for (unsigned i = 0; i < size1; ++i)
-	    {
-	      uint64_t addr = pa1 + i;
-	      uint64_t byteTime = earliestByteTime(instr, addr);
-	      if (byteTime > 0)  // Byte time is zero for undrained writes.
-		regTime = std::min(byteTime, regTime);
-	    }
-
-	  for (unsigned i = 0; i < size2; ++i)
-	    {
-	      uint64_t addr = pa2 + i;
-	      uint64_t byteTime = earliestByteTime(instr, addr);
-	      regTime = std::min(byteTime, regTime);
-	    }
-	}
-
-      times.at(ii) = regTime;
-    }
 }
 
 

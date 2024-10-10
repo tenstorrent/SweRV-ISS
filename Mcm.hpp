@@ -435,12 +435,7 @@ namespace WdRiscv
 			      McmInstrIx& producer, uint64_t& produerTime,
 			      uint64_t& dataTime) const;
 
-    /// Collect the earliest times the data registers of the given load/store instruction
-    /// were read/written. Base is the first vector register, count is the number of
-    /// registers.
-    void getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned base,
-			     unsigned count, std::vector<uint64_t>& times) const;
-
+    /// Return the earliest memory time for the given vector register.
     uint64_t getVecRegEarlyTime(Hart<URV>& hart, const McmInstr& instr, unsigned regNum) const;
 
     /// Trim read operations to match reference (whisper). Mark replay read ops as
