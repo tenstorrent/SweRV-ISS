@@ -1352,6 +1352,13 @@ namespace WdRiscv
       return csr.read();
     }
 
+    /// Fast peek method for MVIEN.
+    URV peekMvien() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::MVIEN));
+      return csr.read();
+    }
+
     /// Fast peek method for HGEIE.
     URV peekHgeie() const
     {

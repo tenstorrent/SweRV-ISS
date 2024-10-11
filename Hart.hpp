@@ -838,9 +838,8 @@ namespace WdRiscv
     {
       if (isRvaia())
         {
-          URV mvien;
-          if (peekCsr(CsrNumber::MVIEN, mvien) and
-              (mvien >> URV(InterruptCause::S_EXTERNAL) & 1))
+          URV mvien = csRegs_.peekMvien();
+          if (mvien >> URV(InterruptCause::S_EXTERNAL) & 1)
             ip &= ~URV(1 << URV(InterruptCause::S_EXTERNAL));
         }
       return ip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
