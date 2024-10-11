@@ -314,9 +314,10 @@ Mcm<URV>::getLdStIndexVectors(const Hart<URV>& hart, const McmInstr& instr,
     return 0;
 
   auto& elems = info.elems_;
-  unsigned elemSize = info.elemSize_;
-  assert(elemSize != 0);
-  unsigned elemsPerVec = hart.vecRegSize() / elemSize;
+
+  unsigned ixElemSize = instr.di_.vecLoadOrStoreElemSize();
+  assert(ixElemSize != 0);
+  unsigned elemsPerVec = hart.vecRegSize() / ixElemSize;
 
   std::array<bool, 32> referenced;  for (auto& x : referenced) x = false;
   std::array<bool, 32> active;      for (auto& x : active)     x = false;
@@ -4595,12 +4596,6 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
 
   auto hartIx = hart.sysHartIndex();
 
-  // Identify index registers.
-  std::array<std::pair<unsigned, VecKind>, 32> ixRegs;  // reg-num/kind pairs
-  unsigned ixCount = getLdStIndexVectors(hart, instr, ixRegs);
-  if (not ixCount)
-    return false;
-
   // Identify data registers.
   std::array<std::pair<unsigned, VecKind>, 32> dataRegs;  // reg-num/kind pairs
   unsigned dataCount = getLdStDataVectors(hart, instr, dataRegs);
@@ -4612,55 +4607,42 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
   for (unsigned i = 0; i < dataCount; ++i)
     {
       auto [dataReg, masked] = dataRegs.at(i);
-      dataTimes.at(i) = getVecRegEarlyTime(hart, instr, dataReg);
+      dataTimes.at(dataReg) = getVecRegEarlyTime(hart, instr, dataReg);
     }
 
-  // FIX this will not work for segment load/store
-  if (dataCount <= ixCount)
-    {         // One or more index registers for each data register.
-      for (unsigned ii = 0; ii < ixCount; ++ii)  // for each index-reg index
-	{
-	  auto [ixr, masked] = ixRegs.at(ii);      // Index reg
-	  uint64_t ixt = vecRegTime(hartIx, ixr);  // Index reg time
-	  unsigned di = ii * dataCount / ixCount;
-	  uint64_t dt = dataTimes.at(di);          // Data reg time
-	  if (ixt < dt)
-	    continue;
+  const VecLdStInfo& info = hart.getLastVectorMemory();
+  const auto& elems = info.elems_;
 
-	  producerTag = vecRegProducer(hartIx, ixr);
-	  if (producerTag == 0)
-	    continue;
-	  producerTime = ixt;
-	  ixReg = ixr;
-	  dataTime = dt;
-	  return true;
-	}
-    }
-  else   // For each index register there are muliple data register
+  unsigned elemSize = info.elemSize_;
+  assert(elemSize != 0);
+  unsigned elemsPerVec = hart.vecRegSize() / elemSize;
+
+  unsigned ixElemSize = instr.di_.vecLoadOrStoreElemSize();
+  assert(ixElemSize != 0);
+  unsigned ixElemsPerVec = hart.vecRegSize() / ixElemSize;
+
+  for (const auto& elem : elems)
     {
-      unsigned factor = dataCount / ixCount;  // Data regs per index reg.
-      assert(factor * ixCount == dataCount);
+      if (elem.skip_)
+	continue;
 
-      for (unsigned ii = 0; ii < ixCount; ++ii)  // for each index-reg index
-	{
-	  auto [ixr, masked] = ixRegs.at(ii);      // Index reg
-	  uint64_t ixt = vecRegTime(hartIx, ixr);  // Index reg time
+      unsigned dataVec = info.vec_ + elem.field_*info.group_ + elem.ix_ / elemsPerVec;
+      unsigned ixVec = info.ixVec_ + elem.ix_ / ixElemsPerVec;
 
-	  for (unsigned di = ii*factor; di < (ii+1)*factor; ++di)
-	    {
-	      uint64_t dt = dataTimes.at(di);      // Data reg time
-	      if (ixt < dt)
-		continue;
+      auto dTime = dataTimes.at(dataVec);
+      auto ixTime = vecRegTime(hartIx, ixVec);
 
-	      producerTag = vecRegProducer(hartIx, ixr);
-	      if (producerTag == 0)
-		continue;
-	      producerTime = ixt;
-	      ixReg = ixr;
-	      dataTime = dt;
-	      return true;
-	    }
-	}
+      if (ixTime < dTime)
+	continue;
+
+      producerTag = vecRegProducer(hartIx, ixVec);
+      if (producerTag == 0)
+	continue;
+
+      producerTime = ixTime;
+      ixReg = ixVec;
+      dataTime = dTime;
+      return true;
     }
 
   return false;
