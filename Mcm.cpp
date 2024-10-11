@@ -464,7 +464,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
   auto& regTimeVec = hartData_.at(hartIx).regTime_;
   auto& regProducer = hartData_.at(hartIx).regProducer_;
 
-  // Load/amo/sc/branch/mop do not carry depenencies to dest register: Update time of dest.
+  // Load/amo/sc/branch/mop do not carry dependencies to dest register: Update time of dest.
   if (di.isLoad() or di.isAmo() or di.isSc() or di.isBranch() or di.isMop())
     {
       auto regIx = effectiveRegIx(di, 0);
@@ -636,7 +636,7 @@ Mcm<URV>::updateVecRegTimes(const Hart<URV>& hart, const McmInstr& instr)
 	    {
 	      // Vector source operand.
 	      // We propagate times at the vector register level. In the future we will do
-	      // this at the element or at the byte elve.
+	      // this at the element or at the byte level.
 
 	      auto baseSrcIx = effectiveRegIx(di, so);
 	      auto srcEmul = hart.vecOpEmul(so);
@@ -733,8 +733,8 @@ Mcm<URV>::setProducerTime(const Hart<URV>& hart, McmInstr& instr)
 	  if (kind != VecKind::Active)
 	    continue;  // Preserve does not apply to store.
 
-	  auto time = regTime.at(dataReg + vecRegOffset_);
-	  auto producer = regProducer.at(dataReg + vecRegOffset_);
+	  auto time = vecRegTime(hartIx, dataReg);
+	  auto producer = vecRegProducer(hartIx, dataReg);
 	  if (time >= instr.dataTime_)
 	    {
 	      instr.dataProducer_ = producer;
@@ -1121,7 +1121,7 @@ Mcm<URV>::isPartialVecLdSt(Hart<URV>& hart, const DecodedInst& di) const
 
   assert(hart.lastInstructionTrapped());
 
-  URV elems = 0;  // Partially complated elements.
+  URV elems = 0;  // Partially completed elements.
   if (not hart.peekCsr(CsrNumber::VSTART, elems))
     return false;  // Should not happen.
 
@@ -1339,7 +1339,7 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
 	    written = true;  // No masking
 	  else
 	    {
-	      // Check if op bytes are all masked or all un-maksed.
+	      // Check if op bytes are all masked or all un-masked.
 	      unsigned masked = 0;  // Count of masked bytes of op.
 	      for (unsigned opIx = 0; opIx < op.size_; ++opIx)   // Scan op bytes
 		{
@@ -1769,7 +1769,7 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
   assert(iter != vecRefMap.end());
   auto& vecRefs = iter->second;
 
-  // Collect refrence byte values in an address to value map. Check for overlap
+  // Collect reference byte values in an address to value map. Check for overlap
   std::unordered_map<uint64_t, uint8_t> refValues;  // Map byte address to value.
   bool overlap = false;
   for (auto& ref : vecRefs.refs_)
@@ -2313,7 +2313,7 @@ Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr* instr)
 	}
     }
 
-  // Mark replayed ops as cancled.
+  // Mark replayed ops as canceled.
   assert(instr->size_ > 0 and instr->size_ <= 8);
   unsigned expectedMask = (1 << instr->size_) - 1;  // Mask of bytes covered by instruction.
   unsigned readMask = 0;    // Mask of bytes covered by read operations.
@@ -3104,7 +3104,7 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 
   // Process all the memory operations that may have been reordered with respect to B. If
   // an instruction A, preceding B in program order, is missing a memory operation, we
-  // will catch it when we process the undrained stores below.
+  // will catch it when we process the un-drained stores below.
   for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
       const auto& op = *iter;
@@ -3166,7 +3166,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
       if (op.time_ < earlyB)
 	break;
 
-      const auto& prev =  instrVec.at(op.tag_);   // Instruction preceeding B in prog order.
+      const auto& prev =  instrVec.at(op.tag_);   // Instruction preceding B in prog order.
       if (prev.isCanceled()  or  not prev.isRetired()  or  not prev.isMemory()  or
 	  not overlaps(prev, instrB))
 	continue;
@@ -3556,7 +3556,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
 	    {
 	      cerr << "Error: PPO rule 4 failed: Hart-id=" << hart.hartId() << " tag="
 		   << instrB.tag_ << " fence-tag= " << fence.tag_ << " store instruction "
-		   << "drains before preceeding fence instruction retires\n";
+		   << "drains before preceding fence instruction retires\n";
 	      return false;
 	    }
 
@@ -4045,8 +4045,6 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
   if (bdi.isVectorStore())
     {
       auto hartIx = hart.sysHartIndex();
-      const auto& regTime = hartData_.at(hartIx).regTime_;
-      const auto& regProducer = hartData_.at(hartIx).regProducer_;
 
       std::array<std::pair<unsigned, VecKind>, 32> dataVecs;  // reg-num/kind pairs
       unsigned count = getLdStDataVectors(hart, instrB, dataVecs);
@@ -4057,11 +4055,11 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
 	  //if (masked)
 	  //  continue;
 
-	  auto atag = regProducer.at(dataReg + vecRegOffset_);
+	  auto atag = vecRegProducer(hartIx, dataReg);
 	  if (atag == 0)
 	    continue;
 
-	  auto atime = regTime.at(dataReg + vecRegOffset_);  // Time A data reg was produced.
+	  auto atime = vecRegTime(hartIx, dataReg);  // Time A data reg was produced.
 	  auto btime = getVecRegEarlyTime(hart, instrB, dataReg);
 
 	  if (btime <= atime)
@@ -4085,7 +4083,6 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
   // Rule 11: B is a store with a control dependency on A
 
   unsigned hartIx = hart.sysHartIndex();
-  const auto& regProducer = hartData_.at(hartIx).regProducer_;
   const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   if (not instrB.isStore_)
@@ -4138,8 +4135,7 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
 
       if (bdi.isMasked()) // VM is control dependency for masked vector instructions
         {
-          unsigned vmReg = 0 + vecRegOffset_;
-          producerTag = regProducer.at(vmReg);
+          producerTag = vecRegProducer(hartIx, 0);   // V0 is mask register.
           if (not rule11(earlyB, producerTag))
             {
               cerr << "Error: PPO rule 11 failed (vm): hart-id=" << hart.hartId() << " tag1="
@@ -4387,10 +4383,10 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	      if (not isIndexed)
 		continue;
 
-	      // Get index register correspondig to dataVec.
+	      // Get index register corresponding to dataVec.
 	      unsigned ixVec = vecRef.ixReg_;
 
-	      // Find the producer AA of identifed index register. M has addr dep on AA.
+	      // Find the producer AA of identified index register. M has addr dep on AA.
 	      aTag = 0;
 	      aTime = 0;
 
