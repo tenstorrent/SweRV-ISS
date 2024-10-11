@@ -1278,6 +1278,10 @@ namespace WdRiscv
     /// after a write/poke to HVICTL.
     void updateVirtInterruptCtl();
 
+    /// Update MVIP aliasing bits. This is called after a write/poke to
+    /// MIP.
+    void updateVirtInterrupt();
+
     /// Enter/exit debug mode based given a flag value of true/false.
     void enterDebug(bool flag)
     { debugMode_ = flag; }

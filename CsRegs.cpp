@@ -311,19 +311,9 @@ CsRegs<URV>::readMvip(URV& value) const
     return false;
   value = mvip->read();
 
-  // Bit 1/9 of MVIP is an alias to bit 1/9 in MIP if bit 1/9 is not set in MVIEN.
-  auto mvien = getImplementedCsr(CsrNumber::MVIEN);
-  auto mip = getImplementedCsr(CsrNumber::MIP);
-  if (mvien and mip)
-    {
-      URV mask = mvien->read();
-      mask &= URV(0x202);
-      mask ^= URV(0x202);
-      value = (value & ~mask) | (mip->read() & mask);
-    }
-
   // Bit STIE (5) of MVIP is an alias to bit 5 of MIP if bit 5 of MIP is writable.
   // Othrwise, it is zero.
+  auto mip = getImplementedCsr(CsrNumber::MIP);
   if (mip)
     {
       URV mask = URV(0x20);  // Bit 5
@@ -348,7 +338,8 @@ CsRegs<URV>::writeMvip(URV value)
   if (mvien and mip)
     {
       // Bit 1/9 of MVIP is an alias to bit 1/9 in MIP if bit 1/9 is not set in MVIEN.
-      URV mask = mvien->read();
+      URV mvienVal = mvien->read();
+      URV mask = mvienVal;
       URV b19 = URV(0x202);
       mask ^= b19;
 
@@ -360,7 +351,8 @@ CsRegs<URV>::writeMvip(URV value)
 
       mask &= b19 | b5;
       mip->write((mip->read() & ~mask) | (value & mask));
-      mvip->write((mvip->read() & mask) | (value & ~mask));
+      mvip->write((mvip->read() & ~(mask | mvienVal)) | (value & (mask | mvienVal)));
+      recordWrite(CsrNumber::MIP);
     }
   else
     mvip->write(value);
@@ -2110,6 +2102,8 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
 
   if (num == CN::MENVCFG or num == CN::HENVCFG)
     updateSstc();
+  else if (num == CN::MIP)
+    updateVirtInterrupt();
 
   return true;
 }
@@ -3671,6 +3665,8 @@ CsRegs<URV>::poke(CsrNumber num, URV value, bool virtMode)
 
   if (num == CN::MENVCFG or num == CN::HENVCFG)
     updateSstc();
+  else if (num == CN::MIP)
+    updateVirtInterrupt();
 
   return true;
 }
@@ -4332,6 +4328,41 @@ CsRegs<URV>::updateVirtInterruptCtl()
   csr = getImplementedCsr(CsrNumber::VSIEH);
   if (csr)
     csr->setHypervisor(not vti);
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::updateVirtInterrupt()
+{
+  auto mip = getImplementedCsr(CsrNumber::MIP);
+  if (not mip)
+    return;
+
+  URV value = mip->read();
+  auto mvien = getImplementedCsr(CsrNumber::MVIEN);
+  auto mvip = getImplementedCsr(CsrNumber::MVIP);
+  if (mvien and mvip)
+    {
+      // Bit 1/9 of MVIP is an alias to bit 1/9 in MIP if bit 1/9 is not set in MVIEN.
+      URV mask = mvien->read();
+      URV b19 = URV(0x202);
+      mask ^= b19;
+
+      // Bit STIE (5) of MVIP is an alias to bit 5 of MIP if bit 5 of MIP is writable.
+      // Othrwise, it is zero.
+      URV b5 = URV(0x20);  // Bit 5 mask
+      if ((mip->getWriteMask() & b5) != 0)   // Bit 5 writable in mip
+	mask |= b5;
+
+      mask &= b19 | b5;
+      // Write aliasing bits.
+      mvip->write((mvip->read() & ~mask) | (value & mask));
+      recordWrite(CsrNumber::MVIP);
+    }
+
+  mip->write(value);
+  return;
 }
 
 
