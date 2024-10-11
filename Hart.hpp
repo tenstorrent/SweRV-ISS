@@ -1874,11 +1874,10 @@ namespace WdRiscv
     void registerPreInst(std::function<void(Hart<URV>&, bool&, bool&)> callback)
     { preInst_ = std::move(callback); }
 
-    /// Define physical memory attribute region at index ix. Region
-    /// addresses are between low and high inclusive. To define a
-    /// 1024-byte region at address zero we would set low to zero and
-    /// high to 1023. Region are checked in order and the first
-    /// matching region applies.
+    /// Define/re-define a physical memory attribute region at index ix. Region addresses
+    /// are between low and high inclusive. To define a 1024-byte region at address zero
+    /// we would set low to zero and high to 1023. Regions are checked in order and the
+    /// first matching region applies.
     bool definePmaRegion(unsigned ix, uint64_t low, uint64_t high, Pma pma)
     { return memory_.pmaMgr_.defineRegion(ix, low, high, pma); }
 
@@ -1894,12 +1893,12 @@ namespace WdRiscv
     /// and false if num is not that of PMACFG CSR.
     bool processPmaChange(CsrNumber num);
 
-    /// Associate a mask with the word-aligned word at the given
-    /// address. Return true on success and flase if given address is
-    /// not in a memory mapped region. The size must be 4 or 8. The
-    /// address must be word/double-word aligned if size is 4/8.
-    bool setMemMappedMask(uint64_t addr, uint64_t mask, unsigned size)
-    { return memory_.pmaMgr_.setMemMappedMask(addr, mask, size); }
+    /// Define a memory mapped register with the given mask and size at the word-aligned
+    /// word with the given address. Return true on success and flase if given address is
+    /// not in a memory mapped region. The size must be 4 or 8. The address must be
+    /// word/double-word aligned for size 4/8.
+    bool defineMemMappedRegister(uint64_t addr, uint64_t mask, unsigned size, Pma pma)
+    { return memory_.pmaMgr_.defineMemMappedReg(addr, mask, size, pma); }
 
     /// Unpack the memory protection information defined by the given
     /// physical memory protection entry (entry 0 corresponds to

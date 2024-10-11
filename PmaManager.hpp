@@ -175,7 +175,11 @@ namespace WdRiscv
       // Search regions in order. Return first matching.
       for (const auto& region : regions_)
 	if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
-	  return region.pma_;
+	  {
+	    if (not region.pma_.hasMemMappedReg())
+	      return region.pma_;
+	    return memMappedPma(region.pma_, addr);
+	  }
 
       if (addr >= memSize_)
 	return noAccessPma_;
@@ -212,7 +216,10 @@ namespace WdRiscv
           if (trace_)
             pmaTrace_.push_back({unsigned(std::distance(regions_.begin(), it)),
                                   addr, it->firstAddr_, it->lastAddr_, reason});
-          return (*it).pma_;
+	  auto& region = *it;
+	  if (not region.pma_.hasMemMappedReg())
+	    return region.pma_;
+          return memMappedPma(region.pma_, addr);
         }
 
       if (addr >= memSize_)
@@ -234,12 +241,13 @@ namespace WdRiscv
       return false;
     }
 
-    /// Define a physical memory attribute region at given index ix (indices are 0 to n-1
-    /// where n is the region count). Regions are checked in order order (if an address is
-    /// covered by multiple regions, then the first defined region applies). The defined
-    /// region consists of the word-aligned words with addresses between fistAddr and
-    /// lastAddr inclusive. For example, if firstAddr is 5 and lastAddr is 13, then the
-    /// defined region consists of the words at 8 and 12 (bytes 8 to 15).
+    /// Define/re-define a physical memory attribute region at given index ix (indices are
+    /// 0 to n-1 where n is the region count). Regions are checked in order order (if an
+    /// address is covered by multiple regions, then the first defined region applies. The
+    /// defined region consists of the word-aligned words with addresses between fistAddr
+    /// and lastAddr inclusive. For example, if firstAddr is 5 and lastAddr is 13, then
+    /// the defined region consists of the words at 8 and 12 (bytes 8 to 15). Return true
+    /// on success.
     bool defineRegion(unsigned ix, uint64_t firstAddr, uint64_t lastAddr, Pma pma);
 
     /// Mark entry at given index as invalid.
@@ -252,10 +260,9 @@ namespace WdRiscv
       regions_.at(ix).valid_ = false;
     }
 
-    /// Associate a mask with the word-aligned word at the given
-    /// address. Return true on success and flase if given address is
-    /// not in a memory mapped region.
-    bool setMemMappedMask(uint64_t addr, uint64_t mask, unsigned size);
+    /// Define a memory mapped register. Return true on success and false if size is not 4
+    /// or 8 or if the address is not word/double-word aligned.
+    bool defineMemMappedReg(uint64_t addr, uint64_t mask, unsigned size, Pma pma);
 
     /// Return mask associated with the word-aligned word at the given
     /// address.  Return 0xffffffff if no mask was ever associated
@@ -370,6 +377,17 @@ namespace WdRiscv
     /// Similar to writeRgister but no masking is applied to value.
     bool pokeRegisterByte(uint64_t addr, uint8_t value);
 
+    /// Return the memory mapped register PMA associated with the given address or the
+    /// given PMA if address does not correspond to a memory mapped register.  Address is
+    /// expected to be word aligned.
+    Pma memMappedPma(Pma pma, uint64_t addr) const
+    {
+      auto iter = memMappedRegs_.find(addr);
+      if (iter == memMappedRegs_.end())
+	iter = memMappedRegs_.find((addr >> 3) << 3);  // Check double word aligned address.
+      return iter == memMappedRegs_.end() ? pma : iter->second.pma_;
+    }
+
   private:
 
     struct Region
@@ -388,11 +406,12 @@ namespace WdRiscv
       uint64_t value_ = 0;
       uint64_t mask_ = ~uint64_t(0);
       unsigned size_ = 4;
+      Pma pma_;
     };
 
-    /// Return the Region object associated with the
-    /// word-aligned word designed by the given address. Return a
-    /// no-access object if the givena ddress is out of memory range.
+    /// Return the Region object associated with the word-aligned word containing the
+    /// given address. Return a no-access object if the given address is out of memory
+    /// range.
     Region getRegion(uint64_t addr) const
     {
       addr = (addr >> 2) << 2;
