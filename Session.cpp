@@ -368,6 +368,7 @@ Session<URV>::openUserFiles(const Args& args)
       setlinebuf(commandLog_);  // Make line-buffered.
     }
 
+  consoleOut_ = stdout;
   if (not args.consoleOutFile.empty())
     {
       consoleOut_ = fopen(args.consoleOutFile.c_str(), "w");
