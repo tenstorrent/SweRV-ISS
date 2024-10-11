@@ -1295,10 +1295,6 @@ CsRegs<URV>::enableSmmpm(bool flag)
       MseccfgFields<URV> rm{regs_.at(size_t(CN::MSECCFG)).getReadMask()};
       rm.bits_.PMM = mask;
       regs_.at(size_t(CN::MSECCFG)).setReadMask(rm.value_);
-
-      MseccfgFields<URV> wm{regs_.at(size_t(CN::MSECCFG)).getWriteMask()};
-      wm.bits_.PMM = mask;
-      regs_.at(size_t(CN::MSECCFG)).setWriteMask(wm.value_);
     }
 }
 
@@ -2720,7 +2716,9 @@ CsRegs<URV>::defineMachineRegs()
       c->markAsHighHalf(true);
     }
 
-  uint32_t mseMask = 0x300;
+  URV mseMask = 0x300;
+  if constexpr (sizeof(URV) == 8)
+    mseMask |= 0x300000000;
   defineCsr("mseccfg", Csrn::MSECCFG, !mand, imp, 0, mseMask, mseMask);
   if (rv32_)
     {
@@ -3156,11 +3154,11 @@ CsRegs<URV>::defineHypervisorRegs()
 
   csr = defineCsr("vsatp",       Csrn::VSATP,       !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
-  csr = defineCsr("vsstimecmp",  Csrn::VSTIMECMP,   !mand, !imp, 0, wam, wam);
+  csr = defineCsr("vstimecmp",  Csrn::VSTIMECMP,   !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
   if (rv32_)
     {
-      csr = defineCsr("vsstimecmph",  Csrn::VSTIMECMPH,   !mand, !imp, 0, wam, wam);
+      csr = defineCsr("vstimecmph",  Csrn::VSTIMECMPH,   !mand, !imp, 0, wam, wam);
       if (csr)
 	{
 	  csr->setHypervisor(true);
@@ -3305,7 +3303,7 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("mtopei",     CN::MTOPEI,     !mand, !imp, 0, wam, wam);
   defineCsr("mtopi",      CN::MTOPI,      !mand, !imp, 0, wam, wam);
   
-  URV mask = 0b10'000'0010;  // Bits 9 and 1 (SEI, SSI).
+  URV mask = 0b10'0000'0010;  // Bits 9 and 1 (SEI, SSI).
   defineCsr("mvien",      CN::MVIEN,      !mand, !imp, 0, mask, mask);
 
   defineCsr("mvip",       CN::MVIP,       !mand, !imp, 0, mask, mask);
@@ -3929,7 +3927,9 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
                   value2 = (unsigned(IC::S_EXTERNAL) << 16) | 255;
                 }
 
-              value2 |= hvf.bits_.IPRIOM? (value2 & 0xff) : 1;
+              URV reportedPrio = value2 & 0xff;
+              value2 &= ~URV(0xff);
+              value2 |= hvf.bits_.IPRIOM? reportedPrio : 1;
             }
 
           if (value and value2)
@@ -4426,6 +4426,14 @@ CsRegs<URV>::addMachineFields()
   setCsrFields(CsrNumber::MCYCLE, {{"mcycle", xlen}});
   setCsrFields(CsrNumber::MINSTRET, {{"minstret", xlen}});
 
+  // smrnmi
+  setCsrFields(CsrNumber::MNSCRATCH,{{"MNSCRATCH", xlen}});
+  setCsrFields(CsrNumber::MNEPC,    {{"MNEPC", xlen}});
+  setCsrFields(CsrNumber::MNCAUSE,  {{"CODE", xlen - 1}, {"INT", 1}});
+  setCsrFields(CsrNumber::MNSTATUS,
+      {{"res0", 3}, {"NMIE",   1}, {"res1", 3}, {"MNPV", 1},
+       {"res2", 1}, {"MNPELP", 2}, {"res3", 1}, {"MNPP", 2}, {"res4", xlen-14}});
+
   if (rv32_)
     {
       setCsrFields(CsrNumber::MSTATUS,
@@ -4841,6 +4849,9 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
   auto vsie = getImplementedCsr(CsrNumber::VSIE);
   auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
   auto hvien = getImplementedCsr(CsrNumber::HVIEN);
+  auto hstatus = getImplementedCsr(CsrNumber::HSTATUS);
+  auto hgeip = getImplementedCsr(CsrNumber::HGEIP); // HGEIP isn't write-able
+  auto hgeie = getImplementedCsr(CsrNumber::HGEIE);
 
   URV prevHipVal = hip->prevValue();
 
@@ -4887,32 +4898,32 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	{
 	  // Bit 10 (VSEIP) of HIP is the or of bit 10 of HVIP and HGEIP bit
 	  // selected by GVEIN.
-	  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
-	  HstatusFields<URV> hsf(hsVal);
+	  HstatusFields<URV> hsf(hstatus->read());
 	  unsigned vgein = hsf.bits_.VGEIN;
-	  URV hgeipVal = regs_.at(size_t(CsrNumber::HGEIP)).read();
-	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
+	  unsigned bit = (hgeip->read() >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
 	  value = value | (bit << 10);  // Or HGEIP bit selected by GVEIN.
 	  hip->poke(value);
 	}
 
       updateCsr(vsip, vsInterruptToS(value));
     }
-  else if (num == CsrNumber::HGEIP or num == CsrNumber::HSTATUS)
+  else if (num == CsrNumber::HSTATUS or num == CsrNumber::HGEIE)
     {
       // Updating HGEIP or HSTATUS.VGEIN is reflected in HIP
       if (hip)
         {
-	  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
-	  HstatusFields<URV> hsf(hsVal);
+	  HstatusFields<URV> hsf(hstatus->read());
 	  unsigned vgein = hsf.bits_.VGEIN;
-	  URV hgeipVal = regs_.at(size_t(CsrNumber::HGEIP)).read();
+          URV hgeipVal = hgeip->read();
+
 	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
 	  // Update bit VSEIP (10) of HIP.
-	  hip->poke(hip->read() & ~(URV(1) << 10));  // Clear bit 10 of HIP
+	  hip->poke(hip->read() & ~(URV(5) << 10));  // Clear bit 10/12 of HIP
 	  URV mask = bit << 10;
 	  if (hvip)
 	    mask |= (hvip->read() & (1 << 10));  // Or bit 10 of HVIP.
+          // Update bit SGEIP (12) of HIP.
+          mask |= ((hgeipVal & hgeie->read()) != 0) << 12;
           hip->poke(hip->read() | mask);  // Set HIP bit 10 to or of HVIP and HGEIP bits.
         }
     }
@@ -5010,6 +5021,9 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
   auto vsip = getImplementedCsr(CsrNumber::VSIP);
   auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
   auto hvien = getImplementedCsr(CsrNumber::HVIEN);
+  auto hstatus = getImplementedCsr(CsrNumber::HSTATUS);
+  auto hgeip = getImplementedCsr(CsrNumber::HGEIP);
+  auto hgeie = getImplementedCsr(CsrNumber::HGEIE);
 
   bool hipUpdated = num == CsrNumber::HIP;
   URV hieMask = 0x1444; // SGEIE, VSEIE, VSTIE and VSSIE.
@@ -5051,11 +5065,9 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
       // logical-or external values for VSEIP and VSTIP.
       if (hip)
         {
-	  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
-	  HstatusFields<URV> hsf(hsVal);
+	  HstatusFields<URV> hsf(hstatus->read());
 	  unsigned vgein = hsf.bits_.VGEIN;
-	  URV hgeipVal = regs_.at(size_t(CsrNumber::HGEIP)).read();
-	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
+	  unsigned bit = (hgeip->read() >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
 	  value = value | (bit << 10);
           hip->poke(value);
           hipUpdated = true;
@@ -5076,20 +5088,23 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 	  vsip->poke(vsInterruptToS(value));
 	}
     }
-  else if (num == CsrNumber::HGEIP or num == CsrNumber::HSTATUS)
+  else if (num == CsrNumber::HGEIP or num == CsrNumber::HGEIE or
+           num == CsrNumber::HSTATUS)
     {
       // Updating HGEIP or HSTATUS.VGEIN is reflected in HIP
       // FIX: only do this when VGEIN is updated
       if (hip)
         {
-	  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
-	  HstatusFields<URV> hsf(hsVal);
+	  HstatusFields<URV> hsf(hstatus->read());
 	  unsigned vgein = hsf.bits_.VGEIN;
-	  URV hgeipVal = regs_.at(size_t(CsrNumber::HGEIP)).read();
+          URV hgeipVal = hgeip->read();
+
 	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
 	  // Update bit VSEIP (10) of HIP.
-	  hip->poke(hip->read() & ~(URV(1) << 10));  // Clear bit 10 of HIP
+	  hip->poke(hip->read() & ~(URV(5) << 10));  // Clear bit 10/12 of HIP
 	  URV mask = bit << 10;
+          // Update bit SGEIP (12) of HIP.
+          mask |= ((hgeipVal & hgeie->read()) != 0) << 12;
           hip->poke(hip->read() | mask);  // Set bit 10 to HGEIP bit selected by VGEIN.
           hipUpdated = true;
         }
@@ -5183,9 +5198,10 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode pm, bool vm) const
     return true;
 
   using CN = CsrNumber;
-  // sstateen not applicable for now
   CN csrn = rv32_? CN::MSTATEEN0H : CN::MSTATEEN0;
-  if (vm)
+  if (pm == PrivilegeMode::User)
+    csrn = CN::SSTATEEN0;
+  else if (vm)
     csrn = rv32_? CN::HSTATEEN0H : CN::HSTATEEN0;
 
   int enableBit = -1;
@@ -5194,7 +5210,6 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode pm, bool vm) const
     enableBit = 55;
   if (num == CN::HCONTEXT or num == CN::SCONTEXT)
     enableBit = 57;
-  // hgeip hgeie
   else if (num == CN::MISELECT or num == CN::MIREG or num == CN::MTOPEI or num == CN::MTOPI or
 	   num == CN::MVIEN or num == CN::MVIP or num == CN::MIDELEGH or num == CN::MIEH or
 	   num == CN::MVIENH or num == CN::MVIPH or num == CN::MIPH or num == CN::STOPEI or

@@ -968,23 +968,10 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
   invalidateDecodeCache(addr, sizeof(val));
 
-  if (hasAclint() and ((addr >= aclintSwStart_ and addr < aclintSwEnd_) or
-      (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_)))
+  bool isDevice = isAclintAddr(addr) or isImsicAddr(addr) or isPciAddr(addr);
+  if (isDevice)
     {
-      URV adjusted = val;
-      processClintWrite(addr, sizeof(val), adjusted);
-      val = adjusted;
-    }
-  else if ((addr >= imsicMbase_ and addr < imsicMend_) or
-	   (addr >= imsicSbase_ and addr < imsicSend_))
-    {
-      if (imsicWrite_)
-        imsicWrite_(addr, sizeof(val), val);
-      return true;
-    }
-  else if (isPciAddr(addr))
-    {
-      pci_->access<uint32_t>(addr, val, true);
+      deviceWrite(addr, val);
       return true;
     }
 
@@ -1001,23 +988,10 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
   invalidateDecodeCache(addr, sizeof(val));
 
-  if (hasAclint() and ((addr >= aclintSwStart_ and addr < aclintSwEnd_) or
-      (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_)))
+  bool isDevice = isAclintAddr(addr) or isImsicAddr(addr) or isPciAddr(addr);
+  if (isDevice)
     {
-      URV adjusted = val;
-      processClintWrite(addr, sizeof(val), adjusted);
-      val = adjusted;
-    }
-  else if ((addr >= imsicMbase_ and addr < imsicMend_) or
-	   (addr >= imsicSbase_ and addr < imsicSend_))
-    {
-      if (imsicWrite_)
-        imsicWrite_(addr, sizeof(val), val);
-      return true;
-    }
-  else if (isPciAddr(addr))
-    {
-      pci_->access<uint64_t>(addr, val, true);
+      deviceWrite(addr, val);
       return true;
     }
 
@@ -1534,6 +1508,11 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
   using EC = ExceptionCause;
   using PM = PrivilegeMode;
 
+  auto [pm, virt] = effLdStMode(hyper);
+
+  ldStFaultAddr_ = addr1 = gaddr1 = va1 = applyPointerMask(va1, true, hyper);
+  addr2 = gaddr2 = va2 = va1;
+
   // If misaligned exception has priority take exception.
   if (misal)
     {
@@ -1545,33 +1524,14 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
   // Address translation
   if (isRvs())     // Supervisor extension
     {
-      PrivilegeMode pm = privMode_;
-      bool virt = virtMode_;
-      if (mstatusMprv() and not nmieOverridesMprv())
-	{
-	  pm = mstatusMpp();
-	  virt = mstatus_.bits_.MPV;
-	}
-
-      if (hyper)
-	{
-	  assert(not virtMode_);
-	  pm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-	  virt = true;
-	}
       if (pm != PM::Machine)
         {
 	  auto cause = virtMem_.translateForLoad2(va1, ldSize, pm, virt, gaddr1, addr1, gaddr2, addr2);
           if (cause != EC::NONE)
-	    {
-	      ldStFaultAddr_ = addr1;
-	      return cause;
-	    }
-        }
-      else
-        {
-          addr1 = VirtMem::applyPointerMaskPa(addr1, mPmBits_);
-          addr2 = VirtMem::applyPointerMaskPa(addr2, mPmBits_);
+            {
+              ldStFaultAddr_ = addr1;
+              return cause;
+            }
         }
     }
 
@@ -1844,10 +1804,15 @@ void
 Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
 {
   val = 0;
-  if (isAclintMtimeAddr(pa))
+  if (isAclintAddr(pa))
     {
-      val = time_;
-      val = val >> (pa - 0xbff8) * 8;
+      if (isAclintMtimeAddr(pa))
+	{
+	  val = time_;
+	  val = val >> (pa - 0xbff8) * 8;
+	  return;
+	}
+      memRead(pa, pa, val);
       return;
     }
 
@@ -2192,7 +2157,7 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
     }
 
   // If we write to special location, end the simulation.
-  if (toHostValid_ and pa1 == toHost_)
+  if (isToHostAddr(pa1))
     {
       handleStoreToHost(pa1, storeVal);
       return true;
@@ -2211,23 +2176,12 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
       return true;  // Memory updated & lr-canceled when merge buffer is written.
     }
 
-  if (isAclintAddr(pa1))
+  bool isDevice = isAclintAddr(pa1) or isImsicAddr(pa1) or isPciAddr(pa1);
+
+  if (isDevice)
     {
       assert(pa1 == pa2);
-      URV val = storeVal;
-      processClintWrite(pa1, ldStSize_, val);
-      storeVal = val;
-      memWrite(pa1, pa2, storeVal);
-      return true;
-    }
-  else if (isImsicAddr(pa1))
-    {
-      imsicWrite_(pa1, sizeof(storeVal), storeVal);
-      return true;
-    }
-  else if (isPciAddr(pa1))
-    {
-      pci_->access<STORE_TYPE>(pa1, storeVal, true);
+      deviceWrite(pa1, storeVal);
       return true;
     }
 
@@ -2651,6 +2605,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
   // point is defined, we jump to it.
   if (debugMode_)
     {
+      hasException_ = true;  // Instruction did no retire. This is for MCM.
       if (cause == ExceptionCause::BREAKP)
 	{
 	  if (debugParkLoop_ != ~URV(0))
@@ -2796,7 +2751,7 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
   else
     {
       uncompressed = decoder_.expandCompressedInst(di->inst() & 0xffff);
-      uncompressed &= 2; // Clear bit 1 to indicate expanded compressed instruction
+      uncompressed &= ~uint32_t(2); // Clear bit 1 to indicate expanded compressed instruction
     }
 
   // Clear relevant fields.
@@ -5801,7 +5756,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 	  if (doStats)
 	    accumulateInstructionStats(di);
 	  printDecodedInstTrace(di, instCounter_, instStr, traceFile);
-	  if (dcsrStep_ and not ebreakInstDebug_)
+	  if (dcsrStep_ and not debugMode_ and not ebreakInstDebug_)
 	    enterDebugMode_(DebugModeCause::STEP, pc_);
 	  return;
 	}
@@ -5824,7 +5779,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       printInstTrace(inst, instCounter_, instStr, traceFile);
 
       // If step bit set in dcsr then enter debug mode unless already there.
-      if (dcsrStep_ and not ebreakInstDebug_)
+      if (dcsrStep_ and not debugMode_ and not ebreakInstDebug_)
 	enterDebugMode_(DebugModeCause::STEP, pc_);
 
       prevPerfControl_ = perfControl_;
@@ -5833,7 +5788,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
     {
       // If step bit set in dcsr then enter debug mode unless already there.
       // This is for the benefit of the test bench.
-      if (dcsrStep_ and not ebreakInstDebug_)
+      if (dcsrStep_ and not debugMode_ and not ebreakInstDebug_)
 	enterDebugMode_(DebugModeCause::STEP, pc_);
 
       stepResult_ = logStop(ce, instCounter_, traceFile);
@@ -9518,16 +9473,19 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
       if (nmiPending_)
         dcsr.bits_.NMIP = 1;
       csRegs_.poke(CsrNumber::DCSR, dcsr.value_);
-
+      hasException_ = true;  // Instruction did no retire. This is for MCM.
     }
 
   csRegs_.poke(CsrNumber::DPC, pc);
   setPrivilegeMode(PrivilegeMode::Machine);
 
-  // If hart is configured to jump to a special target on enetering
-  // debug mode, then set the pc to that target.
+  // If hart is configured to jump to a special target on enetering debug mode, then set
+  // the pc to that target.
   if (debugParkLoop_ != ~URV(0))
-    pc_ = debugParkLoop_;
+    {
+      pc_ = debugParkLoop_;
+      inDebugParkLoop_ = true;
+    }
 }
 
 
@@ -9535,13 +9493,12 @@ template <typename URV>
 void
 Hart<URV>::enterDebugMode(URV pc)
 {
-  // This method is used by the test-bench to make the simulator
-  // follow it into debug-mode. Do nothing if the simulator got into
-  // debug-mode on its own.
+  // This method is used by the test-bench to make the simulator follow it into
+  // debug-mode. Do nothing if the simulator got into debug-mode on its own.
   if (debugMode_)
     return;   // Already in debug mode.
 
-  enterDebugMode_(DebugModeCause::DEBUGGER, pc);
+  enterDebugMode_(DebugModeCause::HALTREQ, pc);
 }
 
 
@@ -9989,30 +9946,45 @@ Hart<URV>::execEbreak(const DecodedInst*)
       return;
     }
 
+  URV dcsrVal = 0;
+  bool hasDcsr = peekCsr(CsrNumber::DCSR, dcsrVal);
+
+  auto dmCause = DebugModeCause::EBREAK;
+
   if (inDebugParkLoop_)
     {
-      inDebugParkLoop_ = false;
-      // return;  // Uncomment once RTL catches up.
+      pc_ = debugParkLoop_;
+      return;
+      if (hasDcsr)
+	{
+	  DcsrFields<URV> fields{dcsrVal};
+	  fields.bits_.CAUSE = unsigned(DebugModeCause::HALTREQ);
+	  csRegs_.poke(CsrNumber::DCSR, fields.value_);
+	  csRegs_.recordWrite(CsrNumber::DCSR);
+	  pc_ = debugParkLoop_;
+	  return;
+	}
     }
 
   // If in machine/supervisor/user mode and DCSR bit ebreakm/s/u is set, then enter debug
   // mode.
-  URV dcsrVal = 0;
-  if (peekCsr(CsrNumber::DCSR, dcsrVal))
+  if (hasDcsr)
     {
-      bool ebm = (dcsrVal >> 15) & 1;
-      bool ebs = (dcsrVal >> 13) & 1;
-      bool ebu = (dcsrVal >> 12) & 1;
+      DcsrFields<URV> fields{dcsrVal};
+      bool ebm = fields.bits_.EBREAKM;  // Break in M-privilege enabled.
+      bool ebs = fields.bits_.EBREAKS;  // Break in S-privilege enabled.
+      bool ebu = fields.bits_.EBREAKU;  // Break in U-privilege enabled.
 
-      bool debug = ( (ebm and privMode_ == PrivilegeMode::Machine) or
-                     (ebs and privMode_ == PrivilegeMode::Supervisor) or
-                     (ebu and privMode_ == PrivilegeMode::User) );
+      bool hit = ( (ebm and privMode_ == PrivilegeMode::Machine) or
+		   (ebs and privMode_ == PrivilegeMode::Supervisor) or
+		   (ebu and privMode_ == PrivilegeMode::User) );
 
-      if (debug)
+      // Should we do if we are debug-mode single stepping?
+      if (hit)
         {
           // The documentation (RISCV external debug support) does not say whether or not
           // we set EPC and MTVAL.
-          enterDebugMode_(DebugModeCause::EBREAK, currPc_);
+          enterDebugMode_(dmCause, currPc_);
           ebreakInstDebug_ = true;
           recordCsrWrite(CsrNumber::DCSR);
           return;
@@ -10529,6 +10501,7 @@ Hart<URV>::execDret(const DecodedInst* di)
   pc_ = peekCsr(CsrNumber::DPC);  // Restore PC
 
   debugMode_ = false;
+  inDebugParkLoop_ = false;
   csRegs_.enterDebug(false);
 
   // If pending nmi bit is set in dcsr, set pending nmi in the hart
@@ -11384,6 +11357,10 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   using EC = ExceptionCause;
   using PM = PrivilegeMode;
 
+  auto [pm, virt] = effLdStMode(hyper);
+
+  ldStFaultAddr_ = addr1 = gaddr1 = va1 = applyPointerMask(va1, false, hyper);
+  addr2 = gaddr2 = va2 = va1;
 
   // If misaligned exception has priority take exception.
   if (misal)
@@ -11396,33 +11373,14 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   // Address translation
   if (isRvs())     // Supervisor extension
     {
-      PrivilegeMode pm = privMode_;
-      bool virt = virtMode_;
-      if (mstatusMprv() and not nmieOverridesMprv())
-	{
-	  pm = mstatusMpp();
-	  virt = mstatus_.bits_.MPV;
-	}
-
-      if (hyper)
-	{
-	  assert(not virtMode_);
-	  pm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-	  virt = true;
-	}
       if (pm != PM::Machine)
         {
 	  auto cause = virtMem_.translateForStore2(va1, stSize, pm, virt, gaddr1, addr1, gaddr2, addr2);
           if (cause != EC::NONE)
-	    {
-	      ldStFaultAddr_ = addr1;
-	      return cause;
-	    }
-        }
-      else
-        {
-          addr1 = VirtMem::applyPointerMaskPa(addr1, mPmBits_);
-          addr2 = VirtMem::applyPointerMaskPa(addr2, mPmBits_);
+            {
+              ldStFaultAddr_ = addr1;
+              return cause;
+            }
         }
     }
 

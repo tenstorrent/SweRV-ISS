@@ -1224,7 +1224,26 @@ Session<URV>::run(const Args& args)
                 << " and steps distribution between " << stepWinLo << " and " << stepWinHi << "\n";
     }
 
-  return system.batchRun(traceFiles_, waitAll, stepWinLo, stepWinHi);
+  struct timeval t0;
+  gettimeofday(&t0, nullptr);
+
+  bool ok = system.batchRun(traceFiles_, waitAll, stepWinLo, stepWinHi);
+
+  struct timeval t1;
+  gettimeofday(&t1, nullptr);
+
+  // Report retired isntructions for deterministic runs.
+  if (not args.deterministic.empty())
+    {
+      uint64_t count = 0;
+      for (unsigned i = 0; i < system.hartCount(); ++i)
+	count += system.ithHart(i)->getInstructionCount();
+      double elapsed = (double(t1.tv_sec - t0.tv_sec) +
+			double(t1.tv_usec - t0.tv_usec)*1e-6);
+      system.ithHart(0)->reportInstsPerSec(count, elapsed, false);
+    }
+
+  return ok;
 }
 
 

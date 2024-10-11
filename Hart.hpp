@@ -345,6 +345,10 @@ namespace WdRiscv
     void configTriggerUseTcontrol(bool flag)
     { csRegs_.triggers_.enableTcontrol(flag); }
 
+    /// Set the maximum NAPOT range with maskmax.
+    void configTriggerNapotMaskMax(unsigned bits)
+    { csRegs_.triggers_.configNapotMaskMax(bits); }
+
     /// Configure machine mode performance counters returning true on
     /// success and false on failure. N consecutive counters starting
     /// at MHPMCOUNTER3/MHPMCOUNTER3H are made read/write. The
@@ -449,7 +453,7 @@ namespace WdRiscv
       if (isRvSmmpm())
         {
           uint8_t pmm = csRegs_.mseccfgPmm();
-          mPmBits_ = VirtMem::pointerMaskBits(VirtMem::Pmm(pmm));
+          virtMem_.enablePointerMasking(VirtMem::Pmm(pmm), PM::Machine, false);
         }
 
       if (isRvSsnpm())
@@ -471,6 +475,40 @@ namespace WdRiscv
           else if (isRvu())
             virtMem_.enablePointerMasking(VirtMem::Pmm(pmm), PM::User, false);
         }
+    }
+
+    /// Applies pointer mask w.r.t. effective privilege mode, effective
+    /// virtual mode, and type of load/store instruction.
+    uint64_t applyPointerMask(uint64_t addr, bool isLoad,
+                              bool hyper = false) const
+    {
+      auto [pm, virt] = effLdStMode(hyper);
+      return virtMem_.applyPointerMask(addr, pm, virt, isLoad);
+    }
+
+    /// Determines the load/store instruction's effective privilege mode
+    /// and effective virtual mode.
+    std::pair<PrivilegeMode, bool> effLdStMode(bool hyper = false) const
+    {
+      using PM = PrivilegeMode;
+      PM pm = privMode_;
+      bool virt = virtMode_;
+      if (isRvs())
+        {
+          if (mstatusMprv() and not nmieOverridesMprv())
+            {
+              pm = mstatusMpp();
+              virt = mstatus_.bits_.MPV;
+            }
+
+          if (hyper)
+            {
+              assert(not virtMode_);
+              pm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
+              virt = true;
+            }
+        }
+      return {pm, virt};
     }
 
     /// Enable page translation naturally aligned power of 2 page sizes.
@@ -2034,13 +2072,7 @@ namespace WdRiscv
 	  URV gip = csRegs_.peekHgeip();
 	  gip = flag ? (gip | (URV(1) << guest)) :  (gip & ~(URV(1) << guest));
 	  csRegs_.poke(CsrNumber::HGEIP, gip);
-
-	  URV gie = csRegs_.peekHgeie();
-	  URV gmask = URV(1) << URV(IC::G_EXTERNAL);
-	  URV mipVal = csRegs_.peekMip();
-          mipVal = (gip & gie) ? (mipVal | gmask) : (mipVal & ~gmask);
-
-	  csRegs_.poke(CsrNumber::MIP, mipVal);
+          recordCsrWrite(CsrNumber::HGEIP);
         });
     }
 
@@ -2171,18 +2203,26 @@ namespace WdRiscv
     ExceptionCause fetchInstNoTrap(uint64_t& virAddr, uint64_t& physAddr, uint64_t& physAddr2,
 				   uint64_t& gPhysAddr, uint32_t& instr);
 
+    /// Return true if the given address is that of tohost.
+    bool isToHostAddr(uint64_t addr) const
+    { return toHostValid_ and addr == toHost_; }
+
+    /// Return true if the given address is in the range of the ACLINT device.
     bool isAclintAddr(uint64_t addr) const
     { return hasAclint() and addr >= aclintBase_ and addr < aclintBase_ + aclintSize_; }
 
+    /// Return true if the given adress is that of the timer of the ACLINT device.
     bool isAclintMtimeAddr(uint64_t addr) const
     { return addr >= aclintMtimeStart_ and addr < aclintMtimeEnd_; }
 
+    /// Return true if given address is in the range of the IMSIC device.
     bool isImsicAddr(uint64_t addr) const
     {
       return (imsic_ and ((addr >= imsicMbase_ and addr < imsicMend_) or
 			  (addr >= imsicSbase_ and addr < imsicSend_)));
     }
 
+    /// Return true if the given address is in the range of the PCI decice.
     bool isPciAddr(uint64_t addr) const
     { return pci_ and pci_->contains_addr(addr); }
 
@@ -2251,6 +2291,9 @@ namespace WdRiscv
     /// info.  We return the individual register and not the base register of a group.
     unsigned identifyDataRegister(const VecLdStInfo& info, const VecLdStElem& elem) const
     { return vecRegs_.identifyDataRegister(info, elem); }
+
+    /// Report the number of retired instruction count and the simulation rate.
+    void reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop);
 
   protected:
 
@@ -2712,7 +2755,7 @@ namespace WdRiscv
 		     uint64_t paddr2, uint64_t& data);
 
     /// Helper to the cache block operation (cbo) instructions.
-    ExceptionCause determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa,
+    ExceptionCause determineCboException(uint64_t& addr, uint64_t& gpa, uint64_t& pa,
 					 bool isZero);
 
     /// Implement part of TIF protocol for writing the "tohost" magical
@@ -2988,10 +3031,6 @@ namespace WdRiscv
     /// operands: Signal an illegal instruction if immediate value is
     /// greater than XLEN-1 returning false; otherwise return true.
     bool checkShiftImmediate(const DecodedInst* di, URV imm);
-
-    /// Report the number of retired instruction count and the simulation
-    /// rate.
-    void reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop);
 
     /// Helper to the run methods: Log (on the standard error) the
     /// cause of a stop signaled with an exception. Return true if
@@ -5293,9 +5332,6 @@ namespace WdRiscv
     TT_STEE::Stee stee_;
     bool steeInsec1_ = false;  // True if insecure access to a secure region.
     bool steeInsec2_ = false;  // True if insecure access to a secure region.
-
-    // Pointer masking
-    unsigned mPmBits_ = 0;
 
     VirtMem virtMem_;
     Isa isa_;

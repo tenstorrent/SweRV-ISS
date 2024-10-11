@@ -93,6 +93,7 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (cause != ExceptionCause::NONE)
     {
+      virtAddr = applyPointerMask(virtAddr, false);
       if (not triggerTripped_)
         initiateLoadException(di, cause, virtAddr, gaddr);
       return false;
@@ -160,6 +161,7 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (cause != ExceptionCause::NONE)
     {
+      virtAddr = applyPointerMask(virtAddr, false);
       if (not triggerTripped_)
         initiateLoadException(di, cause, virtAddr, gaddr);
       return false;
@@ -247,6 +249,7 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
 
   if (cause != ExceptionCause::NONE)
     {
+      virtAddr = applyPointerMask(virtAddr, true);
       initiateLoadException(di, cause, virtAddr, gaddr1);
       return false;
     }
@@ -339,6 +342,7 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   if (misal and misalHasPriority_)
     {
       auto cause = misalAtomicCauseAccessFault_ ? EC::STORE_ACC_FAULT : EC::STORE_ADDR_MISAL;
+      virtAddr = applyPointerMask(virtAddr, false);
       initiateStoreException(di, cause, virtAddr, virtAddr);
       return false;
     }
@@ -365,6 +369,7 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
 
   if (cause != EC::NONE)
     {
+      virtAddr = applyPointerMask(virtAddr, false);
       initiateStoreException(di, cause, virtAddr, gaddr1);
       return false;
     }
@@ -388,7 +393,7 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   memPeek(addr1, addr2, temp, false /*usePma*/);
   ldStData_ = temp;
 
-  invalidateDecodeCache(virtAddr, sizeof(STORE_TYPE));
+  invalidateDecodeCache(addr1, sizeof(STORE_TYPE));
   return true;
 }
 
@@ -944,6 +949,7 @@ Hart<uint64_t>::execAmocas_q(const DecodedInst* di)
   bool misal = (addr & mask) != 0;
   if (misal and misalHasPriority_)
     {
+      addr = applyPointerMask(addr, false);
       if (misalAtomicCauseAccessFault_)
 	initiateStoreException(di, ExceptionCause::STORE_ACC_FAULT, addr, addr);
       initiateStoreException(di, ExceptionCause::STORE_ADDR_MISAL, addr, addr);

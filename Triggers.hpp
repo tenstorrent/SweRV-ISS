@@ -353,7 +353,9 @@ namespace WdRiscv
 	{
 	  if (not data1_.dmodeOnly())
 	    data1_.mcontrol_.action_ = 0;
-	}
+          if (data1_.isMcontrol())
+            data1_.mcontrol_.maskMax_ = std::countr_zero(napotMask_) + 1;
+        }
       else if (data1_.isInstCount())
 	{
 	  if (not data1_.dmodeOnly())
@@ -372,6 +374,9 @@ namespace WdRiscv
 
       data2_ = (value & data2WriteMask_) | (data2_ & ~data2WriteMask_);
       modifiedT2_ = true;
+
+      if (data1_.isMcontrol6() and data2_ == ~URV(0))
+        data2_ = napotMask_;
 
       updateCompareMask();
       return true;
@@ -418,6 +423,10 @@ namespace WdRiscv
     void pokeData2(URV x)
     {
       data2_ = (x & data2PokeMask_) | (data2_ & ~data2PokeMask_);
+
+      if (data1_.isMcontrol6() and data2_ == ~URV(0))
+        data2_ = napotMask_;
+
       updateCompareMask();
     }
 
@@ -632,6 +641,10 @@ namespace WdRiscv
     void enableAllInstAddrMatch(bool flag)
     { matchAllInstAddr_ = flag; }
 
+    /// Config the maximum NAPOT mask.
+    void configNapotMask(uint64_t mask)
+    { napotMask_ = mask; }
+
   protected:
 
     static bool isNegatedMatch(Match m)
@@ -734,6 +747,7 @@ namespace WdRiscv
     URV infoPokeMask_    = ~URV(0);
 
     URV data2CompareMask_ = ~URV(0);
+    URV napotMask_        = ~(URV(1) << (8*sizeof(URV) - 2));
 
     URV prevData1_ = 0;
 
@@ -977,6 +991,17 @@ namespace WdRiscv
     /// Enable all inst address matching [address, address+size-1].
     void enableAllInstAddrMatch(bool flag)
     { for ( auto& trig : triggers_) trig.enableAllInstAddrMatch(flag); }
+
+    /// Set the maximum NAPOT range with maskmax.
+    void configNapotMaskMax(unsigned bits)
+    {
+      if (bits > (8*sizeof(URV) - 1))
+        return;
+
+      bits -= 1;
+      uint64_t mask = ~(URV(1) << bits);
+      for ( auto& trig : triggers_) trig.configNapotMask(mask);
+    }
 
     /// Reset all triggers.
     void reset();

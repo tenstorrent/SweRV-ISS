@@ -615,7 +615,9 @@ namespace WdRiscv
       assert(info.elemSize_ != 0 and not info.elems_.empty());
       unsigned base = info.vec_;
       unsigned count = (elem.ix_ * info.elemSize_) / bytesPerReg_;
-      return base + count + elem.field_;
+      unsigned emulX8 = info.elemSize_ * groupX8_ / elemWidthInBytes(sew_);
+      unsigned field_coeff = std::max(1U, emulX8/8);
+      return base + count + elem.field_ * field_coeff;
     }
 
   protected:

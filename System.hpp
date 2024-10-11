@@ -289,6 +289,10 @@ namespace WdRiscv
     /// Similar to preceding method but with all PPO rules enabled/disabled.
     bool enableMcm(unsigned mbSize, bool mbLineCheckAll, bool enablePpos = true);
 
+    /// Terminate MCM. Experimental. This unlikely to be useful except for executing one
+    /// extra instruction at the end of a test to simplify some debugging.
+    void endMcm();
+
     /// Enable the performance mode API.
     bool enablePerfApi(std::vector<FILE*>& traceFiles);
 
@@ -310,16 +314,16 @@ namespace WdRiscv
     unsigned mergeBufferSize() const
     { return mbSize_; }
 
-    /// Initiate an out of order read operation for a load
-    /// instruction. If a preceding overlapping store has not yet left
-    /// the merge/store buffer then forward data from that store to
-    /// the read operation; otherwise, get the data from glbal
-    /// memory. Return true on success and false if global memory is
-    /// not readable (in the case where we do not forward). Tag is the
-    /// instruction number of the load instruction. Addr/size/data are
-    /// address,size, and data of the read operation.
+    /// Initiate an out of order read operation for a load instruction. If a preceding
+    /// overlapping store has not yet left the merge/store buffer then forward data from
+    /// that store to the read operation; otherwise, get the data from global memory.
+    /// Return true on success and false if global memory is not readable (in the case
+    /// where we do not forward). Tag is the instruction number of the load
+    /// instruction. Addr/size/data are address,size, and data of the read operation.
+    /// For vector load elemIx is the element index and fieldIx is the field number
+    /// for segmented loads (zero if non-segment).
     bool mcmRead(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
-		 unsigned size, uint64_t data);
+		 unsigned size, uint64_t data, unsigned elemIx, unsigned fieldIx);
 
     /// Initiate a merge buffer write.  All associated store write
     /// transactions are marked completed. Write instructions where

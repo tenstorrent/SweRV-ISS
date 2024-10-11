@@ -554,23 +554,23 @@ namespace WdRiscv
     uint64_t value_; // DCSR register value
     struct
     {
-      unsigned PRV : 2;
-      unsigned STEP : 1;
-      unsigned NMIP : 1;
-      unsigned MPRVEN : 1;
-      unsigned V : 1;
-      unsigned CAUSE : 3;
-      unsigned STOPTIME : 1;
-      unsigned STOPCOUNT : 1;
-      unsigned STEPIE : 1;
-      unsigned EBREAKU : 1;
-      unsigned EBREAKS : 1;
-      unsigned reserved1 : 1;
-      unsigned EBREAKM : 1;
-      unsigned EBREAKVU : 1;
-      unsigned EBREAKVS : 1;
-      unsigned reserved2 : 10;
-      unsigned DEBUGVER : 4;
+      unsigned PRV         : 2;     // bits 1-0
+      unsigned STEP        : 1;     // bit  2 
+      unsigned NMIP        : 1;     // bit  3
+      unsigned MPRVEN      : 1;     // bit  4
+      unsigned V           : 1;     // bit  5
+      unsigned CAUSE       : 3;     // bits 8-6
+      unsigned STOPTIME    : 1;     // bit  9
+      unsigned STOPCOUNT   : 1;     // bit  10
+      unsigned STEPIE      : 1;     // bit  11
+      unsigned EBREAKU     : 1;     // bit  12
+      unsigned EBREAKS     : 1;     // bit  13
+      unsigned reserved1   : 1;     // bit  14
+      unsigned EBREAKM     : 1;     // bit  15
+      unsigned EBREAKVU    : 1;     // bit  16
+      unsigned EBREAKVS    : 1;     // bit  17
+      unsigned reserved2   : 10;    // bit  27-18
+      unsigned DEBUGVER    : 4;     // bit  31-28
     } bits_;
   };
 

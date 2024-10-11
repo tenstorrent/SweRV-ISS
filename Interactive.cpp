@@ -1892,6 +1892,14 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       return true;
     }
 
+  if (command == "end_mcm")
+    {
+      system_.endMcm();
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
   if (command == "translate")
     {
       if (not translateCommand(hart, line, tokens))
@@ -2082,8 +2090,8 @@ bool
 Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
 			       const std::vector<std::string>& tokens)
 {
-  // Format: mread <instr-tag> <physical-address> <size> <rtl-data>
-  if (tokens.size() != 5)
+  // Format: mread <instr-tag> <physical-address> <size> <rtl-data> [<elem>] [<field>]
+  if (tokens.size() < 5)
     {
       cerr << "Invalid mread command: " << line << '\n';
       cerr << "  Expecting: mread <tag> <addr> <size> <data>\n";
@@ -2108,12 +2116,21 @@ Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
       return false;
     }
 
+  unsigned elem = 0, field = 0;
+  if (tokens.size() > 5)
+    if (not parseCmdLineNumber("element-index", tokens.at(5), elem))
+      return false;
+
+  if (tokens.size() > 6)
+    if (not parseCmdLineNumber("element-field", tokens.at(6), field))
+      return false;
+
   if (size <= 8)
     {
       uint64_t data = 0;
       if (not parseCmdLineNumber("data", tokens.at(4), data))
 	return false;
-      return system_.mcmRead(hart, this->time_, tag, addr, size, data);
+      return system_.mcmRead(hart, this->time_, tag, addr, size, data, elem, field);
     }
 
   // mread for a vector load, expected size is half a cache line size (32)
@@ -2152,19 +2169,19 @@ Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
     {
       const uint64_t* vdata = reinterpret_cast<const uint64_t*> (bytes.data());
       for (unsigned i = 0; i < size and ok; i += 8, ++vdata, addr += 8)
-	ok = system_.mcmRead(hart, this->time_, tag, addr, 8, *vdata);
+	ok = system_.mcmRead(hart, this->time_, tag, addr, 8, *vdata, elem, field);
     }
   else if ((size & 0x3) == 0 and (addr & 0x3) == 0)
     {
       const uint32_t* vdata = reinterpret_cast<const uint32_t*> (bytes.data());
       for (unsigned i = 0; i < size and ok; i += 4, ++vdata, addr += 4)
-	ok = system_.mcmRead(hart, this->time_, tag, addr, 4, *vdata);
+	ok = system_.mcmRead(hart, this->time_, tag, addr, 4, *vdata, elem, field);
     }
   else
     {
       const uint8_t* vdata = bytes.data();
       for (unsigned i = 0; i < size and ok; ++i, ++vdata, ++addr)
-	ok = system_.mcmRead(hart, this->time_, tag, addr, 1, *vdata);
+	ok = system_.mcmRead(hart, this->time_, tag, addr, 1, *vdata, elem, field);
     }
 
   return ok;

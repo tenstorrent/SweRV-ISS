@@ -56,11 +56,13 @@ namespace WdRiscv
       elems_.clear();
     }
 
-    /// Set element size (in bytes), data vector register, and type (load or store).
-    void init(unsigned elemSize, unsigned vecReg, bool isLoad)
+    /// Set element size (in bytes), data vector register, group multiplier, and type
+    /// (load or store).
+    void init(unsigned elemSize, unsigned vecReg, unsigned group, bool isLoad)
     {
       elemSize_ = elemSize;
       vec_ = vecReg;
+      group_ = group;
       isLoad_ = isLoad;
       
       isIndexed_ = false;
@@ -70,19 +72,22 @@ namespace WdRiscv
       fields_ = 0;
     }
 
-    /// Set element size (in bytes), data vector register, index vector register, and type
-    /// (load or store).
-    void initIndexed(unsigned elemSize, unsigned vecReg, unsigned ixReg, bool isLoad)
+    /// Set element size (in bytes), data vector register, index vector register, data
+    // group multiplier, index group multiplier, and type (load or store).
+    void initIndexed(unsigned elemSize, unsigned vecReg, unsigned ixReg, unsigned group,
+		     unsigned ixGroup, bool isLoad)
     {
-      init(elemSize, vecReg, isLoad);
+      init(elemSize, vecReg, group, isLoad);
       isIndexed_ = true;
       ixVec_ = ixReg;
+      ixGroup_ = ixGroup;
     }
 
-    /// Set the field count. Used for load/store segment.
-    void setFieldCount(unsigned fields)
+    /// Set the field count. Used for ld/st segment and ld/st whole regs.
+    void setFieldCount(unsigned fields, bool isSeg = false)
     {
       fields_ = fields;
+      isSegmented_ = isSeg;
     }
 
     /// Add element information to this object.
@@ -117,6 +122,8 @@ namespace WdRiscv
     unsigned vec_ = 0;                // Base data vector register.
     unsigned ixVec_ = 0;              // Base index vector register.
     unsigned fields_ = 0;             // For load/store segment.
+    unsigned group_ = 0;              // Group multiplier or 1 if fractional.
+    unsigned ixGroup_ = 0;            // Group multiplier of index vec or 1 if fractional.
     bool isLoad_ = false;             // True for load instructions.
     bool isIndexed_ = false;          // True for indexed instructions.
     bool isSegmented_ = false;        // True for load/store segment.

@@ -371,6 +371,7 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
                                                       hart.virtMem().lastVsPbmt(), hart.virtMem().lastPbmt());
                 pma = VirtMem::overridePmaWithPbmt(pma, effpbmt);
                 reply.value = pma.attributesToInt();
+                return true;
               }
             else
               break;
@@ -839,14 +840,17 @@ Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
 {
   bool ok = true;
   uint32_t hartId = req.hart;
+  unsigned elem = uint16_t(req.resource >> 16);  // Vector element ix.
+  unsigned field = uint16_t(req.resource);       // Vector element field (for segment load).
 
   if (req.size <= 8)
     {
       ok = system_.mcmRead(hart, req.time, req.instrTag, req.address, req.size,
-			   req.value);
+			   req.value, elem, field);
       if (cmdLog)
-          fprintf(cmdLog, "hart=%" PRIu32 " time=%" PRIu64 " mread %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
-                  hartId, req.time, req.instrTag, req.address, req.size, req.value);
+          fprintf(cmdLog, "hart=%" PRIu32 " time=%" PRIu64 " mread %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 " %d %d\n",
+                  hartId, req.time, req.instrTag, req.address, req.size, req.value,
+		  elem, field);
     }
   else
     {
@@ -864,19 +868,19 @@ Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
 	    {
 	      const uint64_t* data = reinterpret_cast<const uint64_t*>(req.buffer.data());
 	      for (unsigned i = 0; i < size and ok; i += 8, ++data)
-		ok = system_.mcmRead(hart, time, tag, addr + i, 8, *data);
+		ok = system_.mcmRead(hart, time, tag, addr + i, 8, *data, elem, field);
 	    }
 	  else if ((size & 0x3) == 0 and (addr & 0x3) == 0)
 	    {
 	      const uint32_t* data = reinterpret_cast<const uint32_t*>(req.buffer.data());
 	      for (unsigned i = 0; i < size and ok; i += 4, ++data)
-		ok = system_.mcmRead(hart, time, tag, addr + i, 4, *data);
+		ok = system_.mcmRead(hart, time, tag, addr + i, 4, *data, elem, field);
 	    }
 	  else
 	    {
 	      const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
 	      for (unsigned i = 0; i < size and ok; ++i, ++data)
-		ok = system_.mcmRead(hart, time, tag, addr + i, 1, *data);
+		ok = system_.mcmRead(hart, time, tag, addr + i, 1, *data, elem, field);
 	    }
 
 	  if (cmdLog)
@@ -889,7 +893,7 @@ Server<URV>::mcmReadCommand(const WhisperMessage& req, WhisperMessage& reply,
 		  unsigned val = data[i-1];
 		  fprintf(cmdLog, "%02x", val);
 		}
-	      fprintf(cmdLog, "\n");
+	      fprintf(cmdLog, " %d %d\n", elem, field);
 	    }
 	}
     }
@@ -1385,6 +1389,12 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 
       case McmInsert:
 	mcmInsertCommand(msg, reply, hart, commandLog);
+	break;
+
+      case McmEnd:
+	system_.endMcm();
+	if (commandLog)
+	  fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " end_mcm\n", hartId, msg.time);
 	break;
 
       case McmWrite:

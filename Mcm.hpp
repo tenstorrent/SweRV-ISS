@@ -22,11 +22,14 @@ namespace WdRiscv
   struct MemoryOp
   {
     uint64_t   time_           = 0;
-    uint64_t   physAddr_       = 0;
+    uint64_t   pa_             = 0;  // Physical address.
     uint64_t   data_           = 0;  // Model (Whisper) data for ld/st instructions.
     uint64_t   rtlData_        = 0;  // RTL data.
-    McmInstrIx instrTag_       = 0;
+    McmInstrIx tag_            = 0;  // Instruction tag.
     uint64_t   forwardTime_    = 0;  // Time of store instruction forwarding to this op.
+    uint64_t   insertTime_     = 0;  // Time of merge buffer insert (if applicable).
+    uint16_t   elemIx_         = 0;  // Vector element index.
+    uint16_t   field_          = 0;  // Vector element field (for segment load).
     uint8_t    hartIx_    : 8  = 0;
     uint8_t    size_      : 8  = 0;
     bool       isRead_    : 1  = false;
@@ -36,11 +39,11 @@ namespace WdRiscv
 
     /// Return true if address range of this operation overlaps that of the given one.
     bool overlaps(const MemoryOp& other) const
-    { return physAddr_ + size_ > other.physAddr_ and physAddr_ < other.physAddr_ + other.size_; }
+    { return pa_ + size_ > other.pa_ and pa_ < other.pa_ + other.size_; }
 
     /// Return true if address range of this operation overlaps given address.
     bool overlaps(uint64_t addr) const
-    { return addr >= physAddr_ and addr < physAddr_ + size_; }
+    { return addr >= pa_ and addr < pa_ + size_; }
 
     bool isCanceled() const { return canceled_; }
     void cancel() { canceled_ = true; }
@@ -50,9 +53,9 @@ namespace WdRiscv
     /// operation or if this is not a read operation.
     bool getModelReadOpByte(uint64_t pa, uint8_t& byte) const
     {
-      if (not isRead_ or pa < physAddr_ or pa >= physAddr_ + size_)
+      if (not isRead_ or pa < pa_ or pa >= pa_ + size_)
 	return false;
-      byte = data_ >> ((pa - physAddr_) * 8);
+      byte = data_ >> ((pa - pa_) * 8);
       return true;
     }
   };
@@ -92,11 +95,12 @@ namespace WdRiscv
     uint8_t hartIx_ : 8 = 0;
     uint8_t size_   : 8 = 0;        // Data size for load/store instructions.
 
-    bool retired_   : 1 = false;
-    bool canceled_  : 1 = false;
-    bool isLoad_    : 1 = false;
-    bool isStore_   : 1 = false;
-    bool complete_  : 1 = false;
+    bool retired_    : 1 = false;
+    bool canceled_   : 1 = false;
+    bool isLoad_     : 1 = false;
+    bool isStore_    : 1 = false;
+    bool complete_   : 1 = false;
+    bool hasOverlap_ : 1 = false;   // For vector load instructions.
 
     /// Return true if this a load/store instruction.
     bool isMemory() const { return isLoad_ or isStore_; }
@@ -167,15 +171,14 @@ namespace WdRiscv
     /// Destructor.
     ~Mcm();
 
-    /// Initiate an out of order read for a load instruction. If a
-    /// preceding overlapping store has not yet left the merge/store
-    /// buffer then forward data from that store to the read operation;
-    /// otherwise, get the data from global memory. Return true on
-    /// success and false if global memory is not readable (in the
-    /// case where we do not forward).
-    bool readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-		uint64_t physAddr, unsigned size, uint64_t rtlData);
-
+    /// Initiate an out of order read for a load instruction. If a preceding overlapping
+    /// store has not yet left the merge/store buffer then forward data from that store to
+    /// the read operation; otherwise, get the data from global memory. Return true on
+    /// success and false if global memory is not readable (in the case where we do not
+    /// forward). For vector load elemIx is the element index and field is the segment
+    /// field number (0 if non segment).
+    bool readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag, uint64_t physAddr,
+		unsigned size, uint64_t rtlData, unsigned elemIx, unsigned field);
 
     /// This is a write operation bypassing the merge buffer.
     bool bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
@@ -243,6 +246,16 @@ namespace WdRiscv
     /// instruction.
     uint64_t latestByteTime(const McmInstr& instr, uint64_t addr) const;
 
+    /// Return the effective earliest memory time for the byte at the given
+    /// address. Return 0 if address is not covered by given instruction.
+    /// The effective time it the max of the mread-time and the forward-time.
+    uint64_t effectiveMinByteTime(const McmInstr& instr, uint64_t addr) const;
+
+    /// Return the effective latest memory time for the byte at the given address. Return
+    /// max value if address is not covered by given instruction. The effective time it
+    /// the max of the mread-time and the forward-time.
+    uint64_t effectiveMaxByteTime(const McmInstr& instr, uint64_t addr) const;
+
     /// Skip checking preserve program order (PPO) rules if flag is false.
     void enablePpo(bool flag)
     { std::fill(ppoEnabled_.begin(), ppoEnabled_.end(), flag); }
@@ -296,9 +309,12 @@ namespace WdRiscv
     /// Check PPO rule13. See ppoRule1.
     bool ppoRule13(Hart<URV>& hart, const McmInstr& instr) const;
 
-    /// Helper to above ppoRule1.
-    bool ppoRule1(const McmInstr& instrA, const McmInstr& instrB, uint64_t& t1,
-		  uint64_t& t2, uint64_t& physAddr) const;
+    /// Helper to main ppoRule1. Check A against B.
+    bool ppoRule1(unsigned hartId, const McmInstr& instrA, const McmInstr& instrB) const;
+
+    /// Helper to main ppoRule1. Check memory operation of A against B.
+    bool ppoRule1(unsigned hartId, const McmInstr& instrA, const MemoryOp& opA,
+		  const McmInstr& instrB) const;
 
     /// Helper to above ppoRule5.
     bool ppoRule5(Hart<URV>&, const McmInstr& instrA, const McmInstr& instrB) const;
@@ -408,12 +424,15 @@ namespace WdRiscv
 
     bool referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64_t& val);
 
-    /// Return true if given instruction is an indexed load/store and it has
-    /// an index register with a value produced after the instruction has used
-    /// that index register. If out of order, set producer to the tag of the
-    /// instruction producing the value of the ooo index register.
+    /// Return true if given instruction is an indexed load/store and it has an index
+    /// register with a value produced after the instruction has used that index
+    /// register. If out of order, set producer to the tag of the instruction producing
+    /// the value of the ooo index register, also set dataTime to the time of the
+    /// corrsponding data register instr. This works only for the instruction being
+    /// retired.
     bool isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned& ixReg,
-			      McmInstrIx& producer, uint64_t& produerTime) const;
+			      McmInstrIx& producer, uint64_t& produerTime,
+			      uint64_t& dataTime) const;
 
     /// Collect the earliest times the data registers of the given load/store instruction
     /// were read/written. Base is the first vector register, count is the number of
@@ -548,7 +567,7 @@ namespace WdRiscv
 	return false;
 
       for (auto& vecRef : vecRefs.refs_)
-        if (rangesOverlap(vecRef.addr_, vecRef.size_, other.physAddr_, other.size_))
+        if (rangesOverlap(vecRef.addr_, vecRef.size_, other.pa_, other.size_))
 	  return true;
 
       return false;
@@ -564,20 +583,20 @@ namespace WdRiscv
     {
       if (instr.size_ == 0 or op.size_ == 0)
 	std::cerr << "Mcm::overlaps: Error: tag1=" << instr.tag_
-		  << " tag2=" << op.instrTag_ << " zero data size\n";
+		  << " tag2=" << op.tag_ << " zero data size\n";
 
       if (instr.di_.isVector())
 	return vecOverlaps(instr, op);
 
       if (instr.physAddr_ == instr.physAddr2_)   // Non-page-crossing
-	return rangesOverlap(instr.physAddr_, instr.size_, op.physAddr_, op.size_);
+	return rangesOverlap(instr.physAddr_, instr.size_, op.pa_, op.size_);
 
       // Page crossing.
       unsigned size1 = offsetToNextPage(instr.physAddr_);
-      if (rangesOverlap(instr.physAddr_, size1, op.physAddr_, op.size_))
+      if (rangesOverlap(instr.physAddr_, size1, op.pa_, op.size_))
 	return true;
       unsigned size2 = instr.size_ - size1;
-      return rangesOverlap(instr.physAddr2_, size2, op.physAddr_, op.size_);
+      return rangesOverlap(instr.physAddr2_, size2, op.pa_, op.size_);
     }
 
     /// Return true if the given address ranges overlap one another.
@@ -667,7 +686,7 @@ namespace WdRiscv
 	  const auto& op = sysMemOps_.at(opIx);
 	  for (unsigned i = 0; i < op.size_; ++i)
 	    {
-	      uint64_t addr = op.physAddr_ + i;
+	      uint64_t addr = op.pa_ + i;
 	      if (overlapsRefPhysAddr(storeInstr, addr))
 		written.insert(addr);
 	    }
@@ -787,7 +806,7 @@ namespace WdRiscv
 	if (empty())
 	  return true;
 	assert(op.size_ > 0);
-	return isOutOfBounds(op.physAddr_, op.physAddr_ + op.size_ - 1);
+	return isOutOfBounds(op.pa_, op.pa_ + op.size_ - 1);
       }
 
       bool isOutOfBounds(const VecRef& ref) const

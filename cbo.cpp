@@ -23,7 +23,7 @@ using namespace WdRiscv;
 
 template <typename URV>
 ExceptionCause
-Hart<URV>::determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, bool isZero)
+Hart<URV>::determineCboException(uint64_t& addr, uint64_t& gpa, uint64_t& pa, bool isZero)
 {
   uint64_t mask = uint64_t(cacheLineSize_) - 1;
   addr &= ~mask;  // Make addr a multiple of cache line size.
@@ -35,19 +35,14 @@ Hart<URV>::determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, boo
   EC cause = EC::NONE;
 
   // Address translation
+  auto [pm, virt] = effLdStMode();
+
+  gpa = pa = addr = applyPointerMask(addr, false);
+
   if (isRvs())
     {
-      PrivilegeMode pm = privMode_;
-      bool virt = virtMode_;
-      if (mstatusMprv() and not nmieOverridesMprv())
-	{
-	  pm = mstatusMpp();
-	  virt = mstatus_.bits_.MPV;
-	}
-
       if (pm != PrivilegeMode::Machine)
         {
-          gpa = pa = addr;
 	  if (isZero)
 	    {
 	      bool read = false, write = true, exec = false;

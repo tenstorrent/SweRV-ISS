@@ -1,5 +1,6 @@
 #include <cinttypes>
 #include <iostream>
+#include <iomanip>
 #include <ranges>
 #include <sstream>
 #include "Hart.hpp"
@@ -322,6 +323,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       auto& vecInfo = getLastVectorMemory();
       if (not vecInfo.empty())
 	{
+          unsigned num_nibbles = vecInfo.elemSize_*2;
 	  std::ostringstream oss;
 	  auto& elems = vecInfo.elems_;
 	  for (uint64_t i = 0; i < elems.size(); ++i)
@@ -333,7 +335,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 	      if (einfo.pa_ != einfo.va_)
 		oss << ":0x" << einfo.pa_;
 	      if (not vecInfo.isLoad_)
-		oss << '=' << "0x" << einfo.stData_;
+		oss << '=' << "0x" << std::setfill('0') << std::setw(num_nibbles) << einfo.stData_;
 	    }
 	  tmp += " [" + oss.str() + "]";
 	}
