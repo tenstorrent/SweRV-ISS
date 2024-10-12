@@ -2103,7 +2103,10 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
   if (num == CN::MENVCFG or num == CN::HENVCFG)
     updateSstc();
   else if (num == CN::MIP)
-    updateVirtInterrupt();
+    {
+      if (updateVirtInterrupt())
+        recordWrite(CN::MVIP);
+    }
 
   return true;
 }
@@ -4332,12 +4335,12 @@ CsRegs<URV>::updateVirtInterruptCtl()
 
 
 template <typename URV>
-void
+bool
 CsRegs<URV>::updateVirtInterrupt()
 {
   auto mip = getImplementedCsr(CsrNumber::MIP);
   if (not mip)
-    return;
+    return false;
 
   URV value = mip->read();
   auto mvien = getImplementedCsr(CsrNumber::MVIEN);
@@ -4358,11 +4361,9 @@ CsRegs<URV>::updateVirtInterrupt()
       mask &= b19 | b5;
       // Write aliasing bits.
       mvip->write((mvip->read() & ~mask) | (value & mask));
-      recordWrite(CsrNumber::MVIP);
+      return true;
     }
-
-  mip->write(value);
-  return;
+  return false;
 }
 
 

@@ -2799,9 +2799,9 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
       URV delegVal = peekCsr(interrupt? CsrNumber::MIDELEG : CsrNumber::MEDELEG);
       if (isRvaia())
         {
-          URV mvienVal = peekCsr(CsrNumber::MVIEN);
+          URV mvien = csRegs_.peekMvien();
           if (interrupt)
-            delegVal |= mvienVal;
+            delegVal |= mvien;
         }
       if (delegVal & (URV(1) << cause))
 	{
@@ -5417,8 +5417,8 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   URV delegVal = csRegs_.peekMideleg();
   if (isRvaia())
     {
-      URV mvienVal = peekCsr(CsrNumber::MVIEN);
-      delegVal |= mvienVal;
+      URV mvien = csRegs_.peekMvien();
+      delegVal |= mvien;
     }
   URV hDelegVal = csRegs_.peekHideleg();
 
@@ -5519,14 +5519,15 @@ bool
 Hart<URV>::isInterruptPossible(InterruptCause& cause) const
 {
   URV mip = csRegs_.peekMip();
-  if (isRvaia())
-    {
-      URV mvip = csRegs_.peekMvip() & ~csRegs_.peekMideleg();
-      mip |= mvip;
-    }
 
   // MIP read value is ored with supervisor external interrupt pin.
   mip = overrideWithSeiPin(mip);
+
+  if (isRvaia())
+    {
+      URV mvip = csRegs_.peekMvip() & ~csRegs_.peekMideleg() & csRegs_.peekMvien();
+      mip |= mvip;
+    }
 
   mip &= ~deferredInterrupts_;  // Inhibited by test-bench.
 
@@ -10751,11 +10752,8 @@ Hart<URV>::imsicAccessible(const DecodedInst* di, CsrNumber csr, PrivilegeMode m
         bool isS = privMode_ == PrivilegeMode::Supervisor and not virtMode_;
         if (isS and (csr == CN::STOPEI or csr == CN::SIREG))
           {
-            URV mvien;
-            if (not peekCsr(CsrNumber::MVIEN, mvien))
-              return false;
-
-            if ((mvien >> 9) & 1)
+            URV mvien = csRegs_.peekMvien();
+            if ((mvien >> URV(InterruptCause::S_EXTERNAL)) & 1)
               {
                 if (csr == CN::STOPEI)
                   {
