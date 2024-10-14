@@ -321,35 +321,27 @@ Mcm<URV>::getLdStIndexVectors(const Hart<URV>& hart, const McmInstr& instr,
 
   std::array<bool, 32> referenced;  for (auto& x : referenced) x = false;
   std::array<bool, 32> active;      for (auto& x : active)     x = false;
-  std::array<bool, 32> preserve;    for (auto& x : preserve)   x = true;
-
-  bool maskAgn = hart.isVectorMaskAgnostic();
-  bool tailAgn = hart.isVectorTailAgnostic();
 
   for (auto& elem : elems)
     {
       unsigned regNum = info.ixVec_ + elem.ix_ / elemsPerVec;
-      referenced.at(regNum) = true;
 
-      if (elem.skip_)
-	{
-	  bool masked = elem.ix_ < info.elemCount_;
-	  bool drop = masked ? maskAgn : tailAgn;
-	  preserve.at(regNum) = preserve.at(regNum) and not drop;
-	}
-      else
-	active.at(regNum) = true;   // Vector has one or more active element.
+      // It's possible tail extends past the number of registers. This is because
+      // we do not perform a read for indices part of the tail.
+      if (elem.ix_ >= info.elemCount_)
+        continue;
+
+      if (not elem.skip_)
+        active.at(regNum) = true;
+
+      referenced.at(regNum) = true;
     }
 
   unsigned count = 0;
   for (unsigned regNum = 0; regNum < 32; ++regNum)
     if (referenced.at(regNum))
       {
-	VecKind kind = VecKind::Skip;
-	if (active.at(regNum))
-	  kind = VecKind::Active;
-	else if (preserve.at(regNum))
-	  kind = VecKind::Preserve;
+	VecKind kind = active.at(regNum)? VecKind::Active : VecKind::Skip;
 	vecs.at(count++) = std::pair<unsigned, VecKind>{regNum, kind};
       }
 
