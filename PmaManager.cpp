@@ -86,7 +86,7 @@ PmaManager::PmaManager(uint64_t memSize)
 
 
 bool
-PmaManager::setMemMappedMask(uint64_t addr, uint64_t mask, unsigned size)
+PmaManager::defineMemMappedReg(uint64_t addr, uint64_t mask, unsigned size, Pma pma)
 {
   if (size != 4 and size != 8)
     return false;
@@ -94,8 +94,8 @@ PmaManager::setMemMappedMask(uint64_t addr, uint64_t mask, unsigned size)
   if ((addr & (size - 1)) != 0)
     return false;   // Not aligned.
 
-  memMappedRegs_[addr].mask_ = mask;
-  memMappedRegs_[addr].size_ = size;
+  MemMappedReg mmr {.mask_ = mask, .size_ = size, .pma_ = pma};
+  memMappedRegs_[addr] = mmr;
   return true;
 }
 
