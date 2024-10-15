@@ -9518,6 +9518,7 @@ Hart<URV>::exitDebugMode()
   pc_ = peekCsr(CsrNumber::DPC);  // Restore PC
 
   debugMode_ = false;
+  inDebugParkLoop_ = false;
   csRegs_.enterDebug(false);
 
   // If pending nmi bit is set in dcsr, set pending nmi in the hart
@@ -10481,47 +10482,7 @@ template <typename URV>
 void
 Hart<URV>::execDret(const DecodedInst* di)
 {
-  auto dcsr = csRegs_.getImplementedCsr(CsrNumber::DCSR);
-  auto dpc = csRegs_.getImplementedCsr(CsrNumber::DPC);
-  if (not dcsr or not dpc)
-    {
-      illegalInst(di);
-      return;
-    }
-
-  // The dret instruction is only valid if debug is on. However, if dcsr is
-  // not marked debug-only, then allow dret in any mode.
-  if (not debugMode_ and dcsr->isDebug())
-    {
-      illegalInst(di);
-      return;
-    }
-
-  cancelLr(CancelLrCause::EXIT_DEBUG);  // Exiting debug modes loses LR reservation.
-
-  pc_ = peekCsr(CsrNumber::DPC);  // Restore PC
-
-  debugMode_ = false;
-  inDebugParkLoop_ = false;
-  csRegs_.enterDebug(false);
-
-  // If pending nmi bit is set in dcsr, set pending nmi in the hart
-  // object.
-  URV dcsrVal = 0;
-  if (not peekCsr(CsrNumber::DCSR, dcsrVal))
-    std::cerr << "Error: Failed to read DCSR in exit debug.\n";
-
-  DcsrFields<URV> dcsrf(dcsrVal);
-  if (dcsrf.bits_.NMIP)
-    setPendingNmi(nmiCause_);
-
-  // Restore privilege mode.
-  auto pm = PrivilegeMode{dcsrf.bits_.PRV};
-  setPrivilegeMode(pm);
-
-  // Restore virtual mode.
-  bool vm = dcsrf.bits_.V;
-  setVirtualMode(vm);
+  illegalInst(di);
 }
 
 
