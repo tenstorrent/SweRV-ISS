@@ -4584,40 +4584,45 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
 
   auto hartIx = hart.sysHartIndex();
 
-  // Identify data registers.
-  std::array<std::pair<unsigned, VecKind>, 32> dataRegs;  // reg-num/kind pairs
-  unsigned dataCount = getLdStDataVectors(hart, instr, dataRegs);
-  if (not dataCount)
-    return false;
-
-  // Determine memory times of data registers.
-  std::array<std::uint64_t, 32> dataTimes;
-  for (unsigned i = 0; i < dataCount; ++i)
-    {
-      auto [dataReg, masked] = dataRegs.at(i);
-      dataTimes.at(dataReg) = getVecRegEarlyTime(hart, instr, dataReg);
-    }
-
   const VecLdStInfo& info = hart.getLastVectorMemory();
   const auto& elems = info.elems_;
 
   unsigned elemSize = info.elemSize_;
   assert(elemSize != 0);
-  unsigned elemsPerVec = hart.vecRegSize() / elemSize;
 
   unsigned ixElemSize = instr.di_.vecLoadOrStoreElemSize();
   assert(ixElemSize != 0);
   unsigned ixElemsPerVec = hart.vecRegSize() / ixElemSize;
+
+  uint64_t maxVal = ~uint64_t(0);
 
   for (const auto& elem : elems)
     {
       if (elem.skip_)
 	continue;
 
-      unsigned dataVec = info.vec_ + elem.field_*info.group_ + elem.ix_ / elemsPerVec;
-      unsigned ixVec = info.ixVec_ + elem.ix_ / ixElemsPerVec;
+      // Compute the earliest data element time.
+      uint64_t dTime = maxVal;
+      uint64_t pa1 = elem.pa_, pa2 = elem.pa2_;
+      unsigned size = elemSize, size1 = elemSize;
+      if (pa1 != pa2)
+	{
+	  size1 = offsetToNextPage(pa1);
+	  assert(size1 > 0 and size1 < 8);
+	}
 
-      auto dTime = dataTimes.at(dataVec);
+      for (unsigned i = 0; i < size; ++i)
+	{
+	  uint64_t addr = i < size1 ? pa1 + i : pa2 + i - size1;
+
+	  // FIX match element index and field.
+	  uint64_t byteTime = earliestByteTime(instr, addr);
+	  if (byteTime > 0)  // Byte time is zero for undrained writes.
+	    dTime = std::min(byteTime, dTime);
+	}
+      
+      // Compare data element time against corresponding index register time.
+      unsigned ixVec = info.ixVec_ + elem.ix_ / ixElemsPerVec;
       auto ixTime = vecRegTime(hartIx, ixVec);
 
       if (ixTime < dTime)
