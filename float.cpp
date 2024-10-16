@@ -2574,18 +2574,23 @@ Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
 
               int      shift    = exp - std::numeric_limits<double>::digits;
               uint64_t result64 = std::bit_cast<uint64_t>(frac);
+              bool sign = std::signbit(d1);
               if (shift > 0)
                 result64 <<= shift;
               else
                 result64 >>= -shift;
 
+              // Overflow.
+              if (result64 > (sign? std::bit_cast<uint32_t>(std::numeric_limits<int32_t>::min()) :
+                                    std::bit_cast<uint32_t>(std::numeric_limits<int32_t>::max())))
+                raiseSimulatorFpFlags(FpFlags::Invalid);
+
 	      result32 = result64;
-              if (std::signbit(d1))
+              if (sign)
                 result32 = -result32;
 	      result = result32;  // Sign extend.
             }
-          if (exp > (1 + std::numeric_limits<int32_t>::digits) or
-              (std::signbit(d1) ^ std::signbit(result32)))
+          if (exp > (1 + std::numeric_limits<int32_t>::digits))
             raiseSimulatorFpFlags(FpFlags::Invalid);
           else if (result != d1)
             raiseSimulatorFpFlags(FpFlags::Inexact);
