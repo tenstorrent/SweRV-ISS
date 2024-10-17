@@ -4296,7 +4296,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
       auto byteTime = byteInfo.time_;
 
       if (not mdi.isVectorStore())
-	{
+	{       // M is a scalar store or AMO.
 	  auto mapt = instrM.addrProducer_;  // M address producer tag.
 	  auto mdpt = instrM.dataProducer_;  // M data producer tag.
 	  auto& ap = instrVec.at(mapt);  // Address producer.
@@ -4368,7 +4368,8 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 		{
 		  cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
 		       << aTag << " tag2=" << instrB.tag_ << " mtag=" << mTag
-		       << " time1=" << aTime << " time2=" << byteTime << " dep=data\n";
+		       << " time1=" << aTime << " time2=" << byteTime << " addr2=0x"
+		       << std::hex << byteAddr << std::dec << " dep=data\n";
 		  return false;
 		}
 
