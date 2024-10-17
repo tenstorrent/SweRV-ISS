@@ -835,7 +835,7 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       if (instr->complete_)
 	{
 	  undrained.erase(instrTag);
-	  checkStoreData(hart.hartId(), *instr);
+	  checkStoreData(hart, *instr);
 	}
 
       if (not instr->retired_)
@@ -956,7 +956,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	    {
 	      auto& op = sysMemOps_.at(opIx);
 	      if (not op.isCanceled() and not op.isRead_)
-		result = checkStoreData(hart.hartId(), *instr) and result;
+		result = checkStoreData(hart, *instr) and result;
 	    }
 
 	  if (isEnabled(PpoRule::R1))
@@ -1030,17 +1030,18 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
       instr.complete_ = checkStoreComplete(hartIx, instr);
     }
 
+  bool ok = checkStoreData(hart, instr);
+
   auto& undrained = hartData_.at(hartIx).undrainedStores_;
 
   if (not instr.complete_)
     {
       undrained.insert(instr.tag_);
-      return true;
+      return ok;
     }
 
   undrained.erase(instr.tag_);
-
-  return true;
+  return ok;
 }
 
 
@@ -1204,7 +1205,6 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   if (instr->isStore_ and instr->complete_)
     {
-      ok = checkStoreData(hartIx, *instr) and ok;
       if (isEnabled(PpoRule::R1))
 	ok = ppoRule1(hart, *instr) and ok;
     }
@@ -1513,7 +1513,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	{
 	  instr->complete_ = true;
 	  undrained.erase(instr->tag_);
-	  checkStoreData(hart.hartId(), *instr);
+	  checkStoreData(hart, *instr);
 	  if (isEnabled(PpoRule::R1))
 	    result = ppoRule1(hart, *instr) and result;
 	  if (isEnabled(PpoRule::R3) and instr->di_.isAmo())
@@ -1721,39 +1721,56 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
 
 template <typename URV>
 bool
-Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
+Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
 {
-  if (not store.complete_)
-    return false;
+  auto hartId = hart.hartId();
 
   if (not store.di_.isVector())
     {
       for (auto opIx : store.memOps_)
 	{
-	  if (opIx >= sysMemOps_.size())
-	    continue;
-
 	  const auto& op = sysMemOps_.at(opIx);
 	  if (op.isRead_)
 	    continue;
-
 	  if (not checkRtlWrite(hartId, store, op))
 	    return false;
 	}
-
       return true;
     }
 
-  // Vector store.
+  // Vector store. We assume that the stores are done in order.
 
-  // Collect RTL write ops byte values. We use a map to account for overlap. Later writes
-  // over-write earlier ones.
-  std::unordered_map<uint64_t, uint8_t> rtlValues;  // Map byte address to value.
+  // Collect RTL drained write ops byte values. We use a map to account for overlap. Later
+  // writes over-write earlier ones.
+  using AddrValue = std::pair<uint64_t, uint8_t>;
+  std::vector<AddrValue> rtlData;
+  rtlData.reserve(1024);
   for (auto opIx : store.memOps_)
     {
       auto& op = sysMemOps_.at(opIx);
       for (unsigned i = 0; i < op.size_; ++i)
-	rtlValues[op.pa_ + i] = op.rtlData_ >> (i*8);
+	{
+	  uint64_t addr = op.pa_ +i;
+	  uint8_t val = op.rtlData_ >> (i*8);
+	  rtlData.push_back(AddrValue{addr, val});
+	}
+    }
+
+  // Collect undrained write ops byte values.
+  if (not store.complete_)
+    {
+      auto hartIx = hart.sysHartIndex();
+      const auto& pendingWrites = hartData_.at(hartIx).pendingWrites_;
+      for (auto& op : pendingWrites)
+	{
+	  if (op.tag_ == store.tag_ and hartIx == op.hartIx_)
+	    for (unsigned i = 0; i < op.size_; ++i)
+	      {
+		uint64_t addr = op.pa_ + i;
+		uint8_t val = op.rtlData_ >> (i*8);
+		rtlData.push_back(AddrValue{addr, val});
+	      }
+	}
     }
 
   auto& vecRefMap = hartData_.at(store.hartIx_).vecRefMap_;
@@ -1761,43 +1778,50 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
   assert(iter != vecRefMap.end());
   auto& vecRefs = iter->second;
 
-  // Collect reference byte values in an address to value map. Check for overlap
-  std::unordered_map<uint64_t, uint8_t> refValues;  // Map byte address to value.
-  bool overlap = false;
+  unsigned rtlDataIx = 0;
   for (auto& ref : vecRefs.refs_)
     {
-      for (unsigned i = 0; i < ref.size_; ++i)
+      for (unsigned i = 0; i < ref.size_; ++i, ++rtlDataIx)
 	{
 	  uint64_t addr = ref.pa_ + i;
-	  overlap = overlap or refValues.contains(addr);
-	  refValues[addr] = ref.data_ >> (i*8);
+	  uint8_t val = ref.data_ >> (i*8);
+	  if (rtlDataIx >= rtlData.size())
+	    {
+	      if (store.complete_)
+		{
+		  cerr << "Error: hart-id=" << hartId << " tag=" << store.tag_
+		       << " mismatch on vector store: whisper-addr=0x"
+		       << std::hex << addr << std::dec << " RTL-addr=none\n";
+		  return false;
+		}
+	      return true;  // Will check again once store is complete.
+	    }
+
+	  auto [rtlAddr, rtlVal] = rtlData.at(rtlDataIx);
+	  if (rtlAddr != addr)
+	    {
+	      cerr << "Error: hart-id=" << hartId << " tag=" << store.tag_
+		   << " mismatch on vector store: whisper-addr=0x"
+		   << std::hex << addr << " RTL-addr=0x" << rtlAddr
+		   << std::dec << '\n';
+	      return false;
+	    }
+
+	  if (rtlVal != val)
+	    {
+	      cerr << "Error: hart-id=" << hartId << " tag=" << store.tag_
+		   << " mismatch on vector store: addr=0x"
+		   << std::hex << addr << " whisper-value=0x" << unsigned(val)
+		   << " RTL-value=0x" << rtlVal << std::dec << '\n';
+	      return false;
+	    }
 	}
     }
 
-  // Overlap can happen for indexed/strided vector stores. We don't have enough
-  // information to handle that case.
-  if (overlap)
-    return true;
-
-  // Compare RTL to reference.
-  for (auto [addr, refVal] : refValues)
+  if (rtlDataIx < rtlData.size())
     {
-      auto iter = rtlValues.find(addr);
-      if (iter == rtlValues.end())
-	{
-	  cerr << "Error: RTL/whisper mismatch for vector store hart-id=" << hartId << " tag="
-	       << store.tag_ << " addr=0x" << std::hex << addr << " no RTL data\n";
-	  return false;
-	}
-
-      auto rtlVal = iter->second;
-      if (rtlVal == refVal)
-	continue;
-
-      cerr << "Error: RTL/whisper mismatch for vector store hart-id=" << hartId << " tag="
-	   << store.tag_ << " addr=0x" << std::hex << addr << " RTL=0x"
-	   << unsigned(rtlVal) << " whisper=0x" << unsigned(refVal) << std::dec << '\n';
-      return false;
+      cerr << "Warning: hart-id=" << hartId << " tag=" << store.tag_
+	   << " RTL has extra write-operation data vector store instruction.\n";
     }
 
   return true;

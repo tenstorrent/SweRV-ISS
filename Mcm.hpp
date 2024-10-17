@@ -680,7 +680,7 @@ namespace WdRiscv
 
     bool checkStoreComplete(unsigned hartIx, const McmInstr& instr) const;
 
-    bool checkStoreData(unsigned hartId, const McmInstr& insrt) const;
+    bool checkStoreData(Hart<URV>& hart, const McmInstr& insrt) const;
 
     bool checkLoadComplete(const McmInstr& instr) const;
 
