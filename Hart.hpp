@@ -513,7 +513,7 @@ namespace WdRiscv
 
     /// Enable page translation naturally aligned power of 2 page sizes.
     void enableTranslationNapot(bool flag)
-    { virtMem_.enableNapot(flag); }
+    { enableExtension(RvExtension::Svnapot, flag); virtMem_.enableNapot(flag); }
 
     /// Do not consider lr and sc instructions as load/store events for
     /// performance counter when flag is false. Do consider them when
@@ -1317,6 +1317,10 @@ namespace WdRiscv
     /// Return true if the svinval extension (TLB invalidate) is enabled.
     bool isRvsvinval() const
     { return extensionIsEnabled(RvExtension::Svinval); }
+
+    /// Return true if the svnapot extension is enabled.
+    bool isRvsvnapot() const
+    { return extensionIsEnabled(RvExtension::Svnapot); }
 
     /// Return true if the zicbom extension (cache block management) is enabled.
     bool isRvzicbom() const

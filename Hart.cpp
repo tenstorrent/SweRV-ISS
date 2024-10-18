@@ -381,6 +381,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvsstc(true);
   if (isa_.isEnabled(RvExtension::Svinval))
     enableSvinval(true);
+  if (isa_.isEnabled(RvExtension::Svnapot))
+    enableTranslationNapot(true);
   if (isa_.isEnabled(RvExtension::Svpbmt))
     enableTranslationPbmt(true);
   if (isa_.isEnabled(RvExtension::Svadu))
