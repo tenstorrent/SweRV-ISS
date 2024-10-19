@@ -2563,7 +2563,8 @@ Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
         }
       else
         {
-          int32_t result32 = 0;
+          bool sign = std::signbit(d1);
+          uint64_t result64 = 0;
           if (exp >= (64 + std::numeric_limits<double>::digits))
             result = 0;
           else
@@ -2573,19 +2574,21 @@ Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
                                 std::numeric_limits<double>::min_exponent);
 
               int      shift    = exp - std::numeric_limits<double>::digits;
-              uint64_t result64 = std::bit_cast<uint64_t>(frac);
+              result64 = std::bit_cast<uint64_t>(frac);
               if (shift > 0)
                 result64 <<= shift;
               else
                 result64 >>= -shift;
 
-	      result32 = result64;
-              if (std::signbit(d1))
+	      int32_t result32 = result64;
+              if (sign)
                 result32 = -result32;
 	      result = result32;  // Sign extend.
             }
-          if (exp > (1 + std::numeric_limits<int32_t>::digits) or
-              (std::signbit(d1) ^ std::signbit(result32)))
+          if (exp > (1 + std::numeric_limits<int32_t>::digits))
+            raiseSimulatorFpFlags(FpFlags::Invalid);
+          else if (result64 > (sign? std::bit_cast<uint32_t>(std::numeric_limits<int32_t>::min()) :
+                                     std::bit_cast<uint32_t>(std::numeric_limits<int32_t>::max())))
             raiseSimulatorFpFlags(FpFlags::Invalid);
           else if (result != d1)
             raiseSimulatorFpFlags(FpFlags::Inexact);
