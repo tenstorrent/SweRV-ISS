@@ -1774,10 +1774,12 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& store) const
 	}
     }
 
+#if 0
   // Overlap can happen for indexed/strided vector stores. We don't have enough
   // information to handle that case.
   if (overlap)
     return true;
+#endif
 
   // Compare RTL to reference.
   for (auto [addr, refVal] : refValues)
