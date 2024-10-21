@@ -1169,7 +1169,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
     }
 
   if (instr->isLoad_)
-    ok = commitReadOps(hart, instr);
+    ok = commitReadOps(hart, *instr);
 
   if (instr->di_.instId() == InstId::sfence_vma)
     {
@@ -2109,9 +2109,9 @@ Mcm<URV>::trimMemoryOp(const McmInstr& instr, MemoryOp& op)
 
 template <typename URV>
 void
-Mcm<URV>::collectVecRefElems(Hart<URV>& hart, McmInstr* instr, unsigned& activeCount)
+Mcm<URV>::collectVecRefElems(Hart<URV>& hart, McmInstr& instr, unsigned& activeCount)
 {
-  auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr->tag_];
+  auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr.tag_];
 
   const VecLdStInfo& info = hart.getLastVectorMemory();
   const std::vector<VecLdStElem>& elems = info.elems_;
@@ -2147,9 +2147,54 @@ Mcm<URV>::collectVecRefElems(Hart<URV>& hart, McmInstr* instr, unsigned& activeC
     }
 }
 
+
+template <typename URV>
+void
+Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
+{
+  const VecLdStInfo& info = hart.getLastVectorMemory();
+  auto& elems = info.elems_;
+  auto fields = info.fields_;
+  if (fields == 0)
+    fields = 1;
+
+  unsigned elemSize = info.elemSize_;
+  assert(elemSize > 0);
+
+  for (unsigned i = 1; i < instr.memOps_.size(); ++i)
+    {
+      auto opIx = instr.memOps_.at(i);
+      auto prevIx = instr.memOps_.at(i - 1);
+
+      auto& op = sysMemOps_.at(opIx);
+      auto& prev = sysMemOps_.at(prevIx);
+
+      if (op.elemIx_ != prev.elemIx_ or op.field_ != prev.field_ or op.time_ != prev.time_)
+	continue;  // Not split from the same large read-op.
+
+      unsigned rank = op.elemIx_*fields + op.field_;  // Position of elem in elems_
+
+      unsigned opSpan = (op.size_ + elemSize - 1) / elemSize;
+
+      for (unsigned j = rank + 1; j < rank + opSpan; ++j)
+	{
+	  if (j >= elems.size())
+	    break;
+	  const auto& elem = elems.at(j);
+	  if (op.pa_ >= elem.pa_ and op.pa_ < elem.pa_ + elemSize)
+	    {
+	      op.elemIx_ = elem.ix_;
+	      op.field_ = elem.field_;
+	      break;
+	    }
+	}
+    }
+}
+
+
 template <typename URV>
 bool
-Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
+Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 {
   const VecLdStInfo& info = hart.getLastVectorMemory();
 
@@ -2157,18 +2202,21 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   if (elemSize == 0)
     {
       std::cerr << "Error: Mcm::commitVecReadOps: hart-id=" << hart.hartId()
-		<< " tag=" << instr->tag_ << " instruction is not a vector load\n";
+		<< " tag=" << instr.tag_ << " instruction is not a vector load\n";
       return false;
     }
 
-  if (instr->memOps_.empty() and instr->size_ == 0)
-    instr->size_ = elemSize;
+  if (instr.memOps_.empty() and instr.size_ == 0)
+    instr.size_ = elemSize;
 
-  assert(instr->size_ == elemSize);
+  assert(instr.size_ == elemSize);
 
   // Collect reference (Whisper) elements and associated with instruction.
   unsigned activeCount = 0;
   collectVecRefElems(hart, instr, activeCount);
+
+  // Repair memory op indices and fields.
+  repairVecReadOps(hart, instr);
 
   // Map a reference address to a reference value and a flag indicating if address is
   // covered by a read op.
@@ -2180,7 +2228,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   std::unordered_map<uint64_t, RefByte> addrMap;
 
   // Check for overlap between elements. Collect reference byte addresses in addrMap.
-  auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr->tag_];
+  auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr.tag_];
   bool hasOverlap = false;
   for (auto& ref : vecRefs.refs_)
     {
@@ -2191,22 +2239,21 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
 	  addrMap[pa] = RefByte{0, false};
 	}
     }
-  instr->hasOverlap_ = hasOverlap;
+  instr.hasOverlap_ = hasOverlap;
 
   bool ok = true;
-  if (activeCount > 0 and instr->memOps_.empty() and not hart.inDebugMode())
+  if (activeCount > 0 and instr.memOps_.empty() and not hart.inDebugMode())
     {
       cerr << "Error: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
-	   << instr->tag_ << " vector load instruction retires without any memory "
+	   << instr.tag_ << " vector load instruction retires without any memory "
 	   << "read operation.\n";
       ok = false;
     }
 
-
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
   // addresses covered by read ops. Set reference (Whisper) values of reference addresses.
-  auto& ops = instr->memOps_;
+  auto& ops = instr.memOps_;
   for (auto iter = ops.rbegin(); iter != ops.rend(); ++iter)
     {
       auto opIx = *iter;
@@ -2263,7 +2310,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
   // correctly for overlapping elements.
   if (not hasOverlap)
     {
-      for (auto opIx : instr->memOps_)
+      for (auto opIx : instr.memOps_)
 	{
 	  auto& op = sysMemOps_.at(opIx);
 	  if (not op.isRead_)
@@ -2296,50 +2343,50 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr* instr)
       {
 	complete = false;
 	ok = false;
-	cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr->tag_
+	cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr.tag_
 	     << " addr=0x" << std::hex << addr << std::dec
 	     << " read ops do not cover all the bytes of vector load instruction\n";
 	break;
       }
 
-  instr->complete_ = complete;
+  instr.complete_ = complete;
   return ok;
 }
 
 
 template <typename URV>
 bool
-Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr* instr)
+Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr& instr)
 {
-  if (instr->di_.isVector())
+  if (instr.di_.isVector())
     return commitVecReadOps(hart, instr);
 
-  if (instr->memOps_.empty())
+  if (instr.memOps_.empty())
     {
-      const auto& di = instr->di_;
-      if (instr->size_ == 0)
-	instr->size_ = di.isAmo() ? di.amoSize() : di.loadSize();
+      const auto& di = instr.di_;
+      if (instr.size_ == 0)
+	instr.size_ = di.isAmo() ? di.amoSize() : di.loadSize();
 
       if (not hart.inDebugMode())
 	{
 	  cerr << "Error: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
-	       << instr->tag_ << " load/amo instruction retires witout any memory "
+	       << instr.tag_ << " load/amo instruction retires witout any memory "
 	       << "read operation.\n";
 	  return false;
 	}
     }
 
   // Mark replayed ops as canceled.
-  assert(instr->size_ > 0 and instr->size_ <= 8);
-  unsigned expectedMask = (1 << instr->size_) - 1;  // Mask of bytes covered by instruction.
+  assert(instr.size_ > 0 and instr.size_ <= 8);
+  unsigned expectedMask = (1 << instr.size_) - 1;  // Mask of bytes covered by instruction.
   unsigned readMask = 0;    // Mask of bytes covered by read operations.
 
-  auto& ops = instr->memOps_;
+  auto& ops = instr.memOps_;
   for (auto& opIx : ops)
-    trimMemoryOp(*instr, sysMemOps_.at(opIx));
+    trimMemoryOp(instr, sysMemOps_.at(opIx));
 
   // Process read ops in reverse order so that later reads take precedence.
-  for (auto iter = instr->memOps_.rbegin(); iter  != instr->memOps_.rend(); ++iter)
+  for (auto iter = instr.memOps_.rbegin(); iter  != instr.memOps_.rend(); ++iter)
     {
       auto opIx = *iter;
       auto& op = sysMemOps_.at(opIx);
@@ -2348,7 +2395,7 @@ Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr* instr)
 
       if (readMask != expectedMask)
 	{
-	  unsigned mask = determineOpMask(*instr, op);
+	  unsigned mask = determineOpMask(instr, op);
 	  mask &= expectedMask;
           if (not mask or ((mask & readMask) == mask))
             continue; // Not matched, or read op already covered by other read ops
@@ -2364,11 +2411,11 @@ Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr* instr)
 
   // Check read operations of instruction comparing RTL values to model (whisper) values.
   bool ok = true;
-  for (auto opIx : instr->memOps_)
+  for (auto opIx : instr.memOps_)
     {
       auto& op = sysMemOps_.at(opIx);
       if (op.isRead_)
-	ok = checkRtlRead(hart, *instr, op) and ok;
+	ok = checkRtlRead(hart, instr, op) and ok;
     }
   return ok;
 }

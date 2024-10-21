@@ -37,11 +37,14 @@ namespace WdRiscv
     friend class Hart<uint32_t>;
     friend class Hart<uint64_t>;
 
+    /// Address translation mode.
     enum class Mode : uint32_t { Bare = 0, Sv32 = 1, Sv39 = 8, Sv48 = 9, Sv57 = 10,
 				 Sv64 = 11, Limit_ = 12};
 
+    /// Page baed memory type.
     enum class Pbmt : uint32_t { None = 0, Nc = 1, Io = 2, Reserved = 3 };
 
+    /// Pointer masking modes.
     enum class Pmm : uint32_t { Off = 0, Reserved = 1, Pm57 = 2, Pm48 = 3, Limit_ = 4 };
 
     VirtMem(unsigned hartIx, Memory& memory, unsigned pageSize,
@@ -51,7 +54,7 @@ namespace WdRiscv
 
     /// Perform virtual to physical memory address translation and
     /// check for read/write/fetch access (one and only one of the
-    /// read/write/exec flags must be true). Return encoutered
+    /// read/write/exec flags must be true). Return encountered
     /// exception on failure or ExceptionType::NONE on success. Does
     /// not check for page crossing. The twoStage flag indicates
     /// that two-stage translation (hypervisor with V=1) is on.
@@ -166,16 +169,15 @@ namespace WdRiscv
 	}
     }
 
-    /// Return true if given mode is supported. On construction all
-    /// modes are supported but that can be modified with
-    /// setSupportedModes.
+    /// Return true if given translation mode is supported. On construction all modes are
+    /// supported but that can be modified with setSupportedModes.
     bool isModeSupported(Mode mode)
     {
       unsigned ix = unsigned(mode);
       return ix < supportedModes_.size() ? supportedModes_.at(ix) : false;
     }
 
-    /// Mark items in the pmms array as supported PMM modes.
+    /// Mark items in the pmms array as supported pointer masking (PMM) modes.
     void setSupportedPmms(const std::vector<Pmm>& pmms)
     {
       std::fill(supportedPmms_.begin(), supportedPmms_.end(), false);
@@ -190,13 +192,14 @@ namespace WdRiscv
 	}
     }
 
-    /// Return true if PMM is supported.
+    /// Return true if given pointer masking mode (PMM) is supported.
     bool isPmmSupported(Pmm pmm)
     {
       unsigned ix = unsigned(pmm);
       return ix < supportedPmms_.size() ? supportedPmms_.at(ix) : false;
     }
 
+    /// Apply pointer masking to the given address returning the result.
     uint64_t applyPointerMask(uint64_t addr, PrivilegeMode priv, bool twoStage, bool load) const
     {
       if (execReadable_)
@@ -492,7 +495,7 @@ namespace WdRiscv
 
     /// Translate virtual address without updating TLB or
     /// updating/checking A/D bits of PTE. Return ExceptionCause::NONE
-    /// on success or fault/access exception on failure. If succesful
+    /// on success or fault/access exception on failure. If successful
     /// set pa to the physical address.
     ExceptionCause transAddrNoUpdate(uint64_t va, PrivilegeMode pm, bool twoStage,
 				     bool r, bool w, bool x, uint64_t& pa);
@@ -544,13 +547,13 @@ namespace WdRiscv
     void setRootPage(uint64_t root)
     { rootPage_ = root; }
 
-    /// Set the page table root page for Vs mdoe: The root page is
+    /// Set the page table root page for Vs mode: The root page is
     /// placed in guest physical memory at address root * page_size
     void setVsRootPage(uint64_t root)
     { vsRootPage_ = root; }
 
     /// Set the page table root page for 2nd stage address translation after
-    /// clearing the least siginficant 2 bits of the given address.
+    /// clearing the least significant 2 bits of the given address.
     void setStage2RootPage(uint64_t root)
     { rootPageStage2_ = (root >> 2) << 2; }
 
@@ -750,14 +753,14 @@ namespace WdRiscv
     { updatedPtes_.clear(); }
 
     /// Remember value of page table entry modified by most recent translation.
-    /// This is for reporting intial memory state.
+    /// This is for reporting initial memory state.
     void saveUpdatedPte(uint64_t addr, unsigned size, uint64_t value)
     {
       if (trace_)
 	updatedPtes_.emplace(updatedPtes_.end(), addr, size, value);
     }
 
-    /// Eable/disable tracing of accessed page table entries.
+    /// Enable/disable tracing of accessed page table entries.
     /// Return prior trace setting.
     bool enableTrace(bool flag)
     { bool prev = trace_; trace_ = flag; return prev; }
@@ -772,8 +775,8 @@ namespace WdRiscv
 	  byte = (prev.value_ >> ((addr - prev.addr_)*8)) & 0xff;
     }
 
-    /// Check for NAPOT on PTE and apply NAPOT fixup if applicable.
-    /// Returns false if PTE would cause a pagefault due to NAPOT, and true otherwise.
+    /// Check for NAPOT on PTE and apply NAPOT fix-up if applicable. Returns false if PTE
+    /// would cause a page-fault due to NAPOT, and true otherwise.
     template <typename PTE, typename VA>
     bool napotCheck(PTE& pte, VA va)
     {
@@ -781,7 +784,7 @@ namespace WdRiscv
         {
           if (pte.hasNapot())
             {
-	      // Table 6.1 of privileged spec (version 1.12) disallows napot for non-leaf
+	      // Table 6.1 of privileged spec (version 1.12) disallows NAPOT for non-leaf
 	      if (not pte.leaf())
 		return false;
 
@@ -845,14 +848,14 @@ namespace WdRiscv
     bool faultOnFirstAccess_ = true;
     bool faultOnFirstAccess1_ = true;    // For stage1
     bool faultOnFirstAccess2_ = true;    // For stage2
-    bool accessDirtyCheck_ = true;  // To be able to supress AD check
+    bool accessDirtyCheck_ = true;  // To be able to suppress AD check
 
     bool xForR_ = false;   // True for hlvx.hu and hlvx.wu instructions: use exec for read
 
     std::vector<bool> supportedModes_; // Indexed by Mode.
     std::vector<bool> supportedPmms_;  // Indexed by Pmm.
 
-    // Addresses of PTEs used in most recent insruction an data translations.
+    // Addresses of PTEs used in most recent instruction an data translations.
     using Walk = std::vector<WalkEntry>;
     bool forFetch_ = false;
     std::vector<Walk> fetchWalks_;       // Instruction fetch walks of last instruction.
