@@ -1806,8 +1806,12 @@ Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
 	      if (store.complete_)
 		{
 		  cerr << "Error: hart-id=" << hartId << " tag=" << store.tag_
-		       << " mismatch on vector store: whisper-addr=0x"
-		       << std::hex << addr << std::dec << " RTL-addr=none\n";
+		       << " mismatch on vector store: vec=v" << ref.reg_
+		       << " elem=" << ref.ix_;
+		  if (ref.field_)
+		    cerr << " seg=" << ref.field_;
+		  cerr << " whisper-addr=0x" << std::hex << addr << std::dec
+		       << " RTL-addr=none\n";
 		  return false;
 		}
 	      return true;  // Will check again once store is complete.
@@ -1817,18 +1821,25 @@ Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
 	  if (rtlAddr != addr)
 	    {
 	      cerr << "Error: hart-id=" << hartId << " tag=" << store.tag_
-		   << " mismatch on vector store: whisper-addr=0x"
-		   << std::hex << addr << " RTL-addr=0x" << rtlAddr
-		   << std::dec << '\n';
+		   << " mismatch on vector store: vec=v" << ref.reg_
+		   << " elem=" << ref.ix_;
+	      if (ref.field_)
+		cerr << " seg=" << ref.field_;
+	      cerr << " whisper-addr=0x" << std::hex << addr << " RTL-addr=0x"
+		   << rtlAddr << std::dec << '\n';
 	      return false;
 	    }
 
 	  if (rtlVal != val)
 	    {
 	      cerr << "Error: hart-id=" << hartId << " tag=" << store.tag_
-		   << " mismatch on vector store: addr=0x"
+		   << " mismatch on vector store:  vec=v" << ref.reg_
+		   << " elem=" << ref.ix_;
+	      if (ref.field_)
+		cerr << " seg=" << ref.field_;
+	      cerr << " addr=0x"
 		   << std::hex << addr << " whisper-value=0x" << unsigned(val)
-		   << " RTL-value=0x" << rtlVal << std::dec << '\n';
+		   << " RTL-value=0x" << unsigned(rtlVal) << std::dec << '\n';
 	      return false;
 	    }
 	}
