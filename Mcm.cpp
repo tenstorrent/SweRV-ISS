@@ -790,7 +790,7 @@ pokeHartMemory(Hart<URV>& hart, uint64_t physAddr, uint64_t data, unsigned size)
 
 template <typename URV>
 bool
-Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
+Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
 			    uint64_t physAddr, unsigned size, uint64_t rtlData)
 {
   if (not updateTime("Mcm::mergeBufferInsert", time))
@@ -805,15 +805,16 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   op.insertTime_ = time;
   op.pa_ = physAddr;
   op.rtlData_ = rtlData;
-  op.tag_ = instrTag;
+  op.tag_ = tag;
   op.hartIx_ = hartIx;
   op.size_ = size;
   op.isRead_ = false;
+  op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
 
   if (not writeOnInsert_)
     hartData_.at(hartIx).pendingWrites_.push_back(op);
 
-  McmInstr* instr = findOrAddInstr(hartIx, instrTag);
+  McmInstr* instr = findOrAddInstr(hartIx, tag);
   if (not instr)
     {
       cerr << "Mcm::MergeBufferInsertScalar: Error: Unknown instr tag\n";
@@ -822,7 +823,7 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
     }
 
   auto& undrained = hartData_.at(hartIx).undrainedStores_;
-  undrained.insert(instrTag);
+  undrained.insert(tag);
 
   bool result = true;
 
@@ -834,7 +835,8 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       instr->complete_ = checkStoreComplete(hartIx, *instr);
       if (instr->complete_)
 	{
-	  undrained.erase(instrTag);
+	  undrained.erase(tag);
+	  hartData_.at(hartIx).storeInsertCount_.erase(tag);
 	  checkStoreData(hart, *instr);
 	}
 
@@ -950,6 +952,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (instr->complete_)
     {
       undrained.erase(tag);
+      hartData_.at(hartIx).storeInsertCount_.erase(tag);
       if (instr->retired_)
 	{
 	  for (auto opIx : instr->memOps_)
@@ -1041,6 +1044,7 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
     }
 
   undrained.erase(instr.tag_);
+  hartData_.at(hartIx).storeInsertCount_.erase(instr.tag_);
   return ok;
 }
 
@@ -1070,6 +1074,7 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
       if (instrB.complete_)
 	{
 	  undrained.erase(instrB.tag_);
+	  hartData_.at(hartIx).storeInsertCount_.erase(instrB.tag_);
 	  if (isEnabled(PpoRule::R1))
 	    return ppoRule1(hart, instrB);
 	}
@@ -1513,6 +1518,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	{
 	  instr->complete_ = true;
 	  undrained.erase(instr->tag_);
+	  hartData_.at(hartIx).storeInsertCount_.erase(instr->tag_);
 	  checkStoreData(hart, *instr);
 	  if (isEnabled(PpoRule::R1))
 	    result = ppoRule1(hart, *instr) and result;
@@ -1576,7 +1582,8 @@ Mcm<URV>::cancelInstr(Hart<URV>& hart, McmInstr& instr)
   if (instr.isCanceled())
     return;
 
-  auto& undrained = hartData_.at(hart.sysHartIndex()).undrainedStores_;
+  unsigned hartIx = hart.sysHartIndex();
+  auto& undrained = hartData_.at(hartIx).undrainedStores_;
 
   auto iter = undrained.find(instr.tag_);
 
@@ -1586,6 +1593,8 @@ Mcm<URV>::cancelInstr(Hart<URV>& hart, McmInstr& instr)
 	" canceled or trapped instruction has a write operation\n";
       undrained.erase(iter);
     }
+
+  hartData_.at(hartIx).storeInsertCount_.erase(instr.tag_);
 
   for (auto memIx : instr.memOps_)
     {
@@ -1599,7 +1608,7 @@ Mcm<URV>::cancelInstr(Hart<URV>& hart, McmInstr& instr)
 
 template <typename URV>
 void
-Mcm<URV>::cancelNonRetired(Hart<URV>& hart, uint64_t instrTag)
+Mcm<URV>::cancelNonRetired(Hart<URV>& hart, uint64_t tag)
 {
   unsigned hartIx = hart.sysHartIndex();
   auto& vec = hartData_.at(hartIx).instrVec_;
@@ -1607,12 +1616,12 @@ Mcm<URV>::cancelNonRetired(Hart<URV>& hart, uint64_t instrTag)
   if (vec.empty())
     return;
 
-  if (instrTag >= vec.size())
-    instrTag = vec.size();
+  if (tag >= vec.size())
+    tag = vec.size();
 
-  while (instrTag)
+  while (tag)
     {
-      auto& instr = vec.at(--instrTag);
+      auto& instr = vec.at(--tag);
       if (instr.retired_ or instr.canceled_)
 	break;
       cancelInstr(hart, instr);
@@ -1622,10 +1631,10 @@ Mcm<URV>::cancelNonRetired(Hart<URV>& hart, uint64_t instrTag)
 
 template <typename URV>
 void
-Mcm<URV>::cancelInstruction(Hart<URV>& hart, uint64_t instrTag)
+Mcm<URV>::cancelInstruction(Hart<URV>& hart, uint64_t tag)
 {
   unsigned hartIx = hart.sysHartIndex();
-  McmInstr* instr = findInstr(hartIx, instrTag);
+  McmInstr* instr = findInstr(hartIx, tag);
   if (not instr or instr->isCanceled())
     return;
   cancelInstr(hart, *instr);
@@ -1738,16 +1747,38 @@ Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
       return true;
     }
 
-  // Vector store. We assume that the stores are done in order.
+  // Vector store. We assume that the writes are done in element order.
 
-  // Collect RTL drained write ops byte values. We use a map to account for overlap. Later
-  // writes over-write earlier ones.
+  // 1. Collect RTL writes. Start with the drained writes.
+  std::vector<const MemoryOp*> writes;
+  writes.reserve(128);
+  for (auto opIx : store.memOps_)
+    writes.push_back(&sysMemOps_.at(opIx));
+
+  // 1.1. And append undrained writes.
+  if (not store.complete_)
+    {
+      auto hartIx = hart.sysHartIndex();
+      const auto& pendingWrites = hartData_.at(hartIx).pendingWrites_;
+      for (auto& op : pendingWrites)
+	if (op.tag_ == store.tag_ and hartIx == op.hartIx_)
+	  writes.push_back(&op);
+    }
+
+  // 2. Sort writes by insertion order.
+  std::sort(writes.begin(), writes.end(),
+	      [](const MemoryOp* a, const MemoryOp* b) {
+		return a->insertOrder_ < b->insertOrder_;
+	      }
+	    );
+
+  // 3. Put RTL byte data in a vector of address/value pairs.
   using AddrValue = std::pair<uint64_t, uint8_t>;
   std::vector<AddrValue> rtlData;
   rtlData.reserve(1024);
-  for (auto opIx : store.memOps_)
+  for (auto opPtr : writes)
     {
-      auto& op = sysMemOps_.at(opIx);
+      auto& op = *opPtr;
       for (unsigned i = 0; i < op.size_; ++i)
 	{
 	  uint64_t addr = op.pa_ +i;
@@ -1756,28 +1787,13 @@ Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
 	}
     }
 
-  // Collect undrained write ops byte values.
-  if (not store.complete_)
-    {
-      auto hartIx = hart.sysHartIndex();
-      const auto& pendingWrites = hartData_.at(hartIx).pendingWrites_;
-      for (auto& op : pendingWrites)
-	{
-	  if (op.tag_ == store.tag_ and hartIx == op.hartIx_)
-	    for (unsigned i = 0; i < op.size_; ++i)
-	      {
-		uint64_t addr = op.pa_ + i;
-		uint8_t val = op.rtlData_ >> (i*8);
-		rtlData.push_back(AddrValue{addr, val});
-	      }
-	}
-    }
-
+  // 4. Get reference (Whisper) data.
   auto& vecRefMap = hartData_.at(store.hartIx_).vecRefMap_;
   auto iter = vecRefMap.find(store.tag_);
   assert(iter != vecRefMap.end());
   auto& vecRefs = iter->second;
 
+  // 5. Compare RTL data to reference data.
   unsigned rtlDataIx = 0;
   for (auto& ref : vecRefs.refs_)
     {

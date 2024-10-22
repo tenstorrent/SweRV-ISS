@@ -30,6 +30,7 @@ namespace WdRiscv
     uint64_t   insertTime_     = 0;  // Time of merge buffer insert (if applicable).
     uint16_t   elemIx_         = 0;  // Vector element index.
     uint16_t   field_          = 0;  // Vector element field (for segment load).
+    uint16_t   insertOrder_    = 0;  // Order of mbinsert operation in its instruction.
     uint8_t    hartIx_    : 8  = 0;
     uint8_t    size_      : 8  = 0;
     bool       isRead_    : 1  = false;
@@ -890,6 +891,11 @@ namespace WdRiscv
       // Set of stores that may affect (through forwarding) the currently executing load
       // instruction.
       std::set<McmInstrIx> forwardingStores_;
+
+      /// Map a store instruction index to the count of associated merge buffer insert
+      /// operations. This can be dropped once mbinsert is associated with the vector
+      /// element index and field.
+      std::unordered_map<McmInstrIx, uint16_t> storeInsertCount_;
 
       McmInstrIx currentLoadTag_ = 0;  // Currently executing load instruction.
 
