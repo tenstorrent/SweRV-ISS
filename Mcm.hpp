@@ -236,6 +236,12 @@ namespace WdRiscv
     /// address. Return 0 if address is not covered by given instruction.
     uint64_t earliestByteTime(const McmInstr& instr, uint64_t addr) const;
 
+    /// Return the earliest memory time for the byte at the given
+    /// address given an element index.
+    /// Return 0 if address is not covered by given instruction.
+    uint64_t earliestByteTime(const McmInstr& instr, uint64_t addr,
+                              unsigned elemIx) const;
+
     /// Return the latest memory time for the byte at the given
     /// address. Return max value if address is not covered by given
     /// instruction.
@@ -468,7 +474,7 @@ namespace WdRiscv
     /// not know the element size, so all the pieces get assigned the same element index
     /// and field. We assign the correct element index and field here.
     void repairVecReadOps(Hart<URV>& hart, McmInstr& instr);
-    
+
     /// Compute a mask of the instruction data bytes covered by the
     /// given memory operation. Return 0 if the operation does not
     /// overlap the given instruction.
