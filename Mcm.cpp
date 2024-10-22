@@ -151,7 +151,8 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsi
   op.elemIx_ = elemIx;
   op.field_ = field;
 
-  // Read Whisper memory and keep it in memory op.
+  // Read Whisper memory and keep it in op, this will be updated when the load is retired
+  // by forwarding from preceding stores.
   uint64_t refVal = 0;
   op.failRead_ = referenceModelRead(hart, pa, size, refVal);
   op.data_ = refVal;
@@ -1793,6 +1794,14 @@ Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
   assert(iter != vecRefMap.end());
   auto& vecRefs = iter->second;
 
+  auto printError = [] (unsigned hartId, uint64_t tag, const VecRef& ref) {
+    cerr << "Error: hart-id=" << hartId << " tag=" << tag
+	 << " mismatch on vector store: vec=v" << unsigned(ref.reg_)
+	 << " elem=" << unsigned(ref.ix_);
+    if (ref.field_)
+      cerr << " seg=" << unsigned(ref.field_);
+  };
+
   // 5. Compare RTL data to reference data.
   unsigned rtlDataIx = 0;
   for (auto& ref : vecRefs.refs_)
@@ -1805,11 +1814,7 @@ Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
 	    {
 	      if (store.complete_)
 		{
-		  cerr << "Error: hart-id=" << hartId << " tag=" << store.tag_
-		       << " mismatch on vector store: vec=v" << ref.reg_
-		       << " elem=" << ref.ix_;
-		  if (ref.field_)
-		    cerr << " seg=" << ref.field_;
+		  printError(hartId, store.tag_, ref);
 		  cerr << " whisper-addr=0x" << std::hex << addr << std::dec
 		       << " RTL-addr=none\n";
 		  return false;
@@ -1820,11 +1825,7 @@ Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
 	  auto [rtlAddr, rtlVal] = rtlData.at(rtlDataIx);
 	  if (rtlAddr != addr)
 	    {
-	      cerr << "Error: hart-id=" << hartId << " tag=" << store.tag_
-		   << " mismatch on vector store: vec=v" << ref.reg_
-		   << " elem=" << ref.ix_;
-	      if (ref.field_)
-		cerr << " seg=" << ref.field_;
+	      printError(hartId, store.tag_, ref);
 	      cerr << " whisper-addr=0x" << std::hex << addr << " RTL-addr=0x"
 		   << rtlAddr << std::dec << '\n';
 	      return false;
@@ -1832,14 +1833,10 @@ Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
 
 	  if (rtlVal != val)
 	    {
-	      cerr << "Error: hart-id=" << hartId << " tag=" << store.tag_
-		   << " mismatch on vector store:  vec=v" << ref.reg_
-		   << " elem=" << ref.ix_;
-	      if (ref.field_)
-		cerr << " seg=" << ref.field_;
-	      cerr << " addr=0x"
-		   << std::hex << addr << " whisper-value=0x" << unsigned(val)
-		   << " RTL-value=0x" << unsigned(rtlVal) << std::dec << '\n';
+	      printError(hartId, store.tag_, ref);
+	      cerr << " addr=0x" << std::hex << addr << " whisper-value=0x"
+		   << unsigned(val) << " RTL-value=0x" << unsigned(rtlVal)
+		   << std::dec << '\n';
 	      return false;
 	    }
 	}
@@ -2179,6 +2176,9 @@ template <typename URV>
 void
 Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
 {
+  if (instr.memOps_.empty())
+    return;
+
   const VecLdStInfo& info = hart.getLastVectorMemory();
   auto& elems = info.elems_;
   auto fields = info.fields_;
