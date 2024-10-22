@@ -427,11 +427,16 @@ namespace WdRiscv
     /// Read up to a double word (size <= 8) from the reference model memory.
     bool referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64_t& val);
 
-    bool vecReadOpOverlapsElemByte(const MemoryOp& op, uint64_t addr, unsigned elemIx,
-				   unsigned field) const;
-
+    /// Return true if the physical adresses of the given read operation, op, overlaps the
+    /// the range of addresses associated with a memory access for the given vector
+    /// element. Size is the size of the memory access, and elemSize is the element size.
     bool vecReadOpOverlapsElem(const MemoryOp& op, uint64_t pa1, uint64_t pa2,
-			       unsigned size, unsigned elemIx, unsigned field) const;
+			       unsigned size, unsigned elemIx, unsigned field,
+			       unsigned elemSize) const;
+
+    /// Heler to vecReadOpOverlapsElem.
+    bool vecReadOpOverlapsElemByte(const MemoryOp& op, uint64_t addr, unsigned elemIx,
+				   unsigned field, unsigned elemSize) const;
 
     /// Return true if given instruction is an indexed load/store and it has an index
     /// register with a value produced after the instruction has used that index
