@@ -1797,7 +1797,7 @@ Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
 
   auto printError = [] (unsigned hartId, uint64_t tag, const VecRef& ref) {
     cerr << "Error: hart-id=" << hartId << " tag=" << tag
-	 << " mismatch on vector store: vec=v" << unsigned(ref.reg_)
+	 << " mismatch on vector store: vec-reg=" << unsigned(ref.reg_)
 	 << " elem=" << unsigned(ref.ix_);
     if (ref.field_)
       cerr << " seg=" << unsigned(ref.field_);
