@@ -402,6 +402,7 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
       for (unsigned i = 0; i < size; ++i)
 	{
 	  uint64_t addr = i < size1 ? pa1 + i : pa2 + i - size1;
+          // FIXME: match on element index and field
 	  auto byteTime = latestByteTime(instr, addr);
 	  regTime = std::max(byteTime, regTime);
 	}
@@ -3053,6 +3054,30 @@ Mcm<URV>::earliestByteTime(const McmInstr& instr, uint64_t addr) const
 
 template <typename URV>
 uint64_t
+Mcm<URV>::earliestByteTime(const McmInstr& instr, uint64_t addr,
+                           unsigned elemIx) const
+{
+  uint64_t time = 0;
+  bool found = false;
+
+  for (auto opIx : instr.memOps_)
+    if (opIx < sysMemOps_.size())
+      {
+	const auto& op = sysMemOps_.at(opIx);
+	if (op.pa_ <= addr and (addr < op.pa_ + op.size_) and
+            op.elemIx_ == elemIx)
+	  {
+	    time = found? std::min(time, op.time_) : op.time_;
+	    found = true;
+	  }
+      }
+
+  return time;
+}
+
+
+template <typename URV>
+uint64_t
 Mcm<URV>::latestByteTime(const McmInstr& instr, uint64_t addr) const
 {
   uint64_t time = ~uint64_t(0);
@@ -4725,8 +4750,8 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
 	{
 	  uint64_t addr = i < size1 ? pa1 + i : pa2 + i - size1;
 
-	  // FIX match element index and field.
-	  uint64_t byteTime = earliestByteTime(instr, addr);
+          // FIXME: match on element field
+	  uint64_t byteTime = earliestByteTime(instr, addr, elem.ix_);
 	  if (byteTime > 0)  // Byte time is zero for undrained writes.
 	    dTime = std::min(byteTime, dTime);
 	}
@@ -4786,8 +4811,8 @@ Mcm<URV>::getVecRegEarlyTime(Hart<URV>& hart, const McmInstr& instr, unsigned re
 	{
 	  uint64_t addr = i < size1 ? pa1 + i : pa2 + i - size1;
 
-	  // FIX match element index and field.
-	  uint64_t byteTime = earliestByteTime(instr, addr);
+          // FIXME: match on element field
+	  uint64_t byteTime = earliestByteTime(instr, addr, elem.ix_);
 	  if (byteTime > 0)  // Byte time is zero for undrained writes.
 	    time = std::min(byteTime, time);
 	}
