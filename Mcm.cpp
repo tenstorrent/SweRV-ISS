@@ -2601,7 +2601,8 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
 
 template <typename URV>
 bool
-Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask) const
+Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask,
+				uint64_t& fwdTime) const
 {
   const auto& vecRefMap = hartData_.at(store.hartIx_).vecRefMap_;
   auto iter = vecRefMap.find(store.tag_);
@@ -2643,15 +2644,19 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 
       // We cannot forward if last overlapping write drains before read.
       bool drained = false;
+      uint64_t lastWopTime = 0;
       if (refCount == writeCount and writeCount != 0)
 	{
 	  const auto& lastWop = sysMemOps_.at(lastWopIx);
 	  assert(not lastWop.isRead_);
-	  drained = lastWop.time_ < readOp.time_;
+	  lastWopTime = lastWop.time_;
+	  drained = lastWopTime < readOp.time_;
 	}
 
       if (drained)
 	continue;   // Cannot forward from a drained write.
+
+      fwdTime = lastWopTime;
 
       // Process reference model writes in reverse order so that later ones forward first.
       for (auto iter = vecRefs.refs_.rbegin(); iter != vecRefs.refs_.rend(); ++iter)
@@ -2681,7 +2686,8 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 template <typename URV>
 bool
 Mcm<URV>::storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask,
-			     uint64_t addr, uint64_t data, unsigned size) const
+			     uint64_t addr, uint64_t data, unsigned size,
+			     uint64_t& fwdTime) const
 {
   if (mask == 0)
     return true;  // No bytes left to forward.
@@ -2719,10 +2725,15 @@ Mcm<URV>::storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& 
 	      drained = true; // Write op cannot forward.
 	      break;
 	    }
+
+	  fwdTime = fwdTime == 0? wop.time_ : std::min(fwdTime, wop.time_);
 	}
 
       if (drained)
 	continue;  // Cannot forward from a drained write.
+
+      if (fwdTime == 0)
+	fwdTime = store.retireTime_;  // Happens if store.memOps_ empty.
 
       uint8_t byteVal = data >> (byteAddr - il)*8;
       uint64_t aligned = uint64_t(byteVal) << 8*rix;
@@ -2809,13 +2820,15 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, const std::set<McmInstrIx>& stores, Mem
       const auto& store = instrVec.at(storeTag);
 
       uint64_t prev = mask;
+      uint64_t fwdTime = 0;
 
       if (store.di_.isVector())
 	{
-	  if (not vecStoreToReadForward(store, readOp, mask))
+	  if (not vecStoreToReadForward(store, readOp, mask, fwdTime))
 	    continue;
 	}
-      else if (not storeToReadForward(store, readOp, mask, store.physAddr_, store.storeData_, store.size_))
+      else if (not storeToReadForward(store, readOp, mask, store.physAddr_, store.storeData_,
+				      store.size_, fwdTime))
 	{
 	  if (store.physAddr_ == store.physAddr2_)
 	    continue;
@@ -2823,16 +2836,17 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, const std::set<McmInstrIx>& stores, Mem
 	  unsigned size2 = store.size_ - size1;
 	  assert(size2 > 0 and size2 < 8);
 	  uint64_t data2 = store.storeData_ >> size1 * 8;
-	  if (not storeToReadForward(store, readOp, mask, store.physAddr2_, data2, size2))
+	  if (not storeToReadForward(store, readOp, mask, store.physAddr2_, data2, size2,
+				     fwdTime))
 	    continue;
 	}
 
       if (mask != prev)
 	{
 	  if (readOp.forwardTime_ == 0)
-	    readOp.forwardTime_ = earliestOpTime(store);
+	    readOp.forwardTime_ = fwdTime;
 	  else
-	    readOp.forwardTime_ = std::min(earliestOpTime(store), readOp.forwardTime_);
+	    readOp.forwardTime_ = std::min(fwdTime, readOp.forwardTime_);
 	}
     }
 
@@ -3342,11 +3356,11 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	      auto rot = remoteOp.time_;
 	      if (earlyB <= lateA and earlyB <= rot and rot <= lateA)
 		{
-		  cerr << "Error: PPO Rule 2 failed: hart-id=" << hart.hartId()
-		       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_
-		       << " intermediate remote store from hart-id="
-		       << unsigned(remoteOp.hartIx_) << " store-tag=" << remoteOp.tag_
-		       << " store-time=" << remoteOp.time_ << '\n';
+		  cerr << "Error: PPO Rule 2 failed: tag1=" << instrA.tag_ << " tag2="
+		       << instrB.tag_ << " store-tag=" << remoteOp.tag_ << " store-hart="
+		       << unsigned(remoteOp.hartIx_) << " time1=" << lateA
+		       << " time2=" << earlyB << " store-time=" << remoteOp.time_
+		       << " addr=0x" << std::hex << addr << std::dec << '\n';
 		  return false;
 		}
 	    }

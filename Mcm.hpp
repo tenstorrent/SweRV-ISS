@@ -568,9 +568,11 @@ namespace WdRiscv
     /// Addr/data/size are the physical-address/data-value/data-size of the store
     /// instruction.
     bool storeToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask,
-			    uint64_t addr, uint64_t data, unsigned size) const;
+			    uint64_t addr, uint64_t data, unsigned size,
+			    uint64_t& fwdTime) const;
 
-    bool vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask) const;
+    bool vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_t& mask,
+			       uint64_t& fwdTime) const;
 
     /// Determine the source and destination registers of the given instruction.
     void identifyRegisters(const Hart<URV>& hart,
