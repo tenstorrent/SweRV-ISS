@@ -2188,22 +2188,26 @@ Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
   unsigned elemSize = info.elemSize_;
   assert(elemSize > 0);
 
+  MemoryOpIx prevIx = instr.memOps_.at(0);
+
   for (unsigned i = 1; i < instr.memOps_.size(); ++i)
     {
       auto opIx = instr.memOps_.at(i);
-      auto prevIx = instr.memOps_.at(i - 1);
 
       auto& op = sysMemOps_.at(opIx);
       auto& prev = sysMemOps_.at(prevIx);
 
       if (op.elemIx_ != prev.elemIx_ or op.field_ != prev.field_ or op.time_ != prev.time_)
-	continue;  // Not split from the same large read-op.
+	{
+	  prevIx = opIx;
+	  continue;  // Not split from the same large read-op.
+	}
 
-      unsigned rank = op.elemIx_*fields + op.field_;  // Position of elem in elems_
+      unsigned rank = prev.elemIx_*fields + prev.field_;  // Position of prev in elems_
 
-      unsigned opSpan = (op.size_ + elemSize - 1) / elemSize;
+      unsigned span = (op.pa_ - prev.pa_) / elemSize;
 
-      for (unsigned j = rank + 1; j < rank + opSpan; ++j)
+      for (unsigned j = rank + 1; j <= rank + span; ++j)
 	{
 	  if (j >= elems.size())
 	    break;
