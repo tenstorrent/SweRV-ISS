@@ -30,6 +30,7 @@ namespace WdRiscv
     uint64_t   insertTime_     = 0;  // Time of merge buffer insert (if applicable).
     uint16_t   elemIx_         = 0;  // Vector element index.
     uint16_t   field_          = 0;  // Vector element field (for segment load).
+    uint16_t   insertOrder_    = 0;  // Order of mbinsert operation in its instruction.
     uint8_t    hartIx_    : 8  = 0;
     uint8_t    size_      : 8  = 0;
     bool       isRead_    : 1  = false;
@@ -197,18 +198,11 @@ namespace WdRiscv
 			  const std::vector<uint8_t>& rtlData,
 			  const std::vector<bool>& mask);
 
-    /// Interface for sizes greated than 8 (for cbo instructions and vector instructions).
-    /// FIX. Make rtlData a vector of double words.
+    /// Insert a write operation for the given instruction into the merge buffer removing
+    /// it from the store buffer. Return true on success. Size is expected to be less than
+    /// or equal to 8. Larger inserts must be split by the caller.
     bool mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-			   uint64_t physAddr, unsigned size,
-			   uint64_t rtlData);
-
-    /// Helper to mergeBufferInster. Insert a write operation for the given instruction
-    /// into the merge buffer removing it from the store buffer. Return true on
-    /// success. Return false if no such operation is in the store buffer.
-    bool mergeBufferInsertScalar(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-				 uint64_t physAddr, unsigned size,
-				 uint64_t rtlData);
+			   uint64_t physAddr, unsigned size, uint64_t rtlData);
 
     /// Cancel all the memory operations associated with the given tag. This is
     /// done when a speculative instruction is canceled or when an instruction
@@ -227,7 +221,8 @@ namespace WdRiscv
     /// paddr1 except for page crossing loads where pa2 is the physical address of the
     /// second page. Va is the virtual address of the load data.
     bool getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64_t pa1,
-			     uint64_t pa2, unsigned size, bool isVec, uint64_t& value);
+			     uint64_t pa2, unsigned size, bool isVec, uint64_t& value,
+			     unsigned elemIx = 0, unsigned field = 0);
 
     /// Return the merge buffer line size in bytes.
     unsigned mergeBufferLineSize() const
@@ -240,6 +235,12 @@ namespace WdRiscv
     /// Return the earliest memory time for the byte at the given
     /// address. Return 0 if address is not covered by given instruction.
     uint64_t earliestByteTime(const McmInstr& instr, uint64_t addr) const;
+
+    /// Return the earliest memory time for the byte at the given
+    /// address given an element index.
+    /// Return 0 if address is not covered by given instruction.
+    uint64_t earliestByteTime(const McmInstr& instr, uint64_t addr,
+                              unsigned elemIx) const;
 
     /// Return the latest memory time for the byte at the given
     /// address. Return max value if address is not covered by given
@@ -418,11 +419,30 @@ namespace WdRiscv
 
     using MemoryOpVec = std::vector<MemoryOp>;
 
+    enum VecKind
+      {
+	Skip,     // No active elements, all elements have agnostic mask/tail policy.
+	Active,   // Vector has at least one active element.
+	Preserve  // Vector has at least one element with preserve mask/tail policy.
+      };
+
     /// Helper to ppoRule1.
     void printPpo1Error(unsigned hartId, McmInstrIx tag1, McmInstrIx tag2, uint64_t t1,
 			uint64_t t2, uint64_t pa) const;
 
+    /// Read up to a double word (size <= 8) from the reference model memory.
     bool referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64_t& val);
+
+    /// Return true if the physical adresses of the given read operation, op, overlaps the
+    /// the range of addresses associated with a memory access for the given vector
+    /// element. Size is the size of the memory access, and elemSize is the element size.
+    bool vecReadOpOverlapsElem(const MemoryOp& op, uint64_t pa1, uint64_t pa2,
+			       unsigned size, unsigned elemIx, unsigned field,
+			       unsigned elemSize) const;
+
+    /// Heler to vecReadOpOverlapsElem.
+    bool vecReadOpOverlapsElemByte(const MemoryOp& op, uint64_t addr, unsigned elemIx,
+				   unsigned field, unsigned elemSize) const;
 
     /// Return true if given instruction is an indexed load/store and it has an index
     /// register with a value produced after the instruction has used that index
@@ -434,18 +454,26 @@ namespace WdRiscv
 			      McmInstrIx& producer, uint64_t& produerTime,
 			      uint64_t& dataTime) const;
 
-    /// Collect the earliest times the data registers of the given load/store instruction
-    /// were read/written. Base is the first vector register, count is the number of
-    /// registers.
-    void getVecRegEarlyTimes(Hart<URV>& hart, const McmInstr& instr, unsigned base,
-			     unsigned count, std::vector<uint64_t>& times) const;
+    /// Return the earliest memory time for the given vector register.
+    uint64_t getVecRegEarlyTime(Hart<URV>& hart, const McmInstr& instr, unsigned regNum) const;
 
     /// Trim read operations to match reference (whisper). Mark replay read ops as
     /// canceled. Remove cancled ops.
-    bool commitReadOps(Hart<URV>& hart, McmInstr*);
+    bool commitReadOps(Hart<URV>& hart, McmInstr& instr);
 
     /// Similar to above but for vector instructions.
-    bool commitVecReadOps(Hart<URV>& hart, McmInstr*);
+    bool commitVecReadOps(Hart<URV>& hart, McmInstr& instr);
+
+    /// Helper to commitVecReadOps: Collect the reference (Whisper) element info:
+    /// address, index, field, data-reg, index-reg. Determine the number of
+    /// active (non-masked) elements.
+    void collectVecRefElems(Hart<URV>& hart, McmInstr& instr, unsigned& activeCount);
+
+    /// Heler to commitVecReadOps. A large read-op that covers multiple elements will get
+    /// split into multiple sub-ops of size 8 or less each.  When the split is done we do
+    /// not know the element size, so all the pieces get assigned the same element index
+    /// and field. We assign the correct element index and field here.
+    void repairVecReadOps(Hart<URV>& hart, McmInstr& instr);
 
     /// Compute a mask of the instruction data bytes covered by the
     /// given memory operation. Return 0 if the operation does not
@@ -567,7 +595,7 @@ namespace WdRiscv
 	return false;
 
       for (auto& vecRef : vecRefs.refs_)
-        if (rangesOverlap(vecRef.addr_, vecRef.size_, other.pa_, other.size_))
+        if (rangesOverlap(vecRef.pa_, vecRef.size_, other.pa_, other.size_))
 	  return true;
 
       return false;
@@ -670,7 +698,7 @@ namespace WdRiscv
 
     bool checkStoreComplete(unsigned hartIx, const McmInstr& instr) const;
 
-    bool checkStoreData(unsigned hartId, const McmInstr& insrt) const;
+    bool checkStoreData(Hart<URV>& hart, const McmInstr& insrt) const;
 
     bool checkLoadComplete(const McmInstr& instr) const;
 
@@ -721,6 +749,22 @@ namespace WdRiscv
     /// This is a helper to updateDependencies.
     void updateVecRegTimes(const Hart<URV>& hart, const McmInstr& instr);
 
+    /// Put in the given array the indices of the vector data registers of the currently
+    /// retiring vector load/store instruction, each index is associated with a VecKind
+    /// indicating whether or not the vector is active (has one or more active element),
+    /// is preserved (has one or more masked/tail element with a preserve policy), or
+    /// skipped (all elements masked/tail with an agnostic policy). Return 0 if no vector
+    /// register is referenced or if the instruction is not a vector ld/st.
+    unsigned getLdStDataVectors(const Hart<URV>& hart, const McmInstr& instr,
+				std::array<std::pair<unsigned,VecKind>, 32>& vecs) const;
+
+    /// Put in the given array the indices of the vector index registers of the currently
+    /// retiring vector load/store indexed instruction, each index is associated with a
+    /// VecKind (see previous method). Return 0 if no vector register is not referenced or
+    /// if the instruction is not a vector ld/st.
+    unsigned getLdStIndexVectors(const Hart<URV>& hart, const McmInstr& instr,
+				 std::array<std::pair<unsigned,VecKind>, 32>& vecs) const;
+
     /// Set the memory time of the given branch instruction to the latest time (data was
     /// produced) of its registers. This branch memory time is used for checking
     /// the control dependency rule (rule 11). No-op if instr is not a branch.
@@ -761,22 +805,25 @@ namespace WdRiscv
     using RegProducerVec = std::vector<McmInstrIx>;   // Map reg index to instr tag.
 
     /// Vector reference (produced by Whisper) load/store physical addresses and
-    /// corresponding data for store.
+    /// corresponding data.
     struct VecRef
     {
-      VecRef(uint64_t addr = 0, uint64_t data = 0, unsigned size = 0, unsigned dataReg = 0,
-	     unsigned ixReg = 0)
-	: addr_(addr), data_(data), size_(size), reg_(dataReg), ixReg_(ixReg)
+      VecRef(unsigned ix, uint64_t pa = 0, uint64_t data = 0, unsigned size = 0,
+	     unsigned dataReg = 0, unsigned ixReg = 0, unsigned field = 0)
+	: pa_(pa), data_(data), ix_(ix), size_(size), reg_(dataReg), ixReg_(ixReg),
+	  field_(field)
       { }
 
       bool overlaps(uint64_t addr) const
-      { return addr >= addr_ && addr < addr_ + size_; }
+      { return addr >= pa_ && addr < pa_ + size_; }
 
-      uint64_t addr_    = 0;
-      uint64_t data_    = 0;
-      uint16_t size_    = 0;
-      uint16_t reg_     = 0;   // Number of data register.
-      uint16_t ixReg_   = 0;   // Number of index register (if indexed).
+      uint64_t pa_     = 0;   // Physical address.
+      uint64_t data_   = 0;   // Reference value.
+      uint8_t ix_      = 0;   // Index of element in regiser group.
+      uint8_t size_    = 0;   // Number of bytes of element covered by this object.
+      uint8_t reg_     = 0;   // Number of data register.
+      uint8_t ixReg_   = 0;   // Number of index register (if indexed).
+      uint8_t field_   = 0;   // Field (if segmented load).
     };
 
     /// Collection of vector load/store reference (Whisper) addresses for a single
@@ -814,10 +861,11 @@ namespace WdRiscv
 	if (empty())
 	  return true;
 	assert(ref.size_ > 0);
-	return isOutOfBounds(ref.addr_, ref.addr_ + ref.size_ - 1);
+	return isOutOfBounds(ref.pa_, ref.pa_ + ref.size_ - 1);
       }
 
-      void add(uint64_t addr, uint64_t data, unsigned size, unsigned vecReg, unsigned ixReg)
+      void add(unsigned ix, uint64_t addr, uint64_t data, unsigned size, unsigned vecReg,
+	       unsigned ixReg, unsigned field)
       {
 	assert(size > 0);
 
@@ -832,7 +880,7 @@ namespace WdRiscv
 	    low_ = std::min(low_, l);
 	    high_ = std::max(high_, h);
 	  }
-	refs_.push_back(VecRef(addr, data, size, vecReg, ixReg));
+	refs_.push_back(VecRef(ix, addr, data, size, vecReg, ixReg, field));
       }
 
       std::vector<VecRef> refs_;
@@ -854,6 +902,11 @@ namespace WdRiscv
       // Set of stores that may affect (through forwarding) the currently executing load
       // instruction.
       std::set<McmInstrIx> forwardingStores_;
+
+      /// Map a store instruction index to the count of associated merge buffer insert
+      /// operations. This can be dropped once mbinsert is associated with the vector
+      /// element index and field.
+      std::unordered_map<McmInstrIx, uint16_t> storeInsertCount_;
 
       McmInstrIx currentLoadTag_ = 0;  // Currently executing load instruction.
 

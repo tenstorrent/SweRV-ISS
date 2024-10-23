@@ -1279,8 +1279,8 @@ namespace WdRiscv
     void updateVirtInterruptCtl();
 
     /// Update MVIP aliasing bits. This is called after a write/poke to
-    /// MIP.
-    void updateVirtInterrupt();
+    /// MIP. Returns true if MVIP was updated.
+    bool updateVirtInterrupt();
 
     /// Enter/exit debug mode based given a flag value of true/false.
     void enterDebug(bool flag)
@@ -1349,6 +1349,13 @@ namespace WdRiscv
     URV peekMvip() const
     {
       const auto& csr = regs_.at(size_t(CsrNumber::MVIP));
+      return csr.read();
+    }
+
+    /// Fast peek method for MVIEN.
+    URV peekMvien() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::MVIEN));
       return csr.read();
     }
 

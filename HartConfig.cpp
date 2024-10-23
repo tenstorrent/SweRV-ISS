@@ -1146,7 +1146,7 @@ template <typename URV>
 static
 bool
 processMemMappedMasks(Hart<URV>& hart, std::string_view path, const nlohmann::json& masks,
-		      uint64_t low, uint64_t high, unsigned size)
+		      uint64_t low, uint64_t high, unsigned size, Pma pma)
 {
   // Parse an array of entries, each entry is an array containing low
   // address, high address, and mask.
@@ -1183,7 +1183,7 @@ processMemMappedMasks(Hart<URV>& hart, std::string_view path, const nlohmann::js
 
       uint64_t mask = vec.at(2);
       for (uint64_t addr = vec.at(0); addr <= vec.at(1); addr += size)
-	if (not hart.setMemMappedMask(addr, mask, size))
+	if (not hart.defineMemMappedRegister(addr, mask, size, pma))
 	  {
 	    std::cerr << "Error: Failed to configure mask for config item "
 		      << entryPath << " at address 0x" << std::hex << addr
@@ -1347,8 +1347,14 @@ applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config, bool hasPmacfgCsr)
 
 	  tag = "masks";
 	  if (item.contains(tag) and not itemErrors)
-	    if (not processMemMappedMasks(hart, path, item.at(tag), low, high, size))
-	      errors++;
+	    {
+	      // We associate a PMA with the memeory mapped registers. At this point the
+	      // memory mapped PMA is the same as that of the enclosing region. However,
+	      // the region PMA may change later as PMA-related custom CSRs get modified
+	      // by CSR instructions. The memory mapped PMA has higher priority.
+	      if (not processMemMappedMasks(hart, path, item.at(tag), low, high, size, pma))
+		errors++;
+	    }
 	}
     }
 
@@ -1994,6 +2000,9 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_translation_napot";
   if (config_ -> contains(tag))
     {
+      if (hart.sysHartIndex() == 0)
+	cerr << "Warning: Config tag " << tag << " is deprecated. "
+	     << "Use svnapot with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableTranslationNapot(flag);
     }

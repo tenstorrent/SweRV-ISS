@@ -381,6 +381,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvsstc(true);
   if (isa_.isEnabled(RvExtension::Svinval))
     enableSvinval(true);
+  if (isa_.isEnabled(RvExtension::Svnapot))
+    enableTranslationNapot(true);
   if (isa_.isEnabled(RvExtension::Svpbmt))
     enableTranslationPbmt(true);
   if (isa_.isEnabled(RvExtension::Svadu))
@@ -1743,13 +1745,14 @@ readCharNonBlocking(int fd)
 
 template <typename URV>
 bool
-Hart<URV>::getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2,
-			   unsigned size, bool isVec, uint64_t& value)
+Hart<URV>::getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
+			   bool isVec, uint64_t& value, unsigned elemIx, unsigned field)
 {
   if (not ooo_)
     return false;
   if (mcm_)
-    return mcm_->getCurrentLoadValue(*this, instCounter_, va, pa1, pa2, size, isVec, value);
+    return mcm_->getCurrentLoadValue(*this, instCounter_, va, pa1, pa2, size, isVec,
+				     value, elemIx, field);
   if (perfApi_)
     return perfApi_->getLoadData(hartIx_, instCounter_, va, pa1, pa2, size, value);
   assert(0);
@@ -1904,7 +1907,7 @@ template <typename LOAD_TYPE>
 bool
 Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 		       [[maybe_unused]] uint64_t addr1, [[maybe_unused]] uint64_t addr2,
-		       uint64_t& data)
+		       uint64_t& data, unsigned elemIx, unsigned field)
 {
 #ifdef FAST_SLOPPY
   return fastLoad<LOAD_TYPE>(di, virtAddr, data);
@@ -1928,7 +1931,8 @@ Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr
   if (ooo_)
     {
       uint64_t val = 0;
-      hasOooVal = getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), di->isVector(), val);
+      hasOooVal = getOooLoadValue(virtAddr, addr1, addr2, sizeof(LOAD_TYPE), di->isVector(),
+				  val, elemIx, field);
       if (hasOooVal)
 	uval = val;
     }
@@ -2799,9 +2803,9 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
       URV delegVal = peekCsr(interrupt? CsrNumber::MIDELEG : CsrNumber::MEDELEG);
       if (isRvaia())
         {
-          URV mvienVal = peekCsr(CsrNumber::MVIEN);
+          URV mvien = csRegs_.peekMvien();
           if (interrupt)
-            delegVal |= mvienVal;
+            delegVal |= mvien;
         }
       if (delegVal & (URV(1) << cause))
 	{
@@ -5417,8 +5421,8 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   URV delegVal = csRegs_.peekMideleg();
   if (isRvaia())
     {
-      URV mvienVal = peekCsr(CsrNumber::MVIEN);
-      delegVal |= mvienVal;
+      URV mvien = csRegs_.peekMvien();
+      delegVal |= mvien;
     }
   URV hDelegVal = csRegs_.peekHideleg();
 
@@ -5519,14 +5523,15 @@ bool
 Hart<URV>::isInterruptPossible(InterruptCause& cause) const
 {
   URV mip = csRegs_.peekMip();
-  if (isRvaia())
-    {
-      URV mvip = csRegs_.peekMvip() & ~csRegs_.peekMideleg();
-      mip |= mvip;
-    }
 
   // MIP read value is ored with supervisor external interrupt pin.
   mip = overrideWithSeiPin(mip);
+
+  if (isRvaia())
+    {
+      URV mvip = csRegs_.peekMvip() & ~csRegs_.peekMideleg() & csRegs_.peekMvien();
+      mip |= mvip;
+    }
 
   mip &= ~deferredInterrupts_;  // Inhibited by test-bench.
 
@@ -9512,30 +9517,7 @@ Hart<URV>::exitDebugMode()
       return;
     }
 
-  cancelLr(CancelLrCause::EXIT_DEBUG);  // Exiting debug modes loses LR reservation.
-
-  pc_ = peekCsr(CsrNumber::DPC);  // Restore PC
-
-  debugMode_ = false;
-  csRegs_.enterDebug(false);
-
-  // If pending nmi bit is set in dcsr, set pending nmi in the hart
-  // object.
-  URV dcsrVal = 0;
-  if (not peekCsr(CsrNumber::DCSR, dcsrVal))
-    std::cerr << "Error: Failed to read DCSR in exit debug.\n";
-
-  DcsrFields<URV> dcsr(dcsrVal);
-  if (dcsr.bits_.NMIP)
-    setPendingNmi(nmiCause_);
-
-  // Restore privilege mode.
-  auto pm = PrivilegeMode{dcsr.bits_.PRV};
-  setPrivilegeMode(pm);
-
-  // Restore virtual mode.
-  bool vm = dcsr.bits_.V;
-  setVirtualMode(vm);
+  exitDebugMode();
 }
 
 
@@ -10480,17 +10462,8 @@ template <typename URV>
 void
 Hart<URV>::execDret(const DecodedInst* di)
 {
-  auto dcsr = csRegs_.getImplementedCsr(CsrNumber::DCSR);
-  auto dpc = csRegs_.getImplementedCsr(CsrNumber::DPC);
-  if (not dcsr or not dpc)
-    {
-      illegalInst(di);
-      return;
-    }
-
-  // The dret instruction is only valid if debug is on. However, if dcsr is
-  // not marked debug-only, then allow dret in any mode.
-  if (not debugMode_ and dcsr->isDebug())
+  // The dret instruction is only valid if debug is on.
+  if (not debugMode_)
     {
       illegalInst(di);
       return;
@@ -10751,11 +10724,8 @@ Hart<URV>::imsicAccessible(const DecodedInst* di, CsrNumber csr, PrivilegeMode m
         bool isS = privMode_ == PrivilegeMode::Supervisor and not virtMode_;
         if (isS and (csr == CN::STOPEI or csr == CN::SIREG))
           {
-            URV mvien;
-            if (not peekCsr(CsrNumber::MVIEN, mvien))
-              return false;
-
-            if ((mvien >> 9) & 1)
+            URV mvien = csRegs_.peekMvien();
+            if ((mvien >> URV(InterruptCause::S_EXTERNAL)) & 1)
               {
                 if (csr == CN::STOPEI)
                   {
@@ -12377,59 +12347,59 @@ WdRiscv::Hart<uint64_t>::store<uint64_t>(const DecodedInst*, uint64_t, bool, uin
 
 template
 bool
-WdRiscv::Hart<uint32_t>::readForLoad<uint8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::readForLoad<uint8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::readForLoad<int8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::readForLoad<int8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::readForLoad<uint16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::readForLoad<uint16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::readForLoad<int16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::readForLoad<int16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::readForLoad<uint32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::readForLoad<uint32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::readForLoad<int32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::readForLoad<int32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::readForLoad<uint64_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::readForLoad<uint64_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::readForLoad<uint8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint64_t>::readForLoad<uint8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::readForLoad<int8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint64_t>::readForLoad<int8_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::readForLoad<uint16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint64_t>::readForLoad<uint16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::readForLoad<int16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint64_t>::readForLoad<int16_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::readForLoad<uint32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint64_t>::readForLoad<uint32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::readForLoad<int32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint64_t>::readForLoad<int32_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::readForLoad<uint64_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&);
+WdRiscv::Hart<uint64_t>::readForLoad<uint64_t>(const DecodedInst*, uint64_t, uint64_t, uint64_t, uint64_t&, unsigned, unsigned);
 
 
 template

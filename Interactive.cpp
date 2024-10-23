@@ -784,7 +784,17 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
       else if (addrStr == "seipin")
 	out << (boost::format("%d") % hart.getSeiPin()) << std::endl;
       else if (addrStr == "effma")
-	;   // Nothing to do here. In server mode we return the effective memory attribute.
+	{
+	  uint64_t va = 0, pa = 0;
+	  if (hart.lastLdStAddress(va, pa))
+	    {
+	      auto pma = hart.getPma(pa);
+	      auto effpbmt = VirtMem::effectivePbmt(hart.lastVirtMode(), hart.lastVsPageMode(),
+						    hart.virtMem().lastVsPbmt(), hart.virtMem().lastPbmt());
+	      pma = VirtMem::overridePmaWithPbmt(pma, effpbmt);
+              out << (boost::format("0x%x") % pma.attributesToInt()) << std::endl;
+	    }
+	}
       else
 	ok = false;
 

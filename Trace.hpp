@@ -397,9 +397,9 @@ namespace WdRiscv
 	for (auto& einfo : info.elems_)
 	  {
 	    const auto& addr = einfo.va_;
-	    const auto& mask = einfo.masked_;
+	    const auto& skipped = einfo.skip_;
 
-	    if (not mask)
+	    if (not skipped)
 	      {
 		unsigned page = hart_->virtMem().pageNumber(addr);
 		pages.emplace(page);

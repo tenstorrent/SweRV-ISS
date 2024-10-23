@@ -513,7 +513,7 @@ namespace WdRiscv
 
     /// Enable page translation naturally aligned power of 2 page sizes.
     void enableTranslationNapot(bool flag)
-    { virtMem_.enableNapot(flag); }
+    { enableExtension(RvExtension::Svnapot, flag); virtMem_.enableNapot(flag); }
 
     /// Do not consider lr and sc instructions as load/store events for
     /// performance counter when flag is false. Do consider them when
@@ -838,9 +838,8 @@ namespace WdRiscv
     {
       if (isRvaia())
         {
-          URV mvien;
-          if (peekCsr(CsrNumber::MVIEN, mvien) and
-              (mvien >> URV(InterruptCause::S_EXTERNAL) & 1))
+          URV mvien = csRegs_.peekMvien();
+          if (mvien >> URV(InterruptCause::S_EXTERNAL) & 1)
             ip &= ~URV(1 << URV(InterruptCause::S_EXTERNAL));
         }
       return ip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
@@ -1318,6 +1317,10 @@ namespace WdRiscv
     /// Return true if the svinval extension (TLB invalidate) is enabled.
     bool isRvsvinval() const
     { return extensionIsEnabled(RvExtension::Svinval); }
+
+    /// Return true if the svnapot extension is enabled.
+    bool isRvsvnapot() const
+    { return extensionIsEnabled(RvExtension::Svnapot); }
 
     /// Return true if the zicbom extension (cache block management) is enabled.
     bool isRvzicbom() const
@@ -1874,11 +1877,10 @@ namespace WdRiscv
     void registerPreInst(std::function<void(Hart<URV>&, bool&, bool&)> callback)
     { preInst_ = std::move(callback); }
 
-    /// Define physical memory attribute region at index ix. Region
-    /// addresses are between low and high inclusive. To define a
-    /// 1024-byte region at address zero we would set low to zero and
-    /// high to 1023. Region are checked in order and the first
-    /// matching region applies.
+    /// Define/re-define a physical memory attribute region at index ix. Region addresses
+    /// are between low and high inclusive. To define a 1024-byte region at address zero
+    /// we would set low to zero and high to 1023. Regions are checked in order and the
+    /// first matching region applies.
     bool definePmaRegion(unsigned ix, uint64_t low, uint64_t high, Pma pma)
     { return memory_.pmaMgr_.defineRegion(ix, low, high, pma); }
 
@@ -1894,12 +1896,12 @@ namespace WdRiscv
     /// and false if num is not that of PMACFG CSR.
     bool processPmaChange(CsrNumber num);
 
-    /// Associate a mask with the word-aligned word at the given
-    /// address. Return true on success and flase if given address is
-    /// not in a memory mapped region. The size must be 4 or 8. The
-    /// address must be word/double-word aligned if size is 4/8.
-    bool setMemMappedMask(uint64_t addr, uint64_t mask, unsigned size)
-    { return memory_.pmaMgr_.setMemMappedMask(addr, mask, size); }
+    /// Define a memory mapped register with the given mask and size at the word-aligned
+    /// word with the given address. Return true on success and flase if given address is
+    /// not in a memory mapped region. The size must be 4 or 8. The address must be
+    /// word/double-word aligned for size 4/8.
+    bool defineMemMappedRegister(uint64_t addr, uint64_t mask, unsigned size, Pma pma)
+    { return memory_.pmaMgr_.defineMemMappedReg(addr, mask, size, pma); }
 
     /// Unpack the memory protection information defined by the given
     /// physical memory protection entry (entry 0 corresponds to
@@ -2295,6 +2297,14 @@ namespace WdRiscv
     /// Report the number of retired instruction count and the simulation rate.
     void reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop);
 
+    /// Return true if vector component currently has mask-agnositic policy.
+    bool isVectorMaskAgnostic() const
+    { return vecRegs_.isMaskAgnostic(); }
+
+    /// Return true if vector component currently has tail-agnositic policy.
+    bool isVectorTailAgnostic() const
+    { return vecRegs_.isTailAgnostic(); }
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
@@ -2438,7 +2448,8 @@ namespace WdRiscv
 
     /// Get the data value for an out of order read (mcm or perfApi).
     bool getOooLoadValue(uint64_t va, uint64_t pa1, uint64_t pa2, unsigned size,
-			 bool isVec, uint64_t& value);
+			 bool isVec, uint64_t& value, unsigned elemIx = 0,
+			 unsigned field = 0);
 
     /// Helper to reset: reset floating point related structures.
     /// No-op if no  floating point extension is enabled.
@@ -2752,7 +2763,8 @@ namespace WdRiscv
     /// is the physical address on the other page.
     template<typename LOAD_TYPE>
     bool readForLoad(const DecodedInst* di, uint64_t vaddr, uint64_t paddr1,
-		     uint64_t paddr2, uint64_t& data);
+		     uint64_t paddr2, uint64_t& data, unsigned elemIx = 0,
+		     unsigned field = 0);
 
     /// Helper to the cache block operation (cbo) instructions.
     ExceptionCause determineCboException(uint64_t& addr, uint64_t& gpa, uint64_t& pa,
