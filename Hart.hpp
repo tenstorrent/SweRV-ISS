@@ -2893,12 +2893,12 @@ namespace WdRiscv
 
     /// Return true if this hart has one or more active debug triggers.
     bool hasActiveTrigger() const
-    { return (enableTriggers_ and csRegs_.hasActiveTrigger()); }
+    { return (enableTriggers_ and csRegs_.hasActiveTrigger() and not debugMode_); }
 
     /// Return true if this hart has one or more active debug instruction (execute)
     /// triggers.
     bool hasActiveInstTrigger() const
-    { return (enableTriggers_ and csRegs_.hasActiveInstTrigger()); }
+    { return (enableTriggers_ and csRegs_.hasActiveInstTrigger() and not debugMode_); }
 
     /// Collect instruction stats (for instruction profile and/or
     /// performance monitors).
@@ -5283,7 +5283,7 @@ namespace WdRiscv
     VirtMem::Mode lastVsPageMode_ = VirtMem::Mode::Bare;
     VirtMem::Mode lastPageModeStage2_ = VirtMem::Mode::Bare;
 
-    bool debugMode_ = false;         // True on debug mode.
+    bool debugMode_ = false;         // True when in debug mode.
     bool dcsrStepIe_ = false;        // True if stepie bit set in dcsr.
     bool dcsrStep_ = false;          // True if step bit set in dcsr.
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
