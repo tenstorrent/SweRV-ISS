@@ -4475,9 +4475,6 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
       return;
     }
 
-  if (start >= vecRegs_.elemCount())
-    return;
-
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned bitsPerReg = vecRegs_.bitsPerRegister();
@@ -4488,6 +4485,9 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
       postVecFail(di);
       return;
     }
+
+  if (start >= vecRegs_.elemCount())
+    return;
 
   bool found = false;  // true if set bit is found in vs1
 
@@ -4521,9 +4521,6 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
       return;
     }
 
-  if (start >= vecRegs_.elemCount())
-    return;
-
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned bitsPerReg = vecRegs_.bitsPerRegister();
@@ -4534,6 +4531,9 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
       postVecFail(di);
       return;
     }
+
+  if (start >= vecRegs_.elemCount())
+    return;
 
   bool found = false;  // true if set bit is found in vs1
 
@@ -4567,9 +4567,6 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
       return;
     }
 
-  if (start >= vecRegs_.elemCount())
-    return;
-
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned bitsPerReg = vecRegs_.bitsPerRegister();
@@ -4580,6 +4577,9 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
       postVecFail(di);
       return;
     }
+
+  if (start >= vecRegs_.elemCount())
+    return;
 
   // True if masked-off elements should be set to 1.
   bool ones = vecRegs_.isMaskAgnostic() and vecRegs_.isMaskAgnosticOnes();
