@@ -378,6 +378,17 @@ CsRegs<URV>::writeMvien(URV value)
   URV mask = mvien->read() & b9;
   // Bit 9 is read-only when MVIEN is set.
   mip->setWriteMask((mip->getWriteMask() & ~b9) | ~mask);
+
+  // Bit 1 is an alias between mvip/mip when mvien is not set.
+  auto mvip = getImplementedCsr(CsrNumber::MVIP);
+  if (not mvip)
+    return false;
+
+  URV b1 = URV(0x2);
+  mask = mvien->read() ^ b1;
+  mask &= b1;
+  mvip->write((mvip->read() & ~mask) | (mip->read() & mask));
+  recordWrite(CsrNumber::MVIP);
   return true;
 }
 
@@ -1463,7 +1474,8 @@ CsRegs<URV>::writeSip(URV value)
   // Bits SGEIP, VSEIP, VSTIP, VSSIP are not writeable in SIE/SIP.
   sipMask &= ~ URV(0x1444);
 
-  // Where mideleg is 0 and mvien is 1, SIP becomes an alias to mvip.
+  // Where mideleg is 0 and mvien is 1, SIP becomes an alias to mvip. More
+  // importantly, mvip is a separate writable bit.
   // See AIA spec section 5.3.
   auto mvien = getImplementedCsr(CsrNumber::MVIEN);
   auto mvip = getImplementedCsr(CsrNumber::MVIP);
@@ -1472,6 +1484,7 @@ CsRegs<URV>::writeSip(URV value)
       URV mvipMask = mvien->read() & ~mideleg->read();
       sipMask &= ~ mvipMask;  // Don't write SIP where SIP is an alias to mvip.
       mvip->write((mvip->read() & ~mvipMask) | (value & mvipMask)); // Write mvip instead.
+      recordWrite(CN::MVIP);
     }
 
   sip->setWriteMask(sipMask);
@@ -1479,6 +1492,11 @@ CsRegs<URV>::writeSip(URV value)
   sip->setWriteMask(prevSipMask);
 
   recordWrite(CN::SIP);
+
+  // Write to sip may alias mvip when mideleg is 1 and mvien is 0.
+  // In this case, we write sip/mip and mvip is not a separate
+  // writable bit.
+  updateVirtInterrupt();
   return true;
 }
 
