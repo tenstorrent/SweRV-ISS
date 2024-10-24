@@ -836,6 +836,9 @@ namespace WdRiscv
     /// the value of SEIP is solely the value of the pin.
     URV overrideWithSeiPinAndMvip(URV ip) const
     {
+      if (not isRvs())
+        return ip;
+
       if (isRvaia())
         {
           URV mvien = csRegs_.peekMvien();

@@ -5529,7 +5529,7 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause) const
   mip = overrideWithSeiPinAndMvip(mip);
 
   // SIP read value will alias mvip if not delegated and mvien is set.
-  if (isRvaia())
+  if (isRvaia() and isRvs())
     {
       URV mvip = csRegs_.peekMvip() & ~csRegs_.peekMideleg()
                   & csRegs_.peekMvien();
