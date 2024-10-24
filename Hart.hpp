@@ -831,16 +831,21 @@ namespace WdRiscv
     bool getSeiPin() const
     { return seiPin_; }
 
-    /// Peek MIP/SIP and modify by supervisor external interrupt pin. This is
-    /// OR-ed when mvien does not exist or is set to zero. Otherwise,
+    /// Peek MIP/SIP and modify by supervisor external interrupt pin and mvip.
+    /// This is OR-ed when mvien does not exist or is set to zero. Otherwise,
     /// the value of SEIP is solely the value of the pin.
-    URV overrideWithSeiPin(URV ip) const
+    URV overrideWithSeiPinAndMvip(URV ip) const
     {
       if (isRvaia())
         {
           URV mvien = csRegs_.peekMvien();
           if (mvien >> URV(InterruptCause::S_EXTERNAL) & 1)
             ip &= ~URV(1 << URV(InterruptCause::S_EXTERNAL));
+          else
+            {
+              URV mvip = csRegs_.peekMvip();
+              ip |= mvip & URV(1 << URV(InterruptCause::S_EXTERNAL));
+            }
         }
       return ip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
     }

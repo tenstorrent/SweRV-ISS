@@ -363,6 +363,26 @@ CsRegs<URV>::writeMvip(URV value)
 
 
 template <typename URV>
+bool
+CsRegs<URV>::writeMvien(URV value)
+{
+  auto mvien = getImplementedCsr(CsrNumber::MVIEN);
+  mvien->write(value);
+  recordWrite(CsrNumber::MVIEN);
+
+  auto mip = getImplementedCsr(CsrNumber::MIP);
+  if (not mip)
+    return false;
+
+  URV b9 = URV(0x200);
+  URV mask = mvien->read() & b9;
+  // Bit 9 is read-only when MVIEN is set.
+  mip->setWriteMask((mip->getWriteMask() & ~b9) | ~mask);
+  return true;
+}
+
+
+template <typename URV>
 URV
 CsRegs<URV>::adjustTimeValue(CsrNumber num, URV value, bool virtMode) const
 {
@@ -1987,6 +2007,8 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
     return writeSie(value);
   if (num == CN::MVIP)
     return writeMvip(value);
+  if (num == CN::MVIEN)
+    return writeMvien(value);
 
   if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
     return writeSstateen(num, value);

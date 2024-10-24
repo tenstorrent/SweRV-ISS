@@ -1559,6 +1559,9 @@ namespace WdRiscv
     /// Helper to write method.
     bool writeMvip(URV value);
 
+    /// Helper to write method.
+    bool writeMvien(URV value);
+
     /// Adjust the value of TIME/TIMEH by adding the time delta in
     /// virtual mode.
     URV adjustTimeValue(CsrNumber csrn, URV value, bool virtMode) const;
