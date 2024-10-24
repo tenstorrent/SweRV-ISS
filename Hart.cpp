@@ -652,6 +652,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   prevPerfControl_ = perfControl_;
 
   debugMode_ = false;
+  updateCachedTriggerState();
 
   dcsrStepIe_ = false;
   dcsrStep_ = false;
@@ -3474,6 +3475,8 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
     }
 
   effectiveIe_ = csRegs_.effectiveInterruptEnable();
+
+  updateCachedTriggerState();  // In case trigger control CSR written.
 }
 
 
@@ -9470,6 +9473,8 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
   debugMode_ = true;
   csRegs_.enterDebug(true);
 
+  updateCachedTriggerState();
+
   URV value = 0;
   if (peekCsr(CsrNumber::DCSR, value))
     {
@@ -9520,7 +9525,33 @@ Hart<URV>::exitDebugMode()
       return;
     }
 
-  exitDebugMode();
+  cancelLr(CancelLrCause::EXIT_DEBUG);  // Exiting debug modes loses LR reservation.
+
+  pc_ = peekCsr(CsrNumber::DPC);  // Restore PC
+
+  debugMode_ = false;
+  inDebugParkLoop_ = false;
+  csRegs_.enterDebug(false);
+
+  updateCachedTriggerState();
+
+  // If pending nmi bit is set in dcsr, set pending nmi in the hart
+  // object.
+  URV dcsrVal = 0;
+  if (not peekCsr(CsrNumber::DCSR, dcsrVal))
+    std::cerr << "Error: Failed to read DCSR in exit debug.\n";
+
+  DcsrFields<URV> dcsrf(dcsrVal);
+  if (dcsrf.bits_.NMIP)
+    setPendingNmi(nmiCause_);
+
+  // Restore privilege mode.
+  auto pm = PrivilegeMode{dcsrf.bits_.PRV};
+  setPrivilegeMode(pm);
+
+  // Restore virtual mode.
+  bool vm = dcsrf.bits_.V;
+  setVirtualMode(vm);
 }
 
 
@@ -10472,31 +10503,7 @@ Hart<URV>::execDret(const DecodedInst* di)
       return;
     }
 
-  cancelLr(CancelLrCause::EXIT_DEBUG);  // Exiting debug modes loses LR reservation.
-
-  pc_ = peekCsr(CsrNumber::DPC);  // Restore PC
-
-  debugMode_ = false;
-  inDebugParkLoop_ = false;
-  csRegs_.enterDebug(false);
-
-  // If pending nmi bit is set in dcsr, set pending nmi in the hart
-  // object.
-  URV dcsrVal = 0;
-  if (not peekCsr(CsrNumber::DCSR, dcsrVal))
-    std::cerr << "Error: Failed to read DCSR in exit debug.\n";
-
-  DcsrFields<URV> dcsrf(dcsrVal);
-  if (dcsrf.bits_.NMIP)
-    setPendingNmi(nmiCause_);
-
-  // Restore privilege mode.
-  auto pm = PrivilegeMode{dcsrf.bits_.PRV};
-  setPrivilegeMode(pm);
-
-  // Restore virtual mode.
-  bool vm = dcsrf.bits_.V;
-  setVirtualMode(vm);
+  exitDebugMode();
 }
 
 

@@ -1215,7 +1215,11 @@ namespace WdRiscv
     /// Enable debug-triggers. Without this, triggers will not trip and will not cause
     /// exceptions.
     void enableTriggers(bool flag)
-    { enableTriggers_ = flag; csRegs_.enableTriggers(flag);  }
+    {
+      enableTriggers_ = flag;
+      csRegs_.enableTriggers(flag);
+      updateCachedTriggerState();
+    }
 
     /// Enable performance counters (count up for some enabled performance counters when
     /// their events do occur).
@@ -2901,12 +2905,21 @@ namespace WdRiscv
 
     /// Return true if this hart has one or more active debug triggers.
     bool hasActiveTrigger() const
-    { return (enableTriggers_ and csRegs_.hasActiveTrigger() and not debugMode_); }
+    { return activeTrig_; }
 
     /// Return true if this hart has one or more active debug instruction (execute)
     /// triggers.
     bool hasActiveInstTrigger() const
-    { return (enableTriggers_ and csRegs_.hasActiveInstTrigger() and not debugMode_); }
+    { return activeInstTrig_; }
+
+    /// Called on reset, when we enter/exit debug, and when a CSR is written
+    /// to update hasActiveTrigger_/hasActiveInstTrigger_;
+    void updateCachedTriggerState()
+    {
+      bool on = enableTriggers_ and not debugMode_;
+      activeTrig_ =  on and  csRegs_.hasActiveTrigger();
+      activeInstTrig_ = on and csRegs_.hasActiveInstTrigger();
+    }
 
     /// Collect instruction stats (for instruction profile and/or
     /// performance monitors).
@@ -5248,6 +5261,8 @@ namespace WdRiscv
     bool instFreq_ = false;         // Collection instruction frequencies.
     bool enableCounters_ = false;   // Enable performance monitors.
     bool enableTriggers_ = false;   // Enable debug triggers.
+    bool activeTrig_ = false;       // True if data triggers should be evaulated.
+    bool activeInstTrig_ = false;   // True if instruction triggers should be evaluated.
     bool enableGdb_ = false;        // Enable gdb mode.
     int gdbTcpPort_ = -1;           // Enable gdb mode.
     bool newlib_ = false;           // Enable newlib system calls.
