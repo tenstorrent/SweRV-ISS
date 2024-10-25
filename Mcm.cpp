@@ -994,6 +994,8 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
       instr.isStore_ = true;
 
       auto& vecRefs = hartData_.at(hartIx).vecRefMap_[instr.tag_];
+      std::unordered_set<uint64_t> byteCover;
+      bool hasOverlap = false;
 
       for (auto& elem : elems)
         {
@@ -1006,7 +1008,17 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	  uint64_t pa1 = elem.pa_, pa2 = elem.pa2_, value = elem.stData_;
 
 	  if (pa1 == pa2)
-	    vecRefs.add(elem.ix_, pa1, value, elemSize, dataReg, ixReg, elem.field_);
+            {
+              vecRefs.add(elem.ix_, pa1, value, elemSize, dataReg, ixReg, elem.field_);
+              if (not hasOverlap)
+                {
+                  for (unsigned i = 0; i < elemSize; ++i)
+                    {
+                      hasOverlap = hasOverlap or byteCover.contains(pa1 + i);
+                      byteCover.insert(pa1 + i);
+                    }
+                }
+            }
 	  else
 	    {
 	      unsigned size1 = offsetToNextPage(pa1);
@@ -1016,10 +1028,25 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	      uint64_t val2 = (value >> (size1*8));
 	      vecRefs.add(elem.ix_, pa1, val1, size1, dataReg, ixReg, elem.field_);
 	      vecRefs.add(elem.ix_, pa2, val2, size2, dataReg, ixReg, elem.field_);
+
+              if (not hasOverlap)
+                {
+                  for (unsigned i = 0; i < size1; ++i)
+                    {
+                      hasOverlap = hasOverlap or byteCover.contains(pa1 + i);
+                      byteCover.insert(pa1 + i);
+                    }
+                  for (unsigned i = 0; i < size2; ++i)
+                    {
+                      hasOverlap = hasOverlap or byteCover.contains(pa2 + i);
+                      byteCover.insert(pa2 + i);
+                    }
+                }
 	    }
         }
 
       instr.complete_ = checkStoreComplete(hartIx, instr);
+      instr.hasOverlap_ = hasOverlap;
     }
   else
     {
