@@ -2089,6 +2089,10 @@ namespace WdRiscv
     /// not part of STATEEN. Returns false otherwise.
     bool isStateEnabled(CsrNumber num, PrivilegeMode mode, bool virtMode) const;
 
+    /// Update the mask of the LCOF bit in MVIP/MVIEN based on extensions mcdeleg,
+    /// sscofpmf, and smaia. Also update HVIP/HVIEN/SVIP/SVIE if hypervisor enabled.
+    void updateLcofMask();
+
     /// Shift VS-interrupt bit positions to S-interrupt bit positions.
     static URV vsInterruptToS(URV bits)
     {
@@ -2159,6 +2163,7 @@ namespace WdRiscv
     bool pmpTor_ = true;          // Top-of-range PMP mode enabled
     bool pmpNa4_ = true;          // Na4 PMP mode enabled
     bool aiaEnabled_ = false;     // Aia extension.
+    bool mcdelegEnabled_ = true;  // Mvdeleg extension (counter delegation).
 
     bool recordWrite_ = true;
     bool debugMode_ = false;

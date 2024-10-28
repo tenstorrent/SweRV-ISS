@@ -2270,7 +2270,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 
   assert(instr.size_ == elemSize);
 
-  // Collect reference (Whisper) elements and associated with instruction.
+  // Collect reference (Whisper) elements and associate them with instruction.
   unsigned activeCount = 0;
   collectVecRefElems(hart, instr, activeCount);
 
@@ -2996,8 +2996,7 @@ Mcm<URV>::overlaps(const McmInstr& i1, const McmInstr& i2) const
       const auto& vecRefMap2 = hartData_.at(i2.hartIx_).vecRefMap_;
       auto iter1 = vecRefMap1.find(i1.tag_);
       auto iter2 = vecRefMap2.find(i2.tag_);
-      if (iter1 == vecRefMap1.end() or
-	  iter2 == vecRefMap2.end())
+      if (iter1 == vecRefMap1.end() or iter2 == vecRefMap2.end())
 	assert(false);
 
       auto& vecRefs1 = iter1->second;

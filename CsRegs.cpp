@@ -351,12 +351,10 @@ CsRegs<URV>::writeMvip(URV value)
 
       mask &= b19 | b5;
       mip->write((mip->read() & ~mask) | (value & mask));
-      mvip->write((mvip->read() & ~(mask | mvienVal)) | (value & (mask | mvienVal)));
       recordWrite(CsrNumber::MIP);
     }
-  else
-    mvip->write(value);
 
+  mvip->write(value);
   recordWrite(CsrNumber::MVIP);
   return true;
 }
@@ -1105,7 +1103,10 @@ CsRegs<URV>::enableSscofpmf(bool flag)
 	  }
       };
     }
+
+  updateLcofMask();
 }
+
 
 template <typename URV>
 void
@@ -1303,6 +1304,9 @@ CsRegs<URV>::enableAia(bool flag)
 	  csr->setImplemented(hflag);
 	}
     }
+
+  
+  updateLcofMask();
 }
 
 
@@ -3340,7 +3344,7 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("mtopei",     CN::MTOPEI,     !mand, !imp, 0, wam, wam);
   defineCsr("mtopi",      CN::MTOPI,      !mand, !imp, 0, wam, wam);
   
-  URV mask = 0b10'0000'0010;  // Bits 9 and 1 (SEI, SSI).
+  URV mask = 0b10'0010'0000'0010;  // Bits 13, 9, and 1 (LCOFI, SEI, SSI).
   defineCsr("mvien",      CN::MVIEN,      !mand, !imp, 0, mask, mask);
 
   defineCsr("mvip",       CN::MVIP,       !mand, !imp, 0, mask, mask);
@@ -5332,6 +5336,58 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode pm, bool vm) const
   if (rv32_) enableBit -= 8*sizeof(URV);
   URV value = csr->read();
   return (value >> enableBit) & 1;
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::updateLcofMask()
+{
+  using CN = CsrNumber;
+
+  bool lcofOn = mcdelegEnabled_ and cofEnabled_ and aiaEnabled_;
+  URV lcofMask = URV(1) << URV(InterruptCause::LCOF);
+
+  for ( auto csrn : { CN::MVIP, CN::MVIEN } )
+    {
+      auto csr = getImplementedCsr(csrn);
+      if (csr)
+	{
+	  if (lcofOn)
+	    {
+	      // SET LCOF bit in in write mask (enable wrting).
+	      csr->setWriteMask((csr->getWriteMask() | lcofMask));
+	    }
+	  else
+	    {
+	      // Clear LCOF bit in value and in mask (disable writing).
+	      csr->poke(csr->read() & ~lcofMask);
+	      csr->setWriteMask((csr->getWriteMask() & ~lcofMask));
+	    }
+	}
+    }
+
+  if (not hyperEnabled_)
+    return;
+
+  for ( auto csrn : { CN::HVIP, CN::HVIEN, CN::VSIE, CN::VSIP } )
+    {
+      auto csr = getImplementedCsr(csrn);
+      if (csr)
+	{
+	  if (lcofOn)
+	    {
+	      // SET LCOF bit in in write mask (enable wrting).
+	      csr->setWriteMask((csr->getWriteMask() | lcofMask));
+	    }
+	  else
+	    {
+	      // Clear LCOF bit in value and in mask (disable writing).
+	      csr->poke(csr->read() & ~lcofMask);
+	      csr->setWriteMask((csr->getWriteMask() & ~lcofMask));
+	    }
+	}
+    }
 }
 
 
