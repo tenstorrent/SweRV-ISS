@@ -52,8 +52,8 @@ namespace WhisperUtil  {
     std::vector<uint64_t> physAddrs;  // Memory addresses
     std::vector<uint64_t> memVals;    // Correspondign data for store
     std::vector<bool> maskedAddrs;    // Maked addresses (for vector instructions).
-    std::vector<uint64_t> dpteAddrs;  // PTE addresses address translation.
-    std::vector<uint64_t> ipteAddrs;
+    std::unordered_map<uint64_t, std::vector<uint64_t>> dpteAddrs;  // PTE addresses address translation.
+    std::unordered_map<uint64_t, std::vector<uint64_t>> ipteAddrs;
 
     PrivMode priv = PrivMode::Machine;
     bool virt = false;

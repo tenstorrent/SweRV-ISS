@@ -831,41 +831,48 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       buffer.printChar(',');
       std::vector<VirtMem::WalkEntry> addrs;
       std::vector<uint64_t> entries;
-      getPageTableWalkAddresses(true, 0, addrs);
-      getPageTableWalkEntries(true, 0, entries);
-      unsigned entryIx = 0;
-      sep = "";
-      for (uint64_t i = 0; i < addrs.size(); ++i)
-        {
-          buffer.print(sep).print(addrs.at(i).addr_);
-          if (addrs.at(i).type_ == VirtMem::WalkEntry::Type::PA)
-            {
-              buffer.printChar('=').print(entries.at(entryIx++));
 
-              Pma pma = getPma(addrs.at(i).addr_);
-              pma = VirtMem::overridePmaWithPbmt(pma, addrs.at(i).pbmt_);
-              buffer.print(";ma=").print(pma.attributesToInt());
+      sep = "";
+      for (unsigned walk = 0; walk < virtMem_.numFetchWalks(); ++walk)
+        {
+          getPageTableWalkAddresses(true, walk, addrs);
+          getPageTableWalkEntries(true, walk, entries);
+          unsigned entryIx = 0;
+          for (uint64_t i = 0; i < addrs.size(); ++i)
+            {
+              buffer.print(sep).print(addrs.at(i).addr_);
+              if (addrs.at(i).type_ == VirtMem::WalkEntry::Type::PA)
+                {
+                  buffer.printChar('=').print(entries.at(entryIx++));
+
+                  Pma pma = getPma(addrs.at(i).addr_);
+                  pma = VirtMem::overridePmaWithPbmt(pma, addrs.at(i).pbmt_);
+                  buffer.print(";ma=").print(pma.attributesToInt());
+                }
+              sep = ";";
             }
-          sep = ";";
         }
 
       buffer.printChar(',');
-      getPageTableWalkAddresses(false, 0, addrs);
-      getPageTableWalkEntries(false, 0, entries);
-      entryIx = 0;
       sep = "";
-      for (uint64_t i = 0; i < addrs.size(); ++i)
+      for (unsigned walk = 0; walk < virtMem_.numDataWalks(); ++walk)
         {
-          buffer.print(sep).print(addrs.at(i).addr_);
-          if (addrs.at(i).type_ == VirtMem::WalkEntry::Type::PA)
+          getPageTableWalkAddresses(false, walk, addrs);
+          getPageTableWalkEntries(false, walk, entries);
+          unsigned entryIx = 0;
+          for (uint64_t i = 0; i < addrs.size(); ++i)
             {
-              buffer.printChar('=').print(entries.at(entryIx++));
+              buffer.print(sep).print(addrs.at(i).addr_);
+              if (addrs.at(i).type_ == VirtMem::WalkEntry::Type::PA)
+                {
+                  buffer.printChar('=').print(entries.at(entryIx++));
 
-              Pma pma = getPma(addrs.at(i).addr_);
-              pma = VirtMem::overridePmaWithPbmt(pma, addrs.at(i).pbmt_);
-              buffer.print(";ma=").print(pma.attributesToInt());
+                  Pma pma = getPma(addrs.at(i).addr_);
+                  pma = VirtMem::overridePmaWithPbmt(pma, addrs.at(i).pbmt_);
+                  buffer.print(";ma=").print(pma.attributesToInt());
+                }
+              sep = ";";
             }
-          sep = ";";
         }
     }
 
