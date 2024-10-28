@@ -3881,7 +3881,7 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
   GroupMultiplier v2gm = GroupMultiplier::One;
   if (not VecRegs::groupNumberX8ToSymbol(v2Group, v2gm) or
       not vecRegs_.legalConfig(ElementWidth::Half, v2gm) or
-      (masked and vd == 0))
+      (masked and (vd == 0 or vs1 == 0 or vs2 == 0)))
     {
       postVecFail(di);
       return;
