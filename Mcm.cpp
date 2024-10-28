@@ -2265,7 +2265,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
       return false;
     }
 
-  if (instr.memOps_.empty() and instr.size_ == 0)
+  if ((instr.memOps_.empty() or info.allSkipped()) and instr.size_ == 0)
     instr.size_ = elemSize;
 
   assert(instr.size_ == elemSize);
