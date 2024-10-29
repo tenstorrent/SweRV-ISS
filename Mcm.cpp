@@ -4498,26 +4498,22 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	}
       else    // M is a vector store
 	{
-	  if (instrM.hasOverlap_)
-	    continue;  // Not enough info to associate ops with elements.
-
 	  auto iter = vecRefMap.find(mTag);
 	  if (iter == vecRefMap.end())
 	    continue;
 
 	  bool isIndexed = instrM.di_.isVectorStoreIndexed();
-
 	  auto& vecRefs = iter->second;
 
-	  // For each data elem of M.
-	  for (auto& vecRef : vecRefs.refs_)
+	  // Find last element of M overlapping byte of B. We assume vector store
+	  // elements are written in order.
+	  auto& refs = vecRefs.refs_;
+	  for (auto iter = refs.rbegin(); iter != refs.rend(); ++iter)
 	    {
-	      // Identify vector writing to memory overlapping byte address of B.
+	      auto& vecRef = *iter;
 	      if (not vecRef.overlaps(byteAddr))
 		continue;
-	      unsigned dataVec = vecRef.reg_;
-	      if (dataVec != byteInfo.reg_)
-		continue;
+	      unsigned dataVec = vecRef.reg_;  // Identify register of element of M.
 
 	      // Find the producer A of identified vector. M has data dep on A.
 	      McmInstrIx aTag = 0;
@@ -4531,11 +4527,11 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 		  }
 
 	      if (aTag == 0)
-		continue;
+		break;  // No producer of data vec.
 
 	      auto& instrA = instrVec.at(aTag);
-	      if (not instrA.isMemory() or instrA.hasOverlap_)
-		continue;
+	      if (not instrA.isMemory())
+		break;
 
 	      // Check B against A.
 	      if (not instrA.complete_ or byteTime <= aTime)
@@ -4548,7 +4544,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 		}
 
 	      if (not isIndexed)
-		continue;
+		break;
 
 	      // Get index register corresponding to dataVec.
 	      unsigned ixVec = vecRef.ixReg_;
@@ -4566,11 +4562,11 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 		  }
 
 	      if (aTag == 0)
-		continue;
+		break;
 
 	      auto& instrAA = instrVec.at(aTag);
 	      if (not instrAA.isMemory())
-		continue;
+		break;
 
 	      // Check B against AA.
 	      if (not instrAA.complete_ or byteTime <= aTime)
@@ -4580,6 +4576,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 		       << " time1=" << aTime << " time2=" << byteTime << " dep=addr\n";
 		  return false;
 		}
+	      break;
 	    }
 	}
     }
