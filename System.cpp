@@ -1445,13 +1445,13 @@ System<URV>::loadSnapshot(const std::string& snapDir, bool restoreTrace)
   if (not memory_->loadSnapshot(memPath.string(), usedBlocks))
     return false;
 
-  // Rearm CLINT timers.
+  // Rearm CLINT time compare.
   for (auto hartPtr : sysHarts_)
     {
-      uint64_t mtimerAddr = 0;
-      if (hartPtr->hasAclintTimer(mtimerAddr))
+      uint64_t mtimeCmpBase = 0;
+      if (hartPtr->hasAclintTimeCompare(mtimeCmpBase))
 	{
-          uint64_t timeCmpAddr = mtimerAddr + hartPtr->sysHartIndex() * 8;
+          uint64_t timeCmpAddr = mtimeCmpBase + hartPtr->sysHartIndex() * 8;
 	  uint64_t timeCmp = 0;
 	  memory_->peek(timeCmpAddr, timeCmp, false);
 	  hartPtr->setAclintAlarm(timeCmp);
