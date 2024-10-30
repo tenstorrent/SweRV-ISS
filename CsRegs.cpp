@@ -311,12 +311,19 @@ CsRegs<URV>::readMvip(URV& value) const
     return false;
   value = mvip->read();
 
-  // Bit STIE (5) of MVIP is an alias to bit 5 of MIP if bit 5 of MIP is writable.
-  // Othrwise, it is zero.
   auto mip = getImplementedCsr(CsrNumber::MIP);
-  if (mip)
+  auto mvien = getImplementedCsr(CsrNumber::MVIEN);
+  if (mip and mvien)
     {
-      URV mask = URV(0x20);  // Bit 5
+      // Bit 1 is an alias of mip when MVIEN is not set.
+      URV b1 = URV(0x2);
+      URV mask = mvien->read() ^ b1;
+      mask &= b1;
+      value = (value & ~mask) | (mip->read() & mask);
+
+      // Bit STIE (5) of MVIP is an alias to bit 5 of MIP if bit 5 of MIP is writable.
+      // Othrwise, it is zero.
+      mask = URV(0x20);  // Bit 5
       if ((mip->getWriteMask() & mask) != 0)   // Bit 5 writable in mip
 	value = (value & ~mask) | (mip->read() & mask);
     }
@@ -351,13 +358,31 @@ CsRegs<URV>::writeMvip(URV value)
 
       mask &= b19 | b5;
       mip->write((mip->read() & ~mask) | (value & mask));
-      mvip->write((mvip->read() & ~(mask | mvienVal)) | (value & (mask | mvienVal)));
       recordWrite(CsrNumber::MIP);
     }
-  else
-    mvip->write(value);
 
+  mvip->write(value);
   recordWrite(CsrNumber::MVIP);
+  return true;
+}
+
+
+template <typename URV>
+bool
+CsRegs<URV>::writeMvien(URV value)
+{
+  auto mvien = getImplementedCsr(CsrNumber::MVIEN);
+  mvien->write(value);
+  recordWrite(CsrNumber::MVIEN);
+
+  auto mip = getImplementedCsr(CsrNumber::MIP);
+  if (not mip)
+    return false;
+
+  URV b9 = URV(0x200);
+  URV mask = mvien->read() & b9;
+  // Bit 9 is read-only when MVIEN is set.
+  mip->setWriteMask((mip->getWriteMask() & ~b9) | ~mask);
   return true;
 }
 
@@ -1074,7 +1099,10 @@ CsRegs<URV>::enableSscofpmf(bool flag)
 	  }
       };
     }
+
+  updateLcofMask();
 }
+
 
 template <typename URV>
 void
@@ -1272,6 +1300,9 @@ CsRegs<URV>::enableAia(bool flag)
 	  csr->setImplemented(hflag);
 	}
     }
+
+  
+  updateLcofMask();
 }
 
 
@@ -1443,7 +1474,8 @@ CsRegs<URV>::writeSip(URV value)
   // Bits SGEIP, VSEIP, VSTIP, VSSIP are not writeable in SIE/SIP.
   sipMask &= ~ URV(0x1444);
 
-  // Where mideleg is 0 and mvien is 1, SIP becomes an alias to mvip.
+  // Where mideleg is 0 and mvien is 1, SIP becomes an alias to mvip. More
+  // importantly, mvip is a separate writable bit.
   // See AIA spec section 5.3.
   auto mvien = getImplementedCsr(CsrNumber::MVIEN);
   auto mvip = getImplementedCsr(CsrNumber::MVIP);
@@ -1452,6 +1484,7 @@ CsRegs<URV>::writeSip(URV value)
       URV mvipMask = mvien->read() & ~mideleg->read();
       sipMask &= ~ mvipMask;  // Don't write SIP where SIP is an alias to mvip.
       mvip->write((mvip->read() & ~mvipMask) | (value & mvipMask)); // Write mvip instead.
+      recordWrite(CN::MVIP);
     }
 
   sip->setWriteMask(sipMask);
@@ -1459,6 +1492,11 @@ CsRegs<URV>::writeSip(URV value)
   sip->setWriteMask(prevSipMask);
 
   recordWrite(CN::SIP);
+
+  // Write to sip may alias mvip when mideleg is 1 and mvien is 0.
+  // In this case, we write sip/mip and mvip is not a separate
+  // writable bit.
+  updateVirtInterrupt();
   return true;
 }
 
@@ -1987,6 +2025,8 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
     return writeSie(value);
   if (num == CN::MVIP)
     return writeMvip(value);
+  if (num == CN::MVIEN)
+    return writeMvien(value);
 
   if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
     return writeSstateen(num, value);
@@ -3300,7 +3340,7 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("mtopei",     CN::MTOPEI,     !mand, !imp, 0, wam, wam);
   defineCsr("mtopi",      CN::MTOPI,      !mand, !imp, 0, wam, wam);
   
-  URV mask = 0b10'0000'0010;  // Bits 9 and 1 (SEI, SSI).
+  URV mask = 0b10'0010'0000'0010;  // Bits 13, 9, and 1 (LCOFI, SEI, SSI).
   defineCsr("mvien",      CN::MVIEN,      !mand, !imp, 0, mask, mask);
 
   defineCsr("mvip",       CN::MVIP,       !mand, !imp, 0, mask, mask);
@@ -5292,6 +5332,58 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode pm, bool vm) const
   if (rv32_) enableBit -= 8*sizeof(URV);
   URV value = csr->read();
   return (value >> enableBit) & 1;
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::updateLcofMask()
+{
+  using CN = CsrNumber;
+
+  bool lcofOn = mcdelegEnabled_ and cofEnabled_ and aiaEnabled_;
+  URV lcofMask = URV(1) << URV(InterruptCause::LCOF);
+
+  for ( auto csrn : { CN::MVIP, CN::MVIEN } )
+    {
+      auto csr = getImplementedCsr(csrn);
+      if (csr)
+	{
+	  if (lcofOn)
+	    {
+	      // SET LCOF bit in in write mask (enable wrting).
+	      csr->setWriteMask((csr->getWriteMask() | lcofMask));
+	    }
+	  else
+	    {
+	      // Clear LCOF bit in value and in mask (disable writing).
+	      csr->poke(csr->read() & ~lcofMask);
+	      csr->setWriteMask((csr->getWriteMask() & ~lcofMask));
+	    }
+	}
+    }
+
+  if (not hyperEnabled_)
+    return;
+
+  for ( auto csrn : { CN::HVIP, CN::HVIEN, CN::VSIE, CN::VSIP } )
+    {
+      auto csr = getImplementedCsr(csrn);
+      if (csr)
+	{
+	  if (lcofOn)
+	    {
+	      // SET LCOF bit in in write mask (enable wrting).
+	      csr->setWriteMask((csr->getWriteMask() | lcofMask));
+	    }
+	  else
+	    {
+	      // Clear LCOF bit in value and in mask (disable writing).
+	      csr->poke(csr->read() & ~lcofMask);
+	      csr->setWriteMask((csr->getWriteMask() & ~lcofMask));
+	    }
+	}
+    }
 }
 
 

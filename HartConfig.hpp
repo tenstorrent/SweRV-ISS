@@ -78,7 +78,7 @@ namespace WdRiscv
     template<typename URV>
     bool configAclint(System<URV>&, Hart<URV>&, uint64_t aclintStart, uint64_t aclintSize,
                       uint64_t mswiOffset, bool hasMswi,
-                      uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
+                      uint64_t mtimeCmpOffset, uint64_t mtimeOffset, bool hasMtimer,
 		      bool siOnReset = false, bool deliverInterrupts = true) const;
 
     template<typename URV>

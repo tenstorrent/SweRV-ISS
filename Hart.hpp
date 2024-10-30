@@ -674,7 +674,7 @@ namespace WdRiscv
 
     /// Define memory mapped locations for CLINT.
     void configAclint(uint64_t base, uint64_t size, uint64_t mswiOffset, bool hasMswi,
-                      uint64_t mtimerOffset, uint64_t mtimeOffset, bool hasMtimer,
+                      uint64_t mtimeCmpOffset, uint64_t mtimeOffset, bool hasMtimer,
 		      bool softwareInterruptOnReset, bool deliverInterrupts,
                       std::function<Hart<URV>*(unsigned ix)> indexToHart)
     {
@@ -689,8 +689,8 @@ namespace WdRiscv
 
       if (hasMtimer)
         {
-          aclintMtimerStart_ = mtimerOffset;
-          aclintMtimerEnd_ = mtimerOffset + 0x8000;
+          aclintMtimeCmpStart_ = mtimeCmpOffset;
+          aclintMtimeCmpEnd_ = mtimeCmpOffset + 0x8000;
           aclintMtimeStart_ = mtimeOffset;
           aclintMtimeEnd_ = mtimeOffset + 0x8;
         }
@@ -831,16 +831,24 @@ namespace WdRiscv
     bool getSeiPin() const
     { return seiPin_; }
 
-    /// Peek MIP/SIP and modify by supervisor external interrupt pin. This is
-    /// OR-ed when mvien does not exist or is set to zero. Otherwise,
+    /// Peek MIP/SIP and modify by supervisor external interrupt pin and mvip.
+    /// This is OR-ed when mvien does not exist or is set to zero. Otherwise,
     /// the value of SEIP is solely the value of the pin.
-    URV overrideWithSeiPin(URV ip) const
+    URV overrideWithSeiPinAndMvip(URV ip) const
     {
+      if (not isRvs())
+        return ip;
+
       if (isRvaia())
         {
           URV mvien = csRegs_.peekMvien();
           if (mvien >> URV(InterruptCause::S_EXTERNAL) & 1)
             ip &= ~URV(1 << URV(InterruptCause::S_EXTERNAL));
+          else
+            {
+              URV mvip = csRegs_.peekMvip();
+              ip |= mvip & URV(1 << URV(InterruptCause::S_EXTERNAL));
+            }
         }
       return ip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
     }
@@ -1207,7 +1215,11 @@ namespace WdRiscv
     /// Enable debug-triggers. Without this, triggers will not trip and will not cause
     /// exceptions.
     void enableTriggers(bool flag)
-    { enableTriggers_ = flag; csRegs_.enableTriggers(flag);  }
+    {
+      enableTriggers_ = flag;
+      csRegs_.enableTriggers(flag);
+      updateCachedTriggerState();
+    }
 
     /// Enable performance counters (count up for some enabled performance counters when
     /// their events do occur).
@@ -2178,12 +2190,13 @@ namespace WdRiscv
     bool hasAclint() const
     { return aclintSize_ > 0; }
 
-    /// Set the ACLINT alarm to the given value.
-    bool hasAclintTimer(uint64_t& addr) const
+    /// Return true if hart has a set of time-compare addresses setting addr
+    /// to the their base address.
+    bool hasAclintTimeCompare(uint64_t& addr) const
     {
-      if (aclintMtimerStart_ < aclintMtimerEnd_)
+      if (aclintMtimeCmpStart_ < aclintMtimeCmpEnd_)
 	{
-	  addr = aclintMtimerStart_;
+	  addr = aclintMtimeCmpStart_;
 	  return true;
 	}
       return false;
@@ -2893,12 +2906,21 @@ namespace WdRiscv
 
     /// Return true if this hart has one or more active debug triggers.
     bool hasActiveTrigger() const
-    { return (enableTriggers_ and csRegs_.hasActiveTrigger()); }
+    { return activeTrig_; }
 
     /// Return true if this hart has one or more active debug instruction (execute)
     /// triggers.
     bool hasActiveInstTrigger() const
-    { return (enableTriggers_ and csRegs_.hasActiveInstTrigger()); }
+    { return activeInstTrig_; }
+
+    /// Called on reset, when we enter/exit debug, and when a CSR is written
+    /// to update hasActiveTrigger_/hasActiveInstTrigger_;
+    void updateCachedTriggerState()
+    {
+      bool on = enableTriggers_ and not debugMode_;
+      activeTrig_ =  on and  csRegs_.hasActiveTrigger();
+      activeInstTrig_ = on and csRegs_.hasActiveInstTrigger();
+    }
 
     /// Collect instruction stats (for instruction profile and/or
     /// performance monitors).
@@ -5172,8 +5194,8 @@ namespace WdRiscv
     uint64_t aclintSize_ = 0;
     uint64_t aclintSwStart_ = 0;
     uint64_t aclintSwEnd_ = 0;
-    uint64_t aclintMtimerStart_ = 0;
-    uint64_t aclintMtimerEnd_ = 0;
+    uint64_t aclintMtimeCmpStart_ = 0;
+    uint64_t aclintMtimeCmpEnd_ = 0;
     uint64_t aclintMtimeStart_ = 0;
     uint64_t aclintMtimeEnd_ = 0;
     uint64_t aclintAlarm_ = ~uint64_t(0); // Interrupt when timer >= this
@@ -5240,6 +5262,8 @@ namespace WdRiscv
     bool instFreq_ = false;         // Collection instruction frequencies.
     bool enableCounters_ = false;   // Enable performance monitors.
     bool enableTriggers_ = false;   // Enable debug triggers.
+    bool activeTrig_ = false;       // True if data triggers should be evaulated.
+    bool activeInstTrig_ = false;   // True if instruction triggers should be evaluated.
     bool enableGdb_ = false;        // Enable gdb mode.
     int gdbTcpPort_ = -1;           // Enable gdb mode.
     bool newlib_ = false;           // Enable newlib system calls.
@@ -5283,7 +5307,7 @@ namespace WdRiscv
     VirtMem::Mode lastVsPageMode_ = VirtMem::Mode::Bare;
     VirtMem::Mode lastPageModeStage2_ = VirtMem::Mode::Bare;
 
-    bool debugMode_ = false;         // True on debug mode.
+    bool debugMode_ = false;         // True when in debug mode.
     bool dcsrStepIe_ = false;        // True if stepie bit set in dcsr.
     bool dcsrStep_ = false;          // True if step bit set in dcsr.
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.

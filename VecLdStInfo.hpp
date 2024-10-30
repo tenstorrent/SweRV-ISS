@@ -65,7 +65,7 @@ namespace WdRiscv
       vec_ = vecReg;
       group_ = group;
       isLoad_ = isLoad;
-      
+
       isIndexed_ = false;
       isSegmented_ = false;
 
@@ -118,6 +118,11 @@ namespace WdRiscv
       assert(not elems_.empty());
       elems_.resize(elems_.size() - 1);
     }
+
+    /// Returns true if all elements were skipped (mask or tail).
+    bool allSkipped() const
+    { return std::all_of(elems_.begin(), elems_.end(),
+                         [] (const auto& elem) { return elem.skip_; }); }
 
     unsigned elemCount_ = 0;          // VL, elems with ix >= elemCount_ are tail elems.
     unsigned elemSize_ = 0;           // Elem size in bytes.

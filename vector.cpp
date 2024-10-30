@@ -3881,7 +3881,7 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
   GroupMultiplier v2gm = GroupMultiplier::One;
   if (not VecRegs::groupNumberX8ToSymbol(v2Group, v2gm) or
       not vecRegs_.legalConfig(ElementWidth::Half, v2gm) or
-      (masked and vd == 0))
+      (masked and (vd == 0 or vs1 == 0 or vs2 == 0)))
     {
       postVecFail(di);
       return;
@@ -4475,9 +4475,6 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
       return;
     }
 
-  if (start >= vecRegs_.elemCount())
-    return;
-
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned bitsPerReg = vecRegs_.bitsPerRegister();
@@ -4488,6 +4485,9 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
       postVecFail(di);
       return;
     }
+
+  if (start >= vecRegs_.elemCount())
+    return;
 
   bool found = false;  // true if set bit is found in vs1
 
@@ -4521,9 +4521,6 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
       return;
     }
 
-  if (start >= vecRegs_.elemCount())
-    return;
-
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned bitsPerReg = vecRegs_.bitsPerRegister();
@@ -4534,6 +4531,9 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
       postVecFail(di);
       return;
     }
+
+  if (start >= vecRegs_.elemCount())
+    return;
 
   bool found = false;  // true if set bit is found in vs1
 
@@ -4567,9 +4567,6 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
       return;
     }
 
-  if (start >= vecRegs_.elemCount())
-    return;
-
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned bitsPerReg = vecRegs_.bitsPerRegister();
@@ -4580,6 +4577,9 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
       postVecFail(di);
       return;
     }
+
+  if (start >= vecRegs_.elemCount())
+    return;
 
   // True if masked-off elements should be set to 1.
   bool ones = vecRegs_.isMaskAgnostic() and vecRegs_.isMaskAgnosticOnes();
@@ -9164,7 +9164,8 @@ Hart<URV>::execVmv1r_v(const DecodedInst* di)
   unsigned bytes = vecRegs_.bytesPerRegister();
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = bytes / vecRegs_.elemWidthInBytes(vecRegs_.elemWidth());
+  unsigned bytesPerElem = vecRegs_.elemWidthInBytes(vecRegs_.elemWidth());
+  unsigned elems = bytes / bytesPerElem;
   if (start >= elems)
     return;
 
@@ -9172,6 +9173,10 @@ Hart<URV>::execVmv1r_v(const DecodedInst* di)
   uint8_t* source = vecRegs_.getVecData(vs1);
   assert(dest);
   assert(source);
+
+  dest += start*bytesPerElem;
+  source += start*bytesPerElem;
+  bytes -= start*bytesPerElem;
 
   memcpy(dest, source, bytes);
 
@@ -9206,7 +9211,8 @@ Hart<URV>::execVmv2r_v(const DecodedInst* di)
   unsigned bytes = vecRegs_.bytesPerRegister() * 2;
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = bytes / vecRegs_.elemWidthInBytes(vecRegs_.elemWidth());
+  unsigned bytesPerElem = vecRegs_.elemWidthInBytes(vecRegs_.elemWidth());
+  unsigned elems = bytes / bytesPerElem;
   if (start >= elems)
     return;
 
@@ -9214,6 +9220,10 @@ Hart<URV>::execVmv2r_v(const DecodedInst* di)
   uint8_t* source = vecRegs_.getVecData(vs1);
   assert(dest);
   assert(source);
+
+  dest += start*bytesPerElem;
+  source += start*bytesPerElem;
+  bytes -= start*bytesPerElem;
 
   memcpy(dest, source, bytes);
 
@@ -9248,7 +9258,8 @@ Hart<URV>::execVmv4r_v(const DecodedInst* di)
   unsigned bytes = vecRegs_.bytesPerRegister() * 4;
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = bytes / vecRegs_.elemWidthInBytes(vecRegs_.elemWidth());
+  unsigned bytesPerElem = vecRegs_.elemWidthInBytes(vecRegs_.elemWidth());
+  unsigned elems = bytes / bytesPerElem;
   if (start >= elems)
     return;
 
@@ -9256,6 +9267,10 @@ Hart<URV>::execVmv4r_v(const DecodedInst* di)
   uint8_t* source = vecRegs_.getVecData(vs1);
   assert(dest);
   assert(source);
+
+  dest += start*bytesPerElem;
+  source += start*bytesPerElem;
+  bytes -= start*bytesPerElem;
 
   memcpy(dest, source, bytes);
 
@@ -9290,7 +9305,8 @@ Hart<URV>::execVmv8r_v(const DecodedInst* di)
   unsigned bytes = vecRegs_.bytesPerRegister()*8;
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = bytes / vecRegs_.elemWidthInBytes(vecRegs_.elemWidth());
+  unsigned bytesPerElem = vecRegs_.elemWidthInBytes(vecRegs_.elemWidth());
+  unsigned elems = bytes / bytesPerElem;
   if (start >= elems)
     return;
 
@@ -9298,6 +9314,10 @@ Hart<URV>::execVmv8r_v(const DecodedInst* di)
   uint8_t* source = vecRegs_.getVecData(vs1);
   assert(dest);
   assert(source);
+
+  dest += start*bytesPerElem;
+  source += start*bytesPerElem;
+  bytes -= start*bytesPerElem;
 
   memcpy(dest, source, bytes);
 

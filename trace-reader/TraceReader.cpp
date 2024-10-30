@@ -315,26 +315,34 @@ TraceRecord::print(std::ostream& os) const
 
   if (not ipteAddrs.empty())
     {
-      const char* sep = "";
-      os << "  ipte addrs:";
-      for (auto addr : ipteAddrs)
+      os << "  ipte addrs:\n";
+      for (const auto& [key, val] : ipteAddrs)
         {
-          os << sep << " " << addr;
-          sep = ",";
+          const char* sep = "";
+          os << "   " << std::hex << key << ":";
+          for (auto addr : val)
+            {
+              os << sep << " " << addr;
+              sep = ",";
+            }
+          os << '\n';
         }
-      os << '\n';
     }
 
   if (not dpteAddrs.empty())
     {
-      const char* sep = "";
-      os << "  dpte addrs:";
-      for (auto addr : dpteAddrs)
+      os << "  dpte addrs:\n";
+      for (const auto& [key, val] : dpteAddrs)
         {
-          os << sep << " " << addr;
-          sep = ",";
+          const char* sep = "";
+          os << "   " << std::hex << key << ":";
+          for (auto addr : val)
+            {
+              os << sep << " " << addr;
+              sep = ",";
+            }
+          os << '\n';
         }
-      os << '\n';
     }
 }
 
@@ -929,12 +937,16 @@ TraceReader::parseLine(std::string& line, uint64_t lineNum, TraceRecord& record)
       char* ptw = fields_.at(ix);
       if (*ptw)
         {
+          uint64_t va = 0;
           mySplit(subfields_, ptw, ';');
           for (const auto& addr : subfields_)
             {
 	      mySplit(keyvals_, addr, '=');
               if (keyvals_.size() == 1)
-                continue;
+                {
+                  va = hexStrToNum(keyvals_.at(0));
+                  continue;
+                }
               if (strcmp(keyvals_.at(0), "ma") == 0)
                 continue;
               if (keyvals_.size() > 2)
@@ -943,7 +955,7 @@ TraceReader::parseLine(std::string& line, uint64_t lineNum, TraceRecord& record)
 			    << ", expecting: <addr>=<pte> or <addr>\n";
                   return false;
                 }
-              record.ipteAddrs.push_back(hexStrToNum(keyvals_.at(0)));
+              record.ipteAddrs[va].push_back(hexStrToNum(keyvals_.at(0)));
             }
         }
     }
@@ -955,12 +967,16 @@ TraceReader::parseLine(std::string& line, uint64_t lineNum, TraceRecord& record)
       char* ptw = fields_.at(ix);
       if (*ptw)
         {
+          uint64_t va = 0;
           mySplit(subfields_, ptw, ';');
           for (const auto& addr : subfields_)
             {
 	      mySplit(keyvals_, addr, '=');
               if (keyvals_.size() == 1)
-                continue;
+                {
+                  va = hexStrToNum(keyvals_.at(0));
+                  continue;
+                }
               if (strcmp(keyvals_.at(0), "ma") == 0)
                 continue;
               if (keyvals_.size() > 2)
@@ -969,7 +985,7 @@ TraceReader::parseLine(std::string& line, uint64_t lineNum, TraceRecord& record)
 			    << ", expecting: <addr>=<pte> or <addr>\n";
                   return false;
                 }
-              record.dpteAddrs.push_back(hexStrToNum(keyvals_.at(0)));
+              record.dpteAddrs[va].push_back(hexStrToNum(keyvals_.at(0)));
             }
         }
     }
