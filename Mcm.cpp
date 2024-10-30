@@ -923,6 +923,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	  op.size_ = 8;
 	  op.isRead_ = false;
 	  op.bypass_ = true;
+	  op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
 
 	  // Associate write op with instruction.
 	  instr->addMemOp(sysMemOps_.size());
@@ -942,6 +943,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
       op.size_ = size;
       op.isRead_ = false;
       op.bypass_ = true;
+      op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
 
       // Associate write op with instruction.
       instr->addMemOp(sysMemOps_.size());
