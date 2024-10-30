@@ -1812,8 +1812,7 @@ Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
     {
       if (isAclintMtimeAddr(pa))
 	{
-	  val = time_;
-	  val = val >> (pa - 0xbff8) * 8;
+	  val = getTime();
 	  return;
 	}
       memRead(pa, pa, val);
@@ -2250,10 +2249,10 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
         }
       return;  // Timer.
     }
-  else if (addr >= aclintMtimerStart_ and addr < aclintMtimerEnd_)
+  else if (addr >= aclintMtimeCmpStart_ and addr < aclintMtimeCmpEnd_)
     {
       // don't expect software to modify clint alarm from two different harts
-      unsigned hartIx = (addr - aclintMtimerStart_) / 8;
+      unsigned hartIx = (addr - aclintMtimeCmpStart_) / 8;
       auto hart = indexToHart_(hartIx);
       if (hart and (stSize == 4 or stSize == 8))
 	{
