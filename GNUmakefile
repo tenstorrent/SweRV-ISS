@@ -179,7 +179,7 @@ $(soft_float_lib):
 	$(MAKE) -C $(soft_float_build)
 
 $(pci_lib):
-	$(MAKE) -C $(pci_build)
+	$(MAKE) -C $(pci_build) CXX=$(CXX)
 
 $(trace_reader_lib):
 	$(MAKE) -C $(trace_reader_build)
