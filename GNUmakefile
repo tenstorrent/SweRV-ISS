@@ -100,13 +100,16 @@ BUILD_DIR := build-$(shell uname -s)
 MKDIR_P ?= mkdir -p
 RM := rm -rf
 # Optimization flags.  Use -g for debug.
-OFLAGS := -O3
+OFLAGS ?= -O3
 
 # Include paths.
 IFLAGS := $(addprefix -isystem ,$(BOOST_INC)) -isystem third_party -I.
 
+CXX_STD ?= c++20
+
 # Command to compile .cpp files.
-override CXXFLAGS += -MMD -MP $(ARCH_FLAGS) -std=c++20 $(OFLAGS) $(IFLAGS) -fPIC -pedantic -Wall -Wextra -Wformat -Wwrite-strings
+override CXXFLAGS += -MMD -MP $(ARCH_FLAGS) -std=$(CXX_STD) $(OFLAGS) $(IFLAGS)
+override CXXFLAGS += -fPIC -pedantic -Wall -Wextra -Wformat -Wwrite-strings
 
 # Rule to make a .o from a .cpp file.
 $(BUILD_DIR)/%.cpp.o:  %.cpp
