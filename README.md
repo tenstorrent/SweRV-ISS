@@ -31,14 +31,13 @@ Whisper
 
 # Introduction
 
-Whisper is a RISCV instruction set simulator (ISS) developed for the
-verification of the Swerv micro-controller. It allows the user to run
-RISCV code without RISCV hardware. It has an interactive mode where
-the user can single step the target RISCV code and inspect/modify the
-RISCV registers or the simulated system memory. It can also run in
-lock step with a Verilog simulator serving as a "golden model" against
-which an implementation is checked after each instruction of a test
-program.
+Whisper is a RISCV instruction set simulator (ISS) initially developed for the
+verification of the Swerv micro-controller. It allows the user to run RISCV code
+without RISCV hardware. It has an interactive mode where the user can single
+step the target RISCV code and inspect/modify the RISCV registers or the
+simulated system memory. It can also run in lock step with a Verilog simulator
+serving as a "golden model" against which an implementation is checked after
+each instruction of a test program.
 
 <a name="Requirements"/>
 
@@ -93,7 +92,7 @@ where x is the path to your boost library installation.
 
 There are various Makefile options that can be used.
 
-+ `SOFT_FLOAT=1` to use softfloat for RISCV fp operations.
++ `SOFT_FLOAT=1` to use the soft-float library for RISCV floating point operations.
 + `PCI=1` to build the PCI library.
 + `TRACE_READER=1` to build the trace reader library.
 + `MEM_CALLBACKS=1` to use the sparse memory model.
@@ -186,7 +185,7 @@ default memory address range:
 
 ```
     $ riscv64-unknown-elf-gcc -mabi=lp64 -march=rv64imc -nostdlib -g -o test2 test2.c
-    $ whisper test2   # this will carsh
+    $ whisper test2   # this will crash
     $ whisper test2  --setreg sp=0xf0000000   # this will run
 ``` 
 
@@ -565,7 +564,6 @@ C++ style comments are ignored when the file is parsed.
 Here is a sample configuration file:
 ```
     {
-        "xlen" : 32,
         "isa" : "rv32imafd_zfh_zba_zbb_zbc_sbs",
         "abi_names" : "true",
     
@@ -755,7 +753,7 @@ Example:
 ```
 
 ###  aclint
-The advanced core local interrup controller (aclint) configuration is an object with the following fields:
+The advanced core local interrupt controller (aclint) configuration is an object with the following fields:
 * base: base address of the memory area associated with the ACLINT.
 * sw_offset: offset to software interrupt region within the ACLINT area).
 * timer_offset: offset to timer within the ACLINT area.
@@ -915,7 +913,7 @@ system. The interactive command for a merge buffer write is:
    time=<time-stamp> hart=<id> mbwrite <addr> <data>
 ```
 Similarly, we provide server mode commands that allows a client
-(typically test bench code running in a verilog simulator) to provide
+(typically test bench code running in a Verilog simulator) to provide
 whisper information about the time, hart-id, size, instruction tag and
 data of read/write operations associated with load/store/amo
 instructions. We use such information to check the preserved program
