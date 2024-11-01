@@ -1122,6 +1122,8 @@ Hart<URV>::execAddi(const DecodedInst* di)
     throw CoreException(CoreException::Stop, "Stopping run from HINT.");
   if (di->op0() == 0 and di->op1() == 29)
     throw CoreException(CoreException::SnapshotAndStop, "Taking snapshot and stopping run from HINT.");
+  if (di->op0() == 0 and di->op1() == 26)
+    std::cerr << "Executed instructions: " << instCounter_ << "\n";
 #endif
 }
 
