@@ -324,8 +324,9 @@ CsRegs<URV>::readMvip(URV& value) const
       // Bit STIE (5) of MVIP is an alias to bit 5 of MIP if bit 5 of MIP is writable.
       // Othrwise, it is zero.
       mask = URV(0x20);  // Bit 5
+      value &= ~mask;  // Clear bit 5.
       if ((mip->getWriteMask() & mask) != 0)   // Bit 5 writable in mip
-	value = (value & ~mask) | (mip->read() & mask);
+	value |= (mip->read() & mask);  // Set bit 5 to that of mip
     }
 
   return true;
