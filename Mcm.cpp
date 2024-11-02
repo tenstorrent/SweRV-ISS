@@ -3687,8 +3687,8 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
   if (fences.empty())
     return true;
 
-  // Collect all instructions out of order with respect to B.
-  std::vector<McmInstrIx> reordered;
+  // Collect all memory ops out of order with respect to B.
+  std::vector<const MemoryOp*> reordered;
   for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
       const auto& op = *iter;
@@ -3696,10 +3696,14 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
 	continue;
       if (op.time_ < earlyB)
 	break;
-      reordered.push_back(op.tag_);
+      reordered.push_back(&op);
     }
   if (reordered.empty())
     return true;
+
+  auto& succ = instrB;
+  auto succTime = effectiveMinTime(succ);
+  Pma succPma = hart.getPma(succ.physAddr_);
 
   for (auto fenceTag : fences)
     {
@@ -3713,21 +3717,22 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
       bool succIn = fence.di_.isFencePredInput();
       bool succOut = fence.di_.isFencePredOutput();
 
-      for (auto aTag : reordered)
+      // We assume that stores following a fence in program order cannot drain before
+      // fence is retired.
+      if (succ.isStore_ and earlyB <= fence.retireTime_)
 	{
-	  const auto& pred = instrVec.at(aTag);
+	  cerr << "Error: PPO rule 4 failed: Hart-id=" << hart.hartId() << " tag="
+	       << succ.tag_ << " fence-tag= " << fence.tag_ << " store instruction "
+	       << "drains before preceding fence instruction retires\n";
+	  return false;
+	}
+
+      for (auto aOpPtr : reordered)
+	{
+	  const auto& aOp = *aOpPtr;
+	  const auto& pred = instrVec.at(aOp.tag_);
 	  if (pred.isCanceled() or not pred.isMemory() or pred.tag_ > fence.tag_)
 	    continue;
-
-	  // We assume that stores following a fence in program order cannot drain before
-	  // fence is retired.
-	  if (instrB.isStore_ and earlyB <= fence.retireTime_)
-	    {
-	      cerr << "Error: PPO rule 4 failed: Hart-id=" << hart.hartId() << " tag="
-		   << instrB.tag_ << " fence-tag= " << fence.tag_ << " store instruction "
-		   << "drains before preceding fence instruction retires\n";
-	      return false;
-	    }
 
 	  Pma predPma = hart.getPma(pred.physAddr_);
 
@@ -3736,9 +3741,6 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
 	      and not (predIn and pred.isLoad_ and predPma.isIo())
 	      and not (predOut and pred.isStore_ and predPma.isIo()))
 	    continue;
-
-	  const McmInstr& succ = instrB;
-	  Pma succPma = hart.getPma(succ.physAddr_);
 
 	  if (not (succRead and succ.isLoad_)
 	      and not (succWrite and succ.isStore_)
@@ -3754,20 +3756,29 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
 	      return false;
 	    }
 
-	  auto predTime = latestOpTime(pred);
-	  auto succTime = effectiveMinTime(succ);
-
+	  auto predTime = aOp.time_;
 	  if (predTime < succTime)
 	    continue;
 
 	  // Successor performs before predecessor -- Allow if successor is a load and
-	  // there is no store from another core to the same cache line in between the
-	  // predecessor and successor time.
+	  // there is no store from another core to the same cache line.
 	  if (not succ.isStore_)
 	    {
-	      uint64_t predLine = lineNum(pred.physAddr_);
-	      uint64_t succLine = lineNum(succ.physAddr_);
-	      if (predLine != succLine)
+	      uint64_t predLine = lineNum(aOp.pa_);
+	      bool match = false;
+	      for (auto bOpIx : succ.memOps_)
+		{
+		  auto bOp = sysMemOps_.at(bOpIx);
+		  auto bOpTime = std::max(bOp.time_, bOp.forwardTime_);
+		  match = lineNum(bOp.pa_) == predLine and bOpTime <= predTime;
+		  if (match)
+		    {
+		      succTime = bOpTime;
+		      break;
+		    }
+		}
+
+	      if (not match)
 		continue;
 
 	      auto low = std::lower_bound(sysMemOps_.begin(), sysMemOps_.end(), succTime,
@@ -3783,8 +3794,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
 		{
 		  auto& op = *iter;
 		  fail = (not op.isRead_ and op.time_ >= succTime and op.time_ <= predTime
-			  and op.hartIx_ != hartIx
-			  and lineNum(op.pa_) == succLine);
+			  and op.hartIx_ != hartIx and lineNum(op.pa_) == predLine);
 		}
 	      if (not fail)
 		continue;
@@ -3793,7 +3803,8 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
 	  cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
 	       << " tag1=" << pred.tag_ << " tag2=" << succ.tag_
 	       << " fence-tag=" << fence.tag_
-	       << " time1=" << predTime << " time2=" << succTime << '\n';
+	       << " time1=" << predTime << " time2=" << succTime
+	       << " pa=0x" << std::hex << aOp.pa_ << std::dec << '\n';
 	  return false;
 	}
     }
