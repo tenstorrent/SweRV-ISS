@@ -403,8 +403,14 @@ namespace WdRiscv
       return pma;
     }
 
-    /// Return page based memory type of last translation, only
-    /// applicable if translation was successful.
+    /// Return true if given PTE is valid: Valid bit is one, reserved bits all zero, and
+    /// combintation of read/write/execute bits is not reserved.
+    template <typename PTE>
+    bool isValidPte(PTE& pte) const
+    { return pte.valid()  and  (pte.read() or not pte.write())  and  not pte.reserved(); }
+
+    /// Return page based memory type of last translation, only applicable if translation
+    /// was successful.
     Pbmt lastPbmt() const
     { return pbmt_; }
 
@@ -502,8 +508,8 @@ namespace WdRiscv
 
     /// Helper to translate methods: Page table walk version 1.12.
     template <typename PTE, typename VA>
-    ExceptionCause pageTableWalk1p12(uint64_t va, PrivilegeMode pm, bool read, bool write,
-				     bool exec, uint64_t& pa, TlbEntry& tlbEntry);
+    ExceptionCause pageTableWalk(uint64_t va, PrivilegeMode pm, bool read, bool write,
+				 bool exec, uint64_t& pa, TlbEntry& tlbEntry);
 
     /// Page table walk version 1.12 for the G stage of 2-stage
     /// address translation.

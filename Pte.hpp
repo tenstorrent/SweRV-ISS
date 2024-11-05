@@ -93,7 +93,7 @@ namespace WdRiscv
     void setPpn0(unsigned v) { bits_.ppn0_ = v; }
 
     /// Return reserved bits value. NA for Sv32.
-    static constexpr uint64_t res()   { return 0; }
+    static constexpr uint64_t reserved()   { return 0; }
 
     /// Number of levels of an Sv32 PTE.
     static constexpr uint32_t levels() { return 2; }
@@ -216,7 +216,7 @@ namespace WdRiscv
     void setPpn0(unsigned v) { bits_.ppn0_ = v; }
 
     /// Return reserved bits value
-    uint64_t res() const    { return bits_.res_; }
+    uint64_t reserved() const    { return bits_.res_; }
 
     /// Number of levels of an Sv39 PTE.
     static uint32_t levels() { return 3; }
@@ -352,7 +352,7 @@ namespace WdRiscv
     void setPpn0(unsigned v) { bits_.ppn0_ = v; }
 
     /// Return reserved bits value
-    uint64_t res() const    { return bits_.res_; }
+    uint64_t reserved() const    { return bits_.res_; }
 
     /// Number of levels of an Sv48 PTE.
     static uint32_t levels() { return 4; }
@@ -496,7 +496,7 @@ namespace WdRiscv
     void setPpn0(unsigned v) { bits_.ppn0_ = v; }
 
     /// Return reserved bits value
-    uint64_t res() const    { return bits_.res_; }
+    uint64_t reserved() const    { return bits_.res_; }
 
     /// Number of levels of an Sv57 PTE.
     static uint32_t levels() { return 5; }

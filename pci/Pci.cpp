@@ -27,25 +27,24 @@ Pci::config_mmio(uint32_t addr, T& data, bool w)
   addr -= config_base_;
   auto format = address(addr);
 
-  auto slot = find_registered_device(format.bits.bus, format.bits.device, format.bits.function);
-  if (slot) {
-    if (w) {
-      slot->write_config<T>((format.bits.reg << 2) | format.bits.offset, data);
-      return;
+  auto dev = find_registered_device(format.bits.bus, format.bits.device,
+                                     format.bits.function);
+  if (dev)
+    {
+      if (w)
+        dev->write_config<T>((format.bits.reg << 2) | format.bits.offset, data);
+      else
+        dev->read_config<T>((format.bits.reg << 2) | format.bits.offset, data);
     }
-
-    data = -1;
-    slot->read_config<T>((format.bits.reg << 2) | format.bits.offset, data);
-  }
 }
 
 
 template <>
 void
-Pci::config_mmio<uint64_t>([[maybe_unused]] uint32_t addr, [[maybe_unused]] uint64_t& data, [[maybe_unused]] bool w)
-{
-  return;
-}
+Pci::config_mmio<uint64_t>([[maybe_unused]] uint32_t addr,
+                           [[maybe_unused]] uint64_t& data,
+                           [[maybe_unused]] bool w)
+{ return; }
 
 
 template <typename T>
@@ -55,106 +54,32 @@ Pci::mmio(uint32_t addr, T& data, bool w)
   if (addr < mmio_base_)
     return;
 
-  for (auto& mmio : mmio_) {
-      if ((mmio->base <= addr) and (addr < (mmio->base + mmio->size))) {
-        unsigned offset = addr - mmio->base;
-        uint8_t* p = (mmio->bytes + offset);
-        if (w) {
-          memcpy(p, &data, sizeof(T));
-          if (mmio->write_cb)
-            mmio->write_cb(offset, sizeof(T));
+  if (not w)
+    data = -1;
+
+  for (auto& mmio : mmio_)
+    {
+      if ((mmio->base_ <= addr) and (addr < (mmio->base_ + mmio->size_)))
+        {
+          unsigned offset = addr - mmio->base_;
+          uint8_t* p = (mmio->bytes_.data() + offset);
+          if (w)
+            {
+              if (mmio->write_dev_)
+                mmio->write_dev_(data, offset, sizeof(T));
+              else
+                memcpy(p, &data, sizeof(T));
+            }
+          else
+            {
+              if (mmio->read_dev_)
+                data = mmio->read_dev_(offset, sizeof(T));
+              else
+                memcpy(&data,  p, sizeof(T));
+            }
           return;
         }
-
-        data = -1;
-        uint64_t tmp;
-        if (mmio->read_cb and mmio->read_cb(offset, tmp)) {
-          data = tmp;
-          return;
-        }
-        memcpy(&data, p, sizeof(T));
-        return;
-      }
-  }
-}
-
-
-bool
-Pci::register_device(std::shared_ptr<PciDev> dev, unsigned bus, unsigned slot,
-                      const std::function<uint8_t*(uint64_t, size_t)>& map,
-                      const std::function<void(uint64_t, unsigned, uint64_t)>& write)
-{
-  if (bus >= buses_.size()) {
-    std::cerr << "bus location not instantiated" << std::endl;
-    return false;
-  }
-
-  if (slot >= buses_.at(bus).size()) {
-    std::cerr << "slot location not instantiated" << std::endl;
-    return false;
-  }
-
-  dev->memmap_ = map;
-  dev->msi_ = write;
-
-  buses_.at(bus).at(slot) = dev;
-  fixup_bars(dev);
-  if (not dev->setup()) {
-    std::cerr << "Failed to setup PCI device" << std::endl;
-    return false;
-  }
-
-  return true;
-}
-
-
-std::shared_ptr<PciDev>
-Pci::find_registered_device(unsigned bus, unsigned slot, unsigned function)
-{
-  if (bus >= buses_.size())
-    return nullptr;
-
-  auto& slots = buses_.at(bus);
-  if (slot >= slots.size())
-    return nullptr;
-
-  return (function == 0)? slots.at(slot) : nullptr;
-}
-
-
-bool
-Pci::fixup_bars(std::shared_ptr<PciDev> dev)
-{
-  if (not dev) {
-    std::cerr << "Fixup device does not exist" << std::endl;
-    return false;
-  }
-
-  for (unsigned bar = 0; bar < 6; bar++) {
-    uint32_t size = dev->bar_size(bar);
-    if (size) {
-      if ((mmio_eol_ + size - 1) < (mmio_base_ + mmio_len_)) {
-        // TODO: check for EOR
-        uint32_t base = (mmio_eol_ + size - 1) & ~(size - 1);
-        auto mmio_blocks = std::make_shared<PciDev::mmio_blocks>(base, size, dev->memmap());
-        mmio_.emplace_back(mmio_blocks);
-
-        // Assign MMIO region to BAR.
-        dev->header().bits.bar[bar] = base | PCI_BASE_ADDRESS_SPACE_MEMORY;
-        dev->bars().at(bar) = mmio_blocks;
-        dev->bar_eols().at(bar) = mmio_blocks->bytes;
-        mmio_eol_ = base + size;
-        continue;
-      }
-
-      std::cerr << "Ran out of MMIO memory" << std::endl;
-      return false;
     }
-
-    // Mark as unused.
-    dev->header().bits.bar[bar] = 0;
-  }
-  return true;
 }
 
 

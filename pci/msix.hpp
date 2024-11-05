@@ -29,15 +29,17 @@ namespace msix {
   // Allocate cap for MSIX, as well as corresponding msix and pba tables.
   template <typename T>
   bool allocate_cap(T& dev, unsigned num, cap*& cap_entry, uint32_t& cap_offset,
-                    msix_table_entry*& msix_table, pba_table_entry*& pba_table) {
+                    msix_table_entry*& msix_table, pba_table_entry*& pba_table)
+  {
     if (num == 0)
       return false;
 
     cap_entry = reinterpret_cast<cap*>(dev.template ask_header_blocks<uint32_t>(sizeof(cap), cap_offset));
-    if (not cap_entry) {
-      std::cerr << "No more space for MSIX cap entry" << std::endl;
-      return false;
-    }
+    if (not cap_entry)
+      {
+        std::cerr << "No more space for MSIX cap entry" << std::endl;
+        return false;
+      }
 
     cap_entry->cap = PCI_CAP_ID_MSIX;
     cap_entry->next = 0;
@@ -45,55 +47,62 @@ namespace msix {
 
     uint32_t msix_table_offset;
     msix_table = reinterpret_cast<msix_table_entry*>(dev.template ask_bar_blocks<uint64_t>(2, num*sizeof(msix_table_entry), msix_table_offset));
-    if (not msix_table) {
-      std::cerr << "No more space for MSIX table" << std::endl;
-      return false;
-    }
+    if (not msix_table)
+      {
+        std::cerr << "No more space for MSIX table" << std::endl;
+        return false;
+      }
 
     cap_entry->msix_table = msix_table_offset | 2;
 
     uint32_t pba_table_offset;
     unsigned num_pba_entries = (num - 1)/64 + 1;
     pba_table = reinterpret_cast<pba_table_entry*>(dev.template ask_bar_blocks<uint64_t>(2, num_pba_entries*sizeof(pba_table_entry), pba_table_offset));
-    if (not pba_table) {
-      std::cerr << "No more space for MSIX PBA table" << std::endl;
-      return false;
-    }
+    if (not pba_table)
+      {
+        std::cerr << "No more space for MSIX PBA table" << std::endl;
+        return false;
+      }
 
     cap_entry->pba_table = pba_table_offset | 2;
     return true;
   }
 
 
-  // TODO: cache this stuff
-  void check_interrupts(unsigned num, cap* cap_entry, msix_table_entry* msix_table, pba_table_entry* pba_table, std::vector<std::pair<uint64_t, uint16_t>>& msixs, bool clear) {
-    // TODO: need to mutex here?
+  // Updates pba table and indicate if msi should be signaled.
+  void update_interrupts(unsigned num, cap* cap_entry, msix_table_entry* msix_table, pba_table_entry* pba_table,
+                         std::vector<std::pair<uint64_t, uint16_t>>& msixs, bool clear) {
     constexpr unsigned pba_width = 8*sizeof(pba_table_entry);
 
     if (not (cap_entry->ctrl & PCI_MSIX_FLAGS_ENABLE) or (cap_entry->ctrl & PCI_MSIX_FLAGS_MASKALL))
       return;
 
-    for (unsigned i = 0; i < num; i += pba_width) {
-      auto& pba = pba_table[i/pba_width];
-
-      for (unsigned j = 0; j < pba_width; j++) {
-        unsigned irq = (pba.pending >> j) & 1;
-        if (irq) {
-          auto msix = msix_table[i*pba_width + j];
-          // When set to 0, generate message
-          if (not (msix.ctrl & PCI_MSIX_ENTRY_CTRL_MASKBIT)) {
-            msixs.emplace_back((uint64_t(msix.address_hi) << 32) | msix.address_lo, msix.data & 0xffff);
-            // clear out pending bit if it's sent out
-            pba.pending &= ~(uint64_t(clear) << j);
+    for (unsigned i = 0; i < num; i += pba_width)
+      {
+        auto& pba = pba_table[i/pba_width];
+        for (unsigned j = 0; j < pba_width; j++)
+          {
+            unsigned irq = (pba.pending >> j) & 1;
+            if (irq)
+              {
+                auto msix = msix_table[i*pba_width + j];
+                // When set to 0, generate message
+                if (not (msix.ctrl & PCI_MSIX_ENTRY_CTRL_MASKBIT))
+                  {
+                    msixs.emplace_back((uint64_t(msix.address_hi) << 32) |
+                                        msix.address_lo, msix.data & 0xffff);
+                    // clear out pending bit if it's sent out
+                    pba.pending &= ~(uint64_t(clear) << j);
+                  }
+              }
           }
-        }
       }
-    }
   }
 
 
   template <typename T>
-  void initialize_header(T& dev) {
+  void initialize_header(T& dev)
+  {
     if (not dev.bar_size(2))
       dev.set_bar_size(2, 0x1000);
     else

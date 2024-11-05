@@ -2674,7 +2674,7 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 
       // We cannot forward if last overlapping write drains before read.
       bool drained = false;
-      uint64_t lastWopTime = 0;
+      uint64_t lastWopTime = store.retireTime_;
       if (refCount == writeCount and writeCount != 0)
 	{
 	  const auto& lastWop = sysMemOps_.at(lastWopIx);
@@ -3385,8 +3385,9 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	      auto rot = remoteOp.time_;
 	      if (earlyB <= lateA and earlyB <= rot and rot <= lateA)
 		{
-		  cerr << "Error: PPO Rule 2 failed: tag1=" << instrA.tag_ << " tag2="
-		       << instrB.tag_ << " store-tag=" << remoteOp.tag_ << " store-hart="
+		  cerr << "Error: PPO Rule 2 failed: hart-id=" << hart.hartId()
+		       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_
+		       << " store-tag=" << remoteOp.tag_ << " store-hart="
 		       << unsigned(remoteOp.hartIx_) << " time1=" << lateA
 		       << " time2=" << earlyB << " store-time=" << remoteOp.time_
 		       << " addr=0x" << std::hex << addr << std::dec << '\n';
