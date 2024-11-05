@@ -119,21 +119,17 @@ class Virtio : public PciDev {
       uint64_t avail_addr;
       uint64_t used_addr;
       uint16_t last_avail_idx = 0;
-
-      // actual pointers to memory
-      struct descriptor* desc;
-      struct avail_ring* avail;
-      struct used_ring* used;
     };
 
     Virtio(unsigned subsys_id, unsigned class_code, unsigned num_queues);
 
-    virtual ~Virtio()
-    {};
+    virtual ~Virtio() = default;
 
     virtual bool setup();
+
     virtual void operator()(unsigned vq) = 0;
-    virtual void reset();
+
+    void reset();
 
     void interrupts();
 
@@ -154,11 +150,8 @@ class Virtio : public PciDev {
     void notify(unsigned vq)
     { (*this)(vq); }
 
-    template <typename T>
-    T* get_device_config()
-    { return reinterpret_cast<T*>(device_cfg_); }
-
     uint64_t features_;
+    uint8_t* device_cfg_;
 
   private:
 
@@ -179,7 +172,6 @@ class Virtio : public PciDev {
     cap* isr_cap_;
     uint32_t* isr_cfg_;
     cap* device_cap_;
-    uint8_t* device_cfg_;
 
     msix::cap* msix_cap_;
     msix::msix_table_entry* msix_table_;
