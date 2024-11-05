@@ -348,7 +348,7 @@ namespace WdRiscv
       unsigned CBIE      : 2;   // Bits 5:4
       unsigned CBCFE     : 1;   // Bit  6
       unsigned CBZE      : 1;   // Bit  7
-      unsigned reserved1 : 24;  // Bits 31:8
+      unsigned reserved2 : 24;  // Bits 31:8
     } bits_;
   };
 
@@ -394,10 +394,13 @@ namespace WdRiscv
     uint32_t value_; // MENVCFGH register value
     struct
     {
-      unsigned PMM : 2;
-      unsigned reserved0 : 28;
-      unsigned PBMTE : 1;
-      unsigned STCE : 1;
+      unsigned PMM       : 2;   // Bits 1:0
+      unsigned reserved2 : 21;  // Bits 22:2
+      unsigned SRMCFG    : 1;   // Bit  23
+      uint64_t reserved3 : 5;   // Bits 28:24
+      unsigned ADUE      : 1;   // Bit  29
+      unsigned PBMTE     : 1;   // Bit  30
+      unsigned STCE      : 1;   // Bit  31
     } bits_;
   };
 
@@ -415,12 +418,14 @@ namespace WdRiscv
     uint32_t value_; // SENVCFG register value
     struct
     {
-      unsigned FIOM : 1;
-      unsigned reserved0 : 3;
-      unsigned CBIE : 2;
-      unsigned CBCFE : 1;
-      unsigned CBZE : 1;
-      unsigned reserved1 : 24;
+      unsigned FIOM      : 1;  // Bit  0
+      unsigned reserved0 : 1;  // Bit  1
+      unsigned LPE       : 1;  // Bit  2
+      unsigned reserved1 : 1;  // Bit  3
+      unsigned CBIE      : 2;  // Bits 5:4
+      unsigned CBCFE     : 1;  // Bit  6
+      unsigned CBZE      : 1;  // Bit  7
+      unsigned reserved2 : 24; // Bits 31:8
     } bits_;
   };
 
@@ -434,14 +439,16 @@ namespace WdRiscv
     uint64_t value_; // SENVCFG register value
     struct
     {
-      unsigned FIOM : 1;
-      unsigned reserved0 : 3;
-      unsigned CBIE : 2;
-      unsigned CBCFE : 1;
-      unsigned CBZE : 1;
-      uint64_t reserved1 : 24;
-      unsigned PMM : 2;
-      uint64_t reserved2 : 30;
+      unsigned FIOM      : 1;  // Bit  0
+      unsigned reserved0 : 1;  // Bit  1
+      unsigned LPE       : 1;  // Bit  2
+      unsigned SSE       : 1;  // Bit  3
+      unsigned CBIE      : 2;  // Bits 5:4
+      unsigned CBCFE     : 1;  // Bit  6
+      unsigned CBZE      : 1;  // Bit  7
+      unsigned reserved1 : 24; // Bits 31:8
+      unsigned PMM       : 2;  // Bits 33:32
+      uint64_t reserved2 : 30; // Bits 63:34
     } bits_;
   };
 
@@ -459,11 +466,13 @@ namespace WdRiscv
     uint32_t value_; // HENVCFG register value
     struct
     {
-      unsigned FIOM : 1;
-      unsigned reserved0: 3;
-      unsigned CBIE : 2;
-      unsigned CBCFE : 1;
-      unsigned CBZE : 1;
+      unsigned FIOM      : 1;
+      unsigned reserved0 : 1;
+      unsigned LPE       : 1;
+      unsigned SSE       : 1;
+      unsigned CBIE      : 2;
+      unsigned CBCFE     : 1;
+      unsigned CBZE      : 1;
       unsigned reserved1 : 24;
     } bits_;
   };
@@ -478,17 +487,21 @@ namespace WdRiscv
     uint64_t value_; // HENVCFG register value
     struct
     {
-      unsigned FIOM : 1;
-      unsigned reserved0: 3;
-      unsigned CBIE : 2;
-      unsigned CBCFE : 1;
-      unsigned CBZE : 1;
-      uint64_t reserved1 : 24;
-      unsigned PMM : 2;
-      uint64_t reserved2 : 27;
-      unsigned ADUE : 1;
-      unsigned PBMTE : 1;
-      unsigned STCE : 1;
+      unsigned FIOM      : 1;
+      unsigned reserved0 : 1;
+      unsigned LPE       : 1;
+      unsigned SSE       : 1;
+      unsigned CBIE      : 2;
+      unsigned CBCFE     : 1;
+      unsigned CBZE      : 1;
+      unsigned reserved1 : 24;
+      unsigned PMM       : 2;
+      uint64_t reserved2 : 25;
+      unsigned DTE       : 1;
+      unsigned reserved3 : 1;
+      unsigned ADUE      : 1;
+      unsigned PBMTE     : 1;
+      unsigned STCE      : 1;
     } bits_;
   };
 
@@ -506,10 +519,13 @@ namespace WdRiscv
     uint32_t value_; // HENVCFGH register value
     struct
     {
-      unsigned PMM : 2;
-      unsigned reserved0 : 28;
-      unsigned PBMTE : 1;
-      unsigned STCE : 1;
+      unsigned PMM       : 2;
+      uint64_t reserved2 : 25;
+      unsigned DTE       : 1;
+      unsigned reserved3 : 1;
+      unsigned ADUE      : 1;
+      unsigned PBMTE     : 1;
+      unsigned STCE      : 1;
     } bits_;
   };
 

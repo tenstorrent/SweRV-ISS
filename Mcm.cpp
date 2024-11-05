@@ -2674,7 +2674,7 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
 
       // We cannot forward if last overlapping write drains before read.
       bool drained = false;
-      uint64_t lastWopTime = 0;
+      uint64_t lastWopTime = store.retireTime_;
       if (refCount == writeCount and writeCount != 0)
 	{
 	  const auto& lastWop = sysMemOps_.at(lastWopIx);
