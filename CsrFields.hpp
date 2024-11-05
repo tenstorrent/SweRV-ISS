@@ -341,12 +341,14 @@ namespace WdRiscv
     uint32_t value_; // MENVCFG register value
     struct
     {
-      unsigned FIOM : 1;
-      unsigned reserved0: 3;
-      unsigned CBIE : 2;
-      unsigned CBCFE : 1;
-      unsigned CBZE : 1;
-      unsigned reserved1 : 24;
+      unsigned FIOM      : 1;   // Bit  0
+      unsigned reserved0 : 1;   // Bit  1
+      unsigned LPE       : 1;   // Bit  2
+      unsigned SSE       : 1;   // Bit  3
+      unsigned CBIE      : 2;   // Bits 5:4
+      unsigned CBCFE     : 1;   // Bit  6
+      unsigned CBZE      : 1;   // Bit  7
+      unsigned reserved1 : 24;  // Bits 31:8
     } bits_;
   };
 
@@ -361,7 +363,9 @@ namespace WdRiscv
     struct
     {
       unsigned FIOM      : 1;   // Bit  0
-      unsigned reserved0 : 3;   // Bits 3:1
+      unsigned reserved0 : 1;   // Bit  1
+      unsigned LPE       : 1;   // Bit  2
+      unsigned SSE       : 1;   // Bit  3
       unsigned CBIE      : 2;   // Bits 5:4
       unsigned CBCFE     : 1;   // Bit  6
       unsigned CBZE      : 1;   // Bit  7
