@@ -301,7 +301,7 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
 
   // Perform a page table walk.
   if (mode_ == Mode::Sv32)
-    return pageTableWalk1p12<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
+    return pageTableWalk<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
 
   ExceptionCause (VirtMem::*walkFn)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
   unsigned vaMsb = 0;  // Most significant bit of va
@@ -309,17 +309,17 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
   if (mode_ == Mode::Sv39)
     {
       vaMsb = 38; // Bits 63 to 39 of va must equal bit 38
-      walkFn = &VirtMem::pageTableWalk1p12<Pte39, Va39>;
+      walkFn = &VirtMem::pageTableWalk<Pte39, Va39>;
     }
   else if (mode_ == Mode::Sv48)
     {
       vaMsb = 47; // Bits 63 to 48 of va must equal bit 47
-      walkFn = &VirtMem::pageTableWalk1p12<Pte48, Va48>;
+      walkFn = &VirtMem::pageTableWalk<Pte48, Va48>;
     }
   else if (mode_ == Mode::Sv57)
     {
       vaMsb = 56; // Bits 63 to 57 of va must equal bit 56
-      walkFn = &VirtMem::pageTableWalk1p12<Pte57, Va57>;
+      walkFn = &VirtMem::pageTableWalk<Pte57, Va57>;
     }
   else
     {
@@ -532,8 +532,8 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
 
 template<typename PTE, typename VA>
 ExceptionCause
-VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, bool write,
-			   bool exec, uint64_t& pa, TlbEntry& tlbEntry)
+VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool write,
+		       bool exec, uint64_t& pa, TlbEntry& tlbEntry)
 {
   // 1. Root is "a" in section 4.3.2 of the privileged spec, ii is "i" in that section.
   uint64_t root = rootPage_ * pageSize_;
@@ -583,7 +583,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
         return stage1PageFaultType(read, write, exec);
 
       // 3.
-      if (not pte.valid() or (not pte.read() and pte.write()) or pte.res())
+      if (not isValidPte(pte))
         return stage1PageFaultType(read, write, exec);
 
       // 4.
@@ -750,7 +750,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
         return stage2PageFaultType(read, write, exec);
 
       // 3.
-      if (not pte.valid() or (not pte.read() and pte.write()) or pte.res())
+      if (not isValidPte(pte))
         return stage2PageFaultType(read, write, exec);
 
       // 4.
@@ -926,7 +926,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
         return stage1PageFaultType(read, write, exec);
 
       // 3.
-      if (not pte.valid() or (not pte.read() and pte.write()) or pte.res())
+      if (not isValidPte(pte))
         return stage1PageFaultType(read, write, exec);
 
       // 4.
