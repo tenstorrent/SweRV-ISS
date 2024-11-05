@@ -125,18 +125,6 @@ SparseMem::write(uint64_t addr, unsigned size, uint64_t val)
 }
 
 
-uint8_t*
-SparseMem::map(uint64_t addr, size_t size)
-{
-  // TODO: need to check addr + size < end
-  if (size > pageSize_)
-    return nullptr;
-  uint64_t pageRank = getPageRank(addr);
-  std::vector<uint8_t>& page = findOrCreatePage(pageRank);
-  return page.data() + (addr & pageMask_);
-}
-
-
 bool
 SparseMem::writeHexFile(const std::string& path) const
 {

@@ -1,6 +1,6 @@
 OFLAGS   := -O3
 CXX_STD  ?= c++20
-CXXFLAGS := $(OFLAGS) -std=$(CXX_STD) -fPIC -pedantic -Wall -Wextra -Werror -Ivirtio -I.
+CXXFLAGS := $(OFLAGS) -std=$(CXX_STD) -fPIC -pedantic -Wall -Wextra -Werror -I.
 DEPFLAGS := -MMD -MP
 
 SRCS := Pci.cpp PciDev.cpp virtio/Virtio.cpp virtio/Blk.cpp

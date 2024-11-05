@@ -452,10 +452,6 @@ namespace WdRiscv
     void defineWriteMemoryCallback(std::function<bool(uint64_t, unsigned, uint64_t)> callback)
     { writeCallback_ = std::move(callback); }
 
-    /// Define map memory callback.
-    void defineMapMemoryCallback(std::function<uint8_t*(uint64_t, size_t)> callback)
-    { mapCallback_ = std::move(callback); }
-
     /// Enable tracing of memory data lines referenced by current
     /// run. A memory data line is typically 64-bytes long and corresponds to
     /// a cachable line.
@@ -516,18 +512,6 @@ namespace WdRiscv
     /// Return start address of page containing given address.
     uint64_t getPageStartAddr(uint64_t addr) const
     { return (addr >> pageShift_) << pageShift_; }
-
-    uint8_t* data(uint64_t addr, [[maybe_unused]] size_t len) const
-    {
-#ifdef MEM_CALLBACKS
-      if (mapCallback_)
-        return mapCallback_(addr, len);
-      return nullptr;
-#else
-      // TODO: guard range
-      return data_ + addr;
-#endif
-    }
 
     /// Same as write but effects not recorded in last-write info and
     /// physical memory attributes are ignored if usePma is false.

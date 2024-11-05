@@ -24,12 +24,13 @@ class Blk : public Virtio {
 
     bool setup() final
     {
+      if (not Virtio::setup())
+        return false;
+
       if (not fd_)
         return false;
 
-      Virtio::setup();
-
-      config_ = get_device_config<virtio_blk_config>();
+      config_ = reinterpret_cast<virtio_blk_config*>(device_cfg_);
 
       struct stat st;
       fstat(fd_, &st);
@@ -38,13 +39,6 @@ class Blk : public Virtio {
     };
 
     void operator()(unsigned vq) final;
-
-    void reset() final
-    {
-      Virtio::reset();
-
-      // TODO: read capacity override
-    };
 
     int fd_ = -1;
     virtio_blk_config* config_;
