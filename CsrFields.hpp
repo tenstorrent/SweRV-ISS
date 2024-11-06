@@ -733,13 +733,14 @@ namespace WdRiscv
     uint32_t value_;
     struct
     {
-      unsigned MML   : 1;
-      unsigned MMWP  : 1;
-      unsigned RLB   : 1;
-      unsigned res0  : 5;
-      unsigned USEED : 1;
-      unsigned SSEED : 1;
-      unsigned res1  : 22;
+      unsigned MML   : 1;   // Bit  0
+      unsigned MMWP  : 1;   // Bit  1
+      unsigned RLB   : 1;   // Bit  2
+      unsigned res0  : 5;   // Bits 7:3
+      unsigned USEED : 1;   // Bit  8
+      unsigned SSEED : 1;   // Bit  9
+      unsigned MLPTE : 1;   // Bit  10
+      unsigned res1  : 21;  // Bit  31:11
     } bits_;
   };
 
@@ -753,15 +754,16 @@ namespace WdRiscv
     uint64_t value_;
     struct
     {
-      unsigned MML   : 1;
-      unsigned MMWP  : 1;
-      unsigned RLB   : 1;
-      unsigned res0  : 5;
-      unsigned USEED : 1;
-      unsigned SSEED : 1;
-      unsigned res1  : 22;
-      unsigned PMM   : 2;
-      unsigned res2  : 30;
+      unsigned MML   : 1;   // Bit  0
+      unsigned MMWP  : 1;   // Bit  1
+      unsigned RLB   : 1;   // Bit  2
+      unsigned res0  : 5;   // Bits 7:3
+      unsigned USEED : 1;   // Bit  8
+      unsigned SSEED : 1;   // Bit  9
+      unsigned MLPTE : 1;   // Bit  10
+      unsigned res1  : 21;  // Bit  31:11
+      unsigned PMM   : 2;   // Bits 33:32
+      unsigned res2  : 30;  // Bits 63:34
     } bits_;
   };
 
