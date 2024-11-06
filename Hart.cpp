@@ -1817,7 +1817,29 @@ Hart<URV>::deviceRead(uint64_t pa, unsigned size, uint64_t& val)
 	  val = getTime();
 	  return;
 	}
-      memRead(pa, pa, val);
+
+      if (size == 1)
+	{
+	  uint8_t u8 = 0;
+	  memRead(pa, pa, u8);
+	  val = u8;
+	}
+      else if (size == 2)
+	{
+	  uint16_t u16 = 0;
+	  memRead(pa, pa, u16);
+	  val = u16;
+	}
+      else if (size == 4)
+	{
+	  uint32_t u32 = 0;
+	  memRead(pa, pa, u32);
+	  val = u32;
+	}
+      else if (size == 8)
+	memRead(pa, pa, val);
+      else
+	assert(0);
       return;
     }
 
