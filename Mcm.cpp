@@ -4754,8 +4754,8 @@ Mcm<URV>::checkSfenceWInval(Hart<URV>& hart, const McmInstr& instr) const
   if (pendingWrites.empty())
     return true;
 
-  cerr << "Error: Hart-id=" << hart.hartId() << "sfence.w.inval tag=" << instr.tag_
-       << " retired while there are pending stores in the store/merge buffer\n";
+  cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << instr.tag_
+       << " sfence.w.inval retired while there are pending stores in the store/merge buffer\n";
   return false;
 }
 
