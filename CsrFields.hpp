@@ -13,7 +13,9 @@ namespace WdRiscv
     unsigned MBE      : 1;
     unsigned GVA      : 1;
     unsigned MPV      : 1;
-    unsigned res1     : 24;
+    unsigned MPELP    : 1;
+    unsigned MDT      : 1;
+    unsigned res1     : 22;
   };
 
 
@@ -39,7 +41,9 @@ namespace WdRiscv
       unsigned TVM      : 1;
       unsigned TW       : 1;
       unsigned TSR      : 1;
-      unsigned res1     : 8;  // Reserved
+      unsigned SPELP    : 1;
+      unsigned SDT      : 1;
+      unsigned res1     : 6;  // Reserved
       unsigned SD       : 1;
     };
 
@@ -66,14 +70,19 @@ namespace WdRiscv
       unsigned TVM      : 1;  // bit 20
       unsigned TW       : 1;  // bit 21
       unsigned TSR      : 1;  // bit 22
-      unsigned res1     : 9;  // bit 23 to 31
+      unsigned SPELP    : 1;  // bit 23
+      unsigned SDT      : 1;  // bit 24
+      unsigned res1     : 7;  // bit 25 to 31
       unsigned UXL      : 2;  // bit 32 33
       unsigned SXL      : 2;  // bit 34 35
       unsigned SBE      : 1;  // bit 36
       unsigned MBE      : 1;  // bit 37
       unsigned GVA      : 1;  // bit 38
       unsigned MPV      : 1;  // bit 39
-      unsigned res2     : 23; // bit 40 to 62
+      unsigned res2     : 1;  // bit 40
+      unsigned MPELP    : 1;  // bit 41
+      unsigned MDT      : 1;  // bit 42
+      unsigned res3     : 20; // bit 43 to 62
       unsigned SD       : 1;  // bit 63
     };
 
