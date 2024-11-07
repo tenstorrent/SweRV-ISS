@@ -2125,6 +2125,11 @@ namespace WdRiscv
     bool mcmIEvict(uint64_t addr)
     { fetchCache_.removeLine(addr); return true; }
 
+    /// Poke given byte if corresponding line is in the cache. Otherwise, no-op.
+    void pokeFetchCache(uint64_t addr, uint8_t byte)
+    { fetchCache_.poke(addr, byte); }
+
+    /// Return pointer to the memory consistency model object.
     std::shared_ptr<Mcm<URV>> mcm() 
     { return mcm_; }
 

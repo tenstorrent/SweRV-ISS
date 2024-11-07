@@ -934,6 +934,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint8_t val, bool usePma)
 
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
   invalidateDecodeCache(addr, sizeof(val));
+  pokeFetchCache(addr, val);
 
   return memory_.poke(addr, val, usePma);
 }
@@ -953,6 +954,9 @@ Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
       pci_->access<uint16_t>(addr, val, true);
       return true;
     }
+
+  pokeFetchCache(addr, uint8_t(val));
+  pokeFetchCache(addr, uint8_t(val >> 8));
 
   return memory_.poke(addr, val, usePma);
 }
@@ -978,6 +982,9 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
       return true;
     }
 
+  for (unsigned i = 0; i < sizeof(val); ++i)
+    pokeFetchCache(addr + i, uint8_t(val >> (i*8)));
+
   return memory_.poke(addr, val, usePma);
 }
 
@@ -997,6 +1004,9 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
       deviceWrite(addr, val);
       return true;
     }
+
+  for (unsigned i = 0; i < sizeof(val); ++i)
+    pokeFetchCache(addr + i, uint8_t(val >> (i*8)));
 
   return memory_.poke(addr, val, usePma);
 }
@@ -2442,9 +2452,9 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, [[maybe_unuse
   bool done = false;
   if (mcm_)
     {
-      Pma pma = memory_.pmaMgr_.accessPma(physAddr, PmaManager::AccessReason::Fetch);
-      if (not pma.isIo() and pma.isCacheable())
-	done = readInstFromFetchCache(physAddr, half);
+      // If line is io or non-cachable, we cache it anyway counting on the test-bench
+      // evicting it as soon as the RTL gets out of that line.
+      done = readInstFromFetchCache(physAddr, half);
     }
 
   if (not done and not memory_.readInst(physAddr, half))
@@ -2485,9 +2495,9 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, [[maybe_unuse
   done = false;
   if (mcm_)
     {
-      Pma pma = memory_.pmaMgr_.accessPma(physAddr2, PmaManager::AccessReason::Fetch);
-      if (not pma.isIo() and pma.isCacheable())
-	done = readInstFromFetchCache(physAddr2, upperHalf);
+      // If line is io or non-cachable, we cache it anyway counting on the test-bench
+      // evicting it as soon as the RTL gets out of that line.
+      done = readInstFromFetchCache(physAddr2, upperHalf);
     }
 
   if (not done and not memory_.readInst(physAddr2, upperHalf))
