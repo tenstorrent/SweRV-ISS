@@ -2449,16 +2449,15 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, [[maybe_unuse
     }
 
   uint16_t half = 0;
-  bool done = false;
+  if (not memory_.readInst(physAddr, half))
+    return ExceptionCause::INST_ACC_FAULT;
+
   if (mcm_)
     {
       // If line is io or non-cachable, we cache it anyway counting on the test-bench
       // evicting it as soon as the RTL gets out of that line.
-      done = readInstFromFetchCache(physAddr, half);
+      readInstFromFetchCache(physAddr, half);
     }
-
-  if (not done and not memory_.readInst(physAddr, half))
-    return ExceptionCause::INST_ACC_FAULT;
 
   if (initStateFile_)
     dumpInitState("fetch", virtAddr, physAddr);
@@ -2492,18 +2491,17 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, [[maybe_unuse
     }
 
   uint16_t upperHalf = 0;
-  done = false;
+  if (not memory_.readInst(physAddr2, upperHalf))
+    {
+      virtAddr += 2;  // To report faulting portion of fetch.
+      return ExceptionCause::INST_ACC_FAULT;
+    }
+
   if (mcm_)
     {
       // If line is io or non-cachable, we cache it anyway counting on the test-bench
       // evicting it as soon as the RTL gets out of that line.
-      done = readInstFromFetchCache(physAddr2, upperHalf);
-    }
-
-  if (not done and not memory_.readInst(physAddr2, upperHalf))
-    {
-      virtAddr += 2;  // To report faulting portion of fetch.
-      return ExceptionCause::INST_ACC_FAULT;
+      readInstFromFetchCache(physAddr2, upperHalf);
     }
 
   if (initStateFile_)
