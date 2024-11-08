@@ -2628,12 +2628,14 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
     }
 #endif
 
+  exceptionCount_++;
+  hasException_ = true;
+
   // In debug mode no exception is taken. If we get an ebreak exception and debug park
   // loop is defined, we jump to it. If we get a non-ebreak exception and debug trap entry
   // point is defined, we jump to it.
   if (debugMode_)
     {
-      hasException_ = true;  // Instruction did no retire. This is for MCM.
       if (cause == ExceptionCause::BREAKP)
 	{
 	  if (debugParkLoop_ != ~URV(0))
@@ -2648,8 +2650,6 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
     }
 
   bool interrupt = false;
-  exceptionCount_++;
-  hasException_ = true;
   initiateTrap(di, interrupt, URV(cause), pc, info, info2);
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
@@ -9509,7 +9509,6 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
       if (nmiPending_)
         dcsr.bits_.NMIP = 1;
       csRegs_.poke(CsrNumber::DCSR, dcsr.value_);
-      hasException_ = true;  // Instruction did no retire. This is for MCM.
     }
 
   csRegs_.poke(CsrNumber::DPC, pc);
