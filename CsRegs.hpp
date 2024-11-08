@@ -984,7 +984,7 @@ namespace WdRiscv
     { triggers_.enableAllInstAddrMatch(flag); }
 
     /// Enable triggers.
-    void enableTriggers(bool flag);
+    void enableSdtrig(bool flag);
 
     /// Enable STEE (static trusted execution env)
     void enableStee(bool flag);
@@ -2158,7 +2158,7 @@ namespace WdRiscv
     bool sstcEnabled_ = false;    // Supervisor time compare
     bool cofEnabled_ = false;     // Counter overflow
     bool stateenOn_ = false;      // Mstateen extension.
-    bool triggersOn_ = false;     // Stdtrig (debug triggers) extension.
+    bool sdtrigOn_ = false;       // Stdtrig (debug triggers) extension.
     bool ssqosidOn_ = false;      // Ssqosid extension.
     bool pmpTor_ = true;          // Top-of-range PMP mode enabled
     bool pmpNa4_ = true;          // Na4 PMP mode enabled

@@ -19,7 +19,7 @@ namespace WdRiscv
 				      Smaia, Ssaia, Zacas, Zimop, Zcmop, Smrnmi,
 				      Zicsr, Zicntr, Zihpm, Zifencei, Zihintpause,
                                       Smmpm, Ssnpm, Smnpm, Sscofpmf, Smstateen,
-				      Ssqosid, None };
+				      Ssqosid, Sdtrig, None };
 
   /// Model supported extensions with primary/secondary version numbers.
   class Isa

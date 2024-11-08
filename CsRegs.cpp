@@ -753,8 +753,8 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
   updateSstc();  // To activate/deactivate STIMECMP.
   enableSscofpmf(cofEnabled_);  // To activate/deactivate SCOUNTOVF.
   enableSmstateen(stateenOn_);  // To activate/deactivate STATEEN CSRs.
-  enableTriggers(triggersOn_);  // To activate/deactivate SCONTEXT.
-  enableSsqosid(ssqosidOn_);  // To activate/deactivate SRMCFG.
+  enableSdtrig(sdtrigOn_);      // To activate/deactivate SCONTEXT.
+  enableSsqosid(ssqosidOn_);    // To activate/deactivate SRMCFG.
 }
 
 
@@ -968,7 +968,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
   updateSstc();                // To activate/deactivate VSTIMECMP.
   enableSmstateen(stateenOn_); // To activate/deactivate STATEEN CSRs.
   enableAia(aiaEnabled_);      // To activate/deactivate AIA hypervisor CSRs.
-  enableTriggers(triggersOn_); // To activate/deactivate HCONTEXT.
+  enableSdtrig(sdtrigOn_);     // To activate/deactivate HCONTEXT.
   enableSsqosid(ssqosidOn_);   // To activate/deactivate SRMCFG.
 }
 
@@ -1959,10 +1959,10 @@ CsRegs<URV>::enableMenvcfgAdue(bool flag)
 
 template <typename URV>
 void
-CsRegs<URV>::enableTriggers(bool flag)
+CsRegs<URV>::enableSdtrig(bool flag)
 {
   using CN = CsrNumber;
-  triggersOn_ = flag;
+  sdtrigOn_ = flag;
 
   auto enableCsr = [this] (CN csrn, bool flag) {
     auto csr = findCsr(csrn);

@@ -401,6 +401,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableSmstateen(true);
   if (isa_.isEnabled(RvExtension::Ssqosid))
     enableSsqosid(true);
+  if (isa_.isEnabled(RvExtension::Sdtrig))
+    enableSdtrig(true);
 
   if (isa_.isEnabled(RvExtension::Zvknha) and
       isa_.isEnabled(RvExtension::Zvknhb))
@@ -2910,7 +2912,7 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
         assert(0 and "Failed to write MTVAL2 register");
       if (isRvh() and not csRegs_.write(CsrNumber::MTINST, PM::Machine, tinst))
 	assert(0 and "Failed to write MTINST register");
-      if (enableTriggers_)
+      if (sdtrigOn_)
 	csRegs_.saveTcontrolMte();
     }
   else if (nextMode == PM::Supervisor)
@@ -4855,7 +4857,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
                     dumpInitState("dpt", entry.addr_, entry.addr_);
 	    }
 
-	  if (enableTriggers_ and icountTriggerHit())
+	  if (sdtrigOn_ and icountTriggerHit())
 	    if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
 	      return true;
 
@@ -5375,7 +5377,7 @@ Hart<URV>::run(FILE* file)
   // straight-forward execution. If any option is turned on, we switch
   // to runUntilAddress which supports all features.
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
-  bool complex = (stopAddrValid_ or instFreq_ or enableTriggers_ or enableGdb_
+  bool complex = (stopAddrValid_ or instFreq_ or sdtrigOn_ or enableGdb_
                   or enableCounters_ or alarmInterval_ or file
 		  or __tracerExtension or initStateFile_);
   if (complex)
@@ -5779,7 +5781,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       if (mcycleEnabled())
 	++cycleCount_;
 
-      if (enableTriggers_ and icountTriggerHit())
+      if (sdtrigOn_ and icountTriggerHit())
         {
 	  takeTriggerAction(traceFile, pc_, pc_, instCounter_, false);
 	  return;
@@ -10171,7 +10173,7 @@ namespace WdRiscv
     if (triggerTripped_)
       return;
 
-    if (enableTriggers_)
+    if (sdtrigOn_)
       csRegs_.restoreTcontrolMte();
 
     // 1. Restore privilege mode, interrupt enable, and virtual mode.

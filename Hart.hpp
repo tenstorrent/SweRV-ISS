@@ -1214,10 +1214,10 @@ namespace WdRiscv
 
     /// Enable debug-triggers. Without this, triggers will not trip and will not cause
     /// exceptions.
-    void enableTriggers(bool flag)
+    void enableSdtrig(bool flag)
     {
-      enableTriggers_ = flag;
-      csRegs_.enableTriggers(flag);
+      sdtrigOn_ = flag;
+      csRegs_.enableSdtrig(flag);
       updateCachedTriggerState();
     }
 
@@ -2917,7 +2917,7 @@ namespace WdRiscv
     /// to update hasActiveTrigger_/hasActiveInstTrigger_;
     void updateCachedTriggerState()
     {
-      bool on = enableTriggers_ and not debugMode_;
+      bool on = sdtrigOn_ and not debugMode_;
       activeTrig_ =  on and  csRegs_.hasActiveTrigger();
       activeInstTrig_ = on and csRegs_.hasActiveInstTrigger();
     }
@@ -5261,7 +5261,7 @@ namespace WdRiscv
 
     bool instFreq_ = false;         // Collection instruction frequencies.
     bool enableCounters_ = false;   // Enable performance monitors.
-    bool enableTriggers_ = false;   // Enable debug triggers.
+    bool sdtrigOn_ = false;         // Enable debug triggers.
     bool activeTrig_ = false;       // True if data triggers should be evaulated.
     bool activeInstTrig_ = false;   // True if instruction triggers should be evaluated.
     bool enableGdb_ = false;        // Enable gdb mode.
