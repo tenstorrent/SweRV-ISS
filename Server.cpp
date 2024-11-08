@@ -1462,15 +1462,18 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 	  hart.setDeferredInterrupts(0);
 
           URV mipVal = msg.address;
+          URV sipVal = msg.value;
+          URV vsipVal = msg.instrTag;
           InterruptCause cause = InterruptCause{0};
-          reply.flags = hart.isInterruptPossible(mipVal, cause);
+          PrivilegeMode nextMode; bool nextVirt;
+          reply.flags = hart.isInterruptPossible(mipVal, sipVal, vsipVal, cause, nextMode, nextVirt);
           reply.value = static_cast<uint64_t>(cause);
 
 	  hart.setDeferredInterrupts(deferred);
 
           if (commandLog)
-            fprintf(commandLog, "hart=%" PRIu32 " check_interrupt 0x%" PRIxMAX "\n", hartId,
-                    uintmax_t(msg.address));
+            fprintf(commandLog, "hart=%" PRIu32 " check_interrupt 0x%" PRIxMAX " 0x%" PRIxMAX " 0x%" PRIxMAX "\n", hartId,
+                    uintmax_t(msg.address), uintmax_t(msg.value), uintmax_t(msg.instrTag));
         }
         break;
 

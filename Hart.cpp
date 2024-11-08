@@ -644,7 +644,9 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   processExtensions();
 
   csRegs_.reset();
-  effectiveIe_ = csRegs_.effectiveInterruptEnable();
+  effectiveMie_ = csRegs_.effectiveMachineInterruptEnable();
+  effectiveSie_ = csRegs_.effectiveSupervisorInterruptEnable();
+  effectiveVsie_ = csRegs_.effectiveVirtSupervisorInterruptEnable();
 
   perfControl_ = ~uint32_t(0);
   URV value = 0;
@@ -2594,23 +2596,32 @@ Hart<URV>::unimplemented(const DecodedInst* di)
 // Start an asynchronous exception.
 template <typename URV>
 void
-Hart<URV>::initiateInterrupt(InterruptCause cause, URV pc)
+Hart<URV>::initiateInterrupt(InterruptCause cause, PrivilegeMode nextMode,
+                              bool nextVirt, URV pc)
 {
   hasInterrupt_ = true;
   interruptCount_++;
 
   bool interrupt = true;
   URV info = 0;  // This goes into mtval.
-  initiateTrap(nullptr, interrupt, URV(cause), pc, info);
+
+  // Remap the cause to non-VS cause (e.g. VSTIME becomes STIME).
+  using IC = InterruptCause;
+  URV causeNum = URV(cause);
+  if (nextVirt and (cause == IC::VS_EXTERNAL or cause == IC::VS_TIMER or
+                    cause == IC::VS_SOFTWARE))
+    causeNum--;
+
+  initiateTrap(nullptr, interrupt, causeNum, nextMode, nextVirt, pc, info);
 
   if (not enableCounters_ or not hasActivePerfCounter())
     return;
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
-  if (cause == InterruptCause::M_EXTERNAL)
+  if (cause == IC::M_EXTERNAL)
     pregs.updateCounters(EventNumber::ExternalInterrupt, prevPerfControl_,
                          lastPriv_, lastVirt_);
-  else if (cause == InterruptCause::M_TIMER)
+  else if (cause == IC::M_TIMER)
     pregs.updateCounters(EventNumber::TimerInterrupt, prevPerfControl_,
                          lastPriv_, lastVirt_);
 }
@@ -2660,7 +2671,33 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
     }
 
   bool interrupt = false;
-  initiateTrap(di, interrupt, URV(cause), pc, info, info2);
+  exceptionCount_++;
+  hasException_ = true;
+
+  using PM = PrivilegeMode;
+  PM nextMode = PM::Machine;
+  bool nextVirt = false;
+
+  // But they can be delegated to supervisor.
+  if (isRvs() and privMode_ != PM::Machine)
+    {
+      URV delegVal = peekCsr(CsrNumber::MEDELEG);
+      if (delegVal & (URV(1) << URV(cause)))
+        {
+          nextMode = PM::Supervisor;
+
+          // In hypervisor, traps can be further delegated to virtual supervisor (VS)
+          // except for guest page faults
+          if (isRvh() and virtMode_)
+            {
+              delegVal = peekCsr(CsrNumber::HEDELEG);
+              if (delegVal & (URV(1) << URV(cause)))
+                nextVirt = true;
+            }
+        }
+    }
+
+  initiateTrap(di, interrupt, URV(cause), nextMode, nextVirt, pc, info, info2);
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
   if (enableCounters_ and hasActivePerfCounter())
@@ -2812,8 +2849,10 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
 
 template <typename URV>
 void
-Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pcToSave,
-			URV info, URV info2)
+Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt,
+                        URV cause,
+                        PrivilegeMode nextMode, bool nextVirt,
+                        URV pcToSave, URV info, URV info2)
 {
   if (cancelLrOnTrap_)
     cancelLr(CancelLrCause::TRAP);
@@ -2826,41 +2865,8 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
 
   // Traps are taken in machine mode.
   privMode_ = PM::Machine;
-  PM nextMode = PM::Machine;
-  virtMode_ = false;
+  virtMode_ = nextVirt;
 
-  using IC = InterruptCause;
-
-  // But they can be delegated to supervisor.
-  if (isRvs() and origMode != PM::Machine)
-    {
-      URV delegVal = peekCsr(interrupt? CsrNumber::MIDELEG : CsrNumber::MEDELEG);
-      if (isRvaia())
-        {
-          URV mvien = csRegs_.peekMvien();
-          if (interrupt)
-            delegVal |= mvien;
-        }
-      if (delegVal & (URV(1) << cause))
-	{
-	  nextMode = PM::Supervisor;
-
-	  // In hypervisor, traps can be further delegated to virtual supervisor (VS)
-	  // except for guest page faults
-	  if (isRvh() and origVirtMode)
-	    {
-	      delegVal = peekCsr(interrupt? CsrNumber::HIDELEG : CsrNumber::HEDELEG);
-	      if (delegVal & (URV(1) << cause))
-		{
-		  virtMode_ = true;
-		  // Remap the cause to non-VS cause (e.g. VSTIME becomes STIME).
-		  if (interrupt and (cause == URV(IC::VS_EXTERNAL) or cause == URV(IC::VS_TIMER)
-				     or cause == URV(IC::VS_SOFTWARE)))
-		    cause--;
-		}
-	    }
-	}
-    }
   csRegs_.setVirtualMode(virtMode_);
 
   // Enable/disable virtual mode for CSR read/writes
@@ -2997,12 +3003,12 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
       if (interrupt)
 	{
 	  if (csRegs_.intTriggerHit(cause, privMode_, virtMode_, isInterruptEnabled()))
-            initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
+            initiateException(ExceptionCause::BREAKP, pc_, 0, 0, di);
 	}
       else if (cause != URV(ExceptionCause::BREAKP))
 	{
 	  if (csRegs_.expTriggerHit(cause, privMode_, virtMode_, isInterruptEnabled()))
-            initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
+            initiateException(ExceptionCause::BREAKP, pc_, 0, 0, di);
 	}
     }
 }
@@ -3507,7 +3513,9 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 	csRegs_.recordWrite(CN::HSTATUS);
     }
 
-  effectiveIe_ = csRegs_.effectiveInterruptEnable();
+  effectiveMie_ = csRegs_.effectiveMachineInterruptEnable();
+  effectiveSie_ = csRegs_.effectiveSupervisorInterruptEnable();
+  effectiveVsie_ = csRegs_.effectiveVirtSupervisorInterruptEnable();
 
   updateCachedTriggerState();  // In case trigger control CSR written.
 }
@@ -5136,7 +5144,10 @@ Hart<URV>::simpleRunWithLimit()
       if (mcycleEnabled())
 	++cycleCount_;
 
-      if (effectiveIe_ and processExternalInterrupt(nullptr, instStr))
+      if ((effectiveMie_ or
+          (privMode_ != PrivilegeMode::Machine and effectiveSie_) or
+          (virtMode_ and effectiveVsie_))
+            and processExternalInterrupt(nullptr, instStr))
         continue;  // Next instruction in trap handler.
 
       // Fetch/decode unless match in decode cache.
@@ -5435,13 +5446,10 @@ Hart<URV>::setPerfApi(std::shared_ptr<TT_PERF::PerfApi> perfApi)
 
 template <typename URV>
 bool
-Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
+Hart<URV>::isInterruptPossible(URV mip, URV sip, URV vsip, InterruptCause& cause, PrivilegeMode& nextMode, bool& nextVirt) const
 {
   if (debugMode_)
     return false;
-
-  URV mie = csRegs_.peekMie();
-  URV possible = mie & mip;
 
   // If in a non-maskable interrupt handler, then all interrupts disabled.
   if (extensionIsEnabled(RvExtension::Smrnmi) and
@@ -5451,16 +5459,8 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   using IC = InterruptCause;
   using PM = PrivilegeMode;
 
-  URV delegVal = csRegs_.peekMideleg();
-  if (isRvaia())
-    {
-      URV mvien = csRegs_.peekMvien();
-      delegVal |= mvien;
-    }
-  URV hDelegVal = csRegs_.peekHideleg();
-
   // Non-delegated interrupts are destined for machine mode.
-  URV mdest = possible & ~delegVal;  // Interrupts destined for machine mode.
+  URV mdest = mip & effectiveMie_;  // Interrupts destined for machine mode.
   if ((mstatus_.bits_.MIE or privMode_ != PM::Machine) and mdest != 0)
     {
       // Check for interrupts destined for machine-mode (not-delegated).
@@ -5473,6 +5473,8 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
           if ((mdest & mask) != 0)
             {
               cause = ic;
+              nextMode = PM::Machine;
+              nextVirt = false;
               return true;
             }
         }
@@ -5480,9 +5482,9 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if (privMode_ == PM::Machine)
     return false;   // Interrupts destined for lower privileges are disabled.
 
+
   // Delegated but non-h-delegated interrupts are destined for supervisor mode (S/HS).
-  URV sdest = (possible & delegVal) | (mip & csRegs_.shadowSie_);
-  sdest = sdest & ~hDelegVal;  // Interrupts destined for S/HS.
+  URV sdest = sip & effectiveSie_;
   if ((mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User) and sdest != 0)
     {
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_SOFTWARE, IC::M_TIMER,
@@ -5494,6 +5496,8 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
           if ((sdest & mask) != 0)
             {
               cause = ic;
+              nextMode = PM::Supervisor;
+              nextVirt = false;
               return true;
             }
         }
@@ -5512,36 +5516,19 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if (not vsEnabled)
     return false;
 
-#if 0
-  if (isRvaia())
-    {
-      URV vstopi;
-      peekCsr(CsrNumber::VSTOPI, vstopi);
-      if (vstopi)
-        {
-          cause = vstopi >> 16;
-          return true;
-        }
-    }
-#endif
-  URV vsMask = possible & delegVal & hDelegVal;
-  if (isRvaia())
-    {
-      URV hvip = csRegs_.peekHvip();
-      URV hvien = csRegs_.peekHvien();
-
-      vsMask |= hvip & hvien & ~hDelegVal;
-    }
-  if (vsMask)
+  URV vsdest = vsip & effectiveVsie_;
+  if (vsdest)
     {
       // Only VS interrupts can be delegated in HIDELEG.
       for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
                                  IC::VS_TIMER } )
         {
           URV mask = URV(1) << unsigned(ic);
-          if ((vsMask & mask) != 0)
+          if ((vsdest & mask) != 0)
             {
               cause = ic;
+              nextMode = PM::Supervisor;
+              nextVirt = true;
               return true;
             }
         }
@@ -5553,28 +5540,44 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 
 template <typename URV>
 bool
-Hart<URV>::isInterruptPossible(InterruptCause& cause) const
+Hart<URV>::isInterruptPossible(InterruptCause& cause, PrivilegeMode& nextMode, bool& nextVirt) const
 {
   URV mip = csRegs_.peekMip();
+  URV sip = mip;
 
   // MIP read value is ored with supervisor external interrupt pin and
   // mvip if mvien is not set.
-  mip = overrideWithSeiPinAndMvip(mip);
+  sip = mip = overrideWithSeiPinAndMvip(mip);
 
   // SIP read value will alias mvip if not delegated and mvien is set.
   if (isRvaia() and isRvs())
     {
       URV mvip = csRegs_.peekMvip() & ~csRegs_.peekMideleg()
                   & csRegs_.peekMvien();
-      mip |= mvip;
+      sip |= mvip;
+    }
+
+  URV vsip = sip & csRegs_.peekHideleg();
+
+  // VSIP read value may alias hvip (for bits 13-63). These bits don't alias
+  // HIP/HIE and are delgated through hvien.
+  if (isRvaia() and isRvh())
+    {
+      URV hvip = csRegs_.peekHvip() & ~csRegs_.peekHideleg()
+                  & csRegs_.peekHvien();
+      vsip |= hvip;
     }
 
   mip &= ~deferredInterrupts_;  // Inhibited by test-bench.
+  sip &= ~deferredInterrupts_;
+  vsip &= ~deferredInterrupts_;
 
-  if ((mip & effectiveIe_) == 0)
+  if (((mip & effectiveMie_) == 0) and
+      ((sip & effectiveSie_) == 0) and
+      ((vsip & effectiveVsie_) == 0))
     return false;
 
-  return isInterruptPossible(mip, cause);
+  return isInterruptPossible(mip, sip, vsip, cause, nextMode, nextVirt);
 }
 
 
@@ -5673,7 +5676,9 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 
   // If interrupts enabled and one is pending, take it.
   InterruptCause cause;
-  if (isInterruptPossible(cause))
+  PrivilegeMode nextMode;
+  bool nextVirt;
+  if (isInterruptPossible(cause, nextMode, nextVirt))
     {
       // Attach changes to interrupted instruction.
       uint32_t inst = 0; // Load interrupted inst.
@@ -5689,7 +5694,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	    pc = pc + 4;
 #endif
 	}
-      initiateInterrupt(cause, pc);
+      initiateInterrupt(cause, nextMode, nextVirt, pc);
       printInstTrace(inst, instCounter_, instStr, traceFile);
       if (mcycleEnabled())
 	++cycleCount_;
