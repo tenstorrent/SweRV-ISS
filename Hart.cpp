@@ -401,6 +401,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableSmstateen(true);
   if (isa_.isEnabled(RvExtension::Ssqosid))
     enableSsqosid(true);
+  if (isa_.isEnabled(RvExtension::Sdtrig))
+    enableSdtrig(true);
 
   if (isa_.isEnabled(RvExtension::Zvknha) and
       isa_.isEnabled(RvExtension::Zvknhb))
@@ -934,6 +936,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint8_t val, bool usePma)
 
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
   invalidateDecodeCache(addr, sizeof(val));
+  pokeFetchCache(addr, val);
 
   return memory_.poke(addr, val, usePma);
 }
@@ -953,6 +956,9 @@ Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
       pci_->access<uint16_t>(addr, val, true);
       return true;
     }
+
+  pokeFetchCache(addr, uint8_t(val));
+  pokeFetchCache(addr, uint8_t(val >> 8));
 
   return memory_.poke(addr, val, usePma);
 }
@@ -978,6 +984,9 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
       return true;
     }
 
+  for (unsigned i = 0; i < sizeof(val); ++i)
+    pokeFetchCache(addr + i, uint8_t(val >> (i*8)));
+
   return memory_.poke(addr, val, usePma);
 }
 
@@ -997,6 +1006,9 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
       deviceWrite(addr, val);
       return true;
     }
+
+  for (unsigned i = 0; i < sizeof(val); ++i)
+    pokeFetchCache(addr + i, uint8_t(val >> (i*8)));
 
   return memory_.poke(addr, val, usePma);
 }
@@ -2439,16 +2451,15 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, [[maybe_unuse
     }
 
   uint16_t half = 0;
-  bool done = false;
+  if (not memory_.readInst(physAddr, half))
+    return ExceptionCause::INST_ACC_FAULT;
+
   if (mcm_)
     {
-      Pma pma = memory_.pmaMgr_.accessPma(physAddr, PmaManager::AccessReason::Fetch);
-      if (not pma.isIo() and pma.isCacheable())
-	done = readInstFromFetchCache(physAddr, half);
+      // If line is io or non-cachable, we cache it anyway counting on the test-bench
+      // evicting it as soon as the RTL gets out of that line.
+      readInstFromFetchCache(physAddr, half);
     }
-
-  if (not done and not memory_.readInst(physAddr, half))
-    return ExceptionCause::INST_ACC_FAULT;
 
   if (initStateFile_)
     dumpInitState("fetch", virtAddr, physAddr);
@@ -2482,18 +2493,17 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, [[maybe_unuse
     }
 
   uint16_t upperHalf = 0;
-  done = false;
-  if (mcm_)
-    {
-      Pma pma = memory_.pmaMgr_.accessPma(physAddr2, PmaManager::AccessReason::Fetch);
-      if (not pma.isIo() and pma.isCacheable())
-	done = readInstFromFetchCache(physAddr2, upperHalf);
-    }
-
-  if (not done and not memory_.readInst(physAddr2, upperHalf))
+  if (not memory_.readInst(physAddr2, upperHalf))
     {
       virtAddr += 2;  // To report faulting portion of fetch.
       return ExceptionCause::INST_ACC_FAULT;
+    }
+
+  if (mcm_)
+    {
+      // If line is io or non-cachable, we cache it anyway counting on the test-bench
+      // evicting it as soon as the RTL gets out of that line.
+      readInstFromFetchCache(physAddr2, upperHalf);
     }
 
   if (initStateFile_)
@@ -2628,12 +2638,14 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
     }
 #endif
 
+  exceptionCount_++;
+  hasException_ = true;
+
   // In debug mode no exception is taken. If we get an ebreak exception and debug park
   // loop is defined, we jump to it. If we get a non-ebreak exception and debug trap entry
   // point is defined, we jump to it.
   if (debugMode_)
     {
-      hasException_ = true;  // Instruction did no retire. This is for MCM.
       if (cause == ExceptionCause::BREAKP)
 	{
 	  if (debugParkLoop_ != ~URV(0))
@@ -2648,8 +2660,6 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
     }
 
   bool interrupt = false;
-  exceptionCount_++;
-  hasException_ = true;
   initiateTrap(di, interrupt, URV(cause), pc, info, info2);
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
@@ -2910,7 +2920,7 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
         assert(0 and "Failed to write MTVAL2 register");
       if (isRvh() and not csRegs_.write(CsrNumber::MTINST, PM::Machine, tinst))
 	assert(0 and "Failed to write MTINST register");
-      if (enableTriggers_)
+      if (sdtrigOn_)
 	csRegs_.saveTcontrolMte();
     }
   else if (nextMode == PM::Supervisor)
@@ -4855,7 +4865,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
                     dumpInitState("dpt", entry.addr_, entry.addr_);
 	    }
 
-	  if (enableTriggers_ and icountTriggerHit())
+	  if (sdtrigOn_ and icountTriggerHit())
 	    if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
 	      return true;
 
@@ -5375,7 +5385,7 @@ Hart<URV>::run(FILE* file)
   // straight-forward execution. If any option is turned on, we switch
   // to runUntilAddress which supports all features.
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
-  bool complex = (stopAddrValid_ or instFreq_ or enableTriggers_ or enableGdb_
+  bool complex = (stopAddrValid_ or instFreq_ or sdtrigOn_ or enableGdb_
                   or enableCounters_ or alarmInterval_ or file
 		  or __tracerExtension or initStateFile_);
   if (complex)
@@ -5779,7 +5789,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       if (mcycleEnabled())
 	++cycleCount_;
 
-      if (enableTriggers_ and icountTriggerHit())
+      if (sdtrigOn_ and icountTriggerHit())
         {
 	  takeTriggerAction(traceFile, pc_, pc_, instCounter_, false);
 	  return;
@@ -9509,7 +9519,6 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
       if (nmiPending_)
         dcsr.bits_.NMIP = 1;
       csRegs_.poke(CsrNumber::DCSR, dcsr.value_);
-      hasException_ = true;  // Instruction did no retire. This is for MCM.
     }
 
   csRegs_.poke(CsrNumber::DPC, pc);
@@ -10172,7 +10181,7 @@ namespace WdRiscv
     if (triggerTripped_)
       return;
 
-    if (enableTriggers_)
+    if (sdtrigOn_)
       csRegs_.restoreTcontrolMte();
 
     // 1. Restore privilege mode, interrupt enable, and virtual mode.

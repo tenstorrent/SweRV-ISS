@@ -815,7 +815,7 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
     }
 
   if (args.triggers)
-    hart.enableTriggers(*args.triggers);
+    hart.enableSdtrig(*args.triggers);
 
   hart.enableGdb(args.gdb);
   if (args.gdbTcpPort.size()>hart.sysHartIndex())
