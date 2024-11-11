@@ -3350,8 +3350,12 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("stopei",     CN::STOPEI,     !mand, !imp, 0, wam, wam);
   defineCsr("stopi",      CN::STOPI,      !mand, !imp, 0, wam, wam);
 
-  defineCsr("hvien",      CN::HVIEN,      !mand, !imp, 0, wam, wam)->setHypervisor(true);
-  defineCsr("hvictl",     CN::HVICTL,     !mand, !imp, 0, wam, wam)->setHypervisor(true);
+  mask = wam << 13; // Bits 0 to 12 are reserved.
+  defineCsr("hvien",      CN::HVIEN,      !mand, !imp, 0, mask, mask)->setHypervisor(true);
+
+  mask = 0x4fff'03ff; // Bits 0-9, 16-27, and 30.
+  defineCsr("hvictl",     CN::HVICTL,     !mand, !imp, 0, mask, mask)->setHypervisor(true);
+
   defineCsr("hviprio1",   CN::HVIPRIO1,   !mand, !imp, 0, wam, wam)->setHypervisor(true);
   defineCsr("hviprio2",   CN::HVIPRIO2,   !mand, !imp, 0, wam, wam)->setHypervisor(true);
   defineCsr("vsiselect",  CN::VSISELECT,  !mand, !imp, 0, wam, wam)->setHypervisor(true);
