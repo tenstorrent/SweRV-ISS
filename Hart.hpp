@@ -429,7 +429,20 @@ namespace WdRiscv
     {
       bool flag = extensionIsEnabled(RvExtension::Svadu);
       csRegs_.enableSvadu(flag);
+      if (not flag)
+	{
+	  // Hardware access/dirty update extension is not enabled.
+	  virtMem_.setFaultOnFirstAccess(true);
+	  virtMem_.setFaultOnFirstAccessStage2(true);
+	  return;
+	}
 
+      // Extension is enabled.
+      virtMem_.setFaultOnFirstAccess(false);
+      virtMem_.setFaultOnFirstAccessStage1(false);
+      virtMem_.setFaultOnFirstAccessStage2(false);
+
+      // And further controlled by menvcfg/henvcfg.
       auto menv = csRegs_.getImplementedCsr(CsrNumber::MENVCFG);
       if (menv)
 	{
