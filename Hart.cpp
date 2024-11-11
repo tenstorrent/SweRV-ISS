@@ -401,6 +401,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableSmstateen(true);
   if (isa_.isEnabled(RvExtension::Ssqosid))
     enableSsqosid(true);
+  if (isa_.isEnabled(RvExtension::Sdtrig))
+    enableSdtrig(true);
 
   if (isa_.isEnabled(RvExtension::Zvknha) and
       isa_.isEnabled(RvExtension::Zvknhb))
@@ -2636,12 +2638,14 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
     }
 #endif
 
+  exceptionCount_++;
+  hasException_ = true;
+
   // In debug mode no exception is taken. If we get an ebreak exception and debug park
   // loop is defined, we jump to it. If we get a non-ebreak exception and debug trap entry
   // point is defined, we jump to it.
   if (debugMode_)
     {
-      hasException_ = true;  // Instruction did no retire. This is for MCM.
       if (cause == ExceptionCause::BREAKP)
 	{
 	  if (debugParkLoop_ != ~URV(0))
@@ -2656,8 +2660,6 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
     }
 
   bool interrupt = false;
-  exceptionCount_++;
-  hasException_ = true;
   initiateTrap(di, interrupt, URV(cause), pc, info, info2);
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
@@ -2918,7 +2920,7 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
         assert(0 and "Failed to write MTVAL2 register");
       if (isRvh() and not csRegs_.write(CsrNumber::MTINST, PM::Machine, tinst))
 	assert(0 and "Failed to write MTINST register");
-      if (enableTriggers_)
+      if (sdtrigOn_)
 	csRegs_.saveTcontrolMte();
     }
   else if (nextMode == PM::Supervisor)
@@ -4863,7 +4865,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
                     dumpInitState("dpt", entry.addr_, entry.addr_);
 	    }
 
-	  if (enableTriggers_ and icountTriggerHit())
+	  if (sdtrigOn_ and icountTriggerHit())
 	    if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
 	      return true;
 
@@ -5383,7 +5385,7 @@ Hart<URV>::run(FILE* file)
   // straight-forward execution. If any option is turned on, we switch
   // to runUntilAddress which supports all features.
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
-  bool complex = (stopAddrValid_ or instFreq_ or enableTriggers_ or enableGdb_
+  bool complex = (stopAddrValid_ or instFreq_ or sdtrigOn_ or enableGdb_
                   or enableCounters_ or alarmInterval_ or file
 		  or __tracerExtension or initStateFile_);
   if (complex)
@@ -5787,7 +5789,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       if (mcycleEnabled())
 	++cycleCount_;
 
-      if (enableTriggers_ and icountTriggerHit())
+      if (sdtrigOn_ and icountTriggerHit())
         {
 	  takeTriggerAction(traceFile, pc_, pc_, instCounter_, false);
 	  return;
@@ -9517,7 +9519,6 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
       if (nmiPending_)
         dcsr.bits_.NMIP = 1;
       csRegs_.poke(CsrNumber::DCSR, dcsr.value_);
-      hasException_ = true;  // Instruction did no retire. This is for MCM.
     }
 
   csRegs_.poke(CsrNumber::DPC, pc);
@@ -10180,7 +10181,7 @@ namespace WdRiscv
     if (triggerTripped_)
       return;
 
-    if (enableTriggers_)
+    if (sdtrigOn_)
       csRegs_.restoreTcontrolMte();
 
     // 1. Restore privilege mode, interrupt enable, and virtual mode.

@@ -1183,6 +1183,17 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       return true;
     }
 
+  if (hart.inDebugMode())
+    {
+      URV dcsr = 0;
+      if (hart.peekCsr(CsrNumber::DCSR, dcsr))
+	{
+	  DcsrFields<URV> fields(dcsr);
+	  if (fields.bits_.CAUSE == unsigned(DebugModeCause::TRIGGER))
+	    trapped = true;  // Instruction did no complete because of a trigger
+	}
+    }
+
   // If a partially executed vec ld/st store is trapped, we commit its results.
   if (trapped and not isPartialVecLdSt(hart, di))
     {
