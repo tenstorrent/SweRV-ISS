@@ -48,9 +48,8 @@ namespace TT_FETCH_CACHE
       data_.erase(lineNum);
     }
 
-    /// Read into inst the 2-byte instruction at the given
-    /// address. Return true on success. Return false if addr is not
-    /// aligned (even) or if the corresponding line is not in the
+    /// Read into inst the 2-bytes at the given address. Return true on success. Return
+    /// false if addr is not aligned (even) or if the corresponding line is not in the
     /// cache.
     bool read(uint64_t addr, uint16_t& inst) const
     {
@@ -64,6 +63,19 @@ namespace TT_FETCH_CACHE
       unsigned byteIx = addr % lineSize_;
       inst = vec.at(byteIx) | (uint16_t(vec.at(byteIx + 1)) << 8);
       return true;
+    }
+
+    /// Poke byte if given address is in the cache. No-op otherwise.
+    void poke(uint64_t addr, uint8_t byte)
+    {
+      uint64_t lineNum = addr >> lineShift_;
+      auto iter = data_.find(lineNum);
+      if (iter == data_.end())
+	return;
+
+      auto& vec = iter->second;
+      unsigned byteIx = addr % lineSize_;
+      vec.at(byteIx) = byte;
     }
 
     /// Empty fetch cache.
