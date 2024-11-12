@@ -1126,7 +1126,7 @@ VirtMem::printEntries(std::ostream& os, uint64_t addr, const std::string& path) 
   for (unsigned ix = 0; ix < entryCount; ++ix, eaddr += entrySize)
     {
       PTE pte(0);
-      memory_.read(eaddr, pte.data_);
+      memRead(eaddr, false /*bigEndian*/, pte.data_);
 
       if (not pte.valid())
         continue;
@@ -1142,7 +1142,7 @@ VirtMem::printEntries(std::ostream& os, uint64_t addr, const std::string& path) 
   for (unsigned ix = 0; ix < entryCount; ++ix, eaddr += entrySize)
     {
       PTE pte(0);
-      memory_.read(eaddr, pte.data_);
+      memRead(eaddr, false /*bigEnding*/, pte.data_);
 
       if (not pte.valid())
         continue;
