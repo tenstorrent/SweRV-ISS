@@ -1490,25 +1490,8 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	  return false;
 	}
 
-      switch (write.size_)
-	{
-	case 1:
-	  hart.pokeMemory(write.pa_, uint8_t(write.rtlData_), true);
-	  break;
-	case 2:
-	  hart.pokeMemory(write.pa_, uint16_t(write.rtlData_), true);
-	  break;
-	case 4:
-	  hart.pokeMemory(write.pa_, uint32_t(write.rtlData_), true);
-	  break;
-	case 8:
-	  hart.pokeMemory(write.pa_, uint64_t(write.rtlData_), true);
-	  break;
-	default:
-	  for (unsigned i = 0; i < write.size_; ++i)
-	    hart.pokeMemory(write.pa_ + i, uint8_t(write.rtlData_ >> (8*i)), true);
-	  break;
-	}
+      assert(write.size_ <= 8);
+      pokeHartMemory(hart, write.pa_, write.rtlData_, write.size_);
 
       unsigned ix = write.pa_ - physAddr;
       for (unsigned i = 0; i < write.size_; ++i)
