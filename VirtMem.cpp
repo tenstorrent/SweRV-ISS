@@ -534,7 +534,7 @@ ExceptionCause
 VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool write,
 		       bool exec, uint64_t& pa, TlbEntry& tlbEntry)
 {
-  // 1. Root is "a" in section 4.3.2 of the privileged spec, ii is "i" in that section.
+  // 1. Root is "a" in section 11.3.2 of the privileged spec, ii is "i" in that section.
   uint64_t root = rootPage_ * pageSize_;
 
   PTE pte(0);
@@ -691,7 +691,7 @@ ExceptionCause
 VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool write,
 			     bool exec, bool isPteAddr, uint64_t& pa, TlbEntry& tlbEntry)
 {
-  // 1. Root is "a" in section 4.3.2 of the privileged spec, ii is "i" in that section.
+  // 1. Root is "a" in section 11.3.2 of the privileged spec, ii is "i" in that section.
   uint64_t root = rootPageStage2_ * pageSize_;
 
   PTE pte(0);
@@ -848,7 +848,7 @@ ExceptionCause
 VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool write,
 			     bool exec, uint64_t& pa, TlbEntry& tlbEntry)
 {
-  // 1. Root is "a" in section 4.3.2 of the privileged spec, ii is "i" in that section.
+  // 1. Root is "a" in section 11.3.2 of the privileged spec, ii is "i" in that section.
   uint64_t root = vsRootPage_ * pageSize_;
 
   PTE pte(0);

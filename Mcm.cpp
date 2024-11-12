@@ -957,25 +957,17 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
     {
       undrained.erase(tag);
       hartData_.at(hartIx).storeInsertCount_.erase(tag);
-      if (instr->retired_)
-	{
-	  for (auto opIx : instr->memOps_)
-	    {
-	      auto& op = sysMemOps_.at(opIx);
-	      if (not op.isCanceled() and not op.isRead_)
-		if (not checkStoreData(hart, *instr))
-		  {
-		    result = false;
-		    break;
-		  }
-	    }
 
-	  if (isEnabled(PpoRule::R1))
-	    result = ppoRule1(hart, *instr) and result;
+      if (not instr->retired_)
+	return result;
 
-	  if (isEnabled(PpoRule::R3))
-	    result = ppoRule3(hart, *instr) and result;
-	}
+      result = checkStoreData(hart, *instr) and result;
+
+      if (isEnabled(PpoRule::R1))
+	result = ppoRule1(hart, *instr) and result;
+
+      if (isEnabled(PpoRule::R3))
+	result = ppoRule3(hart, *instr) and result;
     }
 
   return result;
