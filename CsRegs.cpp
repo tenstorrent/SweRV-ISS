@@ -4886,10 +4886,11 @@ CsRegs<URV>::addAiaFields()
       {{"iprio", 8}, {"zero", 8}, {"iid", 12}, {"zero", xlen - 28}});
   setCsrFields(Csrn::MVIP,
       {{"zero", 1}, {"ssip", 1}, {"zero", 3}, {"stip", 1},
-       {"zero", 3}, {"seip", 1}, {"zero", 3}, {"interrupts", xlen - 13}});
+       {"zero", 3}, {"seip", 1}, {"zero", 3}, {"lcof", 1},
+       {"interrupts", xlen - 14}});
   setCsrFields(Csrn::MVIEN,
       {{"zero", 1}, {"ssip", 1}, {"zero", 7}, {"seip", 1},
-       {"zero", 3}, {"interrupts", xlen - 13}});
+       {"zero", 3}, {"lcof", 1}, {"interrupts", xlen - 14}});
 }
 
 template <typename URV>
