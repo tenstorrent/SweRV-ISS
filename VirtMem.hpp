@@ -17,6 +17,7 @@
 #include <iosfwd>
 #include "trapEnums.hpp"
 #include "Memory.hpp"
+#include "PmpManager.hpp"
 #include "Tlb.hpp"
 #include "Pte.hpp"
 
@@ -484,6 +485,24 @@ namespace WdRiscv
       if (not memory_.hasReserveAttribute(addr))
 	return false;
       return memory_.write(hartIx_, addr, data);
+    }
+
+    /// Check physical memory protection returning true if given address is readable.
+    bool pmpIsReadable(uint64_t addr, PrivilegeMode pm) const
+    {
+      if (not pmpMgr_.isEnabled())
+	return true;
+      const Pmp& pmp = pmpMgr_.accessPmp(addr);
+      return pmp.isRead(pm);
+    }
+
+    /// Check physical memory protection returning true if given address is writable.
+    bool pmpIsWritable(uint64_t addr, PrivilegeMode pm) const
+    {
+      if (not pmpMgr_.isEnabled())
+	return true;
+      const Pmp& pmp = pmpMgr_.accessPmp(addr);
+      return pmp.isWrite(pm);
     }
 
     /// Use exec access permission for read permission.
