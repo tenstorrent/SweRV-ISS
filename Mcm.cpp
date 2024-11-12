@@ -963,7 +963,11 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	    {
 	      auto& op = sysMemOps_.at(opIx);
 	      if (not op.isCanceled() and not op.isRead_)
-		result = checkStoreData(hart, *instr) and result;
+		if (not checkStoreData(hart, *instr))
+		  {
+		    result = false;
+		    break;
+		  }
 	    }
 
 	  if (isEnabled(PpoRule::R1))
