@@ -4878,6 +4878,12 @@ CsRegs<URV>::addAiaFields()
       {{"prio", 11}, {"identity", 11}, {"zero", xlen - 22}});
   setCsrFields(Csrn::VSTOPEI,
       {{"prio", 11}, {"identity", 11}, {"zero", xlen - 22}});
+  setCsrFields(Csrn::MTOPI,
+      {{"iprio", 8}, {"zero", 8}, {"iid", 12}, {"zero", xlen - 28}});
+  setCsrFields(Csrn::STOPI,
+      {{"iprio", 8}, {"zero", 8}, {"iid", 12}, {"zero", xlen - 28}});
+  setCsrFields(Csrn::VSTOPI,
+      {{"iprio", 8}, {"zero", 8}, {"iid", 12}, {"zero", xlen - 28}});
   setCsrFields(Csrn::MVIP,
       {{"zero", 1}, {"ssip", 1}, {"zero", 3}, {"stip", 1},
        {"zero", 3}, {"seip", 1}, {"zero", 3}, {"interrupts", xlen - 13}});
