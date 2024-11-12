@@ -429,7 +429,20 @@ namespace WdRiscv
     {
       bool flag = extensionIsEnabled(RvExtension::Svadu);
       csRegs_.enableSvadu(flag);
+      if (not flag)
+	{
+	  // Hardware access/dirty update extension is not enabled.
+	  virtMem_.setFaultOnFirstAccess(true);
+	  virtMem_.setFaultOnFirstAccessStage2(true);
+	  return;
+	}
 
+      // Extension is enabled.
+      virtMem_.setFaultOnFirstAccess(false);
+      virtMem_.setFaultOnFirstAccessStage1(false);
+      virtMem_.setFaultOnFirstAccessStage2(false);
+
+      // And further controlled by menvcfg/henvcfg.
       auto menv = csRegs_.getImplementedCsr(CsrNumber::MENVCFG);
       if (menv)
 	{
@@ -1214,10 +1227,10 @@ namespace WdRiscv
 
     /// Enable debug-triggers. Without this, triggers will not trip and will not cause
     /// exceptions.
-    void enableTriggers(bool flag)
+    void enableSdtrig(bool flag)
     {
-      enableTriggers_ = flag;
-      csRegs_.enableTriggers(flag);
+      sdtrigOn_ = flag;
+      csRegs_.enableSdtrig(flag);
       updateCachedTriggerState();
     }
 
@@ -2125,6 +2138,11 @@ namespace WdRiscv
     bool mcmIEvict(uint64_t addr)
     { fetchCache_.removeLine(addr); return true; }
 
+    /// Poke given byte if corresponding line is in the cache. Otherwise, no-op.
+    void pokeFetchCache(uint64_t addr, uint8_t byte)
+    { fetchCache_.poke(addr, byte); }
+
+    /// Return pointer to the memory consistency model object.
     std::shared_ptr<Mcm<URV>> mcm() 
     { return mcm_; }
 
@@ -2917,7 +2935,7 @@ namespace WdRiscv
     /// to update hasActiveTrigger_/hasActiveInstTrigger_;
     void updateCachedTriggerState()
     {
-      bool on = enableTriggers_ and not debugMode_;
+      bool on = sdtrigOn_ and not debugMode_;
       activeTrig_ =  on and  csRegs_.hasActiveTrigger();
       activeInstTrig_ = on and csRegs_.hasActiveInstTrigger();
     }
@@ -5261,7 +5279,7 @@ namespace WdRiscv
 
     bool instFreq_ = false;         // Collection instruction frequencies.
     bool enableCounters_ = false;   // Enable performance monitors.
-    bool enableTriggers_ = false;   // Enable debug triggers.
+    bool sdtrigOn_ = false;         // Enable debug triggers.
     bool activeTrig_ = false;       // True if data triggers should be evaulated.
     bool activeInstTrig_ = false;   // True if instruction triggers should be evaluated.
     bool enableGdb_ = false;        // Enable gdb mode.

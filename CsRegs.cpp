@@ -324,8 +324,9 @@ CsRegs<URV>::readMvip(URV& value) const
       // Bit STIE (5) of MVIP is an alias to bit 5 of MIP if bit 5 of MIP is writable.
       // Othrwise, it is zero.
       mask = URV(0x20);  // Bit 5
+      value &= ~mask;  // Clear bit 5.
       if ((mip->getWriteMask() & mask) != 0)   // Bit 5 writable in mip
-	value = (value & ~mask) | (mip->read() & mask);
+	value |= (mip->read() & mask);  // Set bit 5 to that of mip
     }
 
   return true;
@@ -752,8 +753,8 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
   updateSstc();  // To activate/deactivate STIMECMP.
   enableSscofpmf(cofEnabled_);  // To activate/deactivate SCOUNTOVF.
   enableSmstateen(stateenOn_);  // To activate/deactivate STATEEN CSRs.
-  enableTriggers(triggersOn_);  // To activate/deactivate SCONTEXT.
-  enableSsqosid(ssqosidOn_);  // To activate/deactivate SRMCFG.
+  enableSdtrig(sdtrigOn_);      // To activate/deactivate SCONTEXT.
+  enableSsqosid(ssqosidOn_);    // To activate/deactivate SRMCFG.
 }
 
 
@@ -967,7 +968,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
   updateSstc();                // To activate/deactivate VSTIMECMP.
   enableSmstateen(stateenOn_); // To activate/deactivate STATEEN CSRs.
   enableAia(aiaEnabled_);      // To activate/deactivate AIA hypervisor CSRs.
-  enableTriggers(triggersOn_); // To activate/deactivate HCONTEXT.
+  enableSdtrig(sdtrigOn_);     // To activate/deactivate HCONTEXT.
   enableSsqosid(ssqosidOn_);   // To activate/deactivate SRMCFG.
 }
 
@@ -1958,10 +1959,10 @@ CsRegs<URV>::enableMenvcfgAdue(bool flag)
 
 template <typename URV>
 void
-CsRegs<URV>::enableTriggers(bool flag)
+CsRegs<URV>::enableSdtrig(bool flag)
 {
   using CN = CsrNumber;
-  triggersOn_ = flag;
+  sdtrigOn_ = flag;
 
   auto enableCsr = [this] (CN csrn, bool flag) {
     auto csr = findCsr(csrn);
@@ -3349,8 +3350,12 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("stopei",     CN::STOPEI,     !mand, !imp, 0, wam, wam);
   defineCsr("stopi",      CN::STOPI,      !mand, !imp, 0, wam, wam);
 
-  defineCsr("hvien",      CN::HVIEN,      !mand, !imp, 0, wam, wam)->setHypervisor(true);
-  defineCsr("hvictl",     CN::HVICTL,     !mand, !imp, 0, wam, wam)->setHypervisor(true);
+  mask = wam << 13; // Bits 0 to 12 are reserved.
+  defineCsr("hvien",      CN::HVIEN,      !mand, !imp, 0, mask, mask)->setHypervisor(true);
+
+  mask = 0x4fff'03ff; // Bits 0-9, 16-27, and 30.
+  defineCsr("hvictl",     CN::HVICTL,     !mand, !imp, 0, mask, mask)->setHypervisor(true);
+
   defineCsr("hviprio1",   CN::HVIPRIO1,   !mand, !imp, 0, wam, wam)->setHypervisor(true);
   defineCsr("hviprio2",   CN::HVIPRIO2,   !mand, !imp, 0, wam, wam)->setHypervisor(true);
   defineCsr("vsiselect",  CN::VSISELECT,  !mand, !imp, 0, wam, wam)->setHypervisor(true);
@@ -4873,6 +4878,12 @@ CsRegs<URV>::addAiaFields()
       {{"prio", 11}, {"identity", 11}, {"zero", xlen - 22}});
   setCsrFields(Csrn::VSTOPEI,
       {{"prio", 11}, {"identity", 11}, {"zero", xlen - 22}});
+  setCsrFields(Csrn::MVIP,
+      {{"zero", 1}, {"ssip", 1}, {"zero", 3}, {"stip", 1},
+       {"zero", 3}, {"seip", 1}, {"zero", 3}, {"interrupts", xlen - 13}});
+  setCsrFields(Csrn::MVIEN,
+      {{"zero", 1}, {"ssip", 1}, {"zero", 7}, {"seip", 1},
+       {"zero", 3}, {"interrupts", xlen - 13}});
 }
 
 template <typename URV>

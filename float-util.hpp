@@ -590,6 +590,89 @@ maybeAdjustForTininessBeforeRoundingAndQuietNaN(T res)
 }
 
 
+/// Negate given number x.
+inline
+float flipSign(float x)
+{
+  union
+  {
+    uint32_t u;
+    float f;
+  } uf;
+
+  uf.f = x;
+  uf.u ^= uint32_t(1) << 31;
+  return uf.f;
+}
+
+
+/// Negate given number x.
+inline
+double flipSign(double x)
+{
+  union
+  {
+    uint64_t u;
+    double d;
+  } ud;
+
+  ud.d = x;
+  ud.u ^= uint64_t(1) << 63;
+  return ud.d;
+}
+
+
+/// Negate given number x.
+inline
+Float16 flipSign(Float16 x)
+{
+  union
+  {
+    uint16_t u;
+    Float16 f{0};
+  } uf;
+
+  uf.f = x;
+  uf.u ^= uint16_t(1) << 15;
+  return uf.f;
+};
+
+
+/// Negate given number x.
+inline
+BFloat16 flipSign(BFloat16 x)
+{
+  union
+  {
+    uint16_t u;
+    BFloat16 f{0};
+  } uf;
+
+  uf.f = x;
+  uf.u ^= uint16_t(1) << 15;
+  return uf.f;
+};
+
+
+/// Floating point negation.
+template<typename FT>
+FT
+doNegate(FT f1)
+{
+#ifdef SOFT_FLOAT
+  FT res = FT{0};
+  if (res == f1)
+    res = flipSign(f1);  // plus or minus 0
+  else
+    res = softSub(res, f1);
+#else
+  FT res = -f1;
+#endif
+
+  return res;
+}
+
+
 /// Floating point add. Return sum of two fp numbers. Return a
 /// canonical NAN if either is a NAN.
 template <typename FT>

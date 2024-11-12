@@ -79,12 +79,9 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
                  return sparseMem_->read(addr, size, value); };
   auto writef = [this](uint64_t addr, unsigned size, uint64_t value) -> bool {
                   return sparseMem_->write(addr, size, value); };
-  auto mapf = [this](uint64_t addr, size_t size) -> uint8_t* {
-                  return sparseMem_->map(addr, size); };
 
   mem.defineReadMemoryCallback(readf);
   mem.defineWriteMemoryCallback(writef);
-  mem.defineMapMemoryCallback(mapf);
 #endif
 }
 
@@ -713,6 +710,52 @@ System<URV>::configPci(uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize
 
   pci_ = std::make_shared<Pci>(configBase, (1ULL << 28), mmioBase, mmioSize, buses, slots);
 
+  auto readf = [this](uint64_t addr, size_t size, uint64_t& data) -> bool {
+    bool ok = false;
+    if (size == 1)
+      {
+        uint8_t tmp = 0;
+        ok = this->memory_->peek(addr, tmp, false);
+        data = tmp;
+      }
+    if (size == 2)
+      {
+        uint16_t tmp = 0;
+        ok = this->memory_->peek(addr, tmp, false);
+        data = tmp;
+      }
+    if (size == 4)
+      {
+        uint32_t tmp = 0;
+        ok = this->memory_->peek(addr, tmp, false);
+        data = tmp;
+      }
+    if (size == 8)
+      return this->memory_->peek(addr, data, false);
+    return ok;
+  };
+
+  auto writef = [this](uint64_t addr, size_t size, uint64_t data) -> bool {
+    bool ok = false;
+    if (size == 1)
+      ok = this->memory_->poke(addr, uint8_t(data), false);
+    if (size == 2)
+      ok = this->memory_->poke(addr, uint16_t(data), false);
+    if (size == 4)
+      ok = this->memory_->poke(addr, uint32_t(data), false);
+    if (size == 8)
+      ok = this->memory_->poke(addr, data, false);
+    return ok;
+  };
+
+  auto msif = [this](uint64_t addr, unsigned size, uint64_t data) -> bool {
+    return this->imsicMgr_.write(addr, size, data);
+  };
+
+  pci_->define_read_mem(readf);
+  pci_->define_write_mem(writef);
+  pci_->define_msi(msif);
+
   for (auto& hart : sysHarts_)
     hart->attachPci(pci_);
   return true;
@@ -729,17 +772,8 @@ System<URV>::addPciDevices(const std::vector<std::string>& devs)
       return false;
     }
 
-  auto devmapf = [this](uint64_t addr, size_t size) -> uint8_t* {
-    return this->memory_->data(addr, size);
-  };
-
-  auto writef = [this](uint64_t addr, unsigned size, uint64_t data) -> bool {
-    return this->imsicMgr_.write(addr, size, data);
-  };
-
   for (const auto& devStr : devs)
     {
-      std::shared_ptr<PciDev> dev;
       std::vector<std::string> tokens;
       boost::split(tokens, devStr, boost::is_any_of(":"), boost::token_compress_on);
 
@@ -761,14 +795,14 @@ System<URV>::addPciDevices(const std::vector<std::string>& devs)
               return false;
             }
 
-          dev = std::make_shared<Blk>(false);
-          if (not std::reinterpret_pointer_cast<Blk>(dev)->open_file(tokens.at(3)))
+          std::shared_ptr<Blk> dev = std::make_shared<Blk>(false);
+          if (not dev->open_file(tokens.at(3)))
+            return false;
+
+          if (not pci_->register_device(dev, bus, slot))
             return false;
         }
       else
-        return false;
-
-      if (not pci_->register_device(dev, bus, slot, devmapf, writef))
         return false;
     }
   return true;
@@ -848,7 +882,7 @@ System<URV>::endMcm()
     hart->setMcm(nullptr);
   mcm_ = nullptr;
 }
-  
+
 
 template <typename URV>
 bool
@@ -1385,9 +1419,9 @@ System<URV>::loadSnapshot(const std::string& snapDir, bool restoreTrace)
   for (auto hartPtr : sysHarts_)
     {
       unsigned ix = hartPtr->sysHartIndex();
-      
+
       std::string name = "registers" + std::to_string(ix);
-      
+
       Filesystem::path regPath = dirPath / name;
       bool missing = not Filesystem::is_regular_file(regPath);
       if (missing and ix == 0 and hartCount_ == 1)

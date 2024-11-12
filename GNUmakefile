@@ -10,7 +10,7 @@ STATIC_LINK := 1
 # We use boost 1.67.
 # Set the BOOST_ROOT environment variable to point to the base install
 # location of the Boost Libraries
-BOOST_ROOT := /wdc/apps/utilities/boost-1.67
+BOOST_ROOT ?= /wdc/apps/utilities/boost-1.67
 BOOST_DIR := $(BOOST_ROOT)
 # For Various Installation types of Boost Library
 BOOST_INC := $(wildcard $(BOOST_DIR) $(BOOST_DIR)/include)
@@ -71,7 +71,7 @@ endif
 
 
 # Add External Library location paths here
-LINK_DIRS := $(addprefix -L,$(BOOST_LIB_DIR))
+LINK_DIRS += $(addprefix -L,$(BOOST_LIB_DIR))
 
 # Generating the Linker options for dependent libraries
 ifeq ($(STATIC_LINK), 1)
@@ -100,13 +100,16 @@ BUILD_DIR := build-$(shell uname -s)
 MKDIR_P ?= mkdir -p
 RM := rm -rf
 # Optimization flags.  Use -g for debug.
-OFLAGS := -O3
+OFLAGS ?= -O3
 
 # Include paths.
 IFLAGS := $(addprefix -isystem ,$(BOOST_INC)) -isystem third_party -I.
 
+CXX_STD ?= c++20
+
 # Command to compile .cpp files.
-override CXXFLAGS += -MMD -MP $(ARCH_FLAGS) -std=c++20 $(OFLAGS) $(IFLAGS) -fPIC -pedantic -Wall -Wextra -Wformat -Wwrite-strings
+override CXXFLAGS += -MMD -MP $(ARCH_FLAGS) -std=$(CXX_STD) $(OFLAGS) $(IFLAGS)
+override CXXFLAGS += -fPIC -pedantic -Wall -Wextra -Wformat -Wwrite-strings
 
 # Rule to make a .o from a .cpp file.
 $(BUILD_DIR)/%.cpp.o:  %.cpp
@@ -175,7 +178,7 @@ $(soft_float_lib):
 	$(MAKE) -C $(soft_float_build)
 
 $(pci_lib):
-	$(MAKE) -C $(pci_build)
+	$(MAKE) -C $(pci_build) CXX=$(CXX)
 
 $(trace_reader_lib):
 	$(MAKE) -C $(trace_reader_build)

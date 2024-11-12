@@ -84,6 +84,7 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "sscofpmf", RvExtension::Sscofpmf },
   { "smstateen", RvExtension::Smstateen },
   { "ssqosid", RvExtension::Ssqosid },
+  { "sdtrig", RvExtension::Sdtrig },
 });
 static_assert(STRING_EXT_PAIRS.size() == static_cast<unsigned>(RvExtension::None));
 
@@ -167,6 +168,7 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Smnpm)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Sscofpmf)) = Info{ {{0,5}}, {0,5} };
   infoVec_.at(extIx(RvExtension::Ssqosid)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Sdtrig)) = Info{ {{1,0}}, {1,0} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
 }

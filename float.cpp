@@ -366,7 +366,9 @@ Hart<URV>::execFnmsub_s(const DecodedInst* di)
   if (not checkRoundingModeSp(di))
     return;
 
-  float f1 = -fpRegs_.readSingle(di->op1());
+  float f1 = fpRegs_.readSingle(di->op1());
+  f1 = doNegate(f1);
+
   float f2 = fpRegs_.readSingle(di->op2());
   float f3 = fpRegs_.readSingle(di->op3());
 
@@ -388,9 +390,13 @@ Hart<URV>::execFnmadd_s(const DecodedInst* di)
 
   // we want -(f[op1] * f[op2]) - f[op3]
 
-  float f1 = -fpRegs_.readSingle(di->op1());
+  float f1 = fpRegs_.readSingle(di->op1());
+  f1 = doNegate(f1);
+
   float f2 = fpRegs_.readSingle(di->op2());
-  float f3 = -fpRegs_.readSingle(di->op3());
+
+  float f3 = fpRegs_.readSingle(di->op3());
+  f3 = doNegate(f3);
 
   float res = fusedMultiplyAdd(f1, f2, f3);
 
@@ -1097,7 +1103,9 @@ Hart<URV>::execFnmsub_d(const DecodedInst* di)
   if (not checkRoundingModeDp(di))
     return;
 
-  double f1 = -fpRegs_.readDouble(di->op1());
+  double f1 = fpRegs_.readDouble(di->op1());
+  f1 = doNegate(f1);
+
   double f2 = fpRegs_.readDouble(di->op2());
   double f3 = fpRegs_.readDouble(di->op3());
 
@@ -1120,9 +1128,13 @@ Hart<URV>::execFnmadd_d(const DecodedInst* di)
 
   // we want -(f[op1] * f[op2]) - f[op3]
 
-  double f1 = -fpRegs_.readDouble(di->op1());
+  double f1 = fpRegs_.readDouble(di->op1());
+  f1 = doNegate(f1);
+
   double f2 = fpRegs_.readDouble(di->op2());
-  double f3 = -fpRegs_.readDouble(di->op3());
+
+  double f3 = fpRegs_.readDouble(di->op3());
+  f3 = doNegate(f3);
 
   double res = fusedMultiplyAdd(f1, f2, f3);
 
@@ -1816,7 +1828,9 @@ Hart<URV>::execFnmsub_h(const DecodedInst* di)
   if (not checkRoundingModeHp(di))
     return;
 
-  Float16 f1 = -fpRegs_.readHalf(di->op1());
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  f1 = doNegate(f1);
+
   Float16 f2 = fpRegs_.readHalf(di->op2());
   Float16 f3 = fpRegs_.readHalf(di->op3());
 
@@ -1838,9 +1852,13 @@ Hart<URV>::execFnmadd_h(const DecodedInst* di)
 
   // we want -(f[op1] * f[op2]) - f[op3]
 
-  Float16 f1 = -fpRegs_.readHalf(di->op1());
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  f1 = doNegate(f1);
+
   Float16 f2 = fpRegs_.readHalf(di->op2());
-  Float16 f3 = -fpRegs_.readHalf(di->op3());
+
+  Float16 f3 = fpRegs_.readHalf(di->op3());
+  f3 = doNegate(f3);
 
   Float16 res = fusedMultiplyAdd(f1, f2, f3);
 
