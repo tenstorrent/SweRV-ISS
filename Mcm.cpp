@@ -882,6 +882,13 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
       return false;
     }
 
+  if (instr->canceled_)
+    {
+      cerr << "Mcm::bypassOp: Error: hart-id=" << hart.hartId() << " time=" << time
+           << " tag=" << tag << " bypass op with cancelled instruction\n";
+      return false;
+    }
+
   auto& undrained = hartData_.at(hartIx).undrainedStores_;
   undrained.insert(tag);
 
