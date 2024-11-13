@@ -383,7 +383,7 @@ CsRegs<URV>::writeMvien(URV value)
   URV b9 = URV(0x200);
   URV mask = mvien->read() & b9;
   // Bit 9 is read-only when MVIEN is set.
-  mip->setWriteMask((mip->getWriteMask() & ~b9) | ~mask);
+  mip->setWriteMask((mip->getWriteMask() & ~b9) | (~mask & b9));
   return true;
 }
 
@@ -4143,12 +4143,6 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
   uint64_t n = val >> 58;
   if (n > 0 and n < 12)
     return prev;
-
-#if 0
-  unsigned reserved = (val >> 52) & 0x3f;  // Bits 57 to 52.
-  if (reserved != 0)
-    return prev;  // Reserved bits must be zero.
-#endif
 
   bool read = (val & 1);       // bit 0
   bool write = (val & 2);      // bit 1
