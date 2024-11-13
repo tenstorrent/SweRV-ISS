@@ -957,21 +957,17 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
     {
       undrained.erase(tag);
       hartData_.at(hartIx).storeInsertCount_.erase(tag);
-      if (instr->retired_)
-	{
-	  for (auto opIx : instr->memOps_)
-	    {
-	      auto& op = sysMemOps_.at(opIx);
-	      if (not op.isCanceled() and not op.isRead_)
-		result = checkStoreData(hart, *instr) and result;
-	    }
 
-	  if (isEnabled(PpoRule::R1))
-	    result = ppoRule1(hart, *instr) and result;
+      if (not instr->retired_)
+	return result;
 
-	  if (isEnabled(PpoRule::R3))
-	    result = ppoRule3(hart, *instr) and result;
-	}
+      result = checkStoreData(hart, *instr) and result;
+
+      if (isEnabled(PpoRule::R1))
+	result = ppoRule1(hart, *instr) and result;
+
+      if (isEnabled(PpoRule::R3))
+	result = ppoRule3(hart, *instr) and result;
     }
 
   return result;
@@ -1494,25 +1490,8 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	  return false;
 	}
 
-      switch (write.size_)
-	{
-	case 1:
-	  hart.pokeMemory(write.pa_, uint8_t(write.rtlData_), true);
-	  break;
-	case 2:
-	  hart.pokeMemory(write.pa_, uint16_t(write.rtlData_), true);
-	  break;
-	case 4:
-	  hart.pokeMemory(write.pa_, uint32_t(write.rtlData_), true);
-	  break;
-	case 8:
-	  hart.pokeMemory(write.pa_, uint64_t(write.rtlData_), true);
-	  break;
-	default:
-	  for (unsigned i = 0; i < write.size_; ++i)
-	    hart.pokeMemory(write.pa_ + i, uint8_t(write.rtlData_ >> (8*i)), true);
-	  break;
-	}
+      assert(write.size_ <= 8);
+      pokeHartMemory(hart, write.pa_, write.rtlData_, write.size_);
 
       unsigned ix = write.pa_ - physAddr;
       for (unsigned i = 0; i < write.size_; ++i)
@@ -1776,20 +1755,84 @@ Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
 {
   auto hartId = hart.hartId();
 
-  if (not store.di_.isVector())
+  if (store.di_.isVector())
+    return checkVecStoreData(hart, store);
+  
+  // Scalar store
+  for (auto opIx : store.memOps_)
     {
-      for (auto opIx : store.memOps_)
-	{
-	  const auto& op = sysMemOps_.at(opIx);
-	  if (op.isRead_)
-	    continue;
-	  if (not checkRtlWrite(hartId, store, op))
-	    return false;
-	}
-      return true;
+      const auto& op = sysMemOps_.at(opIx);
+      if (not op.isRead_ and not checkRtlWrite(hartId, store, op))
+	return false;
     }
 
-  // Vector store. We assume that the writes are done in element order.
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
+{
+  if (not store.di_.isVector())
+    return true;
+
+  // Get reference (Whisper) data.
+  auto& vecRefMap = hartData_.at(store.hartIx_).vecRefMap_;
+  auto iter = vecRefMap.find(store.tag_);
+  assert(iter != vecRefMap.end());
+  auto& vecRefs = iter->second;
+
+  auto hartId = hart.hartId();
+
+  if (not store.hasOverlap_)
+    {
+      // Put reference data in a per-byte address/value map.
+      std::unordered_map<uint64_t , uint8_t> dataMap;
+      for (auto& ref : vecRefs.refs_)
+	for (unsigned i = 0; i < ref.size_; ++i)
+	  dataMap[ref.pa_ + i] = ref.data_ >> (i*8);
+
+      // Compare RTL data to reference data.
+      for (auto opIx : store.memOps_)
+	{
+	  auto& op = sysMemOps_.at(opIx);
+	  for (unsigned i = 0; i < op.size_; ++i)
+	    {
+	      uint64_t addr = op.pa_ + i;
+	      uint8_t rtlVal = op.rtlData_ >> (i*8);
+
+	      auto iter = dataMap.find(addr);
+	      if (iter == dataMap.end())
+		{
+		  if (store.complete_)
+		    {
+		      std::cerr << "Error: Assertion fail in Mcm::checkVecStoreData\n";
+		      return false;
+		    }
+		  continue;  // Will scheck again when store is complete.
+		}
+
+	      uint8_t refVal = iter->second;
+	      if (rtlVal != refVal)
+		{
+		  cerr << "Error: hart-id=" << hartId << " tag=" << store.tag_
+		       << " mismatch on vector sotre data: addr=0x" << std::hex << addr
+		       << " rtl=0x" << unsigned(rtlVal) << " whisper="
+		       << unsigned(refVal) << std::dec << '\n';
+		  return false;
+		}
+	    }
+	}
+
+      return true;
+    }
+      
+
+  // We assume that the writes are done in element order. This is not so
+  // when an mbinsert crosses a mid-cache-line boundary. TBD FIX: get
+  // the test-bench to send element index and field with every mbinsert.
+
 
   // 1. Collect RTL writes. Start with the drained writes.
   std::vector<const MemoryOp*> writes;
@@ -1829,12 +1872,6 @@ Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
 	}
     }
 
-  // 4. Get reference (Whisper) data.
-  auto& vecRefMap = hartData_.at(store.hartIx_).vecRefMap_;
-  auto iter = vecRefMap.find(store.tag_);
-  assert(iter != vecRefMap.end());
-  auto& vecRefs = iter->second;
-
   auto printError = [] (unsigned hartId, uint64_t tag, const VecRef& ref) {
     cerr << "Error: hart-id=" << hartId << " tag=" << tag
 	 << " mismatch on vector store: vec-reg=" << unsigned(ref.reg_)
@@ -1843,7 +1880,7 @@ Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
       cerr << " seg=" << unsigned(ref.field_);
   };
 
-  // 5. Compare RTL data to reference data.
+  // 4. Compare RTL data to reference data.
   unsigned rtlDataIx = 0;
   for (auto& ref : vecRefs.refs_)
     {
@@ -1886,7 +1923,7 @@ Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
   if (rtlDataIx < rtlData.size())
     {
       cerr << "Warning: hart-id=" << hartId << " tag=" << store.tag_
-	   << " RTL has extra write-operation data vector store instruction.\n";
+	   << " RTL has extra write-operation data for vector store instruction.\n";
     }
 
   return true;

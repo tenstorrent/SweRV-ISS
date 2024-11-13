@@ -17,9 +17,9 @@
 #include <iosfwd>
 #include "trapEnums.hpp"
 #include "Memory.hpp"
+#include "PmpManager.hpp"
 #include "Tlb.hpp"
 #include "Pte.hpp"
-#include "util.hpp"
 
 
 namespace WdRiscv
@@ -41,7 +41,7 @@ namespace WdRiscv
     enum class Mode : uint32_t { Bare = 0, Sv32 = 1, Sv39 = 8, Sv48 = 9, Sv57 = 10,
 				 Sv64 = 11, Limit_ = 12};
 
-    /// Page baed memory type.
+    /// Page based memory type.
     enum class Pbmt : uint32_t { None = 0, Nc = 1, Io = 2, Reserved = 3 };
 
     /// Pointer masking modes.
@@ -443,7 +443,7 @@ namespace WdRiscv
 
     /// Read a memory word honoring the big-endian flag. Return true
     /// on success and false on failure.
-    bool memRead(uint64_t addr, bool bigEnd, uint32_t& data)
+    bool memRead(uint64_t addr, bool bigEnd, uint32_t& data) const
     {
       if (not memory_.read(addr, data))
 	return false;
@@ -454,7 +454,7 @@ namespace WdRiscv
 
     /// Read a memory double-word honoring the big-endian flag. Return
     /// true on success and false on failure.
-    bool memRead(uint64_t addr, bool bigEnd, uint64_t& data)
+    bool memRead(uint64_t addr, bool bigEnd, uint64_t& data) const
     {
       if (not memory_.read(addr, data))
 	return false;
@@ -487,6 +487,24 @@ namespace WdRiscv
       return memory_.write(hartIx_, addr, data);
     }
 
+    /// Check physical memory protection returning true if given address is readable.
+    bool pmpIsReadable(uint64_t addr, PrivilegeMode pm) const
+    {
+      if (not pmpMgr_.isEnabled())
+	return true;
+      const Pmp& pmp = pmpMgr_.accessPmp(addr);
+      return pmp.isRead(pm);
+    }
+
+    /// Check physical memory protection returning true if given address is writable.
+    bool pmpIsWritable(uint64_t addr, PrivilegeMode pm) const
+    {
+      if (not pmpMgr_.isEnabled())
+	return true;
+      const Pmp& pmp = pmpMgr_.accessPmp(addr);
+      return pmp.isWrite(pm);
+    }
+
     /// Use exec access permission for read permission.
     void useExecForRead(bool flag)
     { xForR_ = flag; }
@@ -495,7 +513,7 @@ namespace WdRiscv
     bool isExecForRead() const
     { return xForR_; }
 
-    /// Heper to transAddrNoUpdate
+    /// Helper to transAddrNoUpdate
     ExceptionCause transNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
 				 bool read, bool write, bool exec, uint64_t& pa);
 

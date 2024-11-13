@@ -700,7 +700,11 @@ namespace WdRiscv
 
     bool checkStoreComplete(unsigned hartIx, const McmInstr& instr) const;
 
-    bool checkStoreData(Hart<URV>& hart, const McmInstr& insrt) const;
+    /// Check reference (Whipser) data aginst RTL data for given instruction.
+    bool checkStoreData(Hart<URV>& hart, const McmInstr& instr) const;
+
+    /// Helper to check sore data. Applies to vector store.
+    bool checkVecStoreData(Hart<URV>& hart, const McmInstr& instr) const;
 
     bool checkLoadComplete(const McmInstr& instr) const;
 

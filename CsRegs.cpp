@@ -383,7 +383,7 @@ CsRegs<URV>::writeMvien(URV value)
   URV b9 = URV(0x200);
   URV mask = mvien->read() & b9;
   // Bit 9 is read-only when MVIEN is set.
-  mip->setWriteMask((mip->getWriteMask() & ~b9) | ~mask);
+  mip->setWriteMask((mip->getWriteMask() & ~b9) | (~mask & b9));
   return true;
 }
 
@@ -4144,12 +4144,6 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
   if (n > 0 and n < 12)
     return prev;
 
-#if 0
-  unsigned reserved = (val >> 52) & 0x3f;  // Bits 57 to 52.
-  if (reserved != 0)
-    return prev;  // Reserved bits must be zero.
-#endif
-
   bool read = (val & 1);       // bit 0
   bool write = (val & 2);      // bit 1
   bool exec = (val & 4);       // bit 2
@@ -4878,12 +4872,19 @@ CsRegs<URV>::addAiaFields()
       {{"prio", 11}, {"identity", 11}, {"zero", xlen - 22}});
   setCsrFields(Csrn::VSTOPEI,
       {{"prio", 11}, {"identity", 11}, {"zero", xlen - 22}});
+  setCsrFields(Csrn::MTOPI,
+      {{"iprio", 8}, {"zero", 8}, {"iid", 12}, {"zero", xlen - 28}});
+  setCsrFields(Csrn::STOPI,
+      {{"iprio", 8}, {"zero", 8}, {"iid", 12}, {"zero", xlen - 28}});
+  setCsrFields(Csrn::VSTOPI,
+      {{"iprio", 8}, {"zero", 8}, {"iid", 12}, {"zero", xlen - 28}});
   setCsrFields(Csrn::MVIP,
       {{"zero", 1}, {"ssip", 1}, {"zero", 3}, {"stip", 1},
-       {"zero", 3}, {"seip", 1}, {"zero", 3}, {"interrupts", xlen - 13}});
+       {"zero", 3}, {"seip", 1}, {"zero", 3}, {"lcof", 1},
+       {"interrupts", xlen - 14}});
   setCsrFields(Csrn::MVIEN,
       {{"zero", 1}, {"ssip", 1}, {"zero", 7}, {"seip", 1},
-       {"zero", 3}, {"interrupts", xlen - 13}});
+       {"zero", 3}, {"lcof", 1}, {"interrupts", xlen - 14}});
 }
 
 template <typename URV>
