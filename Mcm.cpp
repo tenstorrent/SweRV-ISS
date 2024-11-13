@@ -1755,20 +1755,31 @@ Mcm<URV>::checkStoreData(Hart<URV>& hart, const McmInstr& store) const
 {
   auto hartId = hart.hartId();
 
-  if (not store.di_.isVector())
+  if (store.di_.isVector())
+    return checkVecStoreData(hart, store);
+  
+  // Scalar store
+  for (auto opIx : store.memOps_)
     {
-      for (auto opIx : store.memOps_)
-	{
-	  const auto& op = sysMemOps_.at(opIx);
-	  if (op.isRead_)
-	    continue;
-	  if (not checkRtlWrite(hartId, store, op))
-	    return false;
-	}
-      return true;
+      const auto& op = sysMemOps_.at(opIx);
+      if (not op.isRead_ and not checkRtlWrite(hartId, store, op))
+	return false;
     }
 
-  // Vector store. We assume that the writes are done in element order.
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
+{
+  if (not store.di_.isVector())
+    return true;
+
+  // We assume that the writes are done in element order.
+
+  auto hartId = hart.hartId();
 
   // 1. Collect RTL writes. Start with the drained writes.
   std::vector<const MemoryOp*> writes;
