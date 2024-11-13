@@ -457,26 +457,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       // We always record the real csr number for VS/S mappings
       if (not csRegs_.peek(csr, value, false))
         continue;
-      if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TINFO)
-        continue; // Debug trigger values collected below.
       cvps.push_back(CVP(URV(csr), value));
-    }
-
-  // Collect trigger CSRs and their values. A synthetic CSR number is used encoding the
-  // trigger number and the trigger component.
-  for (unsigned trigger : triggers)
-    {
-      // Components of trigger that were changed by instruction.
-      std::vector<std::pair<CsrNumber, uint64_t>> trigChanges;
-      getTriggerChange(trigger, trigChanges);
-
-      for (auto& pair : trigChanges)
-	{
-	  auto csrn = pair.first;
-	  auto val = pair.second;
-          URV ecsr = (trigger << 16) | URV(csrn);
-          cvps.push_back(CVP(ecsr, URV(val)));
-        }
     }
 
   // Sort by CSR number.

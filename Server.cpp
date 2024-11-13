@@ -621,28 +621,7 @@ Server<URV>::processStepChanges(Hart<URV>& hart,
       URV value;
       // We always record the real csr number for VS/S mappings
       if (hart.peekCsr(csr, value, false))
-	{
-	  if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TINFO)
-	    ; // Trigger data collected below.
-	  else
-	    csrMap[URV(csr)] = value;
-	}
-    }
-
-  // Collect changes associated with trigger register.
-  for (unsigned trigger : triggers)
-    {
-      // Components of trigger that were changed by instruction.
-      std::vector<std::pair<CsrNumber, uint64_t>> trigChanges;
-      hart.getTriggerChange(trigger, trigChanges);
-      
-      for (auto& pair : trigChanges)
-	{
-	  auto csrn = pair.first;
-	  auto val = pair.second;
-	  URV ecsr = (trigger << 16) | unsigned(csrn); // effective csr number.
-	  csrMap[ecsr] = val;
-	}
+	csrMap[URV(csr)] = value;
     }
 
   for (const auto& [key, val] : csrMap)
