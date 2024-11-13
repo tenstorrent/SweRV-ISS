@@ -615,7 +615,7 @@ Server<URV>::processStepChanges(Hart<URV>& hart,
   // Map to keep CSRs in order and to drop duplicate entries.
   std::map<URV,URV> csrMap;
 
-  // Collect changed CSRs and their values. Collect components of changed trigger.
+  // Collect changed CSRs and their values.
   for (CsrNumber csr : csrs)
     {
       URV value;

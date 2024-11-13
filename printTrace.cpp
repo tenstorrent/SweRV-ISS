@@ -451,7 +451,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   std::vector< CVP > cvps; // CSR-value pairs
   cvps.reserve(csrs.size() + triggers.size());
 
-  // Collect non-trigger CSRs and their values.
+  // Collect changed CSRs and their values.
   for (CsrNumber csr : csrs)
     {
       // We always record the real csr number for VS/S mappings
