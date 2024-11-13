@@ -1678,8 +1678,8 @@ namespace WdRiscv
     void enableClearMtvalOnIllInst(bool flag)
     { clearMtvalOnIllInst_ = flag; }
 
-    /// Clear MTVAL on illegal instruction exception if flag is true.
-    /// Otherwise, set MTVAL to the opcode of the illegal instruction.
+    /// Clear MTVAL on breakpoint exception if flag is true.
+    /// Otherwise, set MTVAL to the virtual address of the instruction.
     void enableClearMtvalOnEbreak(bool flag)
     { clearMtvalOnEbreak_ = flag; }
 
