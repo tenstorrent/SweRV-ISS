@@ -1777,9 +1777,62 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
   if (not store.di_.isVector())
     return true;
 
-  // We assume that the writes are done in element order.
+  // Get reference (Whisper) data.
+  auto& vecRefMap = hartData_.at(store.hartIx_).vecRefMap_;
+  auto iter = vecRefMap.find(store.tag_);
+  assert(iter != vecRefMap.end());
+  auto& vecRefs = iter->second;
 
   auto hartId = hart.hartId();
+
+  if (not store.hasOverlap_)
+    {
+      // Put reference data in a per-byte address/value map.
+      std::unordered_map<uint64_t , uint8_t> dataMap;
+      for (auto& ref : vecRefs.refs_)
+	for (unsigned i = 0; i < ref.size_; ++i)
+	  dataMap[ref.pa_ + i] = ref.data_ >> (i*8);
+
+      // Compare RTL data to reference data.
+      for (auto opIx : store.memOps_)
+	{
+	  auto& op = sysMemOps_.at(opIx);
+	  for (unsigned i = 0; i < op.size_; ++i)
+	    {
+	      uint64_t addr = op.pa_ + i;
+	      uint8_t rtlVal = op.rtlData_ >> (i*8);
+
+	      auto iter = dataMap.find(addr);
+	      if (iter == dataMap.end())
+		{
+		  if (store.complete_)
+		    {
+		      std::cerr << "Error: Assertion fail in Mcm::checkVecStoreData\n";
+		      return false;
+		    }
+		  continue;  // Will scheck again when store is complete.
+		}
+
+	      uint8_t refVal = iter->second;
+	      if (rtlVal != refVal)
+		{
+		  cerr << "Error: hart-id=" << hartId << " tag=" << store.tag_
+		       << " mismatch on vector sotre data: addr=0x" << std::hex << addr
+		       << " rtl=0x" << unsigned(rtlVal) << " whisper="
+		       << unsigned(refVal) << std::dec << '\n';
+		  return false;
+		}
+	    }
+	}
+
+      return true;
+    }
+      
+
+  // We assume that the writes are done in element order. This is not so
+  // when an mbinsert crosses a mid-cache-line boundary. TBD FIX: get
+  // the test-bench to send element index and field with every mbinsert.
+
 
   // 1. Collect RTL writes. Start with the drained writes.
   std::vector<const MemoryOp*> writes;
@@ -1819,12 +1872,6 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
 	}
     }
 
-  // 4. Get reference (Whisper) data.
-  auto& vecRefMap = hartData_.at(store.hartIx_).vecRefMap_;
-  auto iter = vecRefMap.find(store.tag_);
-  assert(iter != vecRefMap.end());
-  auto& vecRefs = iter->second;
-
   auto printError = [] (unsigned hartId, uint64_t tag, const VecRef& ref) {
     cerr << "Error: hart-id=" << hartId << " tag=" << tag
 	 << " mismatch on vector store: vec-reg=" << unsigned(ref.reg_)
@@ -1833,7 +1880,7 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
       cerr << " seg=" << unsigned(ref.field_);
   };
 
-  // 5. Compare RTL data to reference data.
+  // 4. Compare RTL data to reference data.
   unsigned rtlDataIx = 0;
   for (auto& ref : vecRefs.refs_)
     {
@@ -1876,7 +1923,7 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
   if (rtlDataIx < rtlData.size())
     {
       cerr << "Warning: hart-id=" << hartId << " tag=" << store.tag_
-	   << " RTL has extra write-operation data vector store instruction.\n";
+	   << " RTL has extra write-operation data for vector store instruction.\n";
     }
 
   return true;
