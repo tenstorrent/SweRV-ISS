@@ -4123,6 +4123,7 @@ namespace WdRiscv
     void execVmv_v_x(const DecodedInst*);
     void execVmv_v_i(const DecodedInst*);
 
+    void vmvr_v(const DecodedInst*, unsigned nr);
     void execVmv1r_v(const DecodedInst*);
     void execVmv2r_v(const DecodedInst*);
     void execVmv4r_v(const DecodedInst*);

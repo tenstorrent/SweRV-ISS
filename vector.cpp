@@ -9146,8 +9146,10 @@ Hart<URV>::execVmv_v_i(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execVmv1r_v(const DecodedInst* di)
+Hart<URV>::vmvr_v(const DecodedInst* di, unsigned nr)
 {
+  assert(nr == 1 or nr == 2 or nr == 4 or nr == 8);
+
   if (not checkSewLmulVstart(di))
     return;
 
@@ -9158,30 +9160,44 @@ Hart<URV>::execVmv1r_v(const DecodedInst* di)
     }
 
   unsigned vd = di->op0(), vs1 = di->op1();
-  if (vd == vs1)
-    return;
+  if ((vd & (nr-1)) != 0  or (vs1 & (nr-1)) != 0)
+    {
+      postVecFail(di);   // Vec indices must be multiples of number of register.
+      return;
+    }
 
-  unsigned bytes = vecRegs_.bytesPerRegister();
+  unsigned bytes = vecRegs_.bytesPerRegister() * nr;
 
   unsigned start = csRegs_.peekVstart();
   unsigned bytesPerElem = vecRegs_.elemWidthInBytes(vecRegs_.elemWidth());
   unsigned elems = bytes / bytesPerElem;
-  if (start >= elems)
-    return;
 
-  uint8_t* dest = vecRegs_.getVecData(vd);
-  uint8_t* source = vecRegs_.getVecData(vs1);
-  assert(dest);
-  assert(source);
+  if (vd != vs1 and start < elems)
+    {
+      uint8_t* dest = vecRegs_.getVecData(vd);
+      uint8_t* source = vecRegs_.getVecData(vs1);
+      assert(dest);
+      assert(source);
 
-  dest += start*bytesPerElem;
-  source += start*bytesPerElem;
-  bytes -= start*bytesPerElem;
+      dest += start*bytesPerElem;
+      source += start*bytesPerElem;
+      bytes -= start*bytesPerElem;
 
-  memcpy(dest, source, bytes);
+      memcpy(dest, source, bytes);
 
-  vecRegs_.touchReg(vd, 1*8);  // Grouping of 1.
+      unsigned groupX8 = nr*8;
+      vecRegs_.touchReg(vd, groupX8);
+    }
+
   postVecSuccess();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVmv1r_v(const DecodedInst* di)
+{
+  vmvr_v(di, 1);
 }
 
 
@@ -9189,46 +9205,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv2r_v(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  if (di->isMasked())
-    {
-      postVecFail(di);
-      return;
-    }
-
-  unsigned vd = di->op0(), vs1 = di->op1();
-  if ((vd & 1) != 0 or (vs1 & 1) != 0)
-    {
-      postVecFail(di);   // Vec indices must be even
-      return;
-    }
-
-  if (vd == vs1)
-    return;
-
-  unsigned bytes = vecRegs_.bytesPerRegister() * 2;
-
-  unsigned start = csRegs_.peekVstart();
-  unsigned bytesPerElem = vecRegs_.elemWidthInBytes(vecRegs_.elemWidth());
-  unsigned elems = bytes / bytesPerElem;
-  if (start >= elems)
-    return;
-
-  uint8_t* dest = vecRegs_.getVecData(vd);
-  uint8_t* source = vecRegs_.getVecData(vs1);
-  assert(dest);
-  assert(source);
-
-  dest += start*bytesPerElem;
-  source += start*bytesPerElem;
-  bytes -= start*bytesPerElem;
-
-  memcpy(dest, source, bytes);
-
-  vecRegs_.touchReg(vd, 2*8);    // Grouping of 2
-  postVecSuccess();
+  vmvr_v(di, 2);
 }
 
 
@@ -9236,46 +9213,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv4r_v(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  if (di->isMasked())
-    {
-      postVecFail(di);
-      return;
-    }
-
-  unsigned vd = di->op0(), vs1 = di->op1();
-  if ((vd & 3) != 0 or (vs1 & 3) != 0)
-    {
-      postVecFail(di);   // Vec indices must be multiples of 4
-      return;
-    }
-
-  if (vd == vs1)
-    return;
-
-  unsigned bytes = vecRegs_.bytesPerRegister() * 4;
-
-  unsigned start = csRegs_.peekVstart();
-  unsigned bytesPerElem = vecRegs_.elemWidthInBytes(vecRegs_.elemWidth());
-  unsigned elems = bytes / bytesPerElem;
-  if (start >= elems)
-    return;
-
-  uint8_t* dest = vecRegs_.getVecData(vd);
-  uint8_t* source = vecRegs_.getVecData(vs1);
-  assert(dest);
-  assert(source);
-
-  dest += start*bytesPerElem;
-  source += start*bytesPerElem;
-  bytes -= start*bytesPerElem;
-
-  memcpy(dest, source, bytes);
-
-  vecRegs_.touchReg(vd, 4*8);  // Grouping of 4.
-  postVecSuccess();
+  vmvr_v(di, 4);
 }
 
 
@@ -9283,46 +9221,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv8r_v(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  if (di->isMasked())
-    {
-      postVecFail(di);
-      return;
-    }
-
-  unsigned vd = di->op0(), vs1 = di->op1();
-  if ((vd & 7) != 0 or (vs1 & 7) != 0)
-    {
-      postVecFail(di);   // Vec indices must be multiples of 8
-      return;
-    }
-
-  if (vd == vs1)
-    return;
-
-  unsigned bytes = vecRegs_.bytesPerRegister()*8;
-
-  unsigned start = csRegs_.peekVstart();
-  unsigned bytesPerElem = vecRegs_.elemWidthInBytes(vecRegs_.elemWidth());
-  unsigned elems = bytes / bytesPerElem;
-  if (start >= elems)
-    return;
-
-  uint8_t* dest = vecRegs_.getVecData(vd);
-  uint8_t* source = vecRegs_.getVecData(vs1);
-  assert(dest);
-  assert(source);
-
-  dest += start*bytesPerElem;
-  source += start*bytesPerElem;
-  bytes -= start*bytesPerElem;
-
-  memcpy(dest, source, bytes);
-
-  vecRegs_.touchReg(vd, 8*8);  // Grouping of 8.
-  postVecSuccess();
+  vmvr_v(di, 8);
 }
 
 
