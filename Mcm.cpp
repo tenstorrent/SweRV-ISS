@@ -3397,7 +3397,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 
       auto& instrA = prev;
 
-      if (effectiveMinTime(instrB) >= effectiveMaxTime(instrA))
+      if (effectiveMinTime(hart, instrB) >= effectiveMaxTime(instrA))
 	continue;  // In order.
 
       if (instrA.memOps_.empty() or instrB.memOps_.empty())
@@ -3548,24 +3548,39 @@ Mcm<URV>::finalChecks(Hart<URV>& hart)
 
 template <typename URV>
 uint64_t
-Mcm<URV>::effectiveMinTime(const McmInstr& instr) const
+Mcm<URV>::effectiveMinTime(Hart<URV>& hart, const McmInstr& instr) const
 {
   if (not instr.isLoad_)
     return earliestOpTime(instr);
 
-  if (not instr.complete_ and instr.memOps_.empty())
-    return time_;
+  // This is valid only if instr is the instruction being retired.
+  
+  bool isVec = instr.di_.isVector();
+  unsigned vl = 0;
+  if (isVec)
+    {
+      const VecLdStInfo& info = hart.getLastVectorMemory();
+      vl = info.elemCount_;
+    }
 
-  uint64_t mint = ~uint64_t(0);
+  uint64_t inf = ~uint64_t(0);
+  uint64_t mint = inf;
+
   for (auto opIx : instr.memOps_)
     if (opIx < sysMemOps_.size())
       {
 	auto& op = sysMemOps_.at(opIx);
+	if (isVec and op.elemIx_ >= vl)
+	  continue;
+
 	uint64_t t = op.time_;
 	if (op.isRead_ and op.forwardTime_ and op.forwardTime_ > t)
 	  t = op.forwardTime_;
 	mint = std::min(mint, t);
       }
+
+  if (mint == inf)
+    return time_;  // No valid read op.
 
   return mint;
 }
@@ -3751,7 +3766,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   auto& succ = instrB;
-  auto succTime = effectiveMinTime(succ);
+  auto succTime = effectiveMinTime(hart, instrB);
   Pma succPma = hart.getPma(succ.physAddr_);
 
   for (auto fenceTag : fences)
@@ -3886,7 +3901,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrA, const McmInstr& inst
     return false; // Incomplete store might finish after B
 
   auto timeA = latestOpTime(instrA);
-  auto timeB = effectiveMinTime(instrB);
+  auto timeB = effectiveMinTime(hart, instrB);
 
   if (timeB > timeA)
     return true;

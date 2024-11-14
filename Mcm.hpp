@@ -377,7 +377,7 @@ namespace WdRiscv
 
     /// Return the smallest time of the memory operations of the given instruction. Adjust
     /// read-operation times to account for forwarding.
-    uint64_t effectiveMinTime(const McmInstr& instr) const;
+    uint64_t effectiveMinTime(Hart<URV>& hart, const McmInstr& instr) const;
 
     /// Return the largest time of the memory operations of the given instruction. Adjust
     /// read-operation times to account for forwarding.
