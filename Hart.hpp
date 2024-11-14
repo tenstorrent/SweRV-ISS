@@ -952,6 +952,11 @@ namespace WdRiscv
     bool lastInstructionTrapped() const
     { return hasException_ or hasInterrupt_; }
 
+    /// Return true if the last execution instruction entered debug
+    /// mode because of a trigger or ebreak or if interrupt/exception.
+    bool lastInstructionCancelled() const
+    { return enteredDebugMode_ or hasException_ or hasInterrupt_; }
+
     /// Return true if the last executed instruction was interrupted.
     bool lastInstructionInterrupted() const
     { return hasInterrupt_; }
@@ -2735,8 +2740,11 @@ namespace WdRiscv
     /// can undo such instruction on behalf of the test-bench.
     void recordDivInst(unsigned rd, URV value);
 
-    /// Undo the effect of the last executed instruction given that
-    /// that a trigger has tripped.
+    // We have to undo an instruction execute when there is an instruction trigger. If
+    // there is an instruction trigger, a higher priority exception trigger may exist (such as a
+    // load/store exception) or it may need chaining so we execute the instruction to determine this.
+    // In this case, we have to restore the original value if a trigger does fire. We never
+    // commit load/store values if a trigger is fired (so no need to restore here).
     void undoForTrigger();
 
     /// Return true if the mie bit of the mstatus register is on.
@@ -5151,7 +5159,7 @@ namespace WdRiscv
     inline
     void resetExecInfo()
     {
-      triggerTripped_ = hasInterrupt_ = hasException_ = false;
+      triggerTripped_ = enteredDebugMode_ =hasInterrupt_ = hasException_ = false;
       ebreakInstDebug_ = false;
       ldStSize_ = 0;
       lastPriv_ = privMode_;
@@ -5332,6 +5340,7 @@ namespace WdRiscv
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
     URV debugParkLoop_ = ~URV(0);    // Jump to this address on entering debug mode.
     URV debugTrapAddr_ = ~URV(0);    // Jump to this address on exception in debug mode.
+    bool enteredDebugMode_ = false;  // True if entered debug mode because of trigger or ebreak.
 
     bool inDebugParkLoop_ = false;    // True if BREAKP exception goes to DPL.
 
