@@ -1792,7 +1792,7 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
     {
       if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = not triggerTripped_;  // Mark data unless instruction already tripped.
 	  triggerTripped_ = true;
 	}
     }
