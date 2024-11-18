@@ -1829,12 +1829,17 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
   // when an mbinsert crosses a mid-cache-line boundary. TBD FIX: get
   // the test-bench to send element index and field with every mbinsert.
 
+  bool allIo = true;  // RTL does the right thing for IO.
 
   // 1. Collect RTL writes. Start with the drained writes.
   std::vector<const MemoryOp*> writes;
   writes.reserve(128);
   for (auto opIx : store.memOps_)
-    writes.push_back(&sysMemOps_.at(opIx));
+    {
+      auto& op = sysMemOps_.at(opIx);
+      writes.push_back(&op);
+      allIo = allIo and hart.getPma(op.pa_).isIo();
+    }
 
   // 1.1. And append undrained writes.
   if (not store.complete_)
@@ -1843,8 +1848,14 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
       const auto& pendingWrites = hartData_.at(hartIx).pendingWrites_;
       for (auto& op : pendingWrites)
 	if (op.tag_ == store.tag_ and hartIx == op.hartIx_)
-	  writes.push_back(&op);
+	  {
+	    allIo = allIo and hart.getPma(op.pa_).isIo();
+	    writes.push_back(&op);
+	  }
     }
+
+  if (not allIo)
+    return true;   // Temporary until we get elem-ix and field with teach mbinsert.
 
   // 2. Sort writes by insertion order.
   std::sort(writes.begin(), writes.end(),
