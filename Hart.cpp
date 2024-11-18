@@ -2529,7 +2529,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-	initiateException(cause, virtAddr, va, gPhysAddr);
+        initiateException(cause, virtAddr, va, gPhysAddr);
       return false;
     }
   return true;
@@ -2544,10 +2544,10 @@ Hart<URV>::fetchInstPostTrigger(URV virtAddr, uint64_t& physAddr,
   if (fetchInst(virtAddr, physAddr, inst))
     return true;
 
-  // Fetch failed: take pending trigger-exception.
+  // Fetch failed: take pending trigger-exception or instruction trigger.
+  // If fetch fails, it is not possible to have another etrigger fire.
   URV info = virtAddr;
   takeTriggerAction(traceFile, virtAddr, info, instCounter_, true);
-
   return false;
 }
 
@@ -2997,12 +2997,12 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
       if (interrupt)
 	{
 	  if (csRegs_.intTriggerHit(cause, privMode_, virtMode_, isInterruptEnabled()))
-	    initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
+            initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
 	}
       else if (cause != URV(ExceptionCause::BREAKP))
 	{
 	  if (csRegs_.expTriggerHit(cause, privMode_, virtMode_, isInterruptEnabled()))
-	    initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
+            initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
 	}
     }
 }
@@ -4726,9 +4726,8 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst, FI
         }
     }
   else
-    {
-      fetchOk = fetchInst(addr, physAddr, inst);
-    }
+    fetchOk = fetchInst(addr, physAddr, inst);
+
   if (not fetchOk)
     {
       if (mcycleEnabled())
@@ -9505,6 +9504,8 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
     std::cerr << "Warning: Entering debug-mode while in debug-mode\n";
   debugMode_ = true;
   csRegs_.enterDebug(true);
+  enteredDebugMode_ = (cause == DebugModeCause::EBREAK) or
+                      (cause == DebugModeCause::TRIGGER);
 
   updateCachedTriggerState();
 
