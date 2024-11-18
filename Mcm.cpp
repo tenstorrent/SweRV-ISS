@@ -882,6 +882,13 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
       return false;
     }
 
+  if (instr->canceled_)
+    {
+      cerr << "Mcm::bypassOp: Error: hart-id=" << hart.hartId() << " time=" << time
+           << " tag=" << tag << " bypass op with cancelled instruction\n";
+      return false;
+    }
+
   auto& undrained = hartData_.at(hartIx).undrainedStores_;
   undrained.insert(tag);
 
@@ -1157,7 +1164,7 @@ Mcm<URV>::isPartialVecLdSt(Hart<URV>& hart, const DecodedInst& di) const
 template <typename URV>
 bool
 Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
-		 const DecodedInst& di, bool trapped)
+		 const DecodedInst& di, bool cancelled)
 {
   unsigned hartIx = hart.sysHartIndex();
   cancelNonRetired(hart, tag);
@@ -1179,19 +1186,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       return true;
     }
 
-  if (hart.inDebugMode())
-    {
-      URV dcsr = 0;
-      if (hart.peekCsr(CsrNumber::DCSR, dcsr))
-	{
-	  DcsrFields<URV> fields(dcsr);
-	  if (fields.bits_.CAUSE == unsigned(DebugModeCause::TRIGGER))
-	    trapped = true;  // Instruction did no complete because of a trigger
-	}
-    }
-
-  // If a partially executed vec ld/st store is trapped, we commit its results.
-  if (trapped and not isPartialVecLdSt(hart, di))
+  // If a partially executed vec ld/st store is cancelled, we commit its results.
+  if (cancelled and not isPartialVecLdSt(hart, di))
     {
       cancelInstr(hart, *instr);  // Instruction took a trap.
       return true;
