@@ -68,10 +68,10 @@ namespace WdRiscv
       INST_PAGE_FAULT        = 12, // Instruction page fault
       LOAD_PAGE_FAULT        = 13, // Load page fault
       STORE_PAGE_FAULT       = 15, // Store page fault
-      RESERVED0              = 16,
-      RESERVED1              = 17,
-      RESERVED2              = 18,
-      RESERVED3              = 19,
+      DOUBLE_TRAP            = 16,
+      RESERVED0              = 17,
+      SOFTWARE_CHECK         = 18,
+      HARDWARE_ERROR         = 19,
       INST_GUEST_PAGE_FAULT  = 20, // Instruction guest-page fault.
       LOAD_GUEST_PAGE_FAULT  = 21, // Load guest-page fault.
       VIRT_INST              = 22, // Virtual instruction

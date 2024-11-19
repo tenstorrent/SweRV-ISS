@@ -2683,13 +2683,12 @@ CsRegs<URV>::defineMachineRegs()
     val = 0x800000000020112d;  // MISA: acdfimv
   defineCsr("misa", Csrn::MISA, mand, imp, val, rom, rom);
 
-  // Bits corresponding to reserved interrupts are hardwired to zero
-  // in medeleg.
-  URV userBits = ( (URV(1) << unsigned(ExceptionCause::RESERVED0)) |
-                   (URV(1) << unsigned(ExceptionCause::RESERVED1)) |
-                   (URV(1) << unsigned(ExceptionCause::RESERVED2)) |
-                   (URV(1) << unsigned(ExceptionCause::RESERVED3)));
-  mask = wam & ~ userBits;
+  // Bits corresponding to reserved exceptions are hardwired to zero in medeleg.
+  // Same for double_trap (16) and m_mode_env_call (11).
+  URV hard0 = ( (URV(1) << unsigned(ExceptionCause::M_ENV_CALL))  |
+		(URV(1) << unsigned(ExceptionCause::DOUBLE_TRAP)) |
+		(URV(1) << unsigned(ExceptionCause::RESERVED0)) );
+  mask = wam & ~ hard0;
   defineCsr("medeleg", Csrn::MEDELEG, !mand, !imp, 0, mask, mask);
 
   defineCsr("mideleg", Csrn::MIDELEG, !mand, !imp, 0, wam, wam);
