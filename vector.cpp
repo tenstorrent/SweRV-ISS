@@ -4487,26 +4487,27 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
       return;
     }
 
-  if (start >= vecRegs_.elemCount())
-    return;
-
-  bool found = false;  // true if set bit is found in vs1
-
-  for (uint32_t ix = start; ix < elemCount; ++ix)
+  if (start < vecRegs_.elemCount())
     {
-      bool flag = false;
-      if (vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag))
+      bool found = false;  // true if set bit is found in vs1
+
+      for (uint32_t ix = start; ix < elemCount; ++ix)
 	{
-	  bool input = false;
-	  if (ix < vecRegs_.elemCount())
-	    vecRegs_.readMaskRegister(vs1, ix, input);
-	  found = found or input;
-	  flag = not found;
+	  bool flag = false;
+	  if (vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag))
+	    {
+	      bool input = false;
+	      if (ix < vecRegs_.elemCount())
+		vecRegs_.readMaskRegister(vs1, ix, input);
+	      found = found or input;
+	      flag = not found;
+	    }
+	  vecRegs_.writeMaskRegister(vd, ix, flag);
 	}
-      vecRegs_.writeMaskRegister(vd, ix, flag);
+
+      vecRegs_.touchMask(vd);
     }
 
-  vecRegs_.touchMask(vd);
   postVecSuccess();
 }
 
@@ -4533,26 +4534,27 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
       return;
     }
 
-  if (start >= vecRegs_.elemCount())
-    return;
-
-  bool found = false;  // true if set bit is found in vs1
-
-  for (uint32_t ix = start; ix < elemCount; ++ix)
+  if (start < vecRegs_.elemCount())
     {
-      bool flag = false;
-      if (vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag))
+      bool found = false;  // true if set bit is found in vs1
+
+      for (uint32_t ix = start; ix < elemCount; ++ix)
 	{
-	  bool input = false;
-	  if (ix < vecRegs_.elemCount())
-	    vecRegs_.readMaskRegister(vs1, ix, input);
-	  flag = not found;
-	  found = found or input;
+	  bool flag = false;
+	  if (vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag))
+	    {
+	      bool input = false;
+	      if (ix < vecRegs_.elemCount())
+		vecRegs_.readMaskRegister(vs1, ix, input);
+	      flag = not found;
+	      found = found or input;
+	    }
+	  vecRegs_.writeMaskRegister(vd, ix, flag);
 	}
-      vecRegs_.writeMaskRegister(vd, ix, flag);
+
+      vecRegs_.touchMask(vd);
     }
 
-  vecRegs_.touchMask(vd);
   postVecSuccess();
 }
 
@@ -4579,36 +4581,37 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
       return;
     }
 
-  if (start >= vecRegs_.elemCount())
-    return;
-
-  // True if masked-off elements should be set to 1.
-  bool ones = vecRegs_.isMaskAgnostic() and vecRegs_.isMaskAgnosticOnes();
-
-  bool found = false;  // true if set bit is found in vs1
-
-  for (uint32_t ix = start; ix < elemCount; ++ix)
+  if (start < vecRegs_.elemCount())
     {
-      bool flag = false;
-      bool active = vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag);
+      // True if masked-off elements should be set to 1.
+      bool ones = vecRegs_.isMaskAgnostic() and vecRegs_.isMaskAgnosticOnes();
 
-      bool input = false;
-      if (ix < vecRegs_.elemCount() and active)
-	vecRegs_.readMaskRegister(vs1, ix, input);
+      bool found = false;  // true if set bit is found in vs1
 
-      if (active)
-	vecRegs_.writeMaskRegister(vd, ix, false);
-      else if (ones)
-	vecRegs_.writeMaskRegister(vd, ix, true);
+      for (uint32_t ix = start; ix < elemCount; ++ix)
+	{
+	  bool flag = false;
+	  bool active = vecRegs_.isMaskDestActive(vd, ix, masked, elemCount, flag);
 
-      if (found or not input)
-	continue;
+	  bool input = false;
+	  if (ix < vecRegs_.elemCount() and active)
+	    vecRegs_.readMaskRegister(vs1, ix, input);
 
-      found = true;
-      vecRegs_.writeMaskRegister(vd, ix, true);
+	  if (active)
+	    vecRegs_.writeMaskRegister(vd, ix, false);
+	  else if (ones)
+	    vecRegs_.writeMaskRegister(vd, ix, true);
+
+	  if (found or not input)
+	    continue;
+
+	  found = true;
+	  vecRegs_.writeMaskRegister(vd, ix, true);
+	}
+
+      vecRegs_.touchMask(vd);  // In case nothing was written
     }
 
-  vecRegs_.touchMask(vd);  // In case nothing was written
   postVecSuccess();
 }
 
@@ -4903,62 +4906,64 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
 
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
-  if (start >= vecRegs_.elemCount())
-    return;
 
-  URV amount = 1;
-
-  // Sign extend scalar value
-  SRV replacement = SRV(intRegs_.read(rs2));
-
-  switch (sew)
+  if (start < vecRegs_.elemCount())
     {
-    case ElementWidth::Byte:
-      {
-	vslideup<uint8_t>(vd, vs1, amount, group, start, elems, masked);
-	int8_t dest = int8_t{};
-	if (vecRegs_.isDestActive(vd, 0, group, masked, dest))
-	  dest = int8_t(replacement);
-        if (not start)
-          vecRegs_.write(vd, 0, group, dest);
-      }
-      break;
+      URV amount = 1;
 
-    case ElementWidth::Half:
-      {
-	vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked);
-	int16_t dest = int16_t{};
-	if (vecRegs_.isDestActive(vd, 0, group, masked, dest) and not start)
-	  dest = int16_t(replacement);
-        if (not start)
-          vecRegs_.write(vd, 0, group, dest);
-      }
-      break;
+      // Sign extend scalar value
+      SRV replacement = SRV(intRegs_.read(rs2));
 
-    case ElementWidth::Word:
-      {
-	vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked);
-	int32_t dest = int32_t{};
-	if (vecRegs_.isDestActive(vd, 0, group, masked, dest) and not start)
-	  dest = int32_t(replacement);
-        if (not start)
-          vecRegs_.write(vd, 0, group, dest);
-      }
-      break;
+      switch (sew)
+	{
+	case ElementWidth::Byte:
+	  {
+	    vslideup<uint8_t>(vd, vs1, amount, group, start, elems, masked);
+	    int8_t dest = int8_t{};
+	    if (vecRegs_.isDestActive(vd, 0, group, masked, dest))
+	      dest = int8_t(replacement);
+	    if (not start)
+	      vecRegs_.write(vd, 0, group, dest);
+	  }
+	  break;
 
-    case ElementWidth::Word2:
-      {
-      vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked);
-      int64_t dest = int64_t{};
-	if (vecRegs_.isDestActive(vd, 0, group, masked, dest) and not start)
-	  dest = int64_t(replacement);
-        if (not start)
-          vecRegs_.write(vd, 0, group, dest);
-      }
-      break;
+	case ElementWidth::Half:
+	  {
+	    vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked);
+	    int16_t dest = int16_t{};
+	    if (vecRegs_.isDestActive(vd, 0, group, masked, dest) and not start)
+	      dest = int16_t(replacement);
+	    if (not start)
+	      vecRegs_.write(vd, 0, group, dest);
+	  }
+	  break;
 
-    default:  postVecFail(di); return;
+	case ElementWidth::Word:
+	  {
+	    vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked);
+	    int32_t dest = int32_t{};
+	    if (vecRegs_.isDestActive(vd, 0, group, masked, dest) and not start)
+	      dest = int32_t(replacement);
+	    if (not start)
+	      vecRegs_.write(vd, 0, group, dest);
+	  }
+	  break;
+
+	case ElementWidth::Word2:
+	  {
+	    vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked);
+	    int64_t dest = int64_t{};
+	    if (vecRegs_.isDestActive(vd, 0, group, masked, dest) and not start)
+	      dest = int64_t(replacement);
+	    if (not start)
+	      vecRegs_.write(vd, 0, group, dest);
+	  }
+	  break;
+
+	default:  postVecFail(di); return;
+	}
     }
+
   postVecSuccess();
 }
 
@@ -5072,43 +5077,46 @@ Hart<URV>::execVslide1down_vx(const DecodedInst* di)
 
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
-  if (start >= vecRegs_.elemCount())
-    return;
 
-  URV amount = 1;
-
-  // Sign extend scalar value
-  SRV replacement = SRV(intRegs_.read(rs2));
-
-  unsigned slot = vecRegs_.elemCount() - 1;
-  switch (sew)
+  if (start < vecRegs_.elemCount())
     {
-    case ElementWidth::Byte:
-      vslidedown<uint8_t>(vd, vs1, amount, group, start, elems, masked);
-      if (not masked or vecRegs_.isActive(0, slot))
-	vecRegs_.write(vd, slot, group, int8_t(replacement));
-      break;
 
-    case ElementWidth::Half:
-      vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked);
-      if (not masked or vecRegs_.isActive(0, slot))
-	vecRegs_.write(vd, slot, group, int16_t(replacement));
-      break;
+      URV amount = 1;
 
-    case ElementWidth::Word:
-      vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked);
-      if (not masked or vecRegs_.isActive(0, slot))
-	vecRegs_.write(vd, slot, group, int32_t(replacement));
-      break;
+      // Sign extend scalar value
+      SRV replacement = SRV(intRegs_.read(rs2));
 
-    case ElementWidth::Word2:
-      vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked);
-      if (not masked or vecRegs_.isActive(0, slot))
-	vecRegs_.write(vd, slot, group, int64_t(replacement));
-      break;
+      unsigned slot = vecRegs_.elemCount() - 1;
+      switch (sew)
+	{
+	case ElementWidth::Byte:
+	  vslidedown<uint8_t>(vd, vs1, amount, group, start, elems, masked);
+	  if (not masked or vecRegs_.isActive(0, slot))
+	    vecRegs_.write(vd, slot, group, int8_t(replacement));
+	  break;
 
-    default:  postVecFail(di); return;
+	case ElementWidth::Half:
+	  vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked);
+	  if (not masked or vecRegs_.isActive(0, slot))
+	    vecRegs_.write(vd, slot, group, int16_t(replacement));
+	  break;
+
+	case ElementWidth::Word:
+	  vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked);
+	  if (not masked or vecRegs_.isActive(0, slot))
+	    vecRegs_.write(vd, slot, group, int32_t(replacement));
+	  break;
+
+	case ElementWidth::Word2:
+	  vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked);
+	  if (not masked or vecRegs_.isActive(0, slot))
+	    vecRegs_.write(vd, slot, group, int64_t(replacement));
+	  break;
+
+	default:  postVecFail(di); return;
+	}
     }
+
   postVecSuccess();
 }
 
