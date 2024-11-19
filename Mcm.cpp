@@ -1151,7 +1151,7 @@ Mcm<URV>::isPartialVecLdSt(Hart<URV>& hart, const DecodedInst& di) const
   if (not di.isVectorLoad() and not di.isVectorStore())
     return false;
 
-  assert(hart.lastInstructionTrapped());
+  assert(hart.lastInstructionCancelled());
 
   URV elems = 0;  // Partially completed elements.
   if (not hart.peekCsr(CsrNumber::VSTART, elems))
