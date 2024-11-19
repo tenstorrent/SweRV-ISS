@@ -37,6 +37,7 @@ namespace WdRiscv
     bool       failRead_  : 1  = false;
     bool       canceled_  : 1  = false;
     bool       bypass_    : 1  = false;   // True if a bypass operation.
+    bool       isIo_      : 1  = false;   // True if in IO region.
 
     /// Return true if address range of this operation overlaps that of the given one.
     bool overlaps(const MemoryOp& other) const

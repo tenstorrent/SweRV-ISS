@@ -150,6 +150,7 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsi
   op.canceled_ = true; // To be later marked as false if used.
   op.elemIx_ = elemIx;
   op.field_ = field;
+  op.isIo_ = hart.getPma(op.pa_).isIo();
 
   // Read Whisper memory and keep it in op, this will be updated when the load is retired
   // by forwarding from preceding stores.
@@ -812,6 +813,7 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
   op.size_ = size;
   op.isRead_ = false;
   op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
+  op.isIo_ = hart.getPma(op.pa_).isIo();
 
   if (not writeOnInsert_)
     hartData_.at(hartIx).pendingWrites_.push_back(op);
@@ -931,6 +933,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	  op.isRead_ = false;
 	  op.bypass_ = true;
 	  op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
+	  op.isIo_ = hart.getPma(op.pa_).isIo();
 
 	  // Associate write op with instruction.
 	  instr->addMemOp(sysMemOps_.size());
@@ -951,6 +954,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
       op.isRead_ = false;
       op.bypass_ = true;
       op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
+      op.isIo_ = hart.getPma(op.pa_).isIo();
 
       // Associate write op with instruction.
       instr->addMemOp(sysMemOps_.size());
@@ -1838,7 +1842,7 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
     {
       auto& op = sysMemOps_.at(opIx);
       writes.push_back(&op);
-      allIo = allIo and hart.getPma(op.pa_).isIo();
+      allIo = allIo and op.isIo_;
     }
 
   // 1.1. And append undrained writes.
@@ -1849,7 +1853,7 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
       for (auto& op : pendingWrites)
 	if (op.tag_ == store.tag_ and hartIx == op.hartIx_)
 	  {
-	    allIo = allIo and hart.getPma(op.pa_).isIo();
+	    allIo = allIo and op.isIo_;
 	    writes.push_back(&op);
 	  }
     }
@@ -3390,6 +3394,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
       const auto& op = *iter;
       if (op.isCanceled() or op.hartIx_ != hartIx or op.tag_ >= instrB.tag_)
 	continue;
+
       if (op.time_ < earlyB)
 	break;
 
@@ -3490,8 +3495,10 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
       const auto& op = *iter;
       if (op.isCanceled() or op.hartIx_ != hartIx or op.tag_ >= instrB.tag_)
 	continue;
+
       if (op.time_ < earlyB)
 	break;
+
       const auto& instrA =  instrVec.at(op.tag_);
       if (instrA.isCanceled() or not instrA.isRetired())
 	continue;
