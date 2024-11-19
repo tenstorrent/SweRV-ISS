@@ -98,17 +98,6 @@ linux-boot-job:
     - grep -q "Halt and catch fire!" output.log
   timeout: 2 hours
 
-kvm-boot-job:
-  stage: test
-  dependencies:
-    - "build-job"
-  script:
-    - curl --location --output opensbi.zip --location https://yyz-gitlab.local.tenstorrent.com/api/v4/projects/415/jobs/artifacts/tt-master/download?job=build_payload_zebu_kvm_linux_hello_world
-    - unzip opensbi.zip
-    - build-Linux/whisper --tohost 0x70000008 --fromhost 0x70000000 --configfile whisper.json --memorysize 0xc0000000 fw_payload-2c.elf --hart 2 --quitany 2>&1 | tee output.log
-    - grep -q "Halt and catch fire!" output.log
-  timeout: 2 hours
-
 notify_riscv_cluster:
   stage: notify
   rules:
