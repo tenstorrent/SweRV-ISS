@@ -1291,6 +1291,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (isEnabled(PpoRule::R13))
     ok = ppoRule13(hart, *instr) and ok;
 
+  ok = ioPpoChecks(hart, *instr) and ok;
+
   updateDependencies(hart, *instr);
   setBranchMemTime(hart, *instr);
 
@@ -4168,7 +4170,7 @@ Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
 
   const auto& undrained = hartData_.at(hartIx).undrainedStores_;
 
-  for (auto& tag : undrained)
+  for (auto tag : undrained)
     {
       if (tag >= instrB.tag_)
 	break;
@@ -4730,6 +4732,64 @@ Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
 	    }
 	}
     }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::ioPpoChecks(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Identify earliest IO memory time of instr B.
+  uint64_t inf = ~uint64_t(0);
+  uint64_t earlyB = inf;
+  for (auto opIx : instrB.memOps_)
+    {
+      auto& op = sysMemOps_.at(opIx);
+      if (not op.isIo_  and  not op.canceled_)
+	earlyB = std::min(earlyB, op.time_);
+    }
+
+  if (earlyB == inf)
+    return true; // No IO memory ops.
+
+  auto hartIx = hart.sysHartIndex();
+
+  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+    {
+      const auto& op = *iter;
+      if (op.isCanceled() or op.hartIx_ != hartIx or op.tag_ >= instrB.tag_ or
+	  not op.isIo_ or op.time_ < earlyB)
+	continue;
+
+      cerr << "Error: IO PPO rule failed: hart-id=" << hart.hartId() << " tag1="
+	   << op.tag_ << " tag2=" << instrB.tag_ << " time1=" << op.time_
+	   << " time2=" << earlyB << '\n';
+      return false;
+    }
+
+#if 0
+  // Check that all undrained IO ops belong to instructions that follow B in program
+  // order.
+  const auto& undrained = hartData_.at(hartIx).undrainedStores_;
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
+
+  for (auto tag : undrained)
+    {
+      if (tag >= instrB.tag_)
+	break;
+      const auto& instrA = instrVec.at(tag);
+      if (instrA.memOps_.empty())
+	;
+
+      // For each reference byte physical address of A.
+      //    If not address is IO continue
+      //    If adress is covered by a memory op of A continue
+      //    error
+      //    return false
+    }
+#endif
 
   return true;
 }

@@ -311,6 +311,8 @@ namespace WdRiscv
     /// Check PPO rule13. See ppoRule1.
     bool ppoRule13(Hart<URV>& hart, const McmInstr& instr) const;
 
+    bool ioPpoChecks(Hart<URV>& hart, const McmInstr& instr) const;
+
     /// Helper to main ppoRule1. Check A against B.
     bool ppoRule1(unsigned hartId, const McmInstr& instrA, const McmInstr& instrB) const;
 
