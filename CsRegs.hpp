@@ -1380,12 +1380,35 @@ namespace WdRiscv
       return csr.read();
     }
 
-    /// Return the effective interrupt enable mask: This is MIE ored
-    /// with the virtual interrupt enable implied by MVIEN.
-    URV effectiveInterruptEnable() const
+    /// Return the machine effective interrupt enable mask. This is
+    /// MIE and-ed with non-delegated interrupts.
+    URV effectiveMachineInterruptEnable() const
     {
       const auto& csr = regs_.at(size_t(CsrNumber::MIE));
-      return csr.read() | shadowSie_;
+      const auto& mideleg = regs_.at(size_t(CsrNumber::MIDELEG));
+      return csr.read() & ~mideleg.read();
+    }
+
+    /// Return the effective interrupt enable mask. This is
+    /// SIE with mideleg and mvien delegated interrupts and
+    /// not delegated by hideleg.
+    URV effectiveSupervisorInterruptEnable() const
+    {
+      const auto& mie = regs_.at(size_t(CsrNumber::MIE));
+      const auto& hideleg = regs_.at(size_t(CsrNumber::HIDELEG));
+      return (mie.read() | shadowSie_) & ~hideleg.read();
+    }
+
+    /// Return the effective interrupt enable mask. This is
+    /// VSIE with hideleg and hvien delegated interrupts. 
+    URV effectiveVirtSupervisorInterruptEnable() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::VSIE));
+      const auto& mie = regs_.at(size_t(CsrNumber::MIE));
+      const auto& hideleg = regs_.at(size_t(CsrNumber::HIDELEG));
+      const auto& hvien = regs_.at(size_t(CsrNumber::HVIEN));
+      return ((mie.read() | shadowSie_) & hideleg.read()) |
+              (csr.read() & ~hideleg.read() & hvien.read());
     }
 
     /// Fast peek method for MSTATUS
@@ -1539,19 +1562,13 @@ namespace WdRiscv
     /// Return adjusted value.
     URV adjustPmpValue(CsrNumber csrn, URV value) const;
 
-    /// Read value of SIP (MIP masked with MIDELEG). This never
-    /// maps to VSIP.
+    /// Read value of SIP (MIP masked with MIDELEG). This may
+    /// map to VSIP with AIA.
     bool readSip(URV& value) const;
 
-    /// Read value of SIE (MIE masked with MIDELEG). This never
-    /// maps to VSIP.
+    /// Read value of SIE (MIE masked with MIDELEG). This may
+    /// map to VSIE with AIA.
     bool readSie(URV& value) const;
-
-    /// Helper to read method.
-    bool readVsip(URV& value) const;
-
-    /// Helper to read method.
-    bool readVsie(URV& value) const;
 
     /// Helper to read method.
     bool readMvip(URV& value) const;
@@ -1585,10 +1602,10 @@ namespace WdRiscv
     bool readVsireg(CsrNumber num, URV& value, bool virtMode) const;
 
     /// Helper to write method: Mask with MIP/MIDELEG.
-    bool writeSip(URV value);
+    bool writeSip(URV value, bool recordWr = true);
 
     /// Helper to write method: Mask with SIP/MIDELEG.
-    bool writeSie(URV value);
+    bool writeSie(URV value, bool recordWr = true);
 
     /// Helper to write method.
     bool writeVsip(URV value);

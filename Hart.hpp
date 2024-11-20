@@ -2032,16 +2032,20 @@ namespace WdRiscv
 
     /// Return true if external interrupts are enabled and one or more
     /// external interrupt that is pending is also enabled. Set cause
-    /// to the type of interrupt if one is possible; otherwise, leave
+    /// to the type of interrupt if one is possible, nextMode/nextVirt to
+    /// which mode it should be taken; otherwise, leave
     /// it unmodified. If more than one interrupt is possible, set
     /// cause to the possible interrupt with the highest priority.
-    bool isInterruptPossible(InterruptCause& cause) const;
+    bool isInterruptPossible(InterruptCause& cause, PrivilegeMode& nextMode, bool& nextVirt) const;
 
-    /// Return true if this hart would take an interrupt if the MIP
-    /// CSR were to have the given value. Do not change MIP, do not
+    /// Return true if this hart would take an interrupt if the interrupt
+    /// pending CSRs would have the given value. Do not change MIP, do not
     /// change processor state. If interrupt is possible, set cause
-    /// to the interrupt cause; otherwise, leave cause unmodified.
-    bool isInterruptPossible(URV mipValue, InterruptCause& cause) const;
+    /// to the interrupt cause, nextMode/nextVirt to which mode it
+    /// should be taken; otherwise, leave cause unmodified.
+    bool isInterruptPossible(URV mipValue, URV sipValue, URV vsipValue,
+                              InterruptCause& cause, PrivilegeMode& nextMode,
+                              bool& nextVirt) const;
 
     /// Configure this hart to set its program counter to the given addr on entering debug
     /// mode. If addr bits are all set, then the PC is not changed on entering debug mode.
@@ -3005,7 +3009,8 @@ namespace WdRiscv
 			   const DecodedInst* di = nullptr);
 
     /// Start an asynchronous exception (interrupt).
-    void initiateInterrupt(InterruptCause cause, URV pc);
+    void initiateInterrupt(InterruptCause cause, PrivilegeMode nextMode,
+                           bool nextVirt, URV pc);
 
     /// Start a non-maskable interrupt. Return true if successful. Return false
     /// if Smrnmi and nmis are disabled.
@@ -3038,8 +3043,9 @@ namespace WdRiscv
     /// exception or the instruction to resume after asynchronous
     /// exception is handled). The info and info2 value holds additional
     /// information about an exception.
-    void initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pcToSave, URV info,
-                      URV info2 = 0);
+    void initiateTrap(const DecodedInst* di, bool interrupt, URV cause,
+                      PrivilegeMode nextMode, bool nextVirt,
+                      URV pcToSave, URV info, URV info2 = 0);
 
     /// Create trap instruction information for mtinst/htinst.
     uint32_t createTrapInst(const DecodedInst* di, bool interrupt, unsigned cause, URV info, URV info2) const;
@@ -5321,7 +5327,9 @@ namespace WdRiscv
     Emstatus<URV> mstatus_;         // Cached value of mstatus CSR or mstatush/mstatus.
     MstatusFields<URV> vsstatus_;   // Cached value of vsstatus CSR
     HstatusFields<URV> hstatus_;    // Cached value of hstatus CSR
-    URV effectiveIe_ = 0;           // Effective interrupt enable.
+    URV effectiveMie_ = 0;          // Effective machine interrupt enable.
+    URV effectiveSie_ = 0;          // Effective supervisor interrupt enable.
+    URV effectiveVsie_ = 0;         // Effective v supervisor interrupt enable.
 
     bool clearMprvOnRet_ = true;
     bool cancelLrOnTrap_ = false;   // Cancel reservation on traps when true.
