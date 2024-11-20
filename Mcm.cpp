@@ -155,7 +155,7 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsi
   // Read Whisper memory and keep it in op, this will be updated when the load is retired
   // by forwarding from preceding stores.
   uint64_t refVal = 0;
-  op.failRead_ = referenceModelRead(hart, pa, size, refVal);
+  op.failRead_ = not referenceModelRead(hart, pa, size, refVal);
   op.data_ = refVal;
 
   instr->addMemOp(sysMemOps_.size());
@@ -4741,32 +4741,54 @@ template <typename URV>
 bool
 Mcm<URV>::ioPpoChecks(Hart<URV>& hart, const McmInstr& instrB) const
 {
+  // We check that IO memory operations are never reordered. This is stronger
+  // that what is required by the spec. We will eventually relax this for
+  // non strongly ordered regions.
+
+  auto hartIx = hart.sysHartIndex();
+
   // Identify earliest IO memory time of instr B.
   uint64_t inf = ~uint64_t(0);
-  uint64_t earlyB = inf;
+  uint64_t earlyRead = inf, earlyWrite = inf;
   for (auto opIx : instrB.memOps_)
     {
       auto& op = sysMemOps_.at(opIx);
       if (not op.isIo_  and  not op.canceled_)
-	earlyB = std::min(earlyB, op.time_);
+	{
+	  if (op.isRead_)
+	    earlyRead = std::min(earlyRead, op.time_);
+	  else
+	    earlyWrite = std::min(earlyWrite, op.time_);
+	}
     }
 
-  if (earlyB == inf)
-    return true; // No IO memory ops.
-
-  auto hartIx = hart.sysHartIndex();
-
-  for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+  // Check for IO memory operation reordering.
+  // Currently checking read against read, and write against write. We will generalize
+  // once we get more accurate IO timing from the test-bench.
+  for (auto isRead : { true, false })
     {
-      const auto& op = *iter;
-      if (op.isCanceled() or op.hartIx_ != hartIx or op.tag_ >= instrB.tag_ or
-	  not op.isIo_ or op.time_ < earlyB)
-	continue;
+      auto earlyB = isRead? earlyRead : earlyWrite;
+      if (earlyB == inf)
+	continue; // No IO memory ops.
 
-      cerr << "Error: IO PPO rule failed: hart-id=" << hart.hartId() << " tag1="
-	   << op.tag_ << " tag2=" << instrB.tag_ << " time1=" << op.time_
-	   << " time2=" << earlyB << '\n';
-      return false;
+      // Identify IO ops reordered with respect to B.
+      for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+	{
+	  const auto& op = *iter;
+	  if (op.isCanceled() or op.hartIx_ != hartIx or op.tag_ >= instrB.tag_ or not op.isIo_)
+	    continue;
+	  
+	  if (op.isRead_ != isRead)
+	    continue;  // Temporary till we get more accurate IO timing.
+
+	  if (op.time_ < earlyB)
+	    continue;
+
+	  cerr << "Error: IO PPO rule failed: hart-id=" << hart.hartId() << " tag1="
+	       << op.tag_ << " tag2=" << instrB.tag_ << " time1=" << op.time_
+	       << " time2=" << earlyB << '\n';
+	  return false;
+	}
     }
 
 #if 0
