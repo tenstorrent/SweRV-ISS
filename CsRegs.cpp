@@ -327,6 +327,7 @@ CsRegs<URV>::writeMvien(URV value)
       URV mask = URV(0x1fff);
       hideleg->setReadMask((hideleg->getReadMask() & mask) |
                            (mideleg->read() & value & ~mask));
+      hideleg->write(hideleg->read());
     }
   return true;
 }
@@ -5037,8 +5038,8 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       // Updating HIP is reflected in VSIP.
       if (vsip and num != CsrNumber::VSIP)
 	{
-          URV mask = 0xfff;
-	  URV newVal = (vsip->read() & ~mask) | vsInterruptToS(hip->read() & mask);  // Clear bit 12 (SGEIP)
+          URV mask = 0x1000;
+	  URV newVal = (vsip->read() & ~mask) | vsInterruptToS(hip->read() & ~mask);  // Clear bit 12 (SGEIP)
 	  updateCsr(vsip, newVal);
 	}
 

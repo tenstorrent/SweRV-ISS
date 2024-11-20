@@ -2674,6 +2674,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2, 
   exceptionCount_++;
   hasException_ = true;
 
+  // By default, exceptions are taken in machine mode.
   using PM = PrivilegeMode;
   PM nextMode = PM::Machine;
   bool nextVirt = false;
