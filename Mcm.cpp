@@ -150,6 +150,7 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsi
   op.canceled_ = true; // To be later marked as false if used.
   op.elemIx_ = elemIx;
   op.field_ = field;
+  op.isIo_ = hart.getPma(op.pa_).isIo();
 
   // Read Whisper memory and keep it in op, this will be updated when the load is retired
   // by forwarding from preceding stores.
@@ -812,6 +813,7 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
   op.size_ = size;
   op.isRead_ = false;
   op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
+  op.isIo_ = hart.getPma(op.pa_).isIo();
 
   if (not writeOnInsert_)
     hartData_.at(hartIx).pendingWrites_.push_back(op);
@@ -882,6 +884,13 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
       return false;
     }
 
+  if (instr->canceled_)
+    {
+      cerr << "Mcm::bypassOp: Error: hart-id=" << hart.hartId() << " time=" << time
+           << " tag=" << tag << " bypass op with cancelled instruction\n";
+      return false;
+    }
+
   auto& undrained = hartData_.at(hartIx).undrainedStores_;
   undrained.insert(tag);
 
@@ -924,6 +933,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	  op.isRead_ = false;
 	  op.bypass_ = true;
 	  op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
+	  op.isIo_ = hart.getPma(op.pa_).isIo();
 
 	  // Associate write op with instruction.
 	  instr->addMemOp(sysMemOps_.size());
@@ -944,6 +954,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
       op.isRead_ = false;
       op.bypass_ = true;
       op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
+      op.isIo_ = hart.getPma(op.pa_).isIo();
 
       // Associate write op with instruction.
       instr->addMemOp(sysMemOps_.size());
@@ -1144,7 +1155,7 @@ Mcm<URV>::isPartialVecLdSt(Hart<URV>& hart, const DecodedInst& di) const
   if (not di.isVectorLoad() and not di.isVectorStore())
     return false;
 
-  assert(hart.lastInstructionTrapped());
+  assert(hart.lastInstructionCancelled());
 
   URV elems = 0;  // Partially completed elements.
   if (not hart.peekCsr(CsrNumber::VSTART, elems))
@@ -1157,7 +1168,7 @@ Mcm<URV>::isPartialVecLdSt(Hart<URV>& hart, const DecodedInst& di) const
 template <typename URV>
 bool
 Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
-		 const DecodedInst& di, bool trapped)
+		 const DecodedInst& di, bool cancelled)
 {
   unsigned hartIx = hart.sysHartIndex();
   cancelNonRetired(hart, tag);
@@ -1179,19 +1190,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       return true;
     }
 
-  if (hart.inDebugMode())
-    {
-      URV dcsr = 0;
-      if (hart.peekCsr(CsrNumber::DCSR, dcsr))
-	{
-	  DcsrFields<URV> fields(dcsr);
-	  if (fields.bits_.CAUSE == unsigned(DebugModeCause::TRIGGER))
-	    trapped = true;  // Instruction did no complete because of a trigger
-	}
-    }
-
-  // If a partially executed vec ld/st store is trapped, we commit its results.
-  if (trapped and not isPartialVecLdSt(hart, di))
+  // If a partially executed vec ld/st store is cancelled, we commit its results.
+  if (cancelled and not isPartialVecLdSt(hart, di))
     {
       cancelInstr(hart, *instr);  // Instruction took a trap.
       return true;
@@ -1833,12 +1833,17 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
   // when an mbinsert crosses a mid-cache-line boundary. TBD FIX: get
   // the test-bench to send element index and field with every mbinsert.
 
+  bool allIo = true;  // RTL does the right thing for IO.
 
   // 1. Collect RTL writes. Start with the drained writes.
   std::vector<const MemoryOp*> writes;
   writes.reserve(128);
   for (auto opIx : store.memOps_)
-    writes.push_back(&sysMemOps_.at(opIx));
+    {
+      auto& op = sysMemOps_.at(opIx);
+      writes.push_back(&op);
+      allIo = allIo and op.isIo_;
+    }
 
   // 1.1. And append undrained writes.
   if (not store.complete_)
@@ -1847,8 +1852,14 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
       const auto& pendingWrites = hartData_.at(hartIx).pendingWrites_;
       for (auto& op : pendingWrites)
 	if (op.tag_ == store.tag_ and hartIx == op.hartIx_)
-	  writes.push_back(&op);
+	  {
+	    allIo = allIo and op.isIo_;
+	    writes.push_back(&op);
+	  }
     }
+
+  if (not allIo)
+    return true;   // Temporary until we get elem-ix and field with teach mbinsert.
 
   // 2. Sort writes by insertion order.
   std::sort(writes.begin(), writes.end(),
@@ -2033,14 +2044,17 @@ Mcm<URV>::checkStoreComplete(unsigned hartIx, const McmInstr& instr) const
 	mask = maskCoveredBytes(addr, size, op.pa_, op.size_);
       else
 	{
-	  unsigned size1 = offsetToNextPage(addr);
-	  if (pageNum(op.pa_) == pageNum(addr))
-	    mask = maskCoveredBytes(addr, size1, op.pa_, op.size_);
+	  if (pageNum(addr) == pageNum(addr2))
+	    mask = maskCoveredBytes(addr, size, op.pa_, op.size_);
 	  else
 	    {
+	      unsigned size1 = offsetToNextPage(addr);
+	      mask = maskCoveredBytes(addr, size1, op.pa_, op.size_);
+
 	      unsigned size2 = size - size1;
-	      mask = maskCoveredBytes(addr2, size2, op.pa_, op.size_);
-	      mask = mask << size1;
+	      unsigned mask2 = maskCoveredBytes(addr2, size2, op.pa_, op.size_);
+	      mask2 <<= size1;
+	      mask |= mask2;
 	    }
 	}
 
@@ -3380,6 +3394,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
       const auto& op = *iter;
       if (op.isCanceled() or op.hartIx_ != hartIx or op.tag_ >= instrB.tag_)
 	continue;
+
       if (op.time_ < earlyB)
 	break;
 
@@ -3397,7 +3412,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 
       auto& instrA = prev;
 
-      if (effectiveMinTime(instrB) >= effectiveMaxTime(instrA))
+      if (effectiveMinTime(hart, instrB) >= effectiveMaxTime(instrA))
 	continue;  // In order.
 
       if (instrA.memOps_.empty() or instrB.memOps_.empty())
@@ -3480,8 +3495,10 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
       const auto& op = *iter;
       if (op.isCanceled() or op.hartIx_ != hartIx or op.tag_ >= instrB.tag_)
 	continue;
+
       if (op.time_ < earlyB)
 	break;
+
       const auto& instrA =  instrVec.at(op.tag_);
       if (instrA.isCanceled() or not instrA.isRetired())
 	continue;
@@ -3548,24 +3565,39 @@ Mcm<URV>::finalChecks(Hart<URV>& hart)
 
 template <typename URV>
 uint64_t
-Mcm<URV>::effectiveMinTime(const McmInstr& instr) const
+Mcm<URV>::effectiveMinTime(Hart<URV>& hart, const McmInstr& instr) const
 {
   if (not instr.isLoad_)
     return earliestOpTime(instr);
 
-  if (not instr.complete_ and instr.memOps_.empty())
-    return time_;
+  // This is valid only if instr is the instruction being retired.
+  
+  bool isVec = instr.di_.isVector();
+  unsigned vl = 0;
+  if (isVec)
+    {
+      const VecLdStInfo& info = hart.getLastVectorMemory();
+      vl = info.elemCount_;
+    }
 
-  uint64_t mint = ~uint64_t(0);
+  uint64_t inf = ~uint64_t(0);
+  uint64_t mint = inf;
+
   for (auto opIx : instr.memOps_)
     if (opIx < sysMemOps_.size())
       {
 	auto& op = sysMemOps_.at(opIx);
+	if (isVec and op.elemIx_ >= vl)
+	  continue;
+
 	uint64_t t = op.time_;
 	if (op.isRead_ and op.forwardTime_ and op.forwardTime_ > t)
 	  t = op.forwardTime_;
 	mint = std::min(mint, t);
       }
+
+  if (mint == inf)
+    return time_;  // No valid read op.
 
   return mint;
 }
@@ -3751,7 +3783,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   auto& succ = instrB;
-  auto succTime = effectiveMinTime(succ);
+  auto succTime = effectiveMinTime(hart, instrB);
   Pma succPma = hart.getPma(succ.physAddr_);
 
   for (auto fenceTag : fences)
@@ -3885,8 +3917,8 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrA, const McmInstr& inst
   if (not instrA.complete_)
     return false; // Incomplete store might finish after B
 
-  auto timeA = latestOpTime(instrA);
-  auto timeB = effectiveMinTime(instrB);
+  auto timeA = effectiveMaxTime(instrA);
+  auto timeB = effectiveMinTime(hart, instrB);
 
   if (timeB > timeA)
     return true;
@@ -3988,7 +4020,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 
 template <typename URV>
 bool
-Mcm<URV>::ppoRule6(const McmInstr& instrA, const McmInstr& instrB) const
+Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrA, const McmInstr& instrB) const
 {
   bool hasRelease = instrB.di_.isAtomicRelease();
   if (isTso_)
@@ -4011,8 +4043,8 @@ Mcm<URV>::ppoRule6(const McmInstr& instrA, const McmInstr& instrB) const
   if (instrB.memOps_.empty())
     return true;   // Un-drained store.
 
-  auto btime = earliestOpTime(instrB);
-  return latestOpTime(instrA) < btime;  // A finishes before B.
+  auto btime = effectiveMinTime(hart, instrB);
+  return effectiveMaxTime(instrA) < btime;  // A finishes before B.
 }
 
 
@@ -4038,7 +4070,7 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
       if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory())
 	continue;
 
-      if (not ppoRule6(instrA, instrB))
+      if (not ppoRule6(hart, instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 6 failed: hart-id=" << hart.hartId()
 	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
@@ -4053,7 +4085,7 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
       if (tag >= instrB.tag_)
 	break;
       const auto& instrA =  instrVec.at(tag);
-      if (not ppoRule6(instrA, instrB))
+      if (not ppoRule6(hart, instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 6 failed: hart-id=" << hart.hartId()
 	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';

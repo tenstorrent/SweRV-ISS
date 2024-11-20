@@ -206,21 +206,26 @@ CsRegs<URV>::readSie(URV& value) const
   auto sie = getImplementedCsr(CsrNumber::SIE);
   if (not sie)
     return false;
-  value = sie->read();
 
-  // Read value of MIP/SIP is masked by MIDELG.
+  auto sieVal = sie->read();
+  value = sieVal;
+
   auto deleg = getImplementedCsr(CsrNumber::MIDELEG);
-  if (deleg)
-    value &= deleg->read();
-
-  // Where mideleg is 0 and mvien is 1, sie becomes a writable.
   auto mvien = getImplementedCsr(CsrNumber::MVIEN);
   auto mvip = getImplementedCsr(CsrNumber::MVIP);
+
   if (deleg and mvien and mvip)
     {
+      // Where MIDELEG is 0 and MVIEN is 1, SIE becomes writable.
       URV mask = mvien->read() & ~deleg->read();
-      value = (value & ~mask) | (shadowSie_ & mask);
+      value = shadowSie_ & mask;
+
+      // Everywhere else it is masked by MIDELEG
+      mask = ~mask & deleg->read();
+      value |= (sieVal & mask);
     }
+  else if (deleg)
+    value = sieVal & deleg->read();
 
   // Bits SGEIP, VSEIP, VSTIP, VSSIP are read-only zero in SIE/SIP.
   value &= ~ URV(0x1444);
@@ -2678,13 +2683,12 @@ CsRegs<URV>::defineMachineRegs()
     val = 0x800000000020112d;  // MISA: acdfimv
   defineCsr("misa", Csrn::MISA, mand, imp, val, rom, rom);
 
-  // Bits corresponding to reserved interrupts are hardwired to zero
-  // in medeleg.
-  URV userBits = ( (URV(1) << unsigned(ExceptionCause::RESERVED0)) |
-                   (URV(1) << unsigned(ExceptionCause::RESERVED1)) |
-                   (URV(1) << unsigned(ExceptionCause::RESERVED2)) |
-                   (URV(1) << unsigned(ExceptionCause::RESERVED3)));
-  mask = wam & ~ userBits;
+  // Bits corresponding to reserved exceptions are hardwired to zero in medeleg.
+  // Same for double_trap (16) and m_mode_env_call (11).
+  URV hard0 = ( (URV(1) << unsigned(ExceptionCause::M_ENV_CALL))  |
+		(URV(1) << unsigned(ExceptionCause::DOUBLE_TRAP)) |
+		(URV(1) << unsigned(ExceptionCause::RESERVED0)) );
+  mask = wam & ~ hard0;
   defineCsr("medeleg", Csrn::MEDELEG, !mand, !imp, 0, mask, mask);
 
   defineCsr("mideleg", Csrn::MIDELEG, !mand, !imp, 0, wam, wam);

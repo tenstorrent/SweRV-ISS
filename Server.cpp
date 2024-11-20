@@ -735,9 +735,8 @@ Server<URV>::stepCommand(const WhisperMessage& req,
       hart.setInstructionCount(req.instrTag - 1);
       hart.singleStep(di, traceFile);
       if (not di.isValid())
-	assert(hart.lastInstructionTrapped());
-      bool trapped = hart.lastInstructionTrapped();
-      ok = system_.mcmRetire(hart, req.time, req.instrTag, di, trapped);
+	assert(hart.lastInstructionCancelled());
+      ok = system_.mcmRetire(hart, req.time, req.instrTag, di, hart.lastInstructionCancelled());
     }
   else
     hart.singleStep(di, traceFile);

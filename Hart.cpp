@@ -1792,7 +1792,7 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
     {
       if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = not triggerTripped_;  // Mark data unless instruction already tripped.
 	  triggerTripped_ = true;
 	}
     }
@@ -2529,7 +2529,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-	initiateException(cause, virtAddr, va, gPhysAddr);
+        initiateException(cause, virtAddr, va, gPhysAddr);
       return false;
     }
   return true;
@@ -2544,10 +2544,10 @@ Hart<URV>::fetchInstPostTrigger(URV virtAddr, uint64_t& physAddr,
   if (fetchInst(virtAddr, physAddr, inst))
     return true;
 
-  // Fetch failed: take pending trigger-exception.
+  // Fetch failed: take pending trigger-exception or instruction trigger.
+  // If fetch fails, it is not possible to have another etrigger fire.
   URV info = virtAddr;
   takeTriggerAction(traceFile, virtAddr, info, instCounter_, true);
-
   return false;
 }
 
@@ -2997,12 +2997,12 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
       if (interrupt)
 	{
 	  if (csRegs_.intTriggerHit(cause, privMode_, virtMode_, isInterruptEnabled()))
-	    initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
+            initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
 	}
       else if (cause != URV(ExceptionCause::BREAKP))
 	{
 	  if (csRegs_.expTriggerHit(cause, privMode_, virtMode_, isInterruptEnabled()))
-	    initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
+            initiateTrap(di, false /* interrupt*/,  URV(ExceptionCause::BREAKP), pc_, 0, 0);
 	}
     }
 }
@@ -4710,26 +4710,22 @@ inline
 bool
 Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst, FILE* file)
 {
-  // Process pre-execute address trigger and fetch instruction.
+  // Process pre-execute address trigger.
   bool hasTrig = hasActiveInstTrigger();
   triggerTripped_ = hasTrig and instAddrTriggerHit(addr, 4 /*size*/, TriggerTiming::Before);
-  // Fetch instruction.
-  bool fetchOk = true;
+
+  dataAddrTrig_ = false;  // Not an data-address trigger.
+
   if (triggerTripped_)
     {
-      dataAddrTrig_ = false;
-      if (not fetchInstPostTrigger(addr, physAddr, inst, file))
-        {
-	  if (mcycleEnabled())
-	    ++cycleCount_;
-          return false;  // Next instruction in trap handler.
-        }
+      if (mcycleEnabled())
+	++cycleCount_;
+      takeTriggerAction(file, addr, addr /*info*/, instCounter_, true);
+      return false;  // Next instruction in trap handler.
     }
-  else
-    {
-      fetchOk = fetchInst(addr, physAddr, inst);
-    }
-  if (not fetchOk)
+
+  // Fetch instruction.
+  if (not fetchInst(addr, physAddr, inst))
     {
       if (mcycleEnabled())
 	++cycleCount_;
@@ -4744,10 +4740,13 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst, FI
     }
 
   // Process pre-execute opcode trigger.
-  if (hasTrig and instOpcodeTriggerHit(inst, TriggerTiming::Before))
+  triggerTripped_ = hasTrig and instOpcodeTriggerHit(inst, TriggerTiming::Before);
+  if (triggerTripped_)
     {
-      dataAddrTrig_ = false;
-      triggerTripped_ = true;
+      if (mcycleEnabled())
+	++cycleCount_;
+      takeTriggerAction(file, addr, addr /*info*/, instCounter_, true);
+      return false;  // Next instruction in trap handler.
     }
 
   return true;
@@ -4832,7 +4831,6 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	  currPc_ = pc_;
 
 	  ++instCounter_;
-
 	  if (mcycleEnabled())
 	    ++cycleCount_;
 
@@ -4853,6 +4851,14 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	  pc_ += di->instSize();
 	  execute(di);
 
+	  if (hasException_)
+	    {
+              if (doStats)
+                accumulateInstructionStats(*di);
+	      printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
+	      continue;
+	    }
+
 	  if (initStateFile_)
 	    {
 	      for (const auto& walk : virtMem_.getFetchWalks())
@@ -4865,27 +4871,18 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
                     dumpInitState("dpt", entry.addr_, entry.addr_);
 	    }
 
-	  if (sdtrigOn_ and icountTriggerHit())
-	    if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
-	      return true;
-
-	  if (hasException_)
-	    {
-              if (doStats)
-                accumulateInstructionStats(*di);
-	      printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
-	      continue;
-	    }
-
 	  if (triggerTripped_)
 	    {
-	      // If this is an address or data trigger, set xTVAL to the virtual address
-	      // of the data.
-	      URV tval = dataAddrTrig_? ldStAddr_ : currPc_;
-	      undoForTrigger();
+	      URV tval = ldStAddr_;
 	      if (takeTriggerAction(traceFile, currPc_, tval, instCounter_, true))
 		return true;
 	      continue;
+	    }
+
+	  if (sdtrigOn_ and icountTriggerHit())
+	    {
+	      if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
+		return true;
 	    }
 
           if (minstretEnabled())
@@ -5772,6 +5769,8 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       resetExecInfo(); clearTraceData();
 
       ++instCounter_;
+      if (mcycleEnabled())
+	++cycleCount_;
 
       if (processExternalInterrupt(traceFile, instStr))
 	return;  // Next instruction in interrupt handler.
@@ -5786,15 +5785,6 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       pc_ += di.instSize();
       execute(&di);
 
-      if (mcycleEnabled())
-	++cycleCount_;
-
-      if (sdtrigOn_ and icountTriggerHit())
-        {
-	  takeTriggerAction(traceFile, pc_, pc_, instCounter_, false);
-	  return;
-        }
-
       if (hasException_ or hasInterrupt_)
 	{
 	  if (doStats)
@@ -5807,10 +5797,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 
       if (triggerTripped_)
 	{
-	  // If this is an address or data trigger, set xTVAL to the virtual address of
-	  // the data.
-	  URV tval = dataAddrTrig_? ldStAddr_ : currPc_;
-	  undoForTrigger();
+	  URV tval = ldStAddr_;
 	  takeTriggerAction(traceFile, currPc_, tval, instCounter_, true);
 	  return;
 	}
@@ -9505,6 +9492,8 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
     std::cerr << "Warning: Entering debug-mode while in debug-mode\n";
   debugMode_ = true;
   csRegs_.enterDebug(true);
+  enteredDebugMode_ = (cause == DebugModeCause::EBREAK) or
+                      (cause == DebugModeCause::TRIGGER);
 
   updateCachedTriggerState();
 

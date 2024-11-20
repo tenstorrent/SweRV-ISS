@@ -37,6 +37,7 @@ namespace WdRiscv
     bool       failRead_  : 1  = false;
     bool       canceled_  : 1  = false;
     bool       bypass_    : 1  = false;   // True if a bypass operation.
+    bool       isIo_      : 1  = false;   // True if in IO region.
 
     /// Return true if address range of this operation overlaps that of the given one.
     bool overlaps(const MemoryOp& other) const
@@ -321,7 +322,7 @@ namespace WdRiscv
     bool ppoRule5(Hart<URV>&, const McmInstr& instrA, const McmInstr& instrB) const;
 
     /// Helper to above ppoRule6.
-    bool ppoRule6(const McmInstr& instrA, const McmInstr& instrB) const;
+    bool ppoRule6(Hart<URV>&, const McmInstr& instrA, const McmInstr& instrB) const;
 
     /// Helper to above ppoRule7.
     bool ppoRule7(const McmInstr& instrA, const McmInstr& instrB) const;
@@ -377,7 +378,7 @@ namespace WdRiscv
 
     /// Return the smallest time of the memory operations of the given instruction. Adjust
     /// read-operation times to account for forwarding.
-    uint64_t effectiveMinTime(const McmInstr& instr) const;
+    uint64_t effectiveMinTime(Hart<URV>& hart, const McmInstr& instr) const;
 
     /// Return the largest time of the memory operations of the given instruction. Adjust
     /// read-operation times to account for forwarding.
