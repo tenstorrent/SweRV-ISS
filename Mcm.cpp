@@ -3917,7 +3917,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrA, const McmInstr& inst
   if (not instrA.complete_)
     return false; // Incomplete store might finish after B
 
-  auto timeA = latestOpTime(instrA);
+  auto timeA = effectiveMaxTime(instrA);
   auto timeB = effectiveMinTime(hart, instrB);
 
   if (timeB > timeA)
@@ -4020,7 +4020,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 
 template <typename URV>
 bool
-Mcm<URV>::ppoRule6(const McmInstr& instrA, const McmInstr& instrB) const
+Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrA, const McmInstr& instrB) const
 {
   bool hasRelease = instrB.di_.isAtomicRelease();
   if (isTso_)
@@ -4043,8 +4043,8 @@ Mcm<URV>::ppoRule6(const McmInstr& instrA, const McmInstr& instrB) const
   if (instrB.memOps_.empty())
     return true;   // Un-drained store.
 
-  auto btime = earliestOpTime(instrB);
-  return latestOpTime(instrA) < btime;  // A finishes before B.
+  auto btime = effectiveMinTime(hart, instrB);
+  return effectiveMaxTime(instrA) < btime;  // A finishes before B.
 }
 
 
@@ -4070,7 +4070,7 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
       if (instrA.isCanceled()  or  not instrA.isRetired()  or  not instrA.isMemory())
 	continue;
 
-      if (not ppoRule6(instrA, instrB))
+      if (not ppoRule6(hart, instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 6 failed: hart-id=" << hart.hartId()
 	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
@@ -4085,7 +4085,7 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
       if (tag >= instrB.tag_)
 	break;
       const auto& instrA =  instrVec.at(tag);
-      if (not ppoRule6(instrA, instrB))
+      if (not ppoRule6(hart, instrA, instrB))
 	{
 	  cerr << "Error: PPO rule 6 failed: hart-id=" << hart.hartId()
 	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';

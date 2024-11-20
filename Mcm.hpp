@@ -322,7 +322,7 @@ namespace WdRiscv
     bool ppoRule5(Hart<URV>&, const McmInstr& instrA, const McmInstr& instrB) const;
 
     /// Helper to above ppoRule6.
-    bool ppoRule6(const McmInstr& instrA, const McmInstr& instrB) const;
+    bool ppoRule6(Hart<URV>&, const McmInstr& instrA, const McmInstr& instrB) const;
 
     /// Helper to above ppoRule7.
     bool ppoRule7(const McmInstr& instrA, const McmInstr& instrB) const;
