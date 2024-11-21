@@ -4786,7 +4786,8 @@ Mcm<URV>::ioPpoChecks(Hart<URV>& hart, const McmInstr& instrB) const
 
 	  cerr << "Error: IO PPO rule failed: hart-id=" << hart.hartId() << " tag1="
 	       << op.tag_ << " tag2=" << instrB.tag_ << " time1=" << op.time_
-	       << " time2=" << earlyB << '\n';
+	       << " time2=" << earlyB << " type=" << (isRead? "read" : "write")
+	       << '\n';
 	  return false;
 	}
     }
