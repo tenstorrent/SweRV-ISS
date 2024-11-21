@@ -960,7 +960,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
     }
 
   pokeFetchCache(addr, uint8_t(val));
-  pokeFetchCache(addr, uint8_t(val >> 8));
+  pokeFetchCache(addr + 1, uint8_t(val >> 8));
 
   return memory_.poke(addr, val, usePma);
 }
