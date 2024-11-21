@@ -490,6 +490,38 @@ namespace WdRiscv
         }
     }
 
+    /// Called when landing pad configuration changes.
+    void updateLandingPadEnable()
+    {
+      if (not isRvZicfilp())
+        return;
+
+      mLpEnabled_ = csRegs_.mseccfgMlpe();
+      if (isRvs())
+        {
+          sLpEnabled_ = csRegs_.menvcfgLpe();
+          if (isRvu())
+            uLpEnabled_ = csRegs_.senvcfgLpe();
+          if (isRvh())
+            vsLpEnabled_ = csRegs_.henvcfgLpe();
+        }
+      else
+        {
+          if (isRvu())
+            uLpEnabled_ = csRegs_.menvcfgLpe();
+        }
+    }
+
+    /// Given the privilege and virtual mode, determines if landing
+    /// pad is enabled.
+    bool isLandingPadEnabled(PrivilegeMode mode, bool virt)
+    {
+      return (mode == PrivilegeMode::Machine and mLpEnabled_) or
+             (mode == PrivilegeMode::Supervisor and not virt and sLpEnabled_) or
+             (mode == PrivilegeMode::Supervisor and virt and vsLpEnabled_) or
+             (mode == PrivilegeMode::User and uLpEnabled_);
+    }
+
     /// Applies pointer mask w.r.t. effective privilege mode, effective
     /// virtual mode, and type of load/store instruction.
     uint64_t applyPointerMask(uint64_t addr, bool isLoad,
@@ -1197,6 +1229,10 @@ namespace WdRiscv
     void enableZkr(bool flag)
     { enableExtension(RvExtension::Zkr, flag); csRegs_.enableZkr(flag); }
 
+    /// Enable/disable Zicfilp extension.
+    void enableZicfilp(bool flag)
+    { enableExtension(RvExtension::Zicfilp, flag); csRegs_.enableZicfilp(flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1536,6 +1572,9 @@ namespace WdRiscv
 
     bool isRvSmnpm() const
     { return extensionIsEnabled(RvExtension::Smnpm); }
+
+    bool isRvZicfilp() const
+    { return extensionIsEnabled(RvExtension::Zicfilp); }
 
     /// Return true if current program is considered finished (either
     /// reached stop address or executed exit limit).
@@ -5133,6 +5172,10 @@ namespace WdRiscv
 
     //Zcmop
     void execCmop(const DecodedInst*);
+
+    // Zicfilp
+    void execLpad(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
@@ -5408,6 +5451,13 @@ namespace WdRiscv
     TT_STEE::Stee stee_;
     bool steeInsec1_ = false;  // True if insecure access to a secure region.
     bool steeInsec2_ = false;  // True if insecure access to a secure region.
+
+    // Landing pad (zicfilp)
+    bool mLpEnabled_ = false;
+    bool sLpEnabled_ = false;
+    bool vsLpEnabled_ = false;
+    bool uLpEnabled_ = false;
+    bool elp_ = false;
 
     VirtMem virtMem_;
     Isa isa_;

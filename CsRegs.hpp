@@ -1764,6 +1764,10 @@ namespace WdRiscv
     /// read-only zero if false.
     void enableZkr(bool flag);
 
+    /// Enable/disable zicfilp extension. Sets mseccfg/menvcfg/henvcfg/senvcfg.LPE
+    /// to read-only zero if false.
+    void enableZicfilp(bool flag);
+
     /// Enable/disable virtual supervisor. When enabled, the trap-related
     /// CSRs point to their virtual counterpars (e.g. reading writing sstatus will
     /// actually read/write vsstatus).
@@ -2031,6 +2035,54 @@ namespace WdRiscv
           HenvcfgFields<uint64_t> fields(value);
           return fields.bits_.PMM;
         }
+    }
+
+    /// Return the LPE bits of MSECCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t mseccfgMlpe()
+    {
+      auto csr = getImplementedCsr(CsrNumber::MSECCFG);
+      if (not csr)
+        return 0;
+      URV value = csr->read();
+      MseccfgFields<uint64_t> fields(value);
+      return fields.bits_.MLPE;
+    }
+
+    /// Return the LPE bits of MENVCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t menvcfgLpe()
+    {
+      auto csr = getImplementedCsr(CsrNumber::MENVCFG);
+      if (not csr)
+        return 0;
+      URV value = csr->read();
+      MenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.LPE;
+    }
+
+    /// Return the LPE bits of SENVCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t senvcfgLpe()
+    {
+      auto csr = getImplementedCsr(CsrNumber::SENVCFG);
+      if (not csr)
+        return 0;
+      URV value = csr->read();
+      SenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.LPE;
+    }
+
+    /// Return the LPE bits of HENVCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t henvcfgLpe()
+    {
+      auto csr = getImplementedCsr(CsrNumber::HENVCFG);
+      if (not csr)
+        return 0;
+      URV value = csr->read();
+      HenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.LPE;
     }
 
     /// Return the SSEED and USEED bits of the MSECCFG CSR.
