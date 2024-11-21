@@ -3389,6 +3389,15 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   // Bytes of B written by stores from the local hart.
   std::unordered_set<uint64_t> locallyWritten;
 
+  auto& undrained = hartData_.at(hartIx).undrainedStores_;
+  for (auto storeTag : undrained)
+    {
+      const auto& store = instrVec.at(storeTag);
+      if (store.tag_ >= instrB.tag_)
+	break;
+      identifyWrittenBytes(store, instrB, locallyWritten);
+    }
+
   for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
       const auto& op = *iter;
