@@ -153,9 +153,9 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
 	  dataAddrTrig_ = not triggerTripped_;
 	  triggerTripped_ = true;
 	}
-      if (triggerTripped_)
-        return;
     }
+  if (triggerTripped_)
+    return;
 #endif
 
   bool isZero = false;
@@ -221,9 +221,9 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
 	  dataAddrTrig_ = not triggerTripped_;
 	  triggerTripped_ = true;
 	}
-      if (triggerTripped_)
-        return;
     }
+  if (triggerTripped_)
+    return;
 #endif
 
   bool isZero = false;
@@ -308,9 +308,9 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
 	  dataAddrTrig_ = not triggerTripped_;
 	  triggerTripped_ = true;
 	}
-      if (triggerTripped_)
-        return;
     }
+  if (triggerTripped_)
+    return;
 #endif
 
   ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
@@ -376,9 +376,9 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
 	  dataAddrTrig_ = not triggerTripped_;
 	  triggerTripped_ = true;
 	}
-      if (triggerTripped_)
-        return;
     }
+  if (triggerTripped_)
+    return;
 #endif
 
   ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;

@@ -400,7 +400,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     }
 
   // Process memory diff.
-  if (di.instId() == InstId::cbo_zero)
+  if (di.instId() == InstId::cbo_zero and not hasException_)
     {
       for (unsigned i = 0; i < cacheLineSize_; i += sizeof(URV))
 	{
