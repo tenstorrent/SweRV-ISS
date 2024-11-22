@@ -1699,6 +1699,8 @@ Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
 	type = "io";
       else if (not pma.isCacheable())
 	type = "nc";
+      else
+	type = "c";
       if (type)
 	cerr << " type=" << type;
       cerr << '\n';
@@ -2472,6 +2474,8 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 		type = "io";
 	      else if (not pma.isCacheable())
 		type = "nc";
+	      else
+		type = "c";
 	      if (type)
 		cerr << " type=";
 	      cerr << '\n';
