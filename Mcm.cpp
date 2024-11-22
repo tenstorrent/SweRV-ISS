@@ -1122,8 +1122,8 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
       return true;
     }
 
-  // For cbo.flush/clean, all preceding (in program order) overlapping stores/AMOs must
-  // have drained.
+  // For cbo.flush/clean/inval, all preceding (in program order) overlapping stores/AMOs
+  // must have drained.
   const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   for (auto storeTag : undrained)
@@ -4776,7 +4776,7 @@ template <typename URV>
 bool
 Mcm<URV>::checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const
 {
-  // If B is a load and A is cbo.flush/clean instruction that overlaps B.
+  // If B is a load and A is cbo.flush/clean/inval instruction that overlaps B.
 
   if (not instrB.isLoad_)
     return true;  // NA: B is not a load.
@@ -4796,9 +4796,8 @@ Mcm<URV>::checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const
       if (earlyB > instrA.retireTime_)
 	break;
 
-      auto instId = instrA.di_.instId();
-      if (not (instId == InstId::cbo_flush) and not (instId == InstId::cbo_clean))
-        continue;
+      if (instrA.di_.extension() != RvExtension::Zicbom)
+        continue;  // Not cbo.flush/clean/inval
 
       for (const auto& opIx : instrB.memOps_)
         if (opIx < sysMemOps_.size())
