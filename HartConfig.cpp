@@ -1517,8 +1517,9 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableSdtrig(flag);
-      cerr << "Config file tag \"" << tag << "\" deprecated: "
-	   << "Add extension string \"sdtrig\" to \"isa\" tag instead.\n";
+      if (hart.sysHartIndex() == 0)
+	cerr << "Config file tag \"" << tag << "\" deprecated: "
+	     << "Add extension string \"sdtrig\" to \"isa\" tag instead.\n";
     }
 
   // Enable performance counters.

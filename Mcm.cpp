@@ -1122,8 +1122,8 @@ Mcm<URV>::retireCmo(Hart<URV>& hart, McmInstr& instrB)
       return true;
     }
 
-  // For cbo.flush/clean, all preceding (in program order) overlapping stores/AMOs must
-  // have drained.
+  // For cbo.flush/clean/inval, all preceding (in program order) overlapping stores/AMOs
+  // must have drained.
   const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
   for (auto storeTag : undrained)
@@ -1612,8 +1612,8 @@ Mcm<URV>::cancelInstr(Hart<URV>& hart, McmInstr& instr)
 
   if (iter != undrained.end())
     {
-      std::cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << instr.tag_ <<
-	" canceled or trapped instruction has a write operation\n";
+      cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << instr.tag_
+	   << " canceled or trapped instruction has a write operation\n";
       undrained.erase(iter);
     }
 
@@ -1691,11 +1691,21 @@ Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
 
   if (op.rtlData_ != op.data_)
     {
-      cerr << "Error: hart-id=" << hart.hartId() << " instr-tag=" << op.tag_
-	   << " time=" << op.time_ << " RTL/whisper read mismatch "
-	   << " addr=0x" << std::hex << addr
-	   << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
-	   << " whisper=0x" << op.data_ << std::dec << '\n';
+      cerr << "Error: hart-id=" << hart.hartId() << " tag=" << op.tag_ << " time="
+	   << op.time_ << " RTL/whisper read mismatch " << " addr=0x" << std::hex
+	   << addr << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
+	   << " whisper=0x" << op.data_ << std::dec;
+      auto pma = hart.getPma(addr);
+      const char* type = nullptr;
+      if (pma.isIo())
+	type = "io";
+      else if (not pma.isCacheable())
+	type = "nc";
+      else
+	type = "c";
+      if (type)
+	cerr << " type=" << type;
+      cerr << '\n';
       return false;
     }
 
@@ -1809,7 +1819,10 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
 		{
 		  if (store.complete_)
 		    {
-		      std::cerr << "Error: Assertion fail in Mcm::checkVecStoreData\n";
+		      cerr << "Error: hart-id=" << hartId << " tag=" << store.tag_
+			   << " addr=0x" << std::hex << addr << std::dec
+			   << " addr found in write ops (RTL) but not in "
+			   << " reference (Whisper)\n";
 		      return false;
 		    }
 		  continue;  // Will scheck again when store is complete.
@@ -1819,8 +1832,8 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
 	      if (rtlVal != refVal)
 		{
 		  cerr << "Error: hart-id=" << hartId << " tag=" << store.tag_
-		       << " mismatch on vector sotre data: addr=0x" << std::hex << addr
-		       << " rtl=0x" << unsigned(rtlVal) << " whisper="
+		       << " mismatch on vector store data: addr=0x" << std::hex << addr
+		       << " rtl=0x" << unsigned(rtlVal) << " whisper=0x"
 		       << unsigned(refVal) << std::dec << '\n';
 		  return false;
 		}
@@ -2326,8 +2339,8 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
   unsigned elemSize = info.elemSize_;
   if (elemSize == 0)
     {
-      std::cerr << "Error: Mcm::commitVecReadOps: hart-id=" << hart.hartId()
-		<< " tag=" << instr.tag_ << " instruction is not a vector load\n";
+      cerr << "Error: Mcm::commitVecReadOps: hart-id=" << hart.hartId()
+	   << " tag=" << instr.tag_ << " instruction is not a vector load\n";
       return false;
     }
 
@@ -2452,10 +2465,22 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 	      if (rb.value == rtlVal)
 		continue;
 
-	      cerr << "Error: RTL/whisper read mismatch time=" << op.time_ << " hart-id="
-		   << hart.hartId() << " instr-tag=" << op.tag_ << " addr=0x"
-		   << std::hex << addr << " rtl=0x" << unsigned(rtlVal)
-		   << " whisper=0x" << unsigned(rb.value) << std::dec << '\n';
+	      cerr << "Error: hart-id=" << hart.hartId() << " tag=" << op.tag_
+		   << "time=" << op.time_ << " RTL/whisper read mismatch "
+		   << " addr=0x" << std::hex << addr << " size=" << unsigned(op.size_)
+		   << " rtl=0x" << unsigned(rtlVal) << " whisper=0x"
+		   << unsigned(rb.value) << std::dec;
+	      auto pma = hart.getPma(addr);
+	      const char* type = nullptr;
+	      if (pma.isIo())
+		type = "io";
+	      else if (not pma.isCacheable())
+		type = "nc";
+	      else
+		type = "c";
+	      if (type)
+		cerr << " type=";
+	      cerr << '\n';
 	      ok = false;
 	    }
 	}
@@ -3390,6 +3415,15 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 
   // Bytes of B written by stores from the local hart.
   std::unordered_set<uint64_t> locallyWritten;
+
+  auto& undrained = hartData_.at(hartIx).undrainedStores_;
+  for (auto storeTag : undrained)
+    {
+      const auto& store = instrVec.at(storeTag);
+      if (store.tag_ >= instrB.tag_)
+	break;
+      identifyWrittenBytes(store, instrB, locallyWritten);
+    }
 
   for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
     {
@@ -4822,7 +4856,7 @@ template <typename URV>
 bool
 Mcm<URV>::checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const
 {
-  // If B is a load and A is cbo.flush/clean instruction that overlaps B.
+  // If B is a load and A is cbo.flush/clean/inval instruction that overlaps B.
 
   if (not instrB.isLoad_)
     return true;  // NA: B is not a load.
@@ -4842,9 +4876,8 @@ Mcm<URV>::checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const
       if (earlyB > instrA.retireTime_)
 	break;
 
-      auto instId = instrA.di_.instId();
-      if (not (instId == InstId::cbo_flush) and not (instId == InstId::cbo_clean))
-        continue;
+      if (instrA.di_.extension() != RvExtension::Zicbom)
+        continue;  // Not cbo.flush/clean/inval
 
       for (const auto& opIx : instrB.memOps_)
         if (opIx < sysMemOps_.size())
