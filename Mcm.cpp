@@ -2407,6 +2407,10 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 	  auto& rb = iter->second;
 	  if (rb.covered)
 	    continue;  // Address already covered by another read op.
+
+          rb.covered = true;
+          rb.value = op.data_ >> (i*8);
+
 	  low = std::min(low, addr);
 	  high = std::max(high, addr);
 	}
@@ -2416,17 +2420,6 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 	  unsigned size = high - low + 1;
 	  trimOp(op, low, size);
 	  op.canceled_ = false;
-	  for (unsigned i = 0; i < op.size_; ++i)
-	    {
-	      auto iter = addrMap.find(op.pa_ + i);
-	      if (iter == addrMap.end())
-		continue;
-	      auto& rb = iter->second;
-	      if (rb.covered)
-		continue;  // Address already covered by another read op.
-	      rb.covered = true;
-	      rb.value = op.data_ >> (i*8);
-	    }
 	}
     }
 
