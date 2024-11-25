@@ -2425,11 +2425,11 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
   // addresses covered by read ops. Set reference (Whisper) values of reference addresses.
+  auto& ops = instr.memOps_;
   if (not vecRefs.refs_.empty())
     {
       unsigned elemBytes = vecRefs.refs_.at(0).size_;
 
-      auto& ops = instr.memOps_;
       for (auto iter = ops.rbegin(); iter != ops.rend(); ++iter)
         {
           auto opIx = *iter;
