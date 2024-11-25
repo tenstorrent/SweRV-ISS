@@ -2465,7 +2465,6 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
               high = std::max(high, addr);
             }
 
-          elemIx = op.elemIx_;
           if (low <= high)
             {
               unsigned size = high - low + 1;
