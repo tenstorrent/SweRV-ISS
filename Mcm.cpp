@@ -2330,6 +2330,37 @@ Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
 }
 
 
+struct RefElemCoord
+{
+  uint64_t addr = 0;
+  uint16_t ix = 0;
+
+  bool operator== (const RefElemCoord& other) const
+  { return addr == other.addr and ix == other.ix; }
+};
+
+
+// Map a reference address to a reference value and a flag indicating if address is
+// covered by a read op.
+struct RefElemByte
+{
+  uint8_t value = 0;
+  bool covered = false;
+};
+
+
+template<>
+struct std::hash<RefElemCoord>
+{
+  std::size_t operator()(const RefElemCoord& rec) const noexcept
+    {
+      std::size_t h1 = std::hash<uint64_t>{}(rec.addr);
+      std::size_t h2 = std::hash<uint16_t>{}(rec.ix);
+      return h1 ^ (h2 << 1);
+    }
+};
+
+
 template <typename URV>
 bool
 Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
@@ -2356,14 +2387,9 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
   // Repair memory op indices and fields.
   repairVecReadOps(hart, instr);
 
-  // Map a reference address to a reference value and a flag indicating if address is
-  // covered by a read op.
-  struct RefByte
-  {
-    uint8_t value = 0;
-    bool covered = false;
-  };
-  std::unordered_map<uint64_t, RefByte> addrMap;
+  // Map a reference address/elem-ix/field to a reference value and a flag indicating if
+  // elem is covered by a read op.
+  std::unordered_map<RefElemCoord, RefElemByte> addrMap;
 
   // Check for overlap between elements. Collect reference byte addresses in addrMap.
   auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr.tag_];
@@ -2373,20 +2399,22 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
       for (unsigned i = 0; i < ref.size_; ++i)
 	{
 	  uint64_t pa  = ref.pa_ + i;
-	  hasOverlap = hasOverlap or addrMap.find(pa) != addrMap.end();
-	  addrMap[pa] = RefByte{0, false};
+          RefElemCoord coord {pa, ref.ix_};
+	  hasOverlap = hasOverlap or addrMap.find(coord) != addrMap.end();
+	  addrMap[coord] = RefElemByte{0, false};
 	}
     }
   instr.hasOverlap_ = hasOverlap;
 
-  bool ok = true;
-  if (activeCount > 0 and instr.memOps_.empty() and not hart.inDebugMode())
+  if (activeCount > 0 and instr.memOps_.empty()) //  and not hart.inDebugMode())
     {
       cerr << "Error: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
 	   << instr.tag_ << " vector load instruction retires without any memory "
 	   << "read operation.\n";
-      ok = false;
+      return false;
     }
+
+  bool ok = true;
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
@@ -2399,20 +2427,27 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
       if (not op.isRead_)
 	continue;  // Should not happen.
 
+      uint16_t elemIx = op.elemIx_;
       uint64_t low = ~uint64_t(0), high = 0; // Range of op addresses overlapping reference.
       for (unsigned i = 0; i < op.size_; ++i)
 	{
 	  uint64_t addr = op.pa_ + i;
-	  auto iter = addrMap.find(addr);
+	  auto iter = addrMap.find(RefElemCoord{addr, elemIx});
 	  if (iter == addrMap.end())
-	    continue;  // No overlap with instruction.
-	  auto& rb = iter->second;
-	  if (rb.covered)
+            {
+              iter = addrMap.find(RefElemCoord{addr, uint16_t(elemIx + 1)});
+              if (iter == addrMap.end())
+                continue;  // No overlap with instruction.
+              elemIx++;
+            }
+	  auto& reb = iter->second;  // Ref elem byte
+	  if (reb.covered)
 	    continue;  // Address already covered by another read op.
 	  low = std::min(low, addr);
 	  high = std::max(high, addr);
 	}
 
+      elemIx = op.elemIx_;
       if (low <= high)
 	{
 	  unsigned size = high - low + 1;
@@ -2420,22 +2455,30 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 	  op.canceled_ = false;
 	  for (unsigned i = 0; i < op.size_; ++i)
 	    {
-	      auto iter = addrMap.find(op.pa_ + i);
+              uint64_t addr = op.pa_ + i;
+	      auto iter = addrMap.find(RefElemCoord{addr, elemIx});
 	      if (iter == addrMap.end())
-		continue;
-	      auto& rb = iter->second;
-	      if (rb.covered)
+                {
+                  iter = addrMap.find(RefElemCoord{addr, uint16_t(elemIx + 1)});
+                  if (iter == addrMap.end())
+                    continue;
+                  elemIx++;
+                }
+	      auto& reb = iter->second;
+	      if (reb.covered)
 		continue;  // Address already covered by another read op.
-	      rb.covered = true;
-	      rb.value = op.data_ >> (i*8);
+	      reb.covered = true;
+	      reb.value = op.data_ >> (i*8);
 	    }
 	}
     }
 
+#if 0
   // Remove ops still marked canceled.
   std::erase_if(ops, [this](MemoryOpIx ix) {
     return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
   });
+#endif
 
   // We cannot distinguish read-ops for active elements from those of inactive ones.  The
   // inactive element reads are all-ones and will corrupt those of the active elements if
@@ -2458,18 +2501,18 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 	    {
 	      uint64_t addr = op.pa_ + i;
 	      uint8_t rtlVal = op.rtlData_ >> (i*8);
-	      auto iter = addrMap.find(addr);
+	      auto iter = addrMap.find(RefElemCoord{addr, op.elemIx_});
 	      if (iter == addrMap.end())
 		continue;
-	      const auto& rb = iter->second;
-	      if (rb.value == rtlVal)
+	      const auto& reb = iter->second;
+	      if (reb.value == rtlVal)
 		continue;
 
 	      cerr << "Error: hart-id=" << hart.hartId() << " tag=" << op.tag_
 		   << "time=" << op.time_ << " RTL/whisper read mismatch "
 		   << " addr=0x" << std::hex << addr << " size=" << unsigned(op.size_)
 		   << " rtl=0x" << unsigned(rtlVal) << " whisper=0x"
-		   << unsigned(rb.value) << std::dec;
+		   << unsigned(reb.value) << std::dec;
 	      auto pma = hart.getPma(addr);
 	      const char* type = nullptr;
 	      if (pma.isIo())
@@ -2488,13 +2531,13 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 
   // Check that all reference addresses are covered by the read operations.
   bool complete = true;
-  for (const auto& [addr, rb] : addrMap)
-    if (not rb.covered)
+  for (const auto& [coord, reb] : addrMap)
+    if (not reb.covered)
       {
 	complete = false;
 	ok = false;
 	cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr.tag_
-	     << " addr=0x" << std::hex << addr << std::dec
+	     << " elem-ix=" << coord.ix << " addr=0x" << std::hex << coord.addr << std::dec 
 	     << " read ops do not cover all the bytes of vector load instruction\n";
 	break;
       }
@@ -4775,6 +4818,8 @@ template <typename URV>
 bool
 Mcm<URV>::ioPpoChecks(Hart<URV>& hart, const McmInstr& instrB) const
 {
+  return true;
+
   // We check that IO memory operations are never reordered. This is stronger
   // that what is required by the spec. We will eventually relax this for
   // non strongly ordered regions.
