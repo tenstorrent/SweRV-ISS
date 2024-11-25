@@ -2414,71 +2414,71 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
       return false;
     }
 
+  // Test-bench does not send the right index for vl{1,2,4,8}r. We compensate.
+  auto instId = instr.di_.instId();
+  bool isVlr = instId >= InstId::vlre8_v and instId <= InstId::vlre64_v;
+  uint64_t baseAddr = vecRefs.refs_.empty() ? 0 : vecRefs.refs_.at(0).pa_;
+  uint16_t baseIx = vecRefs.refs_.empty() ? 0 : vecRefs.refs_.at(0).ix_;
+
   bool ok = true;
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
   // addresses covered by read ops. Set reference (Whisper) values of reference addresses.
-  auto& ops = instr.memOps_;
-  for (auto iter = ops.rbegin(); iter != ops.rend(); ++iter)
+  if (not vecRefs.refs_.empty())
     {
-      auto opIx = *iter;
-      auto& op = sysMemOps_.at(opIx);
-      if (not op.isRead_)
-	continue;  // Should not happen.
+      unsigned elemBytes = vecRefs.refs_.at(0).size_;
 
-      uint16_t elemIx = op.elemIx_;
-      uint64_t low = ~uint64_t(0), high = 0; // Range of op addresses overlapping reference.
-      for (unsigned i = 0; i < op.size_; ++i)
-	{
-	  uint64_t addr = op.pa_ + i;
-	  auto iter = addrMap.find(RefElemCoord{addr, elemIx});
-	  if (iter == addrMap.end())
+      auto& ops = instr.memOps_;
+      for (auto iter = ops.rbegin(); iter != ops.rend(); ++iter)
+        {
+          auto opIx = *iter;
+          auto& op = sysMemOps_.at(opIx);
+          if (not op.isRead_)
+            continue;  // Should not happen.
+
+          uint16_t elemIx = op.elemIx_;
+
+          if (isVlr and op.pa_ >= baseAddr)   // Compensate for vl1r, vl2r ...
+            elemIx = baseIx + (op.pa_ - baseAddr) / elemBytes;
+
+          uint64_t low = ~uint64_t(0), high = 0; // Range of op addresses overlapping reference.
+          for (unsigned i = 0; i < op.size_; ++i)
             {
-              iter = addrMap.find(RefElemCoord{addr, uint16_t(elemIx + 1)});
-              if (iter == addrMap.end())
-                continue;  // No overlap with instruction.
-              elemIx++;
-            }
-	  auto& reb = iter->second;  // Ref elem byte
-	  if (reb.covered)
-	    continue;  // Address already covered by another read op.
-	  low = std::min(low, addr);
-	  high = std::max(high, addr);
-	}
-
-      elemIx = op.elemIx_;
-      if (low <= high)
-	{
-	  unsigned size = high - low + 1;
-	  trimOp(op, low, size);
-	  op.canceled_ = false;
-	  for (unsigned i = 0; i < op.size_; ++i)
-	    {
               uint64_t addr = op.pa_ + i;
-	      auto iter = addrMap.find(RefElemCoord{addr, elemIx});
-	      if (iter == addrMap.end())
+              auto iter = addrMap.find(RefElemCoord{addr, elemIx});
+              if (iter == addrMap.end())
                 {
                   iter = addrMap.find(RefElemCoord{addr, uint16_t(elemIx + 1)});
                   if (iter == addrMap.end())
-                    continue;
+                    continue;  // No overlap with instruction.
                   elemIx++;
                 }
-	      auto& reb = iter->second;
-	      if (reb.covered)
-		continue;  // Address already covered by another read op.
-	      reb.covered = true;
-	      reb.value = op.data_ >> (i*8);
-	    }
-	}
+              auto& reb = iter->second;  // Ref elem byte
+              if (reb.covered)
+                continue;  // Address already covered by another read op.
+
+              reb.covered = true;
+              reb.value = op.data_ >> (i*8);
+
+              low = std::min(low, addr);
+              high = std::max(high, addr);
+            }
+
+          elemIx = op.elemIx_;
+          if (low <= high)
+            {
+              unsigned size = high - low + 1;
+              trimOp(op, low, size);
+              op.canceled_ = false;
+            }
+        }
     }
 
-#if 0
   // Remove ops still marked canceled.
   std::erase_if(ops, [this](MemoryOpIx ix) {
     return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
   });
-#endif
 
   // We cannot distinguish read-ops for active elements from those of inactive ones.  The
   // inactive element reads are all-ones and will corrupt those of the active elements if
