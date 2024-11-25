@@ -2475,9 +2475,11 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
     }
 
   // Remove ops still marked canceled.
+#if 0
   std::erase_if(ops, [this](MemoryOpIx ix) {
     return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
   });
+#endif
 
   // We cannot distinguish read-ops for active elements from those of inactive ones.  The
   // inactive element reads are all-ones and will corrupt those of the active elements if
