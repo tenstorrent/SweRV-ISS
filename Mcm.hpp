@@ -433,6 +433,10 @@ namespace WdRiscv
     void printPpo1Error(unsigned hartId, McmInstrIx tag1, McmInstrIx tag2, uint64_t t1,
 			uint64_t t2, uint64_t pa) const;
 
+    /// Helper to read-commit methods: commitReadOps & commitVecReadOPs.
+    void printReadMismatch(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
+                           unsigned size, uint64_t rtlData, uint64_t refData) const;
+
     /// Read up to a double word (size <= 8) from the reference model memory.
     bool referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64_t& val);
 
