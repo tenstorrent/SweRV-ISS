@@ -757,6 +757,12 @@ PerfApi::setStoreData(unsigned hartIx, uint64_t tag, uint64_t value)
 bool
 PerfApi::commitMemoryWrite(Hart64& hart, uint64_t addr, unsigned size, uint64_t value)
 {
+  if (hart.isToHostAddr(addr))
+    {
+      hart.handleStoreToHost(addr, value);
+      return true;
+    }
+
   switch (size)
     {
     case 1:  return hart.pokeMemory(addr, uint8_t(value), true);

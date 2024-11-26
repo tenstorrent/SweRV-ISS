@@ -2345,6 +2345,10 @@ namespace WdRiscv
     bool isVectorTailAgnostic() const
     { return vecRegs_.isTailAgnostic(); }
 
+    /// Implement part of TIF protocol for writing the "tohost" magical location.
+    template<typename STORE_TYPE>
+    void handleStoreToHost(URV physAddr, STORE_TYPE value);
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
@@ -2812,11 +2816,6 @@ namespace WdRiscv
     /// Helper to the cache block operation (cbo) instructions.
     ExceptionCause determineCboException(uint64_t& addr, uint64_t& gpa, uint64_t& pa,
 					 bool isZero);
-
-    /// Implement part of TIF protocol for writing the "tohost" magical
-    /// location.
-    template<typename STORE_TYPE>
-    void handleStoreToHost(URV physAddr, STORE_TYPE value);
 
     /// Helper to sb, sh, sw ... Sore type should be uint8_t, uint16_t
     /// etc... for sb, sh, etc...
