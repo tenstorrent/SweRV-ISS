@@ -766,22 +766,25 @@ template <typename URV>
 static bool
 pokeHartMemory(Hart<URV>& hart, uint64_t physAddr, uint64_t data, unsigned size)
 {
+  bool usePma = true;
+  bool skipFetch = true;
+
   if (size == 1)
-    return hart.pokeMemory(physAddr, uint8_t(data), true);
+    return hart.pokeMemory(physAddr, uint8_t(data), usePma, skipFetch);
 
   if (size == 2)
-    return hart.pokeMemory(physAddr, uint16_t(data), true);
+    return hart.pokeMemory(physAddr, uint16_t(data), usePma, skipFetch);
 
   if (size == 4)
-    return hart.pokeMemory(physAddr, uint32_t(data), true);
+    return hart.pokeMemory(physAddr, uint32_t(data), usePma, skipFetch);
 
   if (size == 8)
-    return hart.pokeMemory(physAddr, uint64_t(data), true);
+    return hart.pokeMemory(physAddr, uint64_t(data), usePma, skipFetch);
 
   if (size < 8)
     {
       for (unsigned i = 0; i < size; ++i)
-	if (not hart.pokeMemory(physAddr + i, uint8_t(data >> (8*i)), true))
+	if (not hart.pokeMemory(physAddr + i, uint8_t(data >> (8*i)), usePma, skipFetch))
 	  return false;
       return true;
     }
