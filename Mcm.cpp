@@ -2405,6 +2405,15 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
       return false;
     }
 
+  // Check if all elements masked off or VL == 0.
+  auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr.tag_];
+  if (vecRefs.refs_.empty())
+    {
+      instr.memOps_.clear();
+      instr.complete_ = true;
+      return true;
+    }
+
   // Repair memory op indices and fields.
   repairVecReadOps(hart, instr);
 
@@ -2413,8 +2422,6 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
   std::unordered_map<RefElemCoord, bool> addrMap;
 
   // Check for overlap between elements. Collect reference byte addresses in addrMap.
-  auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr.tag_];
-  assert(not vecRefs.refs_.empty());
   bool hasOverlap = false;
   for (auto& ref : vecRefs.refs_)
     {
