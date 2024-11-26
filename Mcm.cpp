@@ -2495,11 +2495,10 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
     }
 
   // Remove ops still marked canceled.
-#if 0
-  std::erase_if(ops, [this](MemoryOpIx ix) {
-    return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
-  });
-#endif
+  if (not hasOverlap)  // Temporary until we get accurate elem indices with mread ops.
+    std::erase_if(ops, [this](MemoryOpIx ix) {
+      return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
+    });
 
   // Check that all reference addresses are covered by the read operations.
   instr.complete_ = true;
