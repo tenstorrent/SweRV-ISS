@@ -2408,9 +2408,9 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
   // Repair memory op indices and fields.
   repairVecReadOps(hart, instr);
 
-  // Map a reference address/elem-ix/field to a reference value and a flag indicating if
-  // elem is covered by a read op.
-  std::unordered_map<RefElemCoord, RefElemByte> addrMap;
+  // Map a reference address/elem-ix/field to a flag indicating if elem is covered by a
+  // read op.
+  std::unordered_map<RefElemCoord, bool> addrMap;
 
   // Check for overlap between elements. Collect reference byte addresses in addrMap.
   auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr.tag_];
@@ -2423,7 +2423,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 	  uint64_t pa  = ref.pa_ + i;
           RefElemCoord coord {pa, ref.ix_};
 	  hasOverlap = hasOverlap or addrMap.find(coord) != addrMap.end();
-	  addrMap[coord] = RefElemByte{0, false};
+	  addrMap[coord] = false;
 	}
     }
   instr.hasOverlap_ = hasOverlap;
@@ -2466,11 +2466,12 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
                 continue;  // No overlap with instruction.
               elemIx++;
             }
-          auto& reb = iter->second;  // Ref elem byte
-          if (reb.covered)
+
+          bool& covered = iter->second;  // Ref elem byte covered
+          if (covered)
             continue;  // Address already covered by another read op.
 
-          reb.covered = true;
+          covered = true;
           uint8_t refVal = op.data_ >> (i*8);
           uint8_t rtlVal = op.rtlData_ >> (i*8);
 
@@ -2502,8 +2503,8 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 
   // Check that all reference addresses are covered by the read operations.
   instr.complete_ = true;
-  for (const auto& [coord, reb] : addrMap)
-    if (not reb.covered)
+  for (const auto& [coord, covered] : addrMap)
+    if (not covered)
       {
 	instr.complete_ = false;
 	cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr.tag_
