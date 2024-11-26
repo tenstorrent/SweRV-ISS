@@ -21,6 +21,7 @@ Uartsf::Uartsf(uint64_t addr, uint64_t size)
   struct termios term;
   tcgetattr(fileno(stdin), &term);
   cfmakeraw(&term);
+  term.c_lflag &= ~ECHO;
   tcsetattr(fileno(stdin), 0, &term);
 }
 
