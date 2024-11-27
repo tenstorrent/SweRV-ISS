@@ -2468,11 +2468,11 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
           auto iter = addrMap.find(RefElemCoord{addr, elemIx});
           if (iter == addrMap.end())
             {
-              if (i + elemSize >= op.size_)
-                continue;  // Last elem in op.
+              if (i == 0)
+                break;    // First elem of op is not in ref.
               iter = addrMap.find(RefElemCoord{addr, uint16_t(elemIx + 1)});
               if (iter == addrMap.end())
-                continue;  // No overlap with instruction.
+                break;    // No overlap with instruction.
               elemIx++;
             }
 
