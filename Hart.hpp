@@ -806,16 +806,16 @@ namespace WdRiscv
     /// Return true on success and false on failure (address out of
     /// bounds, location not mapped, location not writable etc...)
     /// Bypass physical memory attribute checking if usePma is false.
-    bool pokeMemory(uint64_t addr, uint8_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint8_t val, bool usePma, bool skipFetch = false);
 
     /// Half-word version of the preceding method.
-    bool pokeMemory(uint64_t address, uint16_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint16_t val, bool usePma, bool skipFetch = false);
 
     /// Word version of the preceding method.
-    bool pokeMemory(uint64_t addr, uint32_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint32_t val, bool usePma, bool skipFetch = false);
 
     /// Double-word version of the preceding method.
-    bool pokeMemory(uint64_t addr, uint64_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint64_t val, bool usePma, bool skipFetch = false);
 
     /// Define value of program counter after a reset.
     void defineResetPc(URV addr)

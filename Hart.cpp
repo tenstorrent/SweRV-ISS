@@ -932,13 +932,15 @@ Hart<URV>::peekMemory(uint64_t address, uint64_t& val, bool usePma) const
 
 template <typename URV>
 bool
-Hart<URV>::pokeMemory(uint64_t addr, uint8_t val, bool usePma)
+Hart<URV>::pokeMemory(uint64_t addr, uint8_t val, bool usePma, bool skipFetch)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
   invalidateDecodeCache(addr, sizeof(val));
-  pokeFetchCache(addr, val);
+
+  if (not skipFetch)
+    pokeFetchCache(addr, val);
 
   return memory_.poke(addr, val, usePma);
 }
@@ -946,7 +948,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint8_t val, bool usePma)
 
 template <typename URV>
 bool
-Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
+Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma, bool skipFetch)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
@@ -959,8 +961,11 @@ Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
       return true;
     }
 
-  pokeFetchCache(addr, uint8_t(val));
-  pokeFetchCache(addr + 1, uint8_t(val >> 8));
+  if (not skipFetch)
+    {
+      pokeFetchCache(addr, uint8_t(val));
+      pokeFetchCache(addr + 1, uint8_t(val >> 8));
+    }
 
   return memory_.poke(addr, val, usePma);
 }
@@ -968,7 +973,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
 
 template <typename URV>
 bool
-Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
+Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma, bool skipFetch)
 {
   // We allow poke to bypass masking for memory mapped registers
   // otherwise, there is no way for external driver to clear bits that
@@ -986,8 +991,9 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
       return true;
     }
 
-  for (unsigned i = 0; i < sizeof(val); ++i)
-    pokeFetchCache(addr + i, uint8_t(val >> (i*8)));
+  if (not skipFetch)
+    for (unsigned i = 0; i < sizeof(val); ++i)
+      pokeFetchCache(addr + i, uint8_t(val >> (i*8)));
 
   return memory_.poke(addr, val, usePma);
 }
@@ -995,7 +1001,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
 
 template <typename URV>
 bool
-Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
+Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma, bool skipFetch)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
@@ -1009,8 +1015,9 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
       return true;
     }
 
-  for (unsigned i = 0; i < sizeof(val); ++i)
-    pokeFetchCache(addr + i, uint8_t(val >> (i*8)));
+  if (not skipFetch)
+    for (unsigned i = 0; i < sizeof(val); ++i)
+      pokeFetchCache(addr + i, uint8_t(val >> (i*8)));
 
   return memory_.poke(addr, val, usePma);
 }
