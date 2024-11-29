@@ -4613,6 +4613,7 @@ CsRegs<URV>::addSupervisorFields()
   setCsrFields(CsrNumber::SEPC, {{"sepc", xlen}});
   setCsrFields(CsrNumber::SCAUSE, {{"CODE", xlen - 1}, {"INT", 1}});
   setCsrFields(CsrNumber::STVAL, {{"stval", xlen}});
+  setCsrFields(CsrNumber::STIMECMP, {{"stimecmp", xlen}});
   setCsrFields(CsrNumber::SIE,
     {{"zero", 1}, {"SSIE", 1}, {"zero", 3}, {"STIE", 1},
      {"zero", 3}, {"SEIE", 1}, {"zero", 3}, {"LCOFIE", 1},
@@ -4624,6 +4625,7 @@ CsRegs<URV>::addSupervisorFields()
 
   if (rv32_)
     {
+      setCsrFields(CsrNumber::STIMECMPH, {{"stimecmph", xlen}});
       setCsrFields(CsrNumber::SSTATUS,
         {{"res0", 1}, {"SIE",  1}, {"res1",  3}, {"SPIE", 1},
          {"UBE",  1}, {"res2", 1}, {"SPP",   1}, {"VS",   2},
@@ -4751,6 +4753,7 @@ CsRegs<URV>::addHypervisorFields()
   setCsrFields(Csrn::VSEPC, {{"sepc", xlen}});
   setCsrFields(Csrn::VSCAUSE, {{"CODE", xlen - 1}, {"INT", 1}});
   setCsrFields(Csrn::VSTVAL, {{"stval", xlen}});
+  setCsrFields(Csrn::VSTIMECMP, {{"stimecmp", xlen}});
   setCsrFields(Csrn::VSIE,
     {{"zero", 1}, {"SSIE", 1}, {"zero", 3}, {"STIE", 1},
      {"zero", 3}, {"SEIE", 1}, {"zero", xlen - 10}});
@@ -4780,6 +4783,7 @@ CsRegs<URV>::addHypervisorFields()
 
   if (rv32_)
     {
+      setCsrFields(Csrn::VSTIMECMPH, {{"stimecmph", xlen}});
       setCsrFields(Csrn::HSTATUS,
         {{"res0", 5}, {"VSBE", 1}, {"GVA", 1},   {"SPV", 1},  {"SPVP", 1},
          {"HU", 1},   {"res1", 2}, {"VGEIN", 6}, {"res2", 2}, {"VTVM", 1},
