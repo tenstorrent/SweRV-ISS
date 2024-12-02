@@ -9961,8 +9961,18 @@ Hart<URV>::execEcall(const DecodedInst*)
 
   if (newlib_ or linux_)
     {
-      URV a0 = syscall_.emulate(hartIx_);
+
+      unsigned sysReg = isRve() ? RegT0 : RegA7; // Reg containting syscall number.
+      URV sysIx = peekIntReg(sysReg);  // Syscall number.
+
+      URV a0 = peekIntReg(RegA0);  // Syscall params.
+      URV a1 = peekIntReg(RegA1);
+      URV a2 = peekIntReg(RegA2);
+      URV a3 = peekIntReg(RegA3);
+
+      a0 = syscall_.emulate(hartIx_, sysIx, a0, a1, a2, a3);
       intRegs_.write(RegA0, a0);
+      return;
     }
 
   if (privMode_ == PrivilegeMode::Machine)

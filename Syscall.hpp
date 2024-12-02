@@ -45,9 +45,10 @@ namespace WdRiscv
     	mmap_blocks_.insert(std::make_pair(mem_size/2L, blk_t(mem_size/2L, true)));
     }
 
-    /// Emulate a system call on the associated hart. Return an integer
-    /// value corresponding to the result.
-    URV emulate(unsigned ix);
+    /// Emulate a system call on the associated hart. Return an integer value
+    /// corresponding to the result. The call number is in syscallIx. The call paramters
+    /// are in a0, a1, a2, and a3.
+    URV emulate(unsigned hartIx, unsigned syscallIx, URV a0, URV a1, URV a2, URV a3);
 
     /// Redirect the given output file descriptor (typically that of
     /// stdout or stderr) to the given file. Return true on success

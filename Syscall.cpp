@@ -406,9 +406,9 @@ Syscall<URV>::registerLinuxFd(int linuxFd, const std::string& path, bool isRead)
 
 template <typename URV>
 URV
-Syscall<URV>::emulate(unsigned ix)
+Syscall<URV>::emulate(unsigned hartIx, unsigned syscallIx, URV a0, URV a1, URV a2, URV a3)
 {
-  static std::unordered_map<int, std::string> names =
+  static std::unordered_map<unsigned, std::string> names =
     {
      {0,    "io_setup"},
      {1,    "io_destroy"},
@@ -747,19 +747,9 @@ Syscall<URV>::emulate(unsigned ix)
   // On failure it returns the negative of the error number.
   std::lock_guard<std::mutex> lock(emulateMutex_);
 
-  auto& hart = *harts_.at(ix);
-  URV a0 = hart.peekIntReg(RegA0);
-  URV a1 = hart.peekIntReg(RegA1);
-  URV a2 = hart.peekIntReg(RegA2);
-  URV a3 = hart.peekIntReg(RegA3);
+  auto& hart = *harts_.at(hartIx);
 
-  URV num = 0;
-  if (hart.isRve())
-    num = hart.peekIntReg(RegT0);
-  else
-    num = hart.peekIntReg(RegA7);
-
-  switch (num)
+  switch (syscallIx)
     {
     case 17:       // getcwd
       {
@@ -1555,13 +1545,14 @@ Syscall<URV>::emulate(unsigned ix)
   // using urv_ll = long long;
   //printf("syscall %s (0x%llx, 0x%llx, 0x%llx, 0x%llx) = 0x%llx\n",names[num].c_str(),urv_ll(a0), urv_ll(a1),urv_ll(a2), urv_ll(a3), urv_ll(retVal));
   //printf("syscall %s (0x%llx, 0x%llx, 0x%llx, 0x%llx) = unimplemented\n",names[num].c_str(),urv_ll(a0), urv_ll(a1),urv_ll(a2), urv_ll(a3));
-  if (num < reportedCalls.size() and reportedCalls.at(num))
+  if (syscallIx < reportedCalls.size() and reportedCalls.at(syscallIx))
     return -1;
 
-  std::cerr << "Warning: Unimplemented syscall " << names[int(num)] << " number " << num << "\n";
+  std::cerr << "Warning: Unimplemented syscall " << names[syscallIx] << " number "
+            << syscallIx << "\n";
 
-   if (num < reportedCalls.size())
-     reportedCalls.at(num) = true;
+   if (syscallIx < reportedCalls.size())
+     reportedCalls.at(syscallIx) = true;
    return -1;
 }
 
