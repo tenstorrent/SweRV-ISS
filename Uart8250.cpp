@@ -18,6 +18,7 @@ Uart8250::Uart8250(uint64_t addr, uint64_t size)
   struct termios term;
   tcgetattr(fileno(stdin), &term);
   cfmakeraw(&term);
+  term.c_lflag &= ~ECHO;
   tcsetattr(fileno(stdin), 0, &term);
 }
 
@@ -148,8 +149,6 @@ Uart8250::monitorStdin()
 	      char c;
 	      if (::read(fd, &c, sizeof(c)) != 1)
 		std::cerr << "Uart8250::monitorStdin: unexpected fail on read\n";
-	      putchar(c);
-	      fflush(stdout);
 	      if (isatty(fd))
 		{
 		  static char prev = 0;

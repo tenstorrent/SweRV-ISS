@@ -865,7 +865,8 @@ Hart<URV>::checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned 
     {
       // From 7.8.3 of spec, for indexed segment loads, no overlap between destination
       // (vd) and source (vi) is allowed.
-      ok = vi >= vd + segGroup  or  vd >= vi + offsetGroup;
+      if (di->vecFieldCount() > 0)   // If segment load.
+        ok = vi >= vd + segGroup  or  vd >= vi + offsetGroup;
     }
   else
     {

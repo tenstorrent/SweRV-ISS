@@ -15,7 +15,7 @@ namespace WdRiscv
                                       Zvfh, Zvfhmin, Zvbb, Zvbc, Zvkg,
 				      Zvkned, Zvknha, Zvknhb, Zvksed,
                                       Zvksh, Zvkb, Zicond, Zcb, Zfa, Zfbfmin,
-                                      Zvfbfmin, Zvfbfwma, Zvqdot, Sstc, Svpbmt, Svadu,
+                                      Zvfbfmin, Zvfbfwma, Zvqdot, Sstc, Svpbmt, Svadu, Svade,
 				      Smaia, Ssaia, Zacas, Zimop, Zcmop, Smrnmi,
 				      Zicsr, Zicntr, Zihpm, Zifencei, Zihintpause,
                                       Smmpm, Ssnpm, Smnpm, Sscofpmf, Smstateen,
