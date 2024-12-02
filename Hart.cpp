@@ -5528,8 +5528,7 @@ Hart<URV>::isInterruptPossible(URV mip, URV sip, URV vsip, InterruptCause& cause
   if (vsdest)
     {
       // Only VS interrupts can be delegated in HIDELEG.
-      for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
-                                 IC::VS_TIMER, IC::LCOF } )
+      for (InterruptCause ic : { IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER, IC::LCOF } )
         {
           URV mask = URV(1) << unsigned(ic);
           if ((vsdest & mask) != 0)

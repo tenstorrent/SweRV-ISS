@@ -5042,8 +5042,8 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       // Updating HIP is reflected in VSIP.
       if (vsip and num != CsrNumber::VSIP)
 	{
-          URV mask = 0x1000;
-	  URV newVal = (vsip->read() & ~mask) | vsInterruptToS(hip->read() & ~mask);  // Clear bit 12 (SGEIP)
+          URV mask = 0x222;
+	  URV newVal = (vsip->read() & ~mask) | vsInterruptToS(hip->read() & sInterruptToVs(mask));  // Clear bit 12 (SGEIP)
 	  updateCsr(vsip, newVal);
 	}
 
@@ -5252,8 +5252,9 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
       // Updating HIP is reflected in VSIP.
       if (vsip and num != CsrNumber::VSIP)
 	{
-	  URV val = hip->read() & ~ URV(0x1000);  // Clear bit 12 (SGEIP)
-	  vsip->poke(vsInterruptToS(val));
+          URV mask = 0x222;
+	  URV newVal = (vsip->read() & ~mask) | vsInterruptToS(hip->read() & sInterruptToVs(mask));  // Clear bit 12 (SGEIP)
+	  vsip->poke(newVal);
 	}
 
       // Updating HIP is reflected in MIP.
