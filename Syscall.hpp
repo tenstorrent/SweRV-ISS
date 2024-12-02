@@ -80,15 +80,6 @@ namespace WdRiscv
 
     using AddrLen = std::pair<uint64_t, uint64_t>;  // Address/length pair
 
-    /// Clear memory changes recorded by last emulate call.
-    void clearMemoryChanges()
-    { memChanges_.clear(); }
-
-    /// Copy the memory changes recorded by the last emulate call to the
-    /// given vector.
-    void getMemoryChanges(std::vector<AddrLen>& changes) const
-    { changes = memChanges_; }
-
     void getUsedMemBlocks(uint64_t sp, std::vector<AddrLen>& used_blocks);
 
     bool saveMmap(const std::string & filename);
@@ -150,8 +141,6 @@ namespace WdRiscv
     std::unordered_map<int, std::string> fdPath_;
     std::unordered_set<std::string, util::string_hash, std::equal_to<>> readPaths_;
     std::unordered_set<std::string, util::string_hash, std::equal_to<>> writePaths_;
-
-    std::vector<AddrLen> memChanges_;  // Memory locations changed by syscall.
 
     std::unordered_map<uint64_t, std::unordered_set<unsigned>> futexMap_;
 

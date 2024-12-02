@@ -1659,19 +1659,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	}
     }
 
-  tag = "syscall_slam_area";
-  if (config_ -> contains(tag))
-    {
-      uint64_t addr = 0;
-      if (getJsonUnsigned(tag, config_ -> at(tag), addr))
-        {
-          hart.defineSyscallSlam(addr);
-          hart.enableLinux(true);
-        }
-      else
-        errors++;
-    }
-
   tag = "physical_memory_protection_grain";
   if (config_ -> contains(tag))
     {

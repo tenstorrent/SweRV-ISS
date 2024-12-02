@@ -4396,7 +4396,6 @@ Hart<URV>::clearTraceData()
   fpRegs_.clearLastWrittenReg();
   csRegs_.clearLastWrittenRegs();
   memory_.clearLastWriteInfo(hartIx_);
-  syscall_.clearMemoryChanges();
   vecRegs_.clearTraceData();
   virtMem_.clearPageTableWalk();
   pmpManager_.clearPmpTrace();
@@ -9960,12 +9959,10 @@ Hart<URV>::execEcall(const DecodedInst*)
   if (triggerTripped_)
     return;
 
-  if (newlib_ or linux_ or syscallSlam_)
+  if (newlib_ or linux_)
     {
       URV a0 = syscall_.emulate(hartIx_);
       intRegs_.write(RegA0, a0);
-      if (not syscallSlam_)
-        return;
     }
 
   if (privMode_ == PrivilegeMode::Machine)

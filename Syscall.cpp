@@ -751,9 +751,6 @@ Syscall<URV>::emulate(unsigned ix)
   URV a0 = hart.peekIntReg(RegA0);
   URV a1 = hart.peekIntReg(RegA1);
   URV a2 = hart.peekIntReg(RegA2);
-
-  memChanges_.clear();
-
   URV a3 = hart.peekIntReg(RegA3);
 
   URV num = 0;
@@ -783,9 +780,6 @@ Syscall<URV>::emulate(unsigned ix)
           if (not hart.pokeMemory(rvBuff+i, uint8_t(buffer[i]), true))
             return SRV(-EINVAL);
 
-	// Linux getcwd system call returns count of bytes placed in buffer
-	// unlike the C-library interface which returns pointer to buffer.
-        memChanges_.emplace_back(rvBuff, len);
         return len;
       }
 
@@ -813,8 +807,6 @@ Syscall<URV>::emulate(unsigned ix)
                 return rc;
 
               uint64_t written = writeHartMemory(hart, fl, a2);
-              if (written)
-                memChanges_.emplace_back(a2, written);
               return written == sizeof(fl)? rc : SRV(-EINVAL);
 	    }
 
@@ -982,8 +974,6 @@ Syscall<URV>::emulate(unsigned ix)
         if (rc >= 0)
           {
             ssize_t written = writeHartMemory(hart, buff, rvBuff, rc);
-            if (written)
-              memChanges_.emplace_back(rvBuff, written);
             return written == rc? rc : SRV(-EINVAL);
           }
 	return SRV(-errno);
@@ -1050,8 +1040,6 @@ Syscall<URV>::emulate(unsigned ix)
           return SRV(-errno);
 
         ssize_t written = writeHartMemory(hart, temp, buffAddr, rc);
-        if (written)
-          memChanges_.emplace_back(buffAddr, written);
 	return written == rc? written : SRV(-EINVAL);
       }
 
@@ -1089,8 +1077,6 @@ Syscall<URV>::emulate(unsigned ix)
           return SRV(-errno);
 
         ssize_t written = writeHartMemory(hart, buff, rvBuff, rc);
-        if (written)
-          memChanges_.emplace_back(rvBuff, written);
 	return  written == rc ? written : SRV(-EINVAL);
       }
 
@@ -1125,8 +1111,7 @@ Syscall<URV>::emulate(unsigned ix)
           }
 
         bool copyOk = true;
-        size_t len = copyStatBufferToRiscv(hart, buff, rvBuff, copyOk);
-        memChanges_.emplace_back(rvBuff, len);
+        copyStatBufferToRiscv(hart, buff, rvBuff, copyOk);
 	return copyOk? rc : SRV(-1);
       }
 
@@ -1142,9 +1127,7 @@ Syscall<URV>::emulate(unsigned ix)
 	  return SRV(-errno);
 
         bool copyOk  = true;
-        size_t len = copyStatBufferToRiscv(hart, buff, rvBuff, copyOk);
-
-        memChanges_.emplace_back(rvBuff, len);
+        copyStatBufferToRiscv(hart, buff, rvBuff, copyOk);
 	return copyOk? rc : SRV(-1);
       }
 
@@ -1247,8 +1230,6 @@ Syscall<URV>::emulate(unsigned ix)
           return SRV(-errno);
 
         ssize_t written = writeHartMemory(hart, temp, buffAddr, rc);
-        if (written)
-          memChanges_.emplace_back(buffAddr, written);
 	return written == rc? written : SRV(-EINVAL);
       }
 
@@ -1284,8 +1265,6 @@ Syscall<URV>::emulate(unsigned ix)
 
         int flags = a3;
         int rc = utimensat(dirfd, path.data(), spec.data(), flags);
-        if (rc >= 0)
-          memChanges_.emplace_back(rvTimeAddr, sizeof(spec));
         return rc < 0 ? SRV(-errno) : rc;
       }
 
@@ -1331,9 +1310,6 @@ Syscall<URV>::emulate(unsigned ix)
         size_t len = copyTmsToRiscv(hart, tms0, rvBuff);
         size_t expected = 4*sizeof(URV);
 
-        if (len)
-          memChanges_.emplace_back(a0, len);
-	
 	return (len == expected)? ticks : SRV(-EINVAL);
       }
 
@@ -1350,8 +1326,6 @@ Syscall<URV>::emulate(unsigned ix)
           {
             strcpy(uts.release, "5.16.0");
             size_t len = writeHartMemory(hart, uts, rvBuff);
-            if (len)
-              memChanges_.emplace_back(rvBuff, len);
             return len == sizeof(uts)? rc : SRV(-EINVAL);
           }
 	return SRV(-errno);
@@ -1386,8 +1360,6 @@ Syscall<URV>::emulate(unsigned ix)
                 len = copyTimevalToRiscv64(hart, tv0, tvAddr);
                 expected = 16; // uint64_t & unit64_t
               }
-            if (len)
-              memChanges_.emplace_back(a0, len);
             if (len != expected)
               return SRV(-EINVAL);
 	  }
@@ -1395,8 +1367,6 @@ Syscall<URV>::emulate(unsigned ix)
 	if (tzAddr)
           {
             size_t len = copyTimezoneToRiscv(hart, tz0, tzAddr);
-            if (len)
-              memChanges_.emplace_back(a1, len);
             if (len != 2*sizeof(URV))
               return SRV(-EINVAL);
           }
@@ -1574,9 +1544,7 @@ Syscall<URV>::emulate(unsigned ix)
 	uint64_t rvBuff = a1;
 
         bool copyOk  = true;
-        size_t len = copyStatBufferToRiscv(hart, buff, rvBuff, copyOk);
-
-        memChanges_.emplace_back(rvBuff, len);
+        copyStatBufferToRiscv(hart, buff, rvBuff, copyOk);
 	return copyOk? rc : SRV(-1);
       }
     }

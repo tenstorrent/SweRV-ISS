@@ -193,13 +193,6 @@ Args::collectCommandLineValues(const boost::program_options::variables_map& varM
         }
     }
 
-  if (varMap.count("syscallslam"))
-    {
-      auto numStr = varMap["syscallslam"].as<std::string>();
-      if (not parseCmdLineNumber("syscallslam", numStr, this->syscallSlam))
-        ok = false;
-    }
-
   if (varMap.count("mcmls"))
     {
       auto numStr = varMap["mcmls"].as<std::string>();
