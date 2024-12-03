@@ -1422,7 +1422,7 @@ CsRegs<URV>::writeSip(URV value, bool recordWr)
   if (mideleg and mvien and mvip)
     {
       URV mvipMask = mvien->read() & ~mideleg->read();
-      mvipMask &= sipMask & URV(0x1fff);
+      mvipMask &= sip->getWriteMask();
       sipMask &= ~ mvipMask;  // Don't write SIP where SIP is an alias to mvip.
       mvip->write((mvip->read() & ~mvipMask) | (value & mvipMask)); // Write mvip instead.
       if (recordWr)
