@@ -12371,7 +12371,7 @@ Hart<URV>::execLpad(const DecodedInst* di)
     }
 
   uint32_t lpl = di->op1();
-  URV expected = intRegs_.read(RegX7);
+  URV expected = (intRegs_.read(RegX7) & 0xfffff000); // Must match bits 31:12
   if (lpl != 0 and expected != lpl)
     {
       initiateException(ExceptionCause::SOFTWARE_CHECK, currPc_, 2 /* Landing pad */);
