@@ -148,5 +148,6 @@ namespace WdRiscv
     std::unordered_map<uint64_t, std::unordered_set<unsigned>> futexMap_;
 
     std::mutex emulateMutex_;
+    std::mutex semihostMutex_;
   };
 }

@@ -442,7 +442,7 @@ Syscall<URV>::emulateSemihost(unsigned hartIx, URV a0, URV a1)
       { Tickfreq,     "tickfreq" }
     };
 
-  std::lock_guard<std::mutex> lock(emulateMutex_);
+  std::lock_guard<std::mutex> lock(semihostMutex_);
 
   auto& hart = *harts_.at(hartIx);
   Operation op = Operation(a0);
