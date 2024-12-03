@@ -911,6 +911,8 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
   enableAia(aiaEnabled_);      // To activate/deactivate AIA hypervisor CSRs.
   enableSdtrig(sdtrigOn_);     // To activate/deactivate HCONTEXT.
   enableSsqosid(ssqosidOn_);   // To activate/deactivate SRMCFG.
+
+  triggers_.enableHypervisor(flag);
 }
 
 

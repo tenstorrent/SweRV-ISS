@@ -21,6 +21,7 @@
 using namespace WdRiscv;
 
 
+
 template <typename URV>
 Triggers<URV>::Triggers(unsigned count)
   : triggers_(count)
@@ -40,17 +41,30 @@ Triggers<URV>::Triggers(unsigned count)
   supportedTypes_.at(unsigned(TT::Custom0)) = false;
   supportedTypes_.at(unsigned(TT::Custom1)) = false;
   supportedTypes_.at(unsigned(TT::Custom2)) = false;
+
+  // By default read masks allow reading of all bits.
+  for (auto& mask : data1ReadMasks_)
+    mask = ~URV(0);
+
+  // Update read masks to make hyervisor realted bits read-only-zero. That may change
+  // later when/if hypervisor is enabled.
+  enableHypervisor(false);
 }
 
 
 template <typename URV>
 bool
-Triggers<URV>::readData1(URV trigger, URV& value) const
+Triggers<URV>::readData1(URV trigIx, URV& value) const
 {
-  if (trigger >= triggers_.size())
+  if (trigIx >= triggers_.size())
     return false;
 
-  value = triggers_.at(trigger).readData1();
+  auto& trigger = triggers_.at(trigIx);
+  unsigned typeIx = unsigned(trigger.type());
+
+  URV readMask = typeIx < data1ReadMasks_.size() ? data1ReadMasks_.at(typeIx) : 0;
+
+  value = trigger.readData1() & readMask;
   return true;
 }
 
@@ -747,6 +761,56 @@ Triggers<URV>::defineChainBounds()
   end = triggers_.size();
   for  (size_t i = begin; i < end; ++i)
     triggers_.at(i).setChainBounds(begin, end);
+}
+
+
+template <typename URV>
+void
+Triggers<URV>::enableHypervisor(bool flag)
+{
+  // Setup read masks. The vs/vu bits are read-only-zero if hyervisor disabled.
+
+
+  // Setup mcontrol6.
+  URV mask = data1ReadMasks_.at(unsigned(TriggerType::Mcontrol6));
+  Data1Bits<URV> d1Bits(0);
+  d1Bits.mcontrol6_.vs_ = 1;
+  d1Bits.mcontrol6_.vu_ = 1;
+  mask = flag? mask | d1Bits.value_ : mask & ~ d1Bits.value_;
+  data1ReadMasks_.at(unsigned(TriggerType::Mcontrol6)) = mask;
+
+  // Setup icount.
+  mask = data1ReadMasks_.at(unsigned(TriggerType::Mcontrol6));
+  d1Bits.value_ = 0;
+  d1Bits.icount_.vs_ = 1;
+  d1Bits.icount_.vu_ = 1;
+  mask = flag? mask | d1Bits.value_ : mask & ~ d1Bits.value_;
+  data1ReadMasks_.at(unsigned(TriggerType::Icount)) = mask;
+
+  // Setup itrigger.
+  mask = data1ReadMasks_.at(unsigned(TriggerType::Itrigger));
+  d1Bits.value_ = 0;
+  d1Bits.itrigger_.vs_ = 1;
+  d1Bits.itrigger_.vu_ = 1;
+  mask = flag? mask | d1Bits.value_ : mask & ~ d1Bits.value_;
+  data1ReadMasks_.at(unsigned(TriggerType::Itrigger)) = mask;
+
+  // Setup etrigger.
+  mask = data1ReadMasks_.at(unsigned(TriggerType::Etrigger));
+  d1Bits.value_ = 0;
+  d1Bits.etrigger_.vs_ = 1;
+  d1Bits.etrigger_.vu_ = 1;
+  mask = flag? mask | d1Bits.value_ : mask & ~ d1Bits.value_;
+  data1ReadMasks_.at(unsigned(TriggerType::Etrigger)) = mask;
+}
+
+
+template <typename URV>
+Trigger<URV>::Trigger(URV data1, URV data2, URV /*data3*/,
+                      URV mask1, URV mask2, URV mask3)
+  : data1_(data1), data2_(data2), data1WriteMask_(mask1),
+    data2WriteMask_(mask2), data3WriteMask_(mask3)
+{
 }
 
 
