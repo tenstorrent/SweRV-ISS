@@ -9814,7 +9814,7 @@ Hart<URV>::execSrai(const DecodedInst* di)
     {
       // End of semi-hosting sequence: See section 2.8 (ebreak) of unprivileged spec.
       if (di->op0() == 0 and di->op1() == 0 and amount == 0x7 and
-          instCounter_ == semihostSlliTag_ + 8)
+          instCounter_ == semihostSlliTag_ + 2)
         {
           URV a0 = peekIntReg(RegA0);
           URV a1 = peekIntReg(RegA1);
@@ -10017,7 +10017,7 @@ Hart<URV>::execEbreak(const DecodedInst* di)
 
   // If semihosting is on and the ebreak follows a special slli, then it is a service call
   // instead of a debugger break. See section 2.8 (ebreak) of unprivileged spec.
-  if (semihostOn_ and not isCompressedInst(di->inst()) and instCounter_ ==  semihostSlliTag_ + 4)
+  if (semihostOn_ and not isCompressedInst(di->inst()) and instCounter_ ==  semihostSlliTag_ + 1)
     return;
   semihostSlliTag_ = 0;
 
