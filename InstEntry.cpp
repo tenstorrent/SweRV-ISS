@@ -2137,7 +2137,7 @@ InstTable::setupInstVec()
         0b110000'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::I,
         OperandType::IntReg, OperandMode::Write, rdMask,
-        OperandType::IntReg, OperandMode::Read, rs1Mask,
+        OperandType::Imm, OperandMode::None, 0x000f8000,
         OperandType::Imm, OperandMode::None, 0x7ff00000,
       },
 
