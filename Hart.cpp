@@ -9810,19 +9810,18 @@ Hart<URV>::execSrai(const DecodedInst* di)
 
   URV val = SRV(intRegs_.read(di->op1())) >> amount;
 
-  if (semihostOn_ and not isCompressedInst(di->inst()))  
+  // End of semi-hosting sequence: See section 2.8 (ebreak) of unprivileged spec.
+  if (semihostOn_ and not isCompressedInst(di->inst()) and
+      di->op0() == 0 and di->op1() == 0 and amount == 0x7 and
+      instCounter_ == semihostSlliTag_ + 2)
     {
-      // End of semi-hosting sequence: See section 2.8 (ebreak) of unprivileged spec.
-      if (di->op0() == 0 and di->op1() == 0 and amount == 0x7 and
-          instCounter_ == semihostSlliTag_ + 2)
-        {
-          URV a0 = peekIntReg(RegA0);
-          URV a1 = peekIntReg(RegA1);
-          val = syscall_.emulateSemihost(hartIx_, a0, a1);
-        }
+      URV a0 = peekIntReg(RegA0);
+      URV a1 = peekIntReg(RegA1);
+      a0 = syscall_.emulateSemihost(hartIx_, a0, a1);
+      intRegs_.write(RegA0, a0);
     }
-
-  intRegs_.write(di->op0(), val);
+  else
+    intRegs_.write(di->op0(), val);
 
   semihostSlliTag_ = 0;
 }
