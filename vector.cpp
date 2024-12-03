@@ -19310,7 +19310,8 @@ Hart<URV>::vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   // Note: NaN canonicalization when there are no active elements
   // is only allowed for vfredusum.vs and NOT for vfredosum.vs,
   // vfredmin.vs, and vfredmax.vs.
-  if (not anyActive and std::isnan(result))
+  if (not anyActive and std::isnan(result) and
+      vecRegs_.fpUnorderedSumCanonical_.at(__builtin_ctz(sizeof(ELEM_TYPE))))
     result = std::numeric_limits<decltype(result)>::quiet_NaN();
 
   vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
@@ -19698,7 +19699,8 @@ Hart<URV>::vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
 
   // Note: NaN canonicalization when there are no active elements
   // is only allowed for vfwredusum.vs and NOT for vfwredosum.vs.
-  if (not anyActive and std::isnan(result))
+  if (not anyActive and std::isnan(result) and
+      vecRegs_.fpUnorderedSumCanonical_.at(__builtin_ctz(sizeof(ELEM_TYPE2X))))
     result = std::numeric_limits<decltype(result)>::quiet_NaN();
 
   vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);

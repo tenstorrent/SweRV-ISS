@@ -2228,6 +2228,10 @@ namespace WdRiscv
     void configVectorLegalizeForEgs(bool flag)
     { vecRegs_.configLegalizeForEgs(flag); }
 
+    /// If flag is true, apply NaN canonicalization to vfredusum/vfwredusum result.
+    void configVectorFpUnorderedSumCanonical(ElementWidth ew, bool flag)
+    { vecRegs_.configVectorFpUnorderedSumCanonical(ew, flag); }
+
     /// Support memory consistency model (MCM) instruction cache. Read 2 bytes from the
     /// given address (must be even) into inst. Return true on success.  Return false if
     /// the line of the given address is not in the cache.
