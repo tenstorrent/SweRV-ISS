@@ -2053,6 +2053,14 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.hfenceGvmaIgnoresGpa(flag);
     }
 
+  tag = "enable_semihosting";
+  if (config_ ->contains(tag))
+    {
+      bool flag = false;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableSemihosting(flag);
+    }
+
   return errors == 0;
 }
 

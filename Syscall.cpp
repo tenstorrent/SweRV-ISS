@@ -406,6 +406,244 @@ Syscall<URV>::registerLinuxFd(int linuxFd, const std::string& path, bool isRead)
 
 template <typename URV>
 URV
+Syscall<URV>::emulateSemihost(unsigned hartIx, URV a0, URV a1)
+{
+  enum Operation { Open = 1, Close = 2, Writec = 3, Write0 = 4, Write = 5, Read = 6,
+                   Readc = 7, Iserror = 8, Istty = 9, Seek = 10, Flen = 12, Tmpnam = 13,
+                   Remove = 14, Rename = 15, Clock = 16, Time = 17, System = 18,
+                   Errno = 19, GetCmdline = 21, Heapinfo = 22, Exit = 24, ExitExtended = 32,
+                   Elapsed = 48, Tickfreq = 49 };
+
+  static std::unordered_map<Operation, std::string>  names =
+    {
+      { Open,         "open" },
+      { Close,        "close" },
+      { Writec,       "writec" },
+      { Write0,       "write0" },
+      { Write,        "write" },
+      { Read,         "read" },
+      { Readc,        "readc" },
+      { Iserror,      "iserror" },
+      { Istty,        "istty" },
+      { Seek,         "seek" },
+      { Flen,         "flen" },
+      { Tmpnam,       "tmpnam" },
+      { Remove,       "remove" },
+      { Rename,       "rename" },
+      { Clock,        "clock" },
+      { Time,         "time" },
+      { System,       "system" },
+      { Errno,        "errno" },
+      { GetCmdline,   "get_cmdline" },
+      { Heapinfo,     "heapinfo" },
+      { Exit,         "exit" },
+      { ExitExtended, "exit_extended" },
+      { Elapsed,      "elapsed" },
+      { Tickfreq,     "tickfreq" }
+    };
+
+  std::lock_guard<std::mutex> lock(emulateMutex_);
+
+  auto& hart = *harts_.at(hartIx);
+  Operation op = Operation(a0);
+
+  switch (op)
+    {
+    case Open:
+      break;
+ 
+    case Close:
+      {
+        URV handle = 0;
+        if (not hart.peekMemory(a1, handle, true))
+          return SRV(-1);
+        SRV rc = emulate(hartIx, 57 /*close*/, handle, 0, 0, 0);
+        return rc == 0? 0 : SRV(-1);
+      }
+
+    case Writec:
+      {
+        uint8_t c = 0;
+        hart.peekMemory(a1, c, true);
+        fputc(c, stderr);
+        return c;
+      }
+
+    case Write0:
+      {
+        uint8_t c = 0;
+        URV addr = a1;
+        while (hart.peekMemory(addr++, c, true) and c != 0)
+          fputc(c, stderr);
+        return a1;
+      }
+
+    case Write:
+      {
+        URV handle = 0, addr = 0, size = 0;
+        if (not hart.peekMemory(a1, handle, true)  or
+            not hart.peekMemory(a1 + sizeof(URV), addr, true) or
+            not hart.peekMemory(a1 + 2*sizeof(URV), size, true))
+          return SRV(-1);
+
+        SRV rc = emulate(hartIx, 64 /*write*/, handle, addr, size, 0);
+        return rc >= 0? rc : SRV(-1);
+      }
+
+    case Read:
+      {
+        URV handle = 0, addr = 0, size = 0;
+        if (not hart.peekMemory(a1, handle, true)  or
+            not hart.peekMemory(a1 + sizeof(URV), addr, true) or
+            not hart.peekMemory(a1 + 2*sizeof(URV), size, true))
+          return SRV(-1);
+
+        SRV rc = emulate(hartIx, 63 /*read*/, handle, addr, size, 0);
+        return rc >= 0? rc : SRV(-1);
+      }
+
+    case Readc:
+      break;
+
+    case Iserror:
+      {
+        URV code = 0;
+        if (not hart.peekMemory(a1, code, true))
+          return SRV(-1);
+        if (code == 0)
+          return 0;
+        return SRV(-1);
+      }
+
+    case Istty:
+      {
+        URV fd = 0;
+        if (not hart.peekMemory(a1, fd, true))
+          return SRV(-1);
+
+        fd = effectiveFd(fd);
+        if (isatty(fd))
+          return 1;
+        return 0;
+      }
+
+    case Seek:
+      {
+        URV fd = 0, position = 0;
+        if (not hart.peekMemory(a1, fd, true) or
+            not hart.peekMemory(a1 + sizeof(URV), position, true))
+          return SRV(-1);
+
+        fd = effectiveFd(fd);
+        off_t offset = position;
+        ssize_t rc = lseek(fd, offset, SEEK_SET);
+        return rc < 0 ? SRV(-1) : SRV(0);
+      }
+
+    case Flen:
+      {
+        URV fd = 0;
+        if (not hart.peekMemory(a1, fd, true))
+          return SRV(-1);
+
+        fd = effectiveFd(fd);
+        struct stat buff;
+	int rc = fstat(fd, &buff);
+        if (rc < 0)
+          return SRV(-1);
+        return buff.st_size;
+      }
+
+    case Tmpnam:
+      break;
+#if 0
+      // Spec is dangerous. Unimplementable.
+      {
+        URV addr = 0, id = 0, len = 0;
+        if (not hart.peekMemory(a1, addr, true) or
+            not hart.peekMemory(a1 + sizeof(URV), id, true) or
+            not hart.peekMemory(a1 + 2*sizeof(URV), len, true))
+          return SRV(-1);
+
+        if (len > L_tmpnam)
+          return SRV(-1);
+
+        char name[L_tmpnam];
+        if (not std::mkstmp(name))
+          return SRV(-1);
+
+        writeHartMemory(hart, name, len);
+        return 0;
+      }
+#endif
+
+    case Remove:
+      {
+        URV addr = 0, len = 0;
+        if (not hart.peekMemory(a1, addr, true) or
+            not hart.peekMemory(a1 + sizeof(URV), len, true))
+          return SRV(-1);
+
+        SRV rc = emulate(hartIx, 1026 /*unlink*/, addr, 0, 0, 0);
+        return rc >= 0 ? rc : SRV(-1);
+      }
+
+    case Rename:
+      {
+        URV addr1 = 0, addr2 = 0;  // Old and new name addresses
+        URV len1 = 0, len2 = 0;
+        if (not hart.peekMemory(a1, addr1, true) or
+            not hart.peekMemory(a1 + sizeof(URV), len1, true) or
+            not hart.peekMemory(a1 + 2*sizeof(URV), addr2, true) or
+            not hart.peekMemory(a1 + 3*sizeof(URV), len2, true))
+          return SRV(-1);
+        SRV rc = emulate(hartIx, 276 /*rename*/, len1, addr1, len2, addr2);
+        return rc >= 0 ? rc : SRV(-1);
+      }
+
+    case Clock:
+      break;
+
+    case Time:
+      break;
+
+    case System:
+      break;
+
+    case Errno:
+      break;
+
+    case GetCmdline:
+      break;
+
+    case Heapinfo:
+      break;
+
+    case Exit:
+      throw CoreException(CoreException::Exit, "", a1);
+      break;
+
+    case Elapsed:
+      break;
+
+    case Tickfreq:
+      break;
+
+    default:
+      std::cerr << "Error: Unknown semi-hosting syscall number: " << a0 << '\n';
+      return SRV(-1);
+    }
+
+  std::cerr << "Warning: Unimplemented semi-hosting syscall \"" << names[op]
+            << "\" number " << a0 << '\n';
+
+  return SRV(-1);
+}
+      
+
+
+template <typename URV>
+URV
 Syscall<URV>::emulate(unsigned hartIx, unsigned syscallIx, URV a0, URV a1, URV a2, URV a3)
 {
   static std::unordered_map<unsigned, std::string> names =
@@ -1548,7 +1786,7 @@ Syscall<URV>::emulate(unsigned hartIx, unsigned syscallIx, URV a0, URV a1, URV a
   if (syscallIx < reportedCalls.size() and reportedCalls.at(syscallIx))
     return -1;
 
-  std::cerr << "Warning: Unimplemented syscall " << names[syscallIx] << " number "
+  std::cerr << "Warning: Unimplemented syscall \"" << names[syscallIx] << "\" number "
             << syscallIx << "\n";
 
    if (syscallIx < reportedCalls.size())

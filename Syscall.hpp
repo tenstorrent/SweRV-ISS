@@ -50,6 +50,8 @@ namespace WdRiscv
     /// are in a0, a1, a2, and a3.
     URV emulate(unsigned hartIx, unsigned syscallIx, URV a0, URV a1, URV a2, URV a3);
 
+    URV emulateSemihost(unsigned hartIx, URV a0, URV a1);
+
     /// Redirect the given output file descriptor (typically that of
     /// stdout or stderr) to the given file. Return true on success
     /// and false on failure.

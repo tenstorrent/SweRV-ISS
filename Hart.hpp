@@ -394,6 +394,11 @@ namespace WdRiscv
     void configAddressTranslationPmms(const std::vector<VirtMem::Pmm>& pmms)
     { virtMem_.setSupportedPmms(pmms); }
 
+    /// Enable support for ebreak semi-hosting.  See ebreak documentation in the
+    /// unprivileged spec.
+    void enableSemihosting(bool flag)
+    { semihostOn_ = flag; }
+
     /// Enable page based memory types.
     void enableTranslationPbmt(bool flag)
     { enableExtension(RvExtension::Svpbmt, flag); updateTranslationPbmt(); }
@@ -5470,6 +5475,9 @@ namespace WdRiscv
 
     bool traceHeaderPrinted_ = false;
     bool ownTrace_ = false;
+
+    bool semihostOn_ = false;
+    uint64_t semihostSlliTag_ = 0;  // Tag (rank) of slli instruction.
 
     // For lockless handling of MIP. We assume the software won't
     // trigger multiple interrupts while handling. To be cleared when

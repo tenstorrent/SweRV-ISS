@@ -4440,10 +4440,7 @@ bool
 Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args,
                                 const std::vector<std::string>& envVars)
 {
-  URV sp = 0;
-
-  if (not peekIntReg(RegSp, sp))
-    return false;
+  URV sp = peekIntReg(RegSp);
 
   // Make sp 16-byte aligned.
   if ((sp & 0xf) != 0)
@@ -9750,6 +9747,13 @@ Hart<URV>::execSlli(const DecodedInst* di)
 
   URV v = intRegs_.read(di->op1()) << amount;
   intRegs_.write(di->op0(), v);
+
+  if (semihostOn_ and not isCompressedInst(di->inst()))
+    {
+      // Start of semi-hosting sequence: See section 2.8 (ebreak) of unprivileged spec.
+      if (di->op0() == 0 and di->op1() == 0 and amount == 0x1f)
+        semihostSlliTag_ = instCounter_;
+    }
 }
 
 
@@ -9804,8 +9808,23 @@ Hart<URV>::execSrai(const DecodedInst* di)
   if (not checkShiftImmediate(di, amount))
     return;
 
-  URV v = SRV(intRegs_.read(di->op1())) >> amount;
-  intRegs_.write(di->op0(), v);
+  URV val = SRV(intRegs_.read(di->op1())) >> amount;
+
+  if (semihostOn_ and not isCompressedInst(di->inst()))  
+    {
+      // End of semi-hosting sequence: See section 2.8 (ebreak) of unprivileged spec.
+      if (di->op0() == 0 and di->op1() == 0 and amount == 0x7 and
+          instCounter_ == semihostSlliTag_ + 8)
+        {
+          URV a0 = peekIntReg(RegA0);
+          URV a1 = peekIntReg(RegA1);
+          val = syscall_.emulateSemihost(hartIx_, a0, a1);
+        }
+    }
+
+  intRegs_.write(di->op0(), val);
+
+  semihostSlliTag_ = 0;
 }
 
 
@@ -9991,10 +10010,16 @@ Hart<URV>::execEcall(const DecodedInst*)
 
 template <typename URV>
 void
-Hart<URV>::execEbreak(const DecodedInst*)
+Hart<URV>::execEbreak(const DecodedInst* di)
 {
   if (triggerTripped_)
     return;
+
+  // If semihosting is on and the ebreak follows a special slli, then it is a service call
+  // instead of a debugger break. See section 2.8 (ebreak) of unprivileged spec.
+  if (semihostOn_ and not isCompressedInst(di->inst()) and instCounter_ ==  semihostSlliTag_ + 4)
+    return;
+  semihostSlliTag_ = 0;
 
   if (enableGdb_)
     {
