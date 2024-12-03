@@ -71,7 +71,7 @@ Hart<URV>::determineCboException(uint64_t& addr, uint64_t& gpa, uint64_t& pa, bo
 
   for (uint64_t offset = 0; offset < cacheLineSize_; offset += 8)
     {
-      Pma pma = getPma(pa + offset);
+      Pma pma = accessPma(pa + offset, PmaManager::AccessReason::LdSt);
       if (isZero)
         {
           if (not pma.isWrite())
