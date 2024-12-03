@@ -2992,7 +2992,7 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt,
 
   // Reset ELP.
   if (isRvZicfilp())
-    elp_ = false;
+    setElp(false);
 
   // If exception happened while in an NMI handler, we go to the NMI exception
   // handler address.
@@ -3057,7 +3057,7 @@ Hart<URV>::initiateNmi(URV cause, URV pcToSave)
       if (isRvZicfilp())
         {
           mnf.bits_.MNPELP = elp_;
-          elp_ = false;
+          setElp(false);
         }
 
       if (not csRegs_.write(CsrNumber::MNEPC, privMode_, pcToSave))
@@ -9544,7 +9544,7 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
       if (isRvZicfilp())
         {
           dcsr.bits_.PELP = elp_;
-          elp_ = false;
+          setElp(false);
         }
 
       if (nmiPending_)
@@ -9618,7 +9618,7 @@ Hart<URV>::exitDebugMode()
 
   // Restore ELP.
   if (isRvZicfilp())
-    elp_ = isLandingPadEnabled(pm, vm)? dcsrf.bits_.PELP : false;
+    setElp(isLandingPadEnabled(pm, vm)? dcsrf.bits_.PELP : false);
 }
 
 
@@ -9730,7 +9730,7 @@ Hart<URV>::execJalr(const DecodedInst* di)
       if (isRvZicfilp())
         {
           if (isLandingPadEnabled(privMode_, virtMode_))
-            elp_ = (di->op1() != 1) and (di->op1() != 5) and (di->op1() != 7);
+            setElp((di->op1() != 1) and (di->op1() != 5) and (di->op1() != 7));
         }
     }
 }
@@ -10255,7 +10255,7 @@ namespace WdRiscv
     // 1.5. Restore ELP.
     if (isRvZicfilp())
       {
-        elp_ = isLandingPadEnabled(savedMode, savedVirt)? fields.bits_.MPELP : false;
+        setElp(isLandingPadEnabled(savedMode, savedVirt)? fields.bits_.MPELP : false);
         fields.bits_.MPELP = false;
       }
 
@@ -10323,7 +10323,7 @@ namespace WdRiscv
     // 1.5. Restore ELP.
     if (isRvZicfilp())
       {
-        elp_ = isLandingPadEnabled(savedMode, savedVirt)? ((hvalue >> 9) & 1) : false;
+        setElp(isLandingPadEnabled(savedMode, savedVirt)? ((hvalue >> 9) & 1) : false);
         hvalue &= ~ uint32_t(1 << 9);
       }
 
@@ -10416,7 +10416,7 @@ Hart<URV>::execSret(const DecodedInst* di)
   // Set ELP.
   if (isRvZicfilp())
     {
-      elp_ = isLandingPadEnabled(savedMode, savedVirt)? fields.bits_.SPELP : false;
+      setElp(isLandingPadEnabled(savedMode, savedVirt)? fields.bits_.SPELP : false);
       fields.bits_.SPELP = 0;
     }
 
@@ -12377,7 +12377,7 @@ Hart<URV>::execLpad(const DecodedInst* di)
       initiateException(ExceptionCause::SOFTWARE_CHECK, currPc_, 2 /* Landing pad */);
       return;
     }
-  elp_ = 0;
+  setElp(false);
 }
 
 template

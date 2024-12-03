@@ -1146,6 +1146,14 @@ namespace WdRiscv
     uint64_t getInterruptCount() const
     { return interruptCount_; }
 
+    /// Get the value of ELP.
+    bool getElp() const
+    { return elp_; }
+
+    /// Set the ELP value.
+    void setElp(bool val)
+    { elp_ = val; }
+
     /// Set pre and post to the count of "before"/"after" triggers
     /// that tripped by the last executed instruction.
     void countTrippedTriggers(unsigned& pre, unsigned& post) const
