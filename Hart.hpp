@@ -1287,6 +1287,10 @@ namespace WdRiscv
     Pma getPma(uint64_t addr) const
     { return memory_.pmaMgr_.getPma(addr); }
 
+    /// Simialr to above but performs an "access".
+    Pma accessPma(uint64_t addr, PmaManager::AccessReason reason) const
+    { return memory_.pmaMgr_.accessPma(addr, reason); }
+
     /// Return true if given extension is statically enabled (enabled my
     /// --isa but may be turned off by the MSTATUS/MISA CSRs).
     bool hasIsaExtension(RvExtension ext) const

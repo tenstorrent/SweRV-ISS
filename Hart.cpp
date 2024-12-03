@@ -1567,7 +1567,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       uint64_t a1 = addr1;
       if (steeEnabled_)
 	a1 = stee_.clearSecureBits(addr1);
-      Pma pma = getPma(a1);
+      Pma pma = accessPma(a1, PmaManager::AccessReason::LdSt);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
@@ -1622,7 +1622,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
     }
 
   // Check PMA.
-  Pma pma = getPma(addr1);
+  Pma pma = accessPma(addr1, PmaManager::AccessReason::LdSt);
   if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
     return EC::LOAD_ACC_FAULT;
 
@@ -1631,7 +1631,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       uint64_t aligned = addr1 & ~alignMask;
       uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
       ldStFaultAddr_ = va2;
-      pma = getPma(next);
+      pma = accessPma(next, PmaManager::AccessReason::LdSt);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
 	return EC::LOAD_ACC_FAULT;
@@ -11403,7 +11403,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       uint64_t a1 = addr1;
       if (steeEnabled_)
 	a1 = stee_.clearSecureBits(addr1);
-      Pma pma = getPma(a1);
+      Pma pma = accessPma(a1, PmaManager::AccessReason::LdSt);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
@@ -11458,7 +11458,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
     }
 
   // Check PMA.
-  Pma pma = getPma(addr1);
+  Pma pma = accessPma(addr1, PmaManager::AccessReason::LdSt);
   if (not pma.isWrite())
     return EC::STORE_ACC_FAULT;
 
@@ -11466,7 +11466,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
     {
       uint64_t aligned = addr1 & ~alignMask;
       uint64_t next = addr1 == addr2? aligned + stSize : addr2;
-      pma = getPma(next);
+      pma = accessPma(next, PmaManager::AccessReason::LdSt);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isWrite())
 	{
