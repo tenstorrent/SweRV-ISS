@@ -1328,6 +1328,30 @@ CsRegs<URV>::enableZkr(bool flag)
 
 
 template <typename URV>
+void
+CsRegs<URV>::enableZicfilp(bool flag)
+{
+  using CN = CsrNumber;
+
+  MseccfgFields<URV> mf{regs_.at(size_t(CN::MSECCFG)).getReadMask()};
+  mf.bits_.MLPE = flag;
+  regs_.at(size_t(CN::MSECCFG)).setReadMask(mf.value_);
+
+  MenvcfgFields<URV> env{regs_.at(size_t(CN::MENVCFG)).getReadMask()};
+  env.bits_.LPE = flag;
+  regs_.at(size_t(CN::MENVCFG)).setReadMask(env.value_);
+
+  env = regs_.at(size_t(CN::SENVCFG)).getReadMask();
+  env.bits_.LPE = flag;
+  regs_.at(size_t(CN::SENVCFG)).setReadMask(env.value_);
+
+  env = regs_.at(size_t(CN::HENVCFG)).getReadMask();
+  env.bits_.LPE = flag;
+  regs_.at(size_t(CN::HENVCFG)).setReadMask(env.value_);
+}
+
+
+template <typename URV>
 URV
 CsRegs<URV>::legalizeMstatusValue(URV value) const
 {
@@ -2714,9 +2738,9 @@ CsRegs<URV>::defineMachineRegs()
       defineCsr(std::move(name), num,  !mand, imp, 0, pmpMask, pmpMask);
     }
 
-  URV menvMask = 0xf1;
+  URV menvMask = 0xf5;
   if constexpr (sizeof(URV) == 8)
-    menvMask = 0xe0000003000000f1;
+    menvMask = 0xe0000003000000f5;
   defineCsr("menvcfg", Csrn::MENVCFG, !mand, imp, 0, menvMask, menvMask);
   if (rv32_)
     {
@@ -2725,7 +2749,7 @@ CsRegs<URV>::defineMachineRegs()
       c->markAsHighHalf(true);
     }
 
-  URV mseMask = 0x300;
+  URV mseMask = 0x700;
   if constexpr (sizeof(URV) == 8)
     mseMask |= 0x300000000;
   defineCsr("mseccfg", Csrn::MSECCFG, !mand, imp, 0, mseMask, mseMask);
@@ -2939,9 +2963,9 @@ CsRegs<URV>::defineSupervisorRegs()
   if (sip and mip)
     sip->tie(mip->valuePtr_); // Sip is a shadow if mip
 
-  mask = 0xf1;
+  mask = 0xf5;
   if constexpr (sizeof(URV) == 8)
-    mask = 0x00000003000000f1;  // PMM field writable.
+    mask = 0x00000003000000f5;  // PMM field writable.
   defineCsr("senvcfg",    Csrn::SENVCFG,    !mand, !imp, 0, mask, mask);
 
   mask = 0;
