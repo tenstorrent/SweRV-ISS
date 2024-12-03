@@ -450,6 +450,48 @@ Syscall<URV>::emulateSemihost(unsigned hartIx, URV a0, URV a1)
   switch (op)
     {
     case Open:
+      {
+        URV addr = 0, mode = 0, len = 0;  // Addr: address of name string
+        if (not hart.peekMemory(a1, addr, true)  or
+            not hart.peekMemory(a1 + sizeof(URV), mode, true) or
+            not hart.peekMemory(a1 + 2*sizeof(URV), len, true))
+          return SRV(-1);
+
+        std::array<char, 1024> path;
+        if (not copyRvString(hart, addr, path))
+          return SRV(-1);
+
+        int flags = O_RDONLY;   // Linux flags corresponding to mode.
+        switch (mode)
+          {
+          case 2:
+          case 3:  flags = O_RDWR; break;
+
+          case 4:
+          case 5:  flags = O_WRONLY | O_CREAT; break;
+
+          case 6:
+          case 7:  flags = O_RDWR | O_CREAT; break;
+
+          case 8:
+          case 9:  flags = O_WRONLY | O_APPEND | O_CREAT; break;
+
+          case 10:
+          case 11:  flags = O_RDWR | O_APPEND | O_CREAT; break;
+          }
+
+	int handle = open(path.data(), flags, S_IRWXU);
+        if (handle < 0)
+          return SRV(-1);
+        bool isRead = not (flags & (O_WRONLY | O_RDWR));
+        int effHandle = registerLinuxFd(handle, path.data(), isRead);
+        if (effHandle < 0)
+          {
+            close(handle);
+            return SRV(-1);
+          }
+        return effHandle;
+      }
       break;
  
     case Close:
