@@ -16,6 +16,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <array>
 #include <string>
 #include <bit>
 #include "trapEnums.hpp"
@@ -299,11 +300,9 @@ namespace WdRiscv
 		       MaskLowEqualHigh = 5, NotEqual = 8, NotMasked = 9,
                        NotMaskHighEqualLow = 12, NotMaskLowEqualHigh = 13 };
 
+    /// Constructor.
     Trigger(URV data1 = 0, URV data2 = 0, URV /*data3*/ = 0,
-	    URV mask1 = ~URV(0), URV mask2 = ~URV(0), URV mask3 = 0)
-      : data1_(data1), data2_(data2), data1WriteMask_(mask1),
-	data2WriteMask_(mask2), data3WriteMask_(mask3)
-    { }
+	    URV mask1 = ~URV(0), URV mask2 = ~URV(0), URV mask3 = 0);
 
     /// Return the type of this trigger.
     TriggerType type() const
@@ -1039,6 +1038,9 @@ namespace WdRiscv
     /// not in types vector.
     bool setSupportedTypes(const std::vector<TriggerType>& types);
 
+    /// Enable hypervisor mode.
+    void enableHypervisor(bool flag);
+
     void getTriggerChange(URV ix, std::vector<std::pair<TriggerOffset, uint64_t>>& changes) const
     {
       changes.clear();
@@ -1093,6 +1095,10 @@ namespace WdRiscv
     std::vector< Trigger<URV> > triggers_;
     bool mmodeEnabled_ = true;  // Triggers trip in Machine mode when true.
     bool tcontrolEnabled_ = true;
+
+    // Set a read mask for each type.
+    constexpr static unsigned typeLimit_ = unsigned(TriggerType::Disabled) + 1;
+    std::array<URV, typeLimit_> data1ReadMasks_;
   };
 }
 

@@ -45,9 +45,12 @@ namespace WdRiscv
     	mmap_blocks_.insert(std::make_pair(mem_size/2L, blk_t(mem_size/2L, true)));
     }
 
-    /// Emulate a system call on the associated hart. Return an integer
-    /// value corresponding to the result.
-    URV emulate(unsigned ix);
+    /// Emulate a system call on the associated hart. Return an integer value
+    /// corresponding to the result. The call number is in syscallIx. The call paramters
+    /// are in a0, a1, a2, and a3.
+    URV emulate(unsigned hartIx, unsigned syscallIx, URV a0, URV a1, URV a2, URV a3);
+
+    URV emulateSemihost(unsigned hartIx, URV a0, URV a1);
 
     /// Redirect the given output file descriptor (typically that of
     /// stdout or stderr) to the given file. Return true on success
@@ -79,15 +82,6 @@ namespace WdRiscv
     uint64_t mmap_remap(Hart<URV>& hart, uint64_t addr, uint64_t old_size, uint64_t new_size, bool maymove);
 
     using AddrLen = std::pair<uint64_t, uint64_t>;  // Address/length pair
-
-    /// Clear memory changes recorded by last emulate call.
-    void clearMemoryChanges()
-    { memChanges_.clear(); }
-
-    /// Copy the memory changes recorded by the last emulate call to the
-    /// given vector.
-    void getMemoryChanges(std::vector<AddrLen>& changes) const
-    { changes = memChanges_; }
 
     void getUsedMemBlocks(uint64_t sp, std::vector<AddrLen>& used_blocks);
 
@@ -151,10 +145,9 @@ namespace WdRiscv
     std::unordered_set<std::string, util::string_hash, std::equal_to<>> readPaths_;
     std::unordered_set<std::string, util::string_hash, std::equal_to<>> writePaths_;
 
-    std::vector<AddrLen> memChanges_;  // Memory locations changed by syscall.
-
     std::unordered_map<uint64_t, std::unordered_set<unsigned>> futexMap_;
 
     std::mutex emulateMutex_;
+    std::mutex semihostMutex_;
   };
 }

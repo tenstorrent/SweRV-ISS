@@ -911,6 +911,8 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
   enableAia(aiaEnabled_);      // To activate/deactivate AIA hypervisor CSRs.
   enableSdtrig(sdtrigOn_);     // To activate/deactivate HCONTEXT.
   enableSsqosid(ssqosidOn_);   // To activate/deactivate SRMCFG.
+
+  triggers_.enableHypervisor(flag);
 }
 
 
@@ -3164,7 +3166,7 @@ CsRegs<URV>::defineHypervisorRegs()
   csr = defineCsr("vsstatus",    Csrn::VSSTATUS,    !mand, !imp, val, mask, pokeMask);
   csr->setHypervisor(true);
 
-  mask = pokeMask = 0x222;
+  mask = pokeMask = 0x2222;
   csr = defineCsr("vsie",        Csrn::VSIE,        !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
 
@@ -3180,8 +3182,8 @@ CsRegs<URV>::defineHypervisorRegs()
   csr = defineCsr("vstval",      Csrn::VSTVAL,      !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
 
-  mask = 0x2;   // Only bit SSIE is writeable
-  pokeMask = 0x222;
+  mask = 0x2002;   // Only bit LCOF and SSIE is writeable
+  pokeMask = 0x2222;
   csr = defineCsr("vsip",        Csrn::VSIP,        !mand, !imp, 0, mask, pokeMask);
   csr->setHypervisor(true);
 
