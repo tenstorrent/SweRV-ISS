@@ -2299,17 +2299,21 @@ template <typename URV>
 void
 Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
 {
-  if (instr.memOps_.empty())
+  if (instr.memOps_.empty() or instr.repaired_)
     return;
 
+  instr.repaired_ = true;
+
   const VecLdStInfo& info = hart.getLastVectorMemory();
-  auto& elems = info.elems_;
+  // auto& elems = info.elems_;
   auto fields = info.fields_;
   if (fields == 0)
     fields = 1;
 
   unsigned elemSize = info.elemSize_;
   assert(elemSize > 0);
+
+  unsigned stride = fields * elemSize;  // Distance between consecutive elements.
 
   MemoryOpIx prevIx = instr.memOps_.at(0);
 
@@ -2320,28 +2324,16 @@ Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
       auto& op = sysMemOps_.at(opIx);
       auto& prev = sysMemOps_.at(prevIx);
 
-      if (op.elemIx_ != prev.elemIx_ or op.field_ != prev.field_ or op.time_ != prev.time_)
+      if (op.elemIx_ != prev.elemIx_ or op.field_ != prev.field_ or op.time_ != prev.time_
+          or op.pa_ < prev.pa_)
 	{
 	  prevIx = opIx;
 	  continue;  // Not split from the same large read-op.
 	}
 
-      unsigned rank = prev.elemIx_*fields + prev.field_;  // Position of prev in elems_
-
-      unsigned span = (op.pa_ - prev.pa_) / elemSize;
-
-      for (unsigned j = rank + 1; j <= rank + span; ++j)
-	{
-	  if (j >= elems.size())
-	    break;
-	  const auto& elem = elems.at(j);
-	  if (op.pa_ >= elem.pa_ and op.pa_ < elem.pa_ + elemSize)
-	    {
-	      op.elemIx_ = elem.ix_;
-	      op.field_ = elem.field_;
-	      break;
-	    }
-	}
+      uint64_t dist = op.pa_ - prev.pa_;
+      if (dist >= stride)
+        op.elemIx_ += dist / stride;
     }
 }
 
@@ -2655,6 +2647,9 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
   McmInstr* instr = findInstr(hartIx, tag);
   if (not instr or instr->isCanceled())
     return false;
+
+  if (isVector)
+    repairVecReadOps(hart, *instr);
 
   // We expect Mcm::retire to be called after this method is called.
   if (instr->isRetired())

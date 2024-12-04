@@ -103,6 +103,7 @@ namespace WdRiscv
     bool isStore_    : 1 = false;
     bool complete_   : 1 = false;
     bool hasOverlap_ : 1 = false;   // For vector load and store instructions.
+    bool repaired_   : 1 = false;   // True if vec read-op indices adjusted.
 
     /// Return true if this a load/store instruction.
     bool isMemory() const { return isLoad_ or isStore_; }
