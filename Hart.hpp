@@ -394,6 +394,11 @@ namespace WdRiscv
     void configAddressTranslationPmms(const std::vector<VirtMem::Pmm>& pmms)
     { virtMem_.setSupportedPmms(pmms); }
 
+    /// Enable support for ebreak semi-hosting.  See ebreak documentation in the
+    /// unprivileged spec.
+    void enableSemihosting(bool flag)
+    { semihostOn_ = flag; }
+
     /// Enable page based memory types.
     void enableTranslationPbmt(bool flag)
     { enableExtension(RvExtension::Svpbmt, flag); updateTranslationPbmt(); }
@@ -1065,9 +1070,6 @@ namespace WdRiscv
     /// dependency tracking.
     bool getLastVecLdStRegsUsed(const DecodedInst& di, unsigned opIx,
                                 unsigned& regBase, unsigned& regCount) const;
-
-    void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const
-    { syscall_.getMemoryChanges(v); }
 
     /// Return data size if last instruction is a ld/st instruction (AMO is considered a
     /// store) setting virtAddr and physAddr to the corresponding virtual and physical
@@ -1994,15 +1996,6 @@ namespace WdRiscv
     bool unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
                                 Pmp::Mode& mode, bool& locked,
                                 uint64_t& low, uint64_t& high) const;
-
-
-    /// an emulated system call. If addr is zero, no slamming is done.
-    void defineSyscallSlam(URV addr)
-    { syscallSlam_ = addr; }
-
-    /// Return the address set by defineSyscallSlam.
-    URV syscallSlam() const
-    { return syscallSlam_; }
 
     /// Force floating point rounding mode to the given mode
     /// regardless of the setting of the FRM CSR. This is useful for
@@ -5252,7 +5245,6 @@ namespace WdRiscv
     VecRegs vecRegs_;            // Vector register file.
 
     Syscall<URV>& syscall_;
-    URV syscallSlam_ = 0;        // Area in which to slam syscall mem changes.
 
     bool forceRounding_ = false;
     RoundingMode forcedRounding_ = RoundingMode::NearestEven;
@@ -5545,6 +5537,9 @@ namespace WdRiscv
 
     bool traceHeaderPrinted_ = false;
     bool ownTrace_ = false;
+
+    bool semihostOn_ = false;
+    uint64_t semihostSlliTag_ = 0;  // Tag (rank) of slli instruction.
 
     // For lockless handling of MIP. We assume the software won't
     // trigger multiple interrupts while handling. To be cleared when

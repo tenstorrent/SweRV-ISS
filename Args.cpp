@@ -193,13 +193,6 @@ Args::collectCommandLineValues(const boost::program_options::variables_map& varM
         }
     }
 
-  if (varMap.count("syscallslam"))
-    {
-      auto numStr = varMap["syscallslam"].as<std::string>();
-      if (not parseCmdLineNumber("syscallslam", numStr, this->syscallSlam))
-        ok = false;
-    }
-
   if (varMap.count("mcmls"))
     {
       auto numStr = varMap["mcmls"].as<std::string>();
@@ -503,14 +496,6 @@ Args::parseCmdLineArgs(std::span<char*> argv)
          "of these double words sets the timer-limit of the corresponding hart. "
          "A timer interrupt in such a hart becomes pending when the timer value "
          "equals or exceeds the timer limit.")
-        ("syscallslam", po::value<std::string>(),
-         "Define address, a, of a non-cached memory area in which the "
-         "memory changes of an emulated system call will be slammed. This "
-         "is used in server mode to relay the effects of a system call "
-         "to the RTL simulator. The memory area at location a will be filled "
-         "with a sequence of pairs of double words designating addresses and "
-         "corresponding values. A zero/zero pair will indicate the end of "
-         "sequence.")
 	("mcm", po::bool_switch(&this->mcm),
 	 "Enable memory consistency checks. This is meaningful in server/interactive mode.")
 	("noppo",
