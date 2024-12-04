@@ -43,11 +43,16 @@ Uart8250::read(uint64_t addr)
 	case 0:
 	  {
 	    std::lock_guard<std::mutex> lock(mutex_);
-	    uint32_t res = byte_;
-	    byte_ = 0;
-	    lsr_ &= ~1;  // Clear least sig bit
-	    iir_ |= 1;   // Set least sig bit indicating no interrupt.
-	    setInterruptPending(false);
+	    uint32_t res = 0;
+	    if (!rx_fifo.empty()) {
+	      res = rx_fifo.front();
+	      rx_fifo.pop();
+	    }
+	    if (rx_fifo.empty()) {
+	      lsr_ &= ~1;  // Clear least sig bit
+	      iir_ |= 1;   // Set least sig bit indicating no interrupt.
+	      setInterruptPending(false);
+	    }
 	    return res;
 	  }
 
@@ -137,7 +142,7 @@ Uart8250::monitorStdin()
       if (terminate_)
 	return;
 
-      int code = poll(&inPollfd, 1, 20);
+      int code = poll(&inPollfd, 1, -1);
       if (code == 0)
 	continue;   // Timed out.
 
@@ -158,7 +163,7 @@ Uart8250::monitorStdin()
 		    throw std::runtime_error("Keyboard stop");
 		  prev = c;
 		}
-	      byte_ = c;
+	      rx_fifo.push(c);
 	      lsr_ |= 1;  // Set least sig bit of line status.
 	      iir_ &= ~1;  // Clear bit 0 indicating interrupt is pending.
 	      // setInterruptPending(true);
