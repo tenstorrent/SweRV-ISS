@@ -473,6 +473,10 @@ namespace WdRiscv
     void configLegalizeForEgs(bool flag)
     { legalizeForEgs_ = flag; }
 
+    /// If flag is true, unordered fp reduction should apply NaN canonicalization.
+    void configVectorFpUnorderedSumCanonical(ElementWidth ew, bool flag)
+    { fpUnorderedSumCanonical_.at(uint32_t(ew)) = flag; }
+
     /// Return true if elems/vstart is a multiple of EGS or if it is legalized to be a
     /// multiple of egs. Return false if legalization is not enabled and elems/vstart is
     /// not a multiple of EGS. This is for some vector-crypto instructions.
@@ -898,6 +902,7 @@ namespace WdRiscv
     bool updateWholeMask_ = false;  // True if mask instructions update whole mask reg.
     bool trapVtype_ = false; // If true trap invalid vtype; else set VTYPE.VILL.
     std::vector<bool> fpUnorderedSumTreeRed_; // True if unordered fp reduction should use a reduction tree computation
+    std::vector<bool> fpUnorderedSumCanonical_; // True if unordered fp reduction should apply NaN canonicalization.
     bool legalizeVsetvlAvl_ = false; // If true legalize VL to VLMAX if vtype is legal (if applicable).
     bool legalizeVsetvliAvl_ = false; // If true legalize VL to VLMAX if vtype is legal (if applicable).
     bool legalizeForEgs_ = false;

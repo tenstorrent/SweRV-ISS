@@ -44,6 +44,7 @@ VecRegs::VecRegs()
 
   // Per-SEW controlled unordered fpsum reduction.
   fpUnorderedSumTreeRed_.resize(unsigned(VecEnums::WidthLimit), false);
+  fpUnorderedSumCanonical_.resize(unsigned(VecEnums::WidthLimit), false);
 }
 
 
