@@ -2466,7 +2466,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
       if (isVlr and op.pa_ >= baseAddr)   // Compensate for vl1r, vl2r ...
         elemIx = baseIx + (op.pa_ - baseAddr) / elemBytes;
 
-      unsigned elemsInOp = op.size_ / elemSize;
+      unsigned elemsInOp = (op.size_ + elemSize - 1) / elemSize;
 
       uint64_t low = ~uint64_t(0), high = 0; // Range of op addresses overlapping reference.
       bool mismatch = false; // True if mismatch in op

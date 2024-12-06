@@ -11503,6 +11503,10 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
       ELEM_TYPE elem = 0;
 
+      bool skip = false;  // Not masked off
+      ldStInfo.addElem(VecLdStElem{addr, pa1, pa2, 0, ix, skip});
+
+
 #ifndef FAST_SLOPPY
       uint64_t gpa2 = addr;
       cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem), false /*hyper*/);
@@ -11510,6 +11514,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
       if (hasTrig and ldStAddrTriggerHit(addr, elemBytes, timing, isLd))
 	{
 	  triggerTripped_ = true;
+	  ldStInfo.removeLastElem();
 	  return false;
 	}
 #endif
@@ -11524,11 +11529,15 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 #ifndef FAST_SLOPPY
 	  triggerTripped_ = ldStDataTriggerHit(elem, timing, isLd);
 	  if (triggerTripped_)
-	    return false;
+            {
+	      ldStInfo.removeLastElem();
+              return false;
+            }
 #endif
 	}
       else
         {
+          ldStInfo.removeLastElem();
           markVsDirty();
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
@@ -11536,9 +11545,6 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
         }
 
       vecRegs_.write(vd, ix, effGroupX8, elem);
-
-      bool skip = false;  // Not masked off
-      ldStInfo.addElem(VecLdStElem{addr, pa1, pa2, 0, ix, skip});
     }
 
   vecRegs_.touchReg(vd, groupX8);  // We want the group and not the effective group.
