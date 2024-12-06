@@ -3327,7 +3327,7 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("stopei",     CN::STOPEI,     !mand, !imp, 0, wam, wam);
   defineCsr("stopi",      CN::STOPI,      !mand, !imp, 0, wam, wam);
 
-  mask = wam << 13; // Bits 0 to 12 are reserved.
+  mask = 1 << 13; // Bits 0 to 12 are reserved. We only make bit 13 writable by default (13)
   defineCsr("hvien",      CN::HVIEN,      !mand, !imp, 0, mask, mask)->setHypervisor(true);
 
   mask = 0x4fff'03ff; // Bits 0-9, 16-27, and 30.
