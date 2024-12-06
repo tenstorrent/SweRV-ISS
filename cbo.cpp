@@ -145,6 +145,9 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
+  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
+  ldStSize_ = cacheLineSize_;
+
 #ifndef FAST_SLOPPY
   if (hasActiveTrigger())
     {
@@ -159,9 +162,6 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
 #endif
 
   bool isZero = false;
-  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
-  ldStSize_ = cacheLineSize_;
-
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
     {
@@ -213,6 +213,9 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
+  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
+  ldStSize_ = cacheLineSize_;
+
 #ifndef FAST_SLOPPY
   if (hasActiveTrigger())
     {
@@ -227,9 +230,6 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
 #endif
 
   bool isZero = false;
-  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
-  ldStSize_ = cacheLineSize_;
-
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
     {
@@ -300,6 +300,9 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
+  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
+  ldStSize_ = cacheLineSize_;
+
 #ifndef FAST_SLOPPY
   if (hasActiveTrigger())
     {
@@ -312,9 +315,6 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
   if (triggerTripped_)
     return;
 #endif
-
-  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
-  ldStSize_ = cacheLineSize_;
 
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
@@ -368,6 +368,9 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
+  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
+  ldStSize_ = cacheLineSize_;
+
 #ifndef FAST_SLOPPY
   if (hasActiveTrigger())
     {
@@ -380,9 +383,6 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   if (triggerTripped_)
     return;
 #endif
-
-  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
-  ldStSize_ = cacheLineSize_;
 
   bool isZero = true;
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
