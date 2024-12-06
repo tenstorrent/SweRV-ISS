@@ -1485,26 +1485,6 @@ CsRegs<URV>::writeSip(URV value, bool recordWr)
 
 
 template <typename URV>
-void
-CsRegs<URV>::updateShadowSie()
-{
-  using CN = CsrNumber;
-
-  // See AIA spec section 5.3.
-  auto sie = getImplementedCsr(CN::SIE);
-  auto mideleg = getImplementedCsr(CN::MIDELEG);
-  auto mvien = getImplementedCsr(CsrNumber::MVIEN);
-  auto mvip = getImplementedCsr(CsrNumber::MVIP);
-  if (mideleg and mvien and mvip)
-    {
-      URV value = sie->read();
-      URV smask = mvien->read() & ~mideleg->read();
-      shadowSie_ = (shadowSie_ & ~smask) | (value & smask);
-    }
-}
-
-
-template <typename URV>
 bool
 CsRegs<URV>::writeSie(URV value, bool recordWr)
 {
@@ -1534,8 +1514,11 @@ CsRegs<URV>::writeSie(URV value, bool recordWr)
   if (mideleg and mvien and mvip)
     {
       URV smask = mvien->read() & ~mideleg->read();
+      // We always write the shadow SIE on SIE write to match RTL behavior. This is legal
+      // because when the writable SIE portion is enabled, its value is undefined by the spec.
+      URV mask = smask | sieMask;
+      shadowSie_ = (shadowSie_ & ~mask) | (value & mask);
       sieMask &= ~ smask;  // Don't write SIE where SIE is indepedent of MIE
-      shadowSie_ = (shadowSie_ & ~smask) | (value & smask); // Write shadow instead.
     }
 
   sie->setWriteMask(sieMask);
@@ -2131,8 +2114,6 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
     updateCounterPrivilege();  // Reflect counter accessibility in user/supervisor.
   else if (num == CN::HVICTL)
     updateVirtInterruptCtl();
-  else if (num == CN::MVIEN or num == CN::MVIP)
-    updateShadowSie();
   else if (num == CN::TCONTROL)
     triggers_.enableMachineMode(tcontrolMte());
   else
@@ -3685,8 +3666,6 @@ CsRegs<URV>::poke(CsrNumber num, URV value, bool virtMode)
     updateCounterPrivilege();  // Reflect counter accessibility in user/supervisor.
   else if (num == CN::HVICTL)
     updateVirtInterruptCtl();
-  else if (num == CN::MVIEN or num == CN::MVIP)
-    updateShadowSie();
   else if (num == CN::TCONTROL)
     triggers_.enableMachineMode(tcontrolMte());
 
