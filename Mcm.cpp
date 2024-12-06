@@ -2466,6 +2466,8 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
       if (isVlr and op.pa_ >= baseAddr)   // Compensate for vl1r, vl2r ...
         elemIx = baseIx + (op.pa_ - baseAddr) / elemBytes;
 
+      unsigned elemsInOp = op.size_ / elemSize;
+
       uint64_t low = ~uint64_t(0), high = 0; // Range of op addresses overlapping reference.
       bool mismatch = false; // True if mismatch in op
       for (unsigned i = 0; i < op.size_; ++i)
@@ -2474,13 +2476,18 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
           auto iter = addrMap.find(RefElemCoord{addr, elemIx});
           if (iter == addrMap.end())
             {
-              if (i == 0)
-                break;    // First elem of op is not in ref.
-              iter = addrMap.find(RefElemCoord{addr, uint16_t(elemIx + 1)});
-              if (iter == addrMap.end())
-                break;    // No overlap with instruction.
-              elemIx++;
+              for (unsigned j = 1; j < elemsInOp; j++)
+                {
+                  iter = addrMap.find(RefElemCoord{addr, uint16_t(elemIx + j)});
+                  if (iter != addrMap.end())
+                    {
+                      elemIx = elemIx + j;
+                      break;
+                    }
+                }
             }
+          if (iter == addrMap.end())
+            continue;    // No overlap with instruction.
 
           bool& covered = iter->second;  // Ref elem byte covered
           if (covered)
