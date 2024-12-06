@@ -2305,7 +2305,13 @@ Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
   instr.repaired_ = true;
 
   const VecLdStInfo& info = hart.getLastVectorMemory();
-  // auto& elems = info.elems_;
+  if (info.isIndexed_ or info.isStrided_)
+    return;  // Considered non-unit-stride.
+
+  auto& elems = info.elems_;
+  if (elems.empty())
+    return;
+
   auto fields = info.fields_;
   if (fields == 0)
     fields = 1;
@@ -2313,7 +2319,12 @@ Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
   unsigned elemSize = info.elemSize_;
   assert(elemSize > 0);
 
+  uint64_t base = elems.at(0).pa_;
   unsigned stride = fields * elemSize;  // Distance between consecutive elements.
+
+  unsigned offset = base % stride;
+  if (offset)
+    offset = stride - offset;
 
   MemoryOpIx prevIx = instr.memOps_.at(0);
 
@@ -2331,7 +2342,7 @@ Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
 	  continue;  // Not split from the same large read-op.
 	}
 
-      uint64_t dist = op.pa_ - prev.pa_;
+      uint64_t dist = op.pa_ - prev.pa_ + ((prev.pa_ + offset) % stride);
       if (dist >= stride)
         op.elemIx_ += dist / stride;
     }

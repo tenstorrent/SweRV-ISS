@@ -11848,7 +11848,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
   unsigned elemSize = sizeof(ELEM_TYPE);
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemCount, elemSize, vd, group, true /*isLoad*/);
+  ldStInfo.initStrided(elemCount, elemSize, vd, group, stride, true /*isLoad*/);
 
   if (start >= elemCount)
     return true;
@@ -12021,7 +12021,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   unsigned group = groupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemCount, elemSize, vd, group, false /*isLoad*/);
+  ldStInfo.initStrided(elemCount, elemSize, vd, group, stride, false /*isLoad*/);
 
   dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
   bool hasTrig = hasActiveTrigger();
