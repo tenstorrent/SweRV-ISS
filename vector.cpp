@@ -11083,6 +11083,8 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 
       if (cause == ExceptionCause::NONE)
         {
+          ldStInfo.setLastElem(pa1, pa2);
+
 	  uint64_t data = 0;
           if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
@@ -11096,8 +11098,6 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 	      return false;
 	    }
 #endif
-
-          ldStInfo.setLastElem(pa1, pa2);
         }
       else
         {
@@ -11521,6 +11521,8 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
       if (cause == ExceptionCause::NONE)
 	{
+          ldStInfo.setLastElem(pa1, pa2);
+
 	  uint64_t data = 0;
 	  if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
@@ -11894,11 +11896,12 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
       if (cause == ExceptionCause::NONE)
         {
+          ldStInfo.setLastElem(pa1, pa2);
+
 	  uint64_t data = 0;
 	  if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
 	  elem = data;
-          ldStInfo.setLastElem(pa1, pa2);
         }
       else
         {
@@ -12242,12 +12245,13 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
       if (cause == ExceptionCause::NONE)
 	{
+          ldStInfo.setLastElem(pa1, pa2);
+
 	  uint64_t data = 0;
 	  if (not readForLoad<ELEM_TYPE>(di, vaddr, pa1, pa2, data, ix))
 	    assert(0);
 	  elem = data;
 	  vecRegs_.write(vd, ix, groupX8, elem);
-          ldStInfo.setLastElem(pa1, pa2);
 	}
       else
         {
@@ -12696,7 +12700,11 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   unsigned group = groupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemCount, elemSize, vd, group, true /*isLoad*/);
+  
+  if (di->isVectorLoadStrided())
+    ldStInfo.initStrided(elemCount, elemSize, vd, group, stride, true /*isLoad*/);
+  else
+    ldStInfo.init(elemCount, elemSize, vd, group, true /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   if (start >= elemCount)
@@ -12746,11 +12754,12 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
 	  if (cause == ExceptionCause::NONE)
             {
+              ldStInfo.setLastElem(pa1, pa2);
+
 	      uint64_t data = 0;
 	      if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data, ix, field))
 		assert(0);
 	      elem = data;
-              ldStInfo.setLastElem(pa1, pa2);
             }
 	  else
 	    {
@@ -13320,12 +13329,13 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
 	  if (cause == ExceptionCause::NONE)
 	    {
+              ldStInfo.setLastElem(pa1, pa2);
+
 	      uint64_t data = 0;
 	      if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data, ix, field))
 		assert(0);
 	      elem = data;
 	      vecRegs_.write(dvg, ix, destGroup, elem);
-              ldStInfo.setLastElem(pa1, pa2);
 	    }
 	  else
 	    {
