@@ -2475,13 +2475,15 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 
       unsigned elemsInOp = (op.size_ + elemSize - 1) / elemSize;
 
+      bool unitStride = not info.isIndexed_ and not info.isStrided_;
+
       uint64_t low = ~uint64_t(0), high = 0; // Range of op addresses overlapping reference.
       bool mismatch = false; // True if mismatch in op
       for (unsigned i = 0; i < op.size_; ++i)
         {
           uint64_t addr = op.pa_ + i;
           auto iter = addrMap.find(RefElemCoord{addr, elemIx});
-          if (iter == addrMap.end())
+          if (iter == addrMap.end() and unitStride)
             {
               for (unsigned j = 1; j < elemsInOp; j++)
                 {
