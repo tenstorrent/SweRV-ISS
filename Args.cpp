@@ -551,6 +551,13 @@ Args::parseCmdLineArgs(std::span<char*> argv)
       po::store(parsed, varMap);
       po::notify(varMap);
 
+      // Remove this nonsense.
+      if (this->verbose)
+        {
+          for (auto &arg : argv)
+            std::cerr << arg << ' ';
+          std::cerr << '\n';
+        }
 
       bool earlyExit = false;
       if (this->version)
