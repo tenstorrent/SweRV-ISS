@@ -2302,18 +2302,9 @@ Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
   if (instr.memOps_.empty() or instr.repaired_)
     return;
 
-  instr.repaired_ = true;
-
   const VecLdStInfo& info = hart.getLastVectorMemory();
-
-  bool strided = info.isStrided_ and info.fields_ == 0;
-  if (info.isIndexed_ or strided)
-    return;  // Considered non-unit-stride.
-
-  bool unitStride = not info.isStrided_;  // Segment strided is not unitStride
-
   auto& elems = info.elems_;
-  if (elems.empty())
+  if (elems.empty() or info.allSkipped())
     return;
 
   auto fields = info.fields_;
@@ -2322,9 +2313,27 @@ Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
 
   unsigned elemSize = info.elemSize_;
   assert(elemSize > 0);
-
-  uint64_t base = elems.at(0).pa_;
   unsigned stride = fields * elemSize;  // Distance between consecutive elements.
+
+  bool strided = info.isStrided_ and info.stride_ != stride;
+  if (info.isIndexed_ or strided)
+    {
+      instr.repaired_ = true;
+      return;  // Considered non-unit-stride.
+    }
+
+  bool unitStride = true; // not info.isStrided_;  // Segment strided is not unitStride
+
+  instr.repaired_ = true;
+
+  uint64_t base = 0;
+  //uint64_t baseIx = 0;
+  for (auto& elem : elems)
+    if (not elem.skip_)
+      {
+        base = elem.pa_ - stride*elem.ix_;
+        //baseIx = elem.ix_;
+      }
 
   unsigned offset = base % stride;
   if (offset)
@@ -2338,6 +2347,12 @@ Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
 
       auto& op = sysMemOps_.at(opIx);
       auto& prev = sysMemOps_.at(prevIx);
+      if (unitStride and prev.pa_ < base)
+        {
+          // Read ops for masked off elems get an addr of 0.
+          prevIx = opIx;
+          continue;
+        }
 
       if (op.elemIx_ != prev.elemIx_ or op.field_ != prev.field_ or op.time_ != prev.time_
           or op.pa_ < prev.pa_)
