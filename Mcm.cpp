@@ -2445,7 +2445,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
   // Repair memory op indices and fields.
   repairVecReadOps(hart, instr);
 
-  // Map a reference address/elem-ix/field to a flag indicating if elem is covered by a
+  // Map a reference address/elem-ix to a flag indicating if elem is covered by a
   // read op.
   std::unordered_map<RefElemCoord, bool> addrMap;
 
@@ -2547,6 +2547,41 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
       return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
     });
 
+  // Special case: strided with a stride of 0. All we need is for 1 element to be covered.
+  if (info.isStrided_ and info.stride_ == 0)
+    {
+      for (const auto& [coord, covered] : addrMap)
+        if (covered)
+          {
+            uint16_t elemIx = uint16_t(coord.ix);
+            unsigned fields = info.fields_ ? info.fields_ : 1;
+            for (unsigned i = 0; i < fields; ++i)
+              {
+                auto& elem = info.elems_.at(elemIx*fields + i);
+                for (unsigned j = 0; j < elemSize; ++j)
+                  {
+                    uint64_t addr = elem.pa_ + j;
+                    auto iter = addrMap.find(RefElemCoord{addr, elemIx});
+                    if (iter == addrMap.end() or not iter->second)
+                      {
+                        cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr.tag_
+                             << " elem-ix=" << elemIx << " addr=0x" << std::hex << addr << std::dec 
+                             << " read ops do not cover all the bytes of vector load instruction\n";
+                        return false;
+                      }
+                  }
+              }
+            instr.complete_ = true;
+            return ok;
+          }
+
+      const auto& [coord, covered] = *(addrMap.begin());
+      cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr.tag_
+           << " elem-ix=" << coord.ix << " addr=0x" << std::hex << coord.addr << std::dec 
+           << " read ops do not cover all the bytes of vector load instruction\n";
+      return false;
+    }
+
   // Check that all reference addresses are covered by the read operations.
   instr.complete_ = true;
   for (const auto& [coord, covered] : addrMap)
@@ -2633,7 +2668,7 @@ Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr& instr)
 template <typename URV>
 bool
 Mcm<URV>::vecReadOpOverlapsElemByte(const MemoryOp& op, uint64_t addr, unsigned elemIx,
-				    unsigned field, unsigned elemSize) const
+				    unsigned /*field*/, unsigned elemSize) const
 {
   if (op.size_ <= elemSize and (elemIx != op.elemIx_))
     return false;  // Op is for a single element and ix does not match.
@@ -2641,8 +2676,8 @@ Mcm<URV>::vecReadOpOverlapsElemByte(const MemoryOp& op, uint64_t addr, unsigned 
   if (op.elemIx_ > elemIx)
     return false;
 
-  if (op.elemIx_ == elemIx and op.field_ > field)
-    return false;
+  //  if (op.elemIx_ == elemIx and op.field_ > field)
+  //    return false;
 
   return op.overlaps(addr);
 }
