@@ -2749,8 +2749,8 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
     pa2 = pageAddress(pageNum(pa2) + 1);
 
   auto& info = hart.getLastVectorMemory();
-  unsigned nfields = info.fields_ == 0 ? 1 : info.fields_;
-  unsigned elemSize = info.elemSize_ * nfields;  // Effective segment elem size
+  // unsigned nfields = info.fields_ == 0 ? 1 : info.fields_;
+  unsigned elemSize = info.elemSize_; //  * nfields;  // Effective segment elem size
 
   bool bc = true;  // Backward compatible all mread elemIx/field are zeros.
   if (isVector)
