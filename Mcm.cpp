@@ -2402,6 +2402,72 @@ struct std::hash<RefElemCoord>
 };
 
 
+
+template <typename URV>
+bool
+Mcm<URV>::commitVecReadOpsStride0(Hart<URV>& hart, McmInstr& instr)
+{
+  // Special case: strided with a stride of 0. All we need is for 1 element to be covered.
+
+  auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr.tag_];
+
+  const auto& vecRef = vecRefs.refs_.at(0);
+  unsigned elemSize = vecRef.size_;  // TODO : handle page crosser
+
+  unsigned mask = (1u << elemSize) - 1;
+
+  bool mismatch = false;
+
+  // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
+  // (marking them as not canceled) where at least one address remains. Mark reference
+  // addresses covered by read ops. Set reference (Whisper) values of reference addresses.
+  auto& ops = instr.memOps_;
+
+  for (auto iter = ops.rbegin(); iter != ops.rend() and mask; ++iter)
+    {
+      auto opIx = *iter;
+      auto& op = sysMemOps_.at(opIx);
+      if (not op.isRead_)
+        continue;  // Should not happen.
+
+      for (unsigned i = 0; i < elemSize; ++i)
+        {
+          unsigned byteMask = 1 << i;
+          if ((mask & byteMask) == 0)
+            continue;   // Byte covered by a another read op.
+
+          uint64_t byteAddr = vecRef.pa_ + i;  // TODO handle page crosser
+          if (not op.overlaps(byteAddr))
+            continue;
+
+          mask &= ~byteMask;
+          op.canceled_ = false;
+
+          unsigned offset = byteAddr - op.pa_;
+          uint8_t refVal = op.data_ >> (offset*8);
+          uint8_t rtlVal = op.rtlData_ >> (offset*8);
+
+          if (refVal != rtlVal)
+            {
+              if (not mismatch)
+                printReadMismatch(hart, op.time_, op.tag_, byteAddr, op.size_, rtlVal, refVal);
+              mismatch = true;
+            }
+        }
+    }
+
+  if (mask)
+    {
+      cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr.tag_
+           << " elem-ix=" << vecRef.ix_ << " addr=0x" << std::hex << vecRef.pa_ << std::dec 
+           << " read ops do not cover all the bytes of vector load instruction\n";
+      return false;
+    }
+
+  return not mismatch;
+}
+
+
 template <typename URV>
 bool
 Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
@@ -2445,8 +2511,11 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
   // Repair memory op indices and fields.
   repairVecReadOps(hart, instr);
 
-  // Map a reference address/elem-ix to a flag indicating if elem is covered by a
-  // read op.
+  // Special case. Test bench sends a read for up to one element for this case.
+  if (info.isStrided_ and info.stride_ == 0)
+    return commitVecReadOpsStride0(hart, instr);
+
+  // Map a reference address/elem-ix to a flag indicating if elem is covered by a read op.
   std::unordered_map<RefElemCoord, bool> addrMap;
 
   // Check for overlap between elements. Collect reference byte addresses in addrMap.
@@ -2546,41 +2615,6 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
     std::erase_if(ops, [this](MemoryOpIx ix) {
       return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
     });
-
-  // Special case: strided with a stride of 0. All we need is for 1 element to be covered.
-  if (info.isStrided_ and info.stride_ == 0)
-    {
-      for (const auto& [coord, covered] : addrMap)
-        if (covered)
-          {
-            uint16_t elemIx = uint16_t(coord.ix);
-            unsigned fields = info.fields_ ? info.fields_ : 1;
-            for (unsigned i = 0; i < fields; ++i)
-              {
-                auto& elem = info.elems_.at(elemIx*fields + i);
-                for (unsigned j = 0; j < elemSize; ++j)
-                  {
-                    uint64_t addr = elem.pa_ + j;
-                    auto iter = addrMap.find(RefElemCoord{addr, elemIx});
-                    if (iter == addrMap.end() or not iter->second)
-                      {
-                        cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr.tag_
-                             << " elem-ix=" << elemIx << " addr=0x" << std::hex << addr << std::dec 
-                             << " read ops do not cover all the bytes of vector load instruction\n";
-                        return false;
-                      }
-                  }
-              }
-            instr.complete_ = true;
-            return ok;
-          }
-
-      const auto& [coord, covered] = *(addrMap.begin());
-      cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr.tag_
-           << " elem-ix=" << coord.ix << " addr=0x" << std::hex << coord.addr << std::dec 
-           << " read ops do not cover all the bytes of vector load instruction\n";
-      return false;
-    }
 
   // Check that all reference addresses are covered by the read operations.
   instr.complete_ = true;
