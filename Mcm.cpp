@@ -2464,6 +2464,8 @@ Mcm<URV>::commitVecReadOpsStride0(Hart<URV>& hart, McmInstr& instr)
       return false;
     }
 
+  instr.complete_ = true;
+
   return not mismatch;
 }
 
@@ -4541,8 +4543,8 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
     auto producerTime = producer.retireTime_;
     if (producer.isMemory())
       {
-	if (not producer.complete_)
-	  return false;
+	if (not producer.complete_ and producer.isStore_)
+          return false;  // Incomplete store considtional
 	producerTime = latestOpTime(producer);
       }
 
