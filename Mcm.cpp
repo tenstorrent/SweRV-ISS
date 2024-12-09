@@ -2533,17 +2533,19 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
   instr.hasOverlap_ = hasOverlap;
 
   // Test-bench does not send the right index for vl{1,2,4,8}r. We compensate.
+#if 0
   auto instId = instr.di_.instId();
   bool isVlr = instId >= InstId::vlre8_v and instId <= InstId::vlre64_v;
   uint64_t baseAddr = vecRefs.refs_.at(0).pa_;
   uint16_t baseIx = vecRefs.refs_.at(0).ix_;
+#endif
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
   // addresses covered by read ops. Set reference (Whisper) values of reference addresses.
   auto& ops = instr.memOps_;
 
-  unsigned elemBytes = vecRefs.refs_.at(0).size_;
+  // unsigned elemBytes = vecRefs.refs_.at(0).size_;
   bool ok = true;
 
   for (auto iter = ops.rbegin(); iter != ops.rend(); ++iter)
@@ -2554,8 +2556,10 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
         continue;  // Should not happen.
 
       uint16_t elemIx = op.elemIx_;
+#if 0
       if (isVlr and op.pa_ >= baseAddr)   // Compensate for vl1r, vl2r ...
         elemIx = baseIx + (op.pa_ - baseAddr) / elemBytes;
+#endif
 
       unsigned elemsInOp = (op.size_ + elemSize - 1) / elemSize;
 
@@ -2785,6 +2789,17 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
   auto& info = hart.getLastVectorMemory();
   // unsigned nfields = info.fields_ == 0 ? 1 : info.fields_;
   unsigned elemSize = info.elemSize_; //  * nfields;  // Effective segment elem size
+
+  // For strided load with 0 stride, all active elems get one read associated with
+  // 1st active.
+  if (isVector)
+    {
+      const VecLdStInfo& info = hart.getLastVectorMemory();
+      if (info.isStrided_ and info.stride_ == 0)
+        for (auto& elem : info.elems_)
+          if (not elem.skip_ and elem.ix_ < elemIx)
+            elemIx = elem.ix_;
+    }
 
   bool bc = true;  // Backward compatible all mread elemIx/field are zeros.
   if (isVector)
