@@ -2456,6 +2456,11 @@ Mcm<URV>::commitVecReadOpsStride0(Hart<URV>& hart, McmInstr& instr)
         }
     }
 
+  // Remove ops still marked canceled.
+  std::erase_if(ops, [this](MemoryOpIx ix) {
+    return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
+  });
+
   if (mask)
     {
       cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr.tag_
