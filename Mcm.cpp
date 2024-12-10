@@ -2315,16 +2315,11 @@ Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
   assert(elemSize > 0);
   unsigned stride = fields * elemSize;  // Distance between consecutive elements.
 
+  instr.repaired_ = true;
+
   bool strided = info.isStrided_ and info.stride_ != stride;
   if (info.isIndexed_ or strided)
-    {
-      instr.repaired_ = true;
-      return;  // Considered non-unit-stride.
-    }
-
-  bool unitStride = true; // not info.isStrided_;  // Segment strided is not unitStride
-
-  instr.repaired_ = true;
+    return;  // Considered non-unit-stride.
 
   uint64_t base = 0;
   //uint64_t baseIx = 0;
@@ -2347,7 +2342,7 @@ Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
 
       auto& op = sysMemOps_.at(opIx);
       auto& prev = sysMemOps_.at(prevIx);
-      if (unitStride and prev.pa_ < base)
+      if (prev.pa_ < base)
         {
           // Read ops for masked off elems get an addr of 0.
           prevIx = opIx;
@@ -2362,8 +2357,7 @@ Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
 	}
 
       uint64_t dist = op.pa_ - prev.pa_;
-      if (unitStride)
-        dist += ((prev.pa_ + offset) % stride);
+      dist += ((prev.pa_ + offset) % stride);
 
       if (dist >= stride)
         op.elemIx_ += dist / stride;
