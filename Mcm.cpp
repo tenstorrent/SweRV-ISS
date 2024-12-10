@@ -2487,6 +2487,98 @@ Mcm<URV>::commitVecReadOpsStride0(Hart<URV>& hart, McmInstr& instr)
 
 template <typename URV>
 bool
+Mcm<URV>::commitVecReadOpsUnitStride(Hart<URV>& hart, McmInstr& instr)
+{
+  const VecLdStInfo& info = hart.getLastVectorMemory();
+  unsigned elemSize = info.elemSize_;
+
+  // Map a reference address to a flag indicating if elem is covered by a read op.
+  std::unordered_map<uint64_t, bool> addrMap;
+
+  // Collect reference byte addresses in addrMap.
+  auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr.tag_];
+  for (auto& ref : vecRefs.refs_)
+    for (unsigned i = 0; i < ref.size_; ++i)
+      addrMap[ref.pa_ + i] = false;
+
+  instr.hasOverlap_ = false;
+
+  // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
+  // (marking them as not canceled) where at least one address remains. Mark reference
+  // addresses covered by read ops. Set reference (Whisper) values of reference addresses.
+  auto& ops = instr.memOps_;
+
+  bool ok = true;
+
+  for (auto iter = ops.rbegin(); iter != ops.rend(); ++iter)
+    {
+      auto opIx = *iter;
+      auto& op = sysMemOps_.at(opIx);
+      if (not op.isRead_)
+        continue;  // Should not happen.
+
+      uint64_t low = ~uint64_t(0), high = 0; // Range of op addresses overlapping reference.
+      bool mismatch = false; // True if mismatch in op
+      for (unsigned i = 0; i < op.size_; ++i)
+        {
+          uint64_t addr = op.pa_ + i;
+          auto iter = addrMap.find(addr);
+          if (iter == addrMap.end())
+            continue;    // No overlap with instruction.
+
+          bool& covered = iter->second;  // Ref elem byte covered
+          if (covered)
+            continue;  // Address already covered by another read op.
+
+          covered = true;
+          uint8_t refVal = op.data_ >> (i*8);
+          uint8_t rtlVal = op.rtlData_ >> (i*8);
+
+          if (refVal != rtlVal)
+            {
+              if (not mismatch)
+                printReadMismatch(hart, op.time_, op.tag_, addr, op.size_, rtlVal, refVal);
+              mismatch = true;
+              ok = false;
+            }
+
+          low = std::min(low, addr);
+          high = std::max(high, addr);
+        }
+
+      if (low <= high)
+        {
+          unsigned size = high - low + 1;
+          trimOp(op, low, size);
+          op.canceled_ = false;
+        }
+    }
+
+  // Remove ops still marked canceled.
+  std::erase_if(ops, [this](MemoryOpIx ix) {
+    return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
+  });
+
+  // Check that all reference addresses are covered by the read operations.
+  instr.complete_ = true;
+  for (const auto& [addr, covered] : addrMap)
+    if (not covered)
+      {
+	instr.complete_ = false;
+	cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr.tag_
+	     << " addr=0x" << std::hex << addr << std::dec 
+	     << " read ops do not cover all the bytes of vector load instruction\n";
+	return false;
+      }
+
+  return ok;
+
+
+}
+
+
+template <typename URV>
+bool
 Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 {
   const VecLdStInfo& info = hart.getLastVectorMemory();
@@ -2525,6 +2617,9 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
       return true;
     }
 
+  if (isUnitStride(info))
+    return commitVecReadOpsUnitStride(hart, instr);
+
   // Repair memory op indices and fields.
   repairVecReadOps(hart, instr);
 
@@ -2548,21 +2643,13 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 	}
     }
   instr.hasOverlap_ = hasOverlap;
-
-  // Test-bench does not send the right index for vl{1,2,4,8}r. We compensate.
-#if 0
-  auto instId = instr.di_.instId();
-  bool isVlr = instId >= InstId::vlre8_v and instId <= InstId::vlre64_v;
-  uint64_t baseAddr = vecRefs.refs_.at(0).pa_;
-  uint16_t baseIx = vecRefs.refs_.at(0).ix_;
-#endif
+  assert(not hasOverlap);
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
   // addresses covered by read ops. Set reference (Whisper) values of reference addresses.
   auto& ops = instr.memOps_;
 
-  // unsigned elemBytes = vecRefs.refs_.at(0).size_;
   bool ok = true;
 
   for (auto iter = ops.rbegin(); iter != ops.rend(); ++iter)
@@ -2573,14 +2660,6 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
         continue;  // Should not happen.
 
       uint16_t elemIx = op.elemIx_;
-#if 0
-      if (isVlr and op.pa_ >= baseAddr)   // Compensate for vl1r, vl2r ...
-        elemIx = baseIx + (op.pa_ - baseAddr) / elemBytes;
-#endif
-
-      unsigned elemsInOp = (op.size_ + elemSize - 1) / elemSize;
-
-      bool unitStride = not info.isIndexed_ and not info.isStrided_;
 
       uint64_t low = ~uint64_t(0), high = 0; // Range of op addresses overlapping reference.
       bool mismatch = false; // True if mismatch in op
@@ -2588,18 +2667,6 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
         {
           uint64_t addr = op.pa_ + i;
           auto iter = addrMap.find(RefElemCoord{addr, elemIx});
-          if (iter == addrMap.end() and unitStride)
-            {
-              for (unsigned j = 1; j < elemsInOp; j++)
-                {
-                  iter = addrMap.find(RefElemCoord{addr, uint16_t(elemIx + j)});
-                  if (iter != addrMap.end())
-                    {
-                      elemIx = elemIx + j;
-                      break;
-                    }
-                }
-            }
           if (iter == addrMap.end())
             continue;    // No overlap with instruction.
 
@@ -2632,7 +2699,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
     }
 
   // Remove ops still marked canceled.
-  if (not hasOverlap)  // Temporary until we get accurate elem indices with mread ops.
+  if (not hasOverlap)  // FIX Temporary until we get accurate elem indices with mread ops.
     std::erase_if(ops, [this](MemoryOpIx ix) {
       return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
     });
@@ -2821,6 +2888,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
         }
     }
 
+  // For vector load, we don't check indices if unit stride (no possibility of overlap).
   for (auto opIx : instr->memOps_)
     if (auto& op = sysMemOps_.at(opIx); op.isRead_)
       if (not isVector or unitStride or vecReadOpOverlapsElem(op, pa1, pa2, size, elemIx, field, elemSize))
