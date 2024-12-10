@@ -1841,7 +1841,7 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
 			   << " reference (Whisper)\n";
 		      return false;
 		    }
-		  continue;  // Will scheck again when store is complete.
+		  continue;  // Will check again when store is complete.
 		}
 
 	      uint8_t refVal = iter->second;
@@ -2498,8 +2498,6 @@ Mcm<URV>::commitVecReadOpsUnitStride(Hart<URV>& hart, McmInstr& instr)
     for (unsigned i = 0; i < ref.size_; ++i)
       addrMap[ref.pa_ + i] = false;
 
-  instr.hasOverlap_ = false;
-
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
   // addresses covered by read ops. Set reference (Whisper) values of reference addresses.
@@ -2637,7 +2635,6 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 	  addrMap[coord] = false;
 	}
     }
-  instr.hasOverlap_ = false;
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
@@ -4754,9 +4751,6 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 
   if (not instrB.isLoad_)
     return true;  // NA: B is not a load.
-
-  if (instrB.hasOverlap_)
-    return true;  // TODO FIX once we have enough info from test-bench.
 
   unsigned hartIx = hart.sysHartIndex();
 
