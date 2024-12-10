@@ -2411,48 +2411,64 @@ Mcm<URV>::commitVecReadOpsStride0(Hart<URV>& hart, McmInstr& instr)
 
   auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr.tag_];
 
-  const auto& vecRef = vecRefs.refs_.at(0);
-  unsigned elemSize = vecRef.size_;  // TODO : handle page crosser
+  auto& info = hart.getLastVectorMemory();
+  unsigned nfields = info.fields_ == 0 ? 1 : info.fields_;
+  unsigned elemSize = info.elemSize_;
 
-  unsigned mask = (1u << elemSize) - 1;
-
-  bool mismatch = false;
+  bool matched = false;   // True until a mismatch.
+  instr.complete_ = true;  // True until byte not covered.
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
   // addresses covered by read ops. Set reference (Whisper) values of reference addresses.
   auto& ops = instr.memOps_;
 
-  for (auto iter = ops.rbegin(); iter != ops.rend() and mask; ++iter)
+  for (unsigned field = 0; field < nfields; ++field)
     {
-      auto opIx = *iter;
-      auto& op = sysMemOps_.at(opIx);
-      if (not op.isRead_)
-        continue;  // Should not happen.
+      unsigned mask = (1u << elemSize) - 1;
 
-      for (unsigned i = 0; i < elemSize; ++i)
+      const auto& vecRef = vecRefs.refs_.at(field);
+
+      for (auto iter = ops.rbegin(); iter != ops.rend(); ++iter)
         {
-          unsigned byteMask = 1 << i;
-          if ((mask & byteMask) == 0)
-            continue;   // Byte covered by a another read op.
+          auto opIx = *iter;
+          auto& op = sysMemOps_.at(opIx);
+          if (not op.isRead_)
+            continue;  // Should not happen.
 
-          uint64_t byteAddr = vecRef.pa_ + i;  // TODO handle page crosser
-          if (not op.overlaps(byteAddr))
-            continue;
 
-          mask &= ~byteMask;
-          op.canceled_ = false;
-
-          unsigned offset = byteAddr - op.pa_;
-          uint8_t refVal = op.data_ >> (offset*8);
-          uint8_t rtlVal = op.rtlData_ >> (offset*8);
-
-          if (false and refVal != rtlVal)    // FIX Enable when RTL/TB is fixed.
+          for (unsigned i = 0; i < elemSize; ++i)
             {
-              if (not mismatch)
-                printReadMismatch(hart, op.time_, op.tag_, byteAddr, op.size_, rtlVal, refVal);
-              mismatch = true;
+              unsigned byteMask = 1 << i;
+              if ((mask & byteMask) == 0)
+                continue;   // Byte covered by a another read op.
+
+              uint64_t byteAddr = vecRef.pa_ + i;  // TODO handle page crosser
+              if (not op.overlaps(byteAddr))
+                continue;
+
+              mask &= ~byteMask;
+              op.canceled_ = false;
+
+              unsigned offset = byteAddr - op.pa_;
+              uint8_t refVal = op.data_ >> (offset*8);
+              uint8_t rtlVal = op.rtlData_ >> (offset*8);
+
+              if (false and refVal != rtlVal)    // FIX Enable when RTL/TB is fixed.
+                {
+                  if (matched)
+                    printReadMismatch(hart, op.time_, op.tag_, byteAddr, op.size_, rtlVal, refVal);
+                  matched = false;
+                }
             }
+        }
+
+      if (mask and instr.complete_)
+        {
+          cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr.tag_
+               << " elem-ix=" << unsigned(vecRef.ix_) << " addr=0x" << std::hex << vecRef.pa_ << std::dec 
+               << " read ops do not cover all the bytes of vector load instruction\n";
+          instr.complete_ = false;
         }
     }
 
@@ -2461,17 +2477,7 @@ Mcm<URV>::commitVecReadOpsStride0(Hart<URV>& hart, McmInstr& instr)
     return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
   });
 
-  if (mask)
-    {
-      cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr.tag_
-           << " elem-ix=" << vecRef.ix_ << " addr=0x" << std::hex << vecRef.pa_ << std::dec 
-           << " read ops do not cover all the bytes of vector load instruction\n";
-      return false;
-    }
-
-  instr.complete_ = true;
-
-  return not mismatch;
+  return instr.complete_ and matched;
 }
 
 
@@ -4501,9 +4507,9 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
 
       for (unsigned i = 0; i < count; ++i)
 	{
-	  auto [dataReg, masked] = dataVecs.at(i);
-	  //if (masked)
-	  //  continue;
+	  auto [dataReg, kind] = dataVecs.at(i);
+	  if (kind != VecKind::Active)
+            continue;
 
 	  auto atag = vecRegProducer(hartIx, dataReg);
 	  if (atag == 0)
