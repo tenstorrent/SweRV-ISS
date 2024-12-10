@@ -2489,9 +2489,6 @@ template <typename URV>
 bool
 Mcm<URV>::commitVecReadOpsUnitStride(Hart<URV>& hart, McmInstr& instr)
 {
-  const VecLdStInfo& info = hart.getLastVectorMemory();
-  unsigned elemSize = info.elemSize_;
-
   // Map a reference address to a flag indicating if elem is covered by a read op.
   std::unordered_map<uint64_t, bool> addrMap;
 
@@ -2631,19 +2628,16 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
   std::unordered_map<RefElemCoord, bool> addrMap;
 
   // Check for overlap between elements. Collect reference byte addresses in addrMap.
-  bool hasOverlap = false;
   for (auto& ref : vecRefs.refs_)
     {
       for (unsigned i = 0; i < ref.size_; ++i)
 	{
 	  uint64_t pa  = ref.pa_ + i;
           RefElemCoord coord {pa, ref.ix_};
-	  hasOverlap = hasOverlap or addrMap.find(coord) != addrMap.end();
 	  addrMap[coord] = false;
 	}
     }
-  instr.hasOverlap_ = hasOverlap;
-  assert(not hasOverlap);
+  instr.hasOverlap_ = false;
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
@@ -2699,10 +2693,9 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
     }
 
   // Remove ops still marked canceled.
-  if (not hasOverlap)  // FIX Temporary until we get accurate elem indices with mread ops.
-    std::erase_if(ops, [this](MemoryOpIx ix) {
-      return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
-    });
+  std::erase_if(ops, [this](MemoryOpIx ix) {
+    return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
+  });
 
   // Check that all reference addresses are covered by the read operations.
   instr.complete_ = true;
