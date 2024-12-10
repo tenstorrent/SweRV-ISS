@@ -2814,15 +2814,9 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
             elemIx = elem.ix_;
     }
 
-  bool bc = true;  // Backward compatible all mread elemIx/field are zeros.
-  if (isVector)
-    for (auto opIx : instr->memOps_)
-      if (auto& op = sysMemOps_.at(opIx); op.elemIx_ != 0 or op.field_ != 0)
-	bc = false;
-
   for (auto opIx : instr->memOps_)
     if (auto& op = sysMemOps_.at(opIx); op.isRead_)
-      if (not isVector or bc or vecReadOpOverlapsElem(op, pa1, pa2, size, elemIx, field, elemSize))
+      if (not isVector or vecReadOpOverlapsElem(op, pa1, pa2, size, elemIx, field, elemSize))
 	forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
 
   instr->size_ = size;
@@ -2850,7 +2844,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
       for (auto iter = instr->memOps_.rbegin(); iter  != instr->memOps_.rend(); ++iter)
 	{
 	  const auto& op = sysMemOps_.at(*iter);
-	  if (not isVector or bc or vecReadOpOverlapsElemByte(op, byteAddr, elemIx, field, elemSize))
+	  if (not isVector or vecReadOpOverlapsElemByte(op, byteAddr, elemIx, field, elemSize))
 	    {
 	      uint8_t byte = 0;
 	      if (op.getModelReadOpByte(byteAddr, byte))
