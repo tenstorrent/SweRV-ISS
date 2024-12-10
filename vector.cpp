@@ -852,13 +852,16 @@ Hart<URV>::checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned 
   unsigned sew = vecRegs_.elemWidthInBits();
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
 
-  // Normalize fractional groups to 1 and account for field count.
+  // For segment load: Normalize fractional groups to 1 and account for field count.
   unsigned offsetGroup = offsetGroupX8 >= 8 ? offsetGroupX8/8 : 1;
   unsigned group = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned segGroup = group * fieldCount;
 
-  groupX8 = segGroup * 8;   // Account for fields.
-  offsetGroupX8 = offsetGroup * 8;
+  if (fieldCount > 1)   // If segment load.
+    {
+      groupX8 = segGroup * 8;
+      offsetGroupX8 = offsetGroup * 8;
+    }
 
   bool ok = true;
   if (di->ithOperandMode(0) == OperandMode::Write)

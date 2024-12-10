@@ -1395,8 +1395,10 @@ namespace WdRiscv
     URV effectiveSupervisorInterruptEnable() const
     {
       const auto& mie = regs_.at(size_t(CsrNumber::MIE));
+      const auto& mvien = regs_.at(size_t(CsrNumber::MVIEN));
+      const auto& mideleg = regs_.at(size_t(CsrNumber::MIDELEG));
       const auto& hideleg = regs_.at(size_t(CsrNumber::HIDELEG));
-      return (mie.read() | shadowSie_) & ~hideleg.read();
+      return (mie.read() | (shadowSie_ & mvien.read() & ~mideleg.read())) & ~hideleg.read();
     }
 
     /// Return the effective interrupt enable mask. This is
@@ -1405,9 +1407,11 @@ namespace WdRiscv
     {
       const auto& csr = regs_.at(size_t(CsrNumber::VSIE));
       const auto& mie = regs_.at(size_t(CsrNumber::MIE));
+      const auto& mvien = regs_.at(size_t(CsrNumber::MVIEN));
+      const auto& mideleg = regs_.at(size_t(CsrNumber::MIDELEG));
       const auto& hideleg = regs_.at(size_t(CsrNumber::HIDELEG));
       const auto& hvien = regs_.at(size_t(CsrNumber::HVIEN));
-      return ((mie.read() | shadowSie_) & hideleg.read()) |
+      return ((mie.read() | (shadowSie_ & mvien.read() & ~mideleg.read())) & hideleg.read()) |
               (csr.read() & ~hideleg.read() & hvien.read());
     }
 
@@ -1779,10 +1783,6 @@ namespace WdRiscv
     /// Called after an MHPMEVENT CSR is written/poked to update the
     /// contorl of the underlying counter.
     void updateCounterControl(CsrNumber number);
-
-    /// Update bits of SIE that are distinct for MIE (happens where MVIEN bits are set and
-    /// corresponding bits in MIDELEG are clear).
-    void updateShadowSie();
 
     /// Turn on/off virtual mode. When virtual mode is on read/write to
     /// supervisor CSRs get redirected to virtual supervisor CSRs and read/write
