@@ -103,6 +103,7 @@ namespace WdRiscv
     bool isStore_    : 1 = false;
     bool complete_   : 1 = false;
     bool hasOverlap_ : 1 = false;   // For vector load and store instructions.
+    bool repaired_   : 1 = false;   // True if vec read-op indices adjusted.
 
     /// Return true if this a load/store instruction.
     bool isMemory() const { return isLoad_ or isStore_; }
@@ -311,6 +312,8 @@ namespace WdRiscv
     /// Check PPO rule13. See ppoRule1.
     bool ppoRule13(Hart<URV>& hart, const McmInstr& instr) const;
 
+    bool ioPpoChecks(Hart<URV>& hart, const McmInstr& instr) const;
+
     /// Helper to main ppoRule1. Check A against B.
     bool ppoRule1(unsigned hartId, const McmInstr& instrA, const McmInstr& instrB) const;
 
@@ -430,6 +433,10 @@ namespace WdRiscv
     /// Helper to ppoRule1.
     void printPpo1Error(unsigned hartId, McmInstrIx tag1, McmInstrIx tag2, uint64_t t1,
 			uint64_t t2, uint64_t pa) const;
+
+    /// Helper to read-commit methods: commitReadOps & commitVecReadOPs.
+    void printReadMismatch(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
+                           unsigned size, uint64_t rtlData, uint64_t refData) const;
 
     /// Read up to a double word (size <= 8) from the reference model memory.
     bool referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64_t& val);

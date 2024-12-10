@@ -155,7 +155,7 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsi
   // Read Whisper memory and keep it in op, this will be updated when the load is retired
   // by forwarding from preceding stores.
   uint64_t refVal = 0;
-  op.failRead_ = referenceModelRead(hart, pa, size, refVal);
+  op.failRead_ = not referenceModelRead(hart, pa, size, refVal);
   op.data_ = refVal;
 
   instr->addMemOp(sysMemOps_.size());
@@ -1294,6 +1294,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (isEnabled(PpoRule::R13))
     ok = ppoRule13(hart, *instr) and ok;
 
+  ok = ioPpoChecks(hart, *instr) and ok;
+
   updateDependencies(hart, *instr);
   setBranchMemTime(hart, *instr);
 
@@ -1665,6 +1667,33 @@ Mcm<URV>::cancelInstruction(Hart<URV>& hart, uint64_t tag)
 }
 
 
+/// Helper to read-commit methods: commitReadOps & commitVecReadOPs.
+template <typename URV>
+void
+Mcm<URV>::printReadMismatch(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
+                            unsigned size, uint64_t rtlData, uint64_t refData) const
+{
+  cerr << "Error: hart-id=" << hart.hartId() << " tag=" << tag << " time="
+       << time << " RTL/whisper read mismatch " << " addr=0x" << std::hex
+       << addr << " size=" << size << " rtl=0x" << rtlData
+       << " whisper=0x" << refData << std::dec;
+
+  auto pma = hart.getPma(addr);
+  const char* type = nullptr;
+
+  if (pma.isIo())
+    type = "io";
+  else if (not pma.isCacheable())
+    type = "nc";
+  else
+    type = "c";
+
+  if (type)
+    cerr << " type=" << type;
+  cerr << '\n';
+}
+
+
 template <typename URV>
 bool
 Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
@@ -1692,21 +1721,7 @@ Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
 
   if (op.rtlData_ != op.data_)
     {
-      cerr << "Error: hart-id=" << hart.hartId() << " tag=" << op.tag_ << " time="
-	   << op.time_ << " RTL/whisper read mismatch " << " addr=0x" << std::hex
-	   << addr << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
-	   << " whisper=0x" << op.data_ << std::dec;
-      auto pma = hart.getPma(addr);
-      const char* type = nullptr;
-      if (pma.isIo())
-	type = "io";
-      else if (not pma.isCacheable())
-	type = "nc";
-      else
-	type = "c";
-      if (type)
-	cerr << " type=" << type;
-      cerr << '\n';
+      printReadMismatch(hart, op.time_, op.tag_, addr, op.size_, op.rtlData_, op.data_);
       return false;
     }
 
@@ -2284,17 +2299,21 @@ template <typename URV>
 void
 Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
 {
-  if (instr.memOps_.empty())
+  if (instr.memOps_.empty() or instr.repaired_)
     return;
 
+  instr.repaired_ = true;
+
   const VecLdStInfo& info = hart.getLastVectorMemory();
-  auto& elems = info.elems_;
+  // auto& elems = info.elems_;
   auto fields = info.fields_;
   if (fields == 0)
     fields = 1;
 
   unsigned elemSize = info.elemSize_;
   assert(elemSize > 0);
+
+  unsigned stride = fields * elemSize;  // Distance between consecutive elements.
 
   MemoryOpIx prevIx = instr.memOps_.at(0);
 
@@ -2305,30 +2324,49 @@ Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
       auto& op = sysMemOps_.at(opIx);
       auto& prev = sysMemOps_.at(prevIx);
 
-      if (op.elemIx_ != prev.elemIx_ or op.field_ != prev.field_ or op.time_ != prev.time_)
+      if (op.elemIx_ != prev.elemIx_ or op.field_ != prev.field_ or op.time_ != prev.time_
+          or op.pa_ < prev.pa_)
 	{
 	  prevIx = opIx;
 	  continue;  // Not split from the same large read-op.
 	}
 
-      unsigned rank = prev.elemIx_*fields + prev.field_;  // Position of prev in elems_
-
-      unsigned span = (op.pa_ - prev.pa_) / elemSize;
-
-      for (unsigned j = rank + 1; j <= rank + span; ++j)
-	{
-	  if (j >= elems.size())
-	    break;
-	  const auto& elem = elems.at(j);
-	  if (op.pa_ >= elem.pa_ and op.pa_ < elem.pa_ + elemSize)
-	    {
-	      op.elemIx_ = elem.ix_;
-	      op.field_ = elem.field_;
-	      break;
-	    }
-	}
+      uint64_t dist = op.pa_ - prev.pa_;
+      if (dist >= stride)
+        op.elemIx_ += dist / stride;
     }
 }
+
+
+struct RefElemCoord
+{
+  uint64_t addr = 0;
+  uint16_t ix = 0;
+
+  bool operator== (const RefElemCoord& other) const
+  { return addr == other.addr and ix == other.ix; }
+};
+
+
+// Map a reference address to a reference value and a flag indicating if address is
+// covered by a read op.
+struct RefElemByte
+{
+  uint8_t value = 0;
+  bool covered = false;
+};
+
+
+template<>
+struct std::hash<RefElemCoord>
+{
+  std::size_t operator()(const RefElemCoord& rec) const noexcept
+    {
+      std::size_t h1 = std::hash<uint64_t>{}(rec.addr);
+      std::size_t h2 = std::hash<uint16_t>{}(rec.ix);
+      return h1 ^ (h2 << 1);
+    }
+};
 
 
 template <typename URV>
@@ -2354,146 +2392,131 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
   unsigned activeCount = 0;
   collectVecRefElems(hart, instr, activeCount);
 
+  if (activeCount > 0 and instr.memOps_.empty()) //  and not hart.inDebugMode())
+    {
+      cerr << "Error: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
+	   << instr.tag_ << " vector load instruction retires without any memory "
+	   << "read operation.\n";
+      return false;
+    }
+
+  // Check if all elements masked off or VL == 0.
+  auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr.tag_];
+  if (vecRefs.refs_.empty())
+    {
+      instr.memOps_.clear();
+      instr.complete_ = true;
+      return true;
+    }
+
   // Repair memory op indices and fields.
   repairVecReadOps(hart, instr);
 
-  // Map a reference address to a reference value and a flag indicating if address is
-  // covered by a read op.
-  struct RefByte
-  {
-    uint8_t value = 0;
-    bool covered = false;
-  };
-  std::unordered_map<uint64_t, RefByte> addrMap;
+  // Map a reference address/elem-ix/field to a flag indicating if elem is covered by a
+  // read op.
+  std::unordered_map<RefElemCoord, bool> addrMap;
 
   // Check for overlap between elements. Collect reference byte addresses in addrMap.
-  auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr.tag_];
   bool hasOverlap = false;
   for (auto& ref : vecRefs.refs_)
     {
       for (unsigned i = 0; i < ref.size_; ++i)
 	{
 	  uint64_t pa  = ref.pa_ + i;
-	  hasOverlap = hasOverlap or addrMap.find(pa) != addrMap.end();
-	  addrMap[pa] = RefByte{0, false};
+          RefElemCoord coord {pa, ref.ix_};
+	  hasOverlap = hasOverlap or addrMap.find(coord) != addrMap.end();
+	  addrMap[coord] = false;
 	}
     }
   instr.hasOverlap_ = hasOverlap;
 
-  bool ok = true;
-  if (activeCount > 0 and instr.memOps_.empty() and not hart.inDebugMode())
-    {
-      cerr << "Error: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
-	   << instr.tag_ << " vector load instruction retires without any memory "
-	   << "read operation.\n";
-      ok = false;
-    }
+  // Test-bench does not send the right index for vl{1,2,4,8}r. We compensate.
+  auto instId = instr.di_.instId();
+  bool isVlr = instId >= InstId::vlre8_v and instId <= InstId::vlre64_v;
+  uint64_t baseAddr = vecRefs.refs_.at(0).pa_;
+  uint16_t baseIx = vecRefs.refs_.at(0).ix_;
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
   // addresses covered by read ops. Set reference (Whisper) values of reference addresses.
   auto& ops = instr.memOps_;
+
+  unsigned elemBytes = vecRefs.refs_.at(0).size_;
+  bool ok = true;
+
   for (auto iter = ops.rbegin(); iter != ops.rend(); ++iter)
     {
       auto opIx = *iter;
       auto& op = sysMemOps_.at(opIx);
       if (not op.isRead_)
-	continue;  // Should not happen.
+        continue;  // Should not happen.
+
+      uint16_t elemIx = op.elemIx_;
+      if (isVlr and op.pa_ >= baseAddr)   // Compensate for vl1r, vl2r ...
+        elemIx = baseIx + (op.pa_ - baseAddr) / elemBytes;
 
       uint64_t low = ~uint64_t(0), high = 0; // Range of op addresses overlapping reference.
+      bool mismatch = false; // True if mismatch in op
       for (unsigned i = 0; i < op.size_; ++i)
-	{
-	  uint64_t addr = op.pa_ + i;
-	  auto iter = addrMap.find(addr);
-	  if (iter == addrMap.end())
-	    continue;  // No overlap with instruction.
-	  auto& rb = iter->second;
-	  if (rb.covered)
-	    continue;  // Address already covered by another read op.
+        {
+          uint64_t addr = op.pa_ + i;
+          auto iter = addrMap.find(RefElemCoord{addr, elemIx});
+          if (iter == addrMap.end())
+            {
+              if (i == 0)
+                break;    // First elem of op is not in ref.
+              iter = addrMap.find(RefElemCoord{addr, uint16_t(elemIx + 1)});
+              if (iter == addrMap.end())
+                break;    // No overlap with instruction.
+              elemIx++;
+            }
 
-          rb.covered = true;
-          rb.value = op.data_ >> (i*8);
+          bool& covered = iter->second;  // Ref elem byte covered
+          if (covered)
+            continue;  // Address already covered by another read op.
 
-	  low = std::min(low, addr);
-	  high = std::max(high, addr);
-	}
+          covered = true;
+          uint8_t refVal = op.data_ >> (i*8);
+          uint8_t rtlVal = op.rtlData_ >> (i*8);
+
+          if (refVal != rtlVal)
+            {
+              if (not mismatch)
+                printReadMismatch(hart, op.time_, op.tag_, addr, op.size_, rtlVal, refVal);
+              mismatch = true;
+              ok = false;
+            }
+
+          low = std::min(low, addr);
+          high = std::max(high, addr);
+        }
 
       if (low <= high)
-	{
-	  unsigned size = high - low + 1;
-	  trimOp(op, low, size);
-	  op.canceled_ = false;
-	}
+        {
+          unsigned size = high - low + 1;
+          trimOp(op, low, size);
+          op.canceled_ = false;
+        }
     }
 
   // Remove ops still marked canceled.
-  std::erase_if(ops, [this](MemoryOpIx ix) {
-    return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
-  });
-
-  // We cannot distinguish read-ops for active elements from those of inactive ones.  The
-  // inactive element reads are all-ones and will corrupt those of the active elements if
-  // they overlap them and follow them in temporal order.  Either the test-bench filters
-  // out read-ops of inactive elements or it sends us the element index.
-  hasOverlap = true;  // FIX remove once we can distinguish active from inactive.
-
-  // Check read operations comparing RTL values to reference (whisper) values.
-  // We currently do not get enough information from the test-bench to do this
-  // correctly for overlapping elements.
-  if (not hasOverlap)
-    {
-      for (auto opIx : instr.memOps_)
-	{
-	  auto& op = sysMemOps_.at(opIx);
-	  if (not op.isRead_)
-	    continue;
-
-	  for (unsigned i = 0; i < op.size_; ++i)
-	    {
-	      uint64_t addr = op.pa_ + i;
-	      uint8_t rtlVal = op.rtlData_ >> (i*8);
-	      auto iter = addrMap.find(addr);
-	      if (iter == addrMap.end())
-		continue;
-	      const auto& rb = iter->second;
-	      if (rb.value == rtlVal)
-		continue;
-
-	      cerr << "Error: hart-id=" << hart.hartId() << " tag=" << op.tag_
-		   << "time=" << op.time_ << " RTL/whisper read mismatch "
-		   << " addr=0x" << std::hex << addr << " size=" << unsigned(op.size_)
-		   << " rtl=0x" << unsigned(rtlVal) << " whisper=0x"
-		   << unsigned(rb.value) << std::dec;
-	      auto pma = hart.getPma(addr);
-	      const char* type = nullptr;
-	      if (pma.isIo())
-		type = "io";
-	      else if (not pma.isCacheable())
-		type = "nc";
-	      else
-		type = "c";
-	      if (type)
-		cerr << " type=";
-	      cerr << '\n';
-	      ok = false;
-	    }
-	}
-    }
+  if (not hasOverlap)  // Temporary until we get accurate elem indices with mread ops.
+    std::erase_if(ops, [this](MemoryOpIx ix) {
+      return ix >= sysMemOps_.size() or sysMemOps_.at(ix).isCanceled();
+    });
 
   // Check that all reference addresses are covered by the read operations.
-  bool complete = true;
-  for (const auto& [addr, rb] : addrMap)
-    if (not rb.covered)
+  instr.complete_ = true;
+  for (const auto& [coord, covered] : addrMap)
+    if (not covered)
       {
-	complete = false;
-	ok = false;
+	instr.complete_ = false;
 	cerr << "Error: hart-id=" << hart.hartId() << " tag=" << instr.tag_
-	     << " addr=0x" << std::hex << addr << std::dec
+	     << " elem-ix=" << coord.ix << " addr=0x" << std::hex << coord.addr << std::dec 
 	     << " read ops do not cover all the bytes of vector load instruction\n";
-	break;
+	return false;
       }
 
-  instr.complete_ = complete;
   return ok;
 }
 
@@ -2624,6 +2647,9 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
   McmInstr* instr = findInstr(hartIx, tag);
   if (not instr or instr->isCanceled())
     return false;
+
+  if (isVector)
+    repairVecReadOps(hart, *instr);
 
   // We expect Mcm::retire to be called after this method is called.
   if (instr->isRetired())
@@ -4198,7 +4224,7 @@ Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
 
   const auto& undrained = hartData_.at(hartIx).undrainedStores_;
 
-  for (auto& tag : undrained)
+  for (auto tag : undrained)
     {
       if (tag >= instrB.tag_)
 	break;
@@ -4623,26 +4649,22 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	}
       else    // M is a vector store
 	{
-	  if (instrM.hasOverlap_)
-	    continue;  // Not enough info to associate ops with elements.
-
 	  auto iter = vecRefMap.find(mTag);
 	  if (iter == vecRefMap.end())
 	    continue;
 
 	  bool isIndexed = instrM.di_.isVectorStoreIndexed();
-
 	  auto& vecRefs = iter->second;
 
-	  // For each data elem of M.
-	  for (auto& vecRef : vecRefs.refs_)
+	  // Find last element of M overlapping byte of B. We assume vector store
+	  // elements are written in order.
+	  auto& refs = vecRefs.refs_;
+	  for (auto iter = refs.rbegin(); iter != refs.rend(); ++iter)
 	    {
-	      // Identify vector writing to memory overlapping byte address of B.
+	      auto& vecRef = *iter;
 	      if (not vecRef.overlaps(byteAddr))
 		continue;
-	      unsigned dataVec = vecRef.reg_;
-	      if (dataVec != byteInfo.reg_)
-		continue;
+	      unsigned dataVec = vecRef.reg_;  // Identify register of element of M.
 
 	      // Find the producer A of identified vector. M has data dep on A.
 	      McmInstrIx aTag = 0;
@@ -4656,11 +4678,11 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 		  }
 
 	      if (aTag == 0)
-		continue;
+		break;  // No producer of data vec.
 
 	      auto& instrA = instrVec.at(aTag);
-	      if (not instrA.isMemory() or instrA.hasOverlap_)
-		continue;
+	      if (not instrA.isMemory())
+		break;
 
 	      // Check B against A.
 	      if (not instrA.complete_ or byteTime <= aTime)
@@ -4673,7 +4695,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 		}
 
 	      if (not isIndexed)
-		continue;
+		break;
 
 	      // Get index register corresponding to dataVec.
 	      unsigned ixVec = vecRef.ixReg_;
@@ -4691,11 +4713,11 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 		  }
 
 	      if (aTag == 0)
-		continue;
+		break;
 
 	      auto& instrAA = instrVec.at(aTag);
 	      if (not instrAA.isMemory())
-		continue;
+		break;
 
 	      // Check B against AA.
 	      if (not instrAA.complete_ or byteTime <= aTime)
@@ -4705,6 +4727,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 		       << " time1=" << aTime << " time2=" << byteTime << " dep=addr\n";
 		  return false;
 		}
+	      break;
 	    }
 	}
     }
@@ -4763,6 +4786,89 @@ Mcm<URV>::ppoRule13(Hart<URV>& hart, const McmInstr& instrB) const
 	    }
 	}
     }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::ioPpoChecks(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  return true;
+
+  // We check that IO memory operations are never reordered. This is stronger
+  // that what is required by the spec. We will eventually relax this for
+  // non strongly ordered regions.
+
+  auto hartIx = hart.sysHartIndex();
+
+  // Identify earliest IO memory time of instr B.
+  uint64_t inf = ~uint64_t(0);
+  uint64_t earlyRead = inf, earlyWrite = inf;
+  for (auto opIx : instrB.memOps_)
+    {
+      auto& op = sysMemOps_.at(opIx);
+      if (not op.isIo_  and  not op.canceled_)
+	{
+	  if (op.isRead_)
+	    earlyRead = std::min(earlyRead, op.time_);
+	  else
+	    earlyWrite = std::min(earlyWrite, op.time_);
+	}
+    }
+
+  // Check for IO memory operation reordering.
+  // Currently checking read against read, and write against write. We will generalize
+  // once we get more accurate IO timing from the test-bench.
+  for (auto isRead : { true, false })
+    {
+      auto earlyB = isRead? earlyRead : earlyWrite;
+      if (earlyB == inf)
+	continue; // No IO memory ops.
+
+      // Identify IO ops reordered with respect to B.
+      for (auto iter = sysMemOps_.rbegin(); iter != sysMemOps_.rend(); ++iter)
+	{
+	  const auto& op = *iter;
+	  if (op.isCanceled() or op.hartIx_ != hartIx or op.tag_ >= instrB.tag_ or not op.isIo_)
+	    continue;
+	  
+	  if (op.isRead_ != isRead)
+	    continue;  // Temporary till we get more accurate IO timing.
+
+	  if (op.time_ < earlyB)
+	    continue;
+
+	  cerr << "Error: IO PPO rule failed: hart-id=" << hart.hartId() << " tag1="
+	       << op.tag_ << " tag2=" << instrB.tag_ << " time1=" << op.time_
+	       << " time2=" << earlyB << " type=" << (isRead? "read" : "write")
+	       << '\n';
+	  return false;
+	}
+    }
+
+#if 0
+  // Check that all undrained IO ops belong to instructions that follow B in program
+  // order.
+  const auto& undrained = hartData_.at(hartIx).undrainedStores_;
+  const auto& instrVec = hartData_.at(hartIx).instrVec_;
+
+  for (auto tag : undrained)
+    {
+      if (tag >= instrB.tag_)
+	break;
+      const auto& instrA = instrVec.at(tag);
+      if (instrA.memOps_.empty())
+	;
+
+      // For each reference byte physical address of A.
+      //    If not address is IO continue
+      //    If adress is covered by a memory op of A continue
+      //    error
+      //    return false
+    }
+#endif
 
   return true;
 }
