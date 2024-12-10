@@ -5196,6 +5196,8 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
 
   uint64_t maxVal = ~uint64_t(0);
 
+  bool unitStride = isUnitStride(info);
+
   for (const auto& elem : elems)
     {
       if (elem.skip_)
@@ -5214,9 +5216,8 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
       for (unsigned i = 0; i < size; ++i)
 	{
 	  uint64_t addr = i < size1 ? pa1 + i : pa2 + i - size1;
-
-          // FIXME: match on element field
-	  uint64_t byteTime = earliestByteTime(instr, addr, elem.ix_);
+	  uint64_t byteTime = unitStride ? earliestByteTime(instr, addr) :
+                                           earliestByteTime(instr, addr, elem.ix_);
 	  if (byteTime > 0)  // Byte time is zero for undrained writes.
 	    dTime = std::min(byteTime, dTime);
 	}
@@ -5259,10 +5260,16 @@ Mcm<URV>::getVecRegEarlyTime(Hart<URV>& hart, const McmInstr& instr, unsigned re
   if (elemSize == 0 or info.elems_.empty())
     return time;  // Should not happen.
 
+  unsigned elemsPerVec =  hart.vecRegSize() / elemSize;
+
   for (auto& elem : elems)
     {
-      if (elem.skip_ or elem.ix_ != regNum)
-	continue;  // Non active element or wrong vec register
+      if (elem.skip_)
+	continue;  // Non active.
+
+      unsigned elemReg = info.vec_ + elem.ix_ / elemsPerVec + elem.field_;
+      if (elemReg != regNum)
+        continue;  // Wrong vector register.
 
       uint64_t pa1 = elem.pa_, pa2 = elem.pa2_;
       unsigned size = elemSize, size1 = elemSize;
@@ -5276,7 +5283,6 @@ Mcm<URV>::getVecRegEarlyTime(Hart<URV>& hart, const McmInstr& instr, unsigned re
 	{
 	  uint64_t addr = i < size1 ? pa1 + i : pa2 + i - size1;
 
-          // FIXME: match on element field
 	  uint64_t byteTime = earliestByteTime(instr, addr, elem.ix_);
 	  if (byteTime > 0)  // Byte time is zero for undrained writes.
 	    time = std::min(byteTime, time);
