@@ -2295,6 +2295,17 @@ Mcm<URV>::collectVecRefElems(Hart<URV>& hart, McmInstr& instr, unsigned& activeC
 }
 
 
+static bool isUnitStride(const VecLdStInfo& info)
+{
+  if (info.isIndexed_)
+    return false;
+  if (not info.isStrided_)
+    return true;
+  unsigned nf = info.fields_ == 0 ? 1 : info.fields_;
+  return nf * info.elemSize_ == info.stride_;
+}
+
+
 template <typename URV>
 void
 Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
@@ -2317,9 +2328,8 @@ Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
 
   instr.repaired_ = true;
 
-  bool strided = info.isStrided_ and info.stride_ != stride;
-  if (info.isIndexed_ or strided)
-    return;  // Considered non-unit-stride.
+  if (not isUnitStride(info))
+    return;
 
   uint64_t base = 0;
   //uint64_t baseIx = 0;
@@ -2794,8 +2804,9 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
     pa2 = pageAddress(pageNum(pa2) + 1);
 
   auto& info = hart.getLastVectorMemory();
-  // unsigned nfields = info.fields_ == 0 ? 1 : info.fields_;
-  unsigned elemSize = info.elemSize_; //  * nfields;  // Effective segment elem size
+  unsigned elemSize = info.elemSize_;
+
+  bool unitStride = isUnitStride(info);
 
   // For strided load with 0 stride, all active elems get one read associated with
   // 1st active.
@@ -2803,14 +2814,16 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
     {
       const VecLdStInfo& info = hart.getLastVectorMemory();
       if (info.isStrided_ and info.stride_ == 0)
-        for (auto& elem : info.elems_)
-          if (not elem.skip_ and elem.ix_ < elemIx)
-            elemIx = elem.ix_;
+        {
+          for (auto& elem : info.elems_)
+            if (not elem.skip_ and elem.ix_ < elemIx)
+              elemIx = elem.ix_;
+        }
     }
 
   for (auto opIx : instr->memOps_)
     if (auto& op = sysMemOps_.at(opIx); op.isRead_)
-      if (not isVector or vecReadOpOverlapsElem(op, pa1, pa2, size, elemIx, field, elemSize))
+      if (not isVector or unitStride or vecReadOpOverlapsElem(op, pa1, pa2, size, elemIx, field, elemSize))
 	forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
 
   instr->size_ = size;
