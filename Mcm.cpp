@@ -2310,6 +2310,7 @@ template <typename URV>
 void
 Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
 {
+  return;
   if (instr.memOps_.empty() or instr.repaired_)
     return;
 
@@ -2863,10 +2864,10 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
   auto& info = hart.getLastVectorMemory();
   unsigned elemSize = info.elemSize_;
 
-  bool unitStride = isUnitStride(info);
+  bool unitStride = isVector and isUnitStride(info);
 
-  // For strided load with 0 stride, all active elems get one read associated with
-  // 1st active.
+  // For strided load with 0 stride, all active elems get one read associated with 1st
+  // active.
   if (isVector)
     {
       const VecLdStInfo& info = hart.getLastVectorMemory();
@@ -2880,9 +2881,15 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
 
   // For vector load, we don't check indices if unit stride (no possibility of overlap).
   for (auto opIx : instr->memOps_)
-    if (auto& op = sysMemOps_.at(opIx); op.isRead_)
-      if (not isVector or unitStride or vecReadOpOverlapsElem(op, pa1, pa2, size, elemIx, field, elemSize))
-	forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
+    {
+      if (auto& op = sysMemOps_.at(opIx); op.isRead_)
+        {
+          if (isVector  and  not unitStride  and
+              not vecReadOpOverlapsElem(op, pa1, pa2, size, elemIx, field, elemSize))
+            continue;  // Vector non-unit-stride ops must match element index.
+          forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
+        }
+    }
 
   instr->size_ = size;
   instr->virtAddr_ = va;
@@ -2909,16 +2916,17 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
       for (auto iter = instr->memOps_.rbegin(); iter  != instr->memOps_.rend(); ++iter)
 	{
 	  const auto& op = sysMemOps_.at(*iter);
-	  if (not isVector or vecReadOpOverlapsElemByte(op, byteAddr, elemIx, field, elemSize))
-	    {
-	      uint8_t byte = 0;
-	      if (op.getModelReadOpByte(byteAddr, byte))
-		{
-		  value |= uint64_t(byte) << (8*byteIx);
-		  byteCovered = true;
-		  break;
-		}
-	    }
+          if (isVector and not unitStride and
+              not vecReadOpOverlapsElemByte(op, byteAddr, elemIx, field, elemSize))
+            continue;  // Vector non-unit-stride ops must matc element index.
+
+          uint8_t byte = 0;
+          if (not op.getModelReadOpByte(byteAddr, byte))
+            continue;
+
+          value |= uint64_t(byte) << (8*byteIx);
+          byteCovered = true;
+          break;
 	}
       covered = covered and byteCovered;
     }
@@ -3404,8 +3412,7 @@ Mcm<URV>::earliestByteTime(const McmInstr& instr, uint64_t addr) const
 
 template <typename URV>
 uint64_t
-Mcm<URV>::earliestByteTime(const McmInstr& instr, uint64_t addr,
-                           unsigned elemIx) const
+Mcm<URV>::earliestByteTime(const McmInstr& instr, uint64_t addr, unsigned elemIx) const
 {
   uint64_t time = 0;
   bool found = false;
