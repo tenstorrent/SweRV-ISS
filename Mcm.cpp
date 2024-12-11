@@ -796,8 +796,8 @@ pokeHartMemory(Hart<URV>& hart, uint64_t physAddr, uint64_t data, unsigned size)
 
 template <typename URV>
 bool
-Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
-			    uint64_t physAddr, unsigned size, uint64_t rtlData)
+Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa,
+                            unsigned size, uint64_t rtlData, unsigned elemIx, unsigned field)
 {
   if (not updateTime("Mcm::mergeBufferInsert", time))
     return false;
@@ -809,13 +809,14 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
   MemoryOp op = {};
   op.time_ = time;
   op.insertTime_ = time;
-  op.pa_ = physAddr;
+  op.pa_ = pa;
   op.rtlData_ = rtlData;
   op.tag_ = tag;
   op.hartIx_ = hartIx;
   op.size_ = size;
   op.isRead_ = false;
-  op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
+  op.elemIx_ = elemIx;
+  op.field_ = field;
   op.isIo_ = hart.getPma(op.pa_).isIo();
 
   if (not writeOnInsert_)
@@ -862,7 +863,7 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
       // We commit the RTL data to memory but we check them against whisper data (in
       // checkStoreData). This is simpler than committing part of whisper instruction
       // data.
-      if (not pokeHartMemory(hart, physAddr, rtlData, op.size_))
+      if (not pokeHartMemory(hart, pa, rtlData, op.size_))
 	result = false;
     }
 
@@ -872,8 +873,8 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
 template <typename URV>
 bool
-Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
-		   uint64_t physAddr, unsigned size, uint64_t rtlData)
+Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa,
+                   unsigned size, uint64_t rtlData, unsigned elemIx, unsigned field)
 {
   if (not updateTime("Mcm::writeOp", time))
     return false;
@@ -913,11 +914,11 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	       << " invalid data (must be 0) for a cbo.zero instruction: " << rtlData << '\n';
 	  return false;
 	}
-      uint64_t lineStart = lineAlign(physAddr);
-      if (physAddr + size - lineStart > lineSize_)
+      uint64_t lineStart = lineAlign(pa);
+      if (pa + size - lineStart > lineSize_)
 	return false;
 
-      if ((physAddr % 8) != 0)
+      if ((pa % 8) != 0)
 	return false;
 
       if (rtlData != 0)
@@ -925,7 +926,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
       for (unsigned i = 0; i < size; i += 8)
 	{
-	  uint64_t addr = physAddr + i;
+	  uint64_t addr = pa + i;
 	  MemoryOp op = {};
 	  op.time_ = time;
 	  op.pa_ = addr;
@@ -935,7 +936,8 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	  op.size_ = 8;
 	  op.isRead_ = false;
 	  op.bypass_ = true;
-	  op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
+          op.elemIx_ = elemIx;
+          op.field_ = field;
 	  op.isIo_ = hart.getPma(op.pa_).isIo();
 
 	  // Associate write op with instruction.
@@ -949,21 +951,22 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
     {
       MemoryOp op = {};
       op.time_ = time;
-      op.pa_ = physAddr;
+      op.pa_ = pa;
       op.rtlData_ = rtlData;
       op.tag_ = tag;
       op.hartIx_ = hartIx;
       op.size_ = size;
       op.isRead_ = false;
       op.bypass_ = true;
-      op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
+      op.elemIx_ = elemIx;
+      op.field_ = field;
       op.isIo_ = hart.getPma(op.pa_).isIo();
 
       // Associate write op with instruction.
       instr->addMemOp(sysMemOps_.size());
       sysMemOps_.push_back(op);
 
-      result = pokeHartMemory(hart, physAddr, rtlData, size) and result;
+      result = pokeHartMemory(hart, pa, rtlData, size) and result;
     }
 
   instr->complete_ = checkStoreComplete(hartIx, *instr);
@@ -1892,12 +1895,12 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
   if (not allIo)
     return true;   // Temporary until we get elem-ix and field with teach mbinsert.
 
-  // 2. Sort writes by insertion order.
-  std::sort(writes.begin(), writes.end(),
-	      [](const MemoryOp* a, const MemoryOp* b) {
-		return a->insertOrder_ < b->insertOrder_;
-	      }
-	    );
+  // 2. Sort writes by insertion time.
+  std::stable_sort(writes.begin(), writes.end(),
+                   [](const MemoryOp* a, const MemoryOp* b) {
+                     return a->insertTime_ < b->insertTime_;
+                   }
+                   );
 
   // 3. Put RTL byte data in a vector of address/value pairs.
   using AddrValue = std::pair<uint64_t, uint8_t>;
