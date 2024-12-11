@@ -5256,6 +5256,7 @@ Mcm<URV>::getVecRegEarlyTime(Hart<URV>& hart, const McmInstr& instr, unsigned re
   const VecLdStInfo& info = hart.getLastVectorMemory();
   auto elemSize = info.elemSize_;
   const auto& elems = info.elems_;
+  bool unitStride = isUnitStride(info);
 
   if (elemSize == 0 or info.elems_.empty())
     return time;  // Should not happen.
@@ -5283,7 +5284,11 @@ Mcm<URV>::getVecRegEarlyTime(Hart<URV>& hart, const McmInstr& instr, unsigned re
 	{
 	  uint64_t addr = i < size1 ? pa1 + i : pa2 + i - size1;
 
-	  uint64_t byteTime = earliestByteTime(instr, addr, elem.ix_);
+          uint64_t byteTime = 0;
+          if (not instr.hasOverlap_ or unitStride)
+            byteTime = earliestByteTime(instr, addr);
+          else
+            byteTime = earliestByteTime(instr, addr, elem.ix_);  // FIX: write ops have no index.
 	  if (byteTime > 0)  // Byte time is zero for undrained writes.
 	    time = std::min(byteTime, time);
 	}
