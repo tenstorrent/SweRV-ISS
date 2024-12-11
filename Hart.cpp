@@ -2918,7 +2918,9 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt,
   uint32_t tinst = isRvh()? createTrapInst(di, interrupt, cause, info, info2) : 0;
 
   bool gva = ( isRvh() and not interrupt and
-	       (hyperLs_ or isGvaTrap(gvaVirtMode, cause)) );
+	       (hyperLs_ or isGvaTrap(gvaVirtMode, cause)));
+  if (lastEbreak_ and clearMtvalOnEbreak_)
+    gva = false;
 
   // Update status register saving xIE in xPIE and previous privilege
   // mode in xPP by getting current value of xstatus, updating
@@ -10116,7 +10118,9 @@ Hart<URV>::execEbreak(const DecodedInst* di)
   if (clearMtvalOnEbreak_)
     trapInfo = 0;
 
+  lastEbreak_ = true;
   initiateException(ExceptionCause::BREAKP, savedPc, trapInfo);
+  lastEbreak_ = false;
 }
 
 
