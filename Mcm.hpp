@@ -30,7 +30,6 @@ namespace WdRiscv
     uint64_t   insertTime_     = 0;  // Time of merge buffer insert (if applicable).
     uint16_t   elemIx_         = 0;  // Vector element index.
     uint16_t   field_          = 0;  // Vector element field (for segment load).
-    uint16_t   insertOrder_    = 0;  // Order of mbinsert operation in its instruction.
     uint8_t    hartIx_    : 8  = 0;
     uint8_t    size_      : 8  = 0;
     bool       isRead_    : 1  = false;

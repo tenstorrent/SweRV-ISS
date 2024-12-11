@@ -815,7 +815,6 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
   op.hartIx_ = hartIx;
   op.size_ = size;
   op.isRead_ = false;
-  op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
   op.isIo_ = hart.getPma(op.pa_).isIo();
 
   if (not writeOnInsert_)
@@ -935,7 +934,6 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	  op.size_ = 8;
 	  op.isRead_ = false;
 	  op.bypass_ = true;
-	  op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
 	  op.isIo_ = hart.getPma(op.pa_).isIo();
 
 	  // Associate write op with instruction.
@@ -956,7 +954,6 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag,
       op.size_ = size;
       op.isRead_ = false;
       op.bypass_ = true;
-      op.insertOrder_ = hartData_.at(hartIx).storeInsertCount_[tag]++;
       op.isIo_ = hart.getPma(op.pa_).isIo();
 
       // Associate write op with instruction.
@@ -1892,12 +1889,12 @@ Mcm<URV>::checkVecStoreData(Hart<URV>& hart, const McmInstr& store) const
   if (not allIo)
     return true;   // Temporary until we get elem-ix and field with teach mbinsert.
 
-  // 2. Sort writes by insertion order.
-  std::sort(writes.begin(), writes.end(),
-	      [](const MemoryOp* a, const MemoryOp* b) {
-		return a->insertOrder_ < b->insertOrder_;
-	      }
-	    );
+  // 2. Sort writes by insertion time.
+  std::stable_sort(writes.begin(), writes.end(),
+                   [](const MemoryOp* a, const MemoryOp* b) {
+                     return a->insertTime_ < b->insertTime_;
+                   }
+                   );
 
   // 3. Put RTL byte data in a vector of address/value pairs.
   using AddrValue = std::pair<uint64_t, uint8_t>;
