@@ -2306,75 +2306,6 @@ static bool isUnitStride(const VecLdStInfo& info)
 }
 
 
-template <typename URV>
-void
-Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
-{
-  if (instr.memOps_.empty() or instr.repaired_)
-    return;
-
-  const VecLdStInfo& info = hart.getLastVectorMemory();
-  auto& elems = info.elems_;
-  if (elems.empty() or info.allSkipped())
-    return;
-
-  auto fields = info.fields_;
-  if (fields == 0)
-    fields = 1;
-
-  unsigned elemSize = info.elemSize_;
-  assert(elemSize > 0);
-  unsigned stride = fields * elemSize;  // Distance between consecutive elements.
-
-  instr.repaired_ = true;
-
-  if (not isUnitStride(info))
-    return;
-
-  uint64_t base = 0;
-  //uint64_t baseIx = 0;
-  for (auto& elem : elems)
-    if (not elem.skip_)
-      {
-        base = elem.pa_ - stride*elem.ix_;
-        //baseIx = elem.ix_;
-      }
-
-  unsigned offset = base % stride;
-  if (offset)
-    offset = stride - offset;
-
-  MemoryOpIx prevIx = instr.memOps_.at(0);
-
-  for (unsigned i = 1; i < instr.memOps_.size(); ++i)
-    {
-      auto opIx = instr.memOps_.at(i);
-
-      auto& op = sysMemOps_.at(opIx);
-      auto& prev = sysMemOps_.at(prevIx);
-      if (prev.pa_ < base)
-        {
-          // Read ops for masked off elems get an addr of 0.
-          prevIx = opIx;
-          continue;
-        }
-
-      if (op.elemIx_ != prev.elemIx_ or op.field_ != prev.field_ or op.time_ != prev.time_
-          or op.pa_ < prev.pa_)
-	{
-	  prevIx = opIx;
-	  continue;  // Not split from the same large read-op.
-	}
-
-      uint64_t dist = op.pa_ - prev.pa_;
-      dist += ((prev.pa_ + offset) % stride);
-
-      if (dist >= stride)
-        op.elemIx_ += dist / stride;
-    }
-}
-
-
 struct RefElemCoord
 {
   uint64_t addr = 0;
@@ -2615,9 +2546,6 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
   if (isUnitStride(info))
     return commitVecReadOpsUnitStride(hart, instr);
 
-  // Repair memory op indices and fields.
-  repairVecReadOps(hart, instr);
-
   // Special case. Test bench sends a read for up to one element for this case.
   if (info.isStrided_ and info.stride_ == 0)
     return commitVecReadOpsStride0(hart, instr);
@@ -2837,9 +2765,6 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
   if (not instr or instr->isCanceled())
     return false;
 
-  if (isVector)
-    repairVecReadOps(hart, *instr);
-
   // We expect Mcm::retire to be called after this method is called.
   if (instr->isRetired())
     {
@@ -2863,10 +2788,10 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
   auto& info = hart.getLastVectorMemory();
   unsigned elemSize = info.elemSize_;
 
-  bool unitStride = isUnitStride(info);
+  bool unitStride = isVector and isUnitStride(info);
 
-  // For strided load with 0 stride, all active elems get one read associated with
-  // 1st active.
+  // For strided load with 0 stride, all active elems get one read associated with 1st
+  // active.
   if (isVector)
     {
       const VecLdStInfo& info = hart.getLastVectorMemory();
@@ -2880,9 +2805,15 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
 
   // For vector load, we don't check indices if unit stride (no possibility of overlap).
   for (auto opIx : instr->memOps_)
-    if (auto& op = sysMemOps_.at(opIx); op.isRead_)
-      if (not isVector or unitStride or vecReadOpOverlapsElem(op, pa1, pa2, size, elemIx, field, elemSize))
-	forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
+    {
+      if (auto& op = sysMemOps_.at(opIx); op.isRead_)
+        {
+          if (isVector  and  not unitStride  and
+              not vecReadOpOverlapsElem(op, pa1, pa2, size, elemIx, field, elemSize))
+            continue;  // Vector non-unit-stride ops must match element index.
+          forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
+        }
+    }
 
   instr->size_ = size;
   instr->virtAddr_ = va;
@@ -2909,16 +2840,17 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
       for (auto iter = instr->memOps_.rbegin(); iter  != instr->memOps_.rend(); ++iter)
 	{
 	  const auto& op = sysMemOps_.at(*iter);
-	  if (not isVector or vecReadOpOverlapsElemByte(op, byteAddr, elemIx, field, elemSize))
-	    {
-	      uint8_t byte = 0;
-	      if (op.getModelReadOpByte(byteAddr, byte))
-		{
-		  value |= uint64_t(byte) << (8*byteIx);
-		  byteCovered = true;
-		  break;
-		}
-	    }
+          if (isVector and not unitStride and
+              not vecReadOpOverlapsElemByte(op, byteAddr, elemIx, field, elemSize))
+            continue;  // Vector non-unit-stride ops must matc element index.
+
+          uint8_t byte = 0;
+          if (not op.getModelReadOpByte(byteAddr, byte))
+            continue;
+
+          value |= uint64_t(byte) << (8*byteIx);
+          byteCovered = true;
+          break;
 	}
       covered = covered and byteCovered;
     }
@@ -3404,8 +3336,7 @@ Mcm<URV>::earliestByteTime(const McmInstr& instr, uint64_t addr) const
 
 template <typename URV>
 uint64_t
-Mcm<URV>::earliestByteTime(const McmInstr& instr, uint64_t addr,
-                           unsigned elemIx) const
+Mcm<URV>::earliestByteTime(const McmInstr& instr, uint64_t addr, unsigned elemIx) const
 {
   uint64_t time = 0;
   bool found = false;
