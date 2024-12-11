@@ -2405,14 +2405,6 @@ Interactive<URV>::mbbypassCommand(Hart<URV>& hart, const std::string& line,
   if (not parseCmdLineNumber("size", tokens.at(3), size))
     return false;
 
-  // For the cbo.zero instruction the size may be 8, 32, or 64. Data value must be zero.
-  if (size > 8 and (size % 8) != 0)
-    {
-      cerr << "Invalid mbbypass size: " << size << " -- Expecting 0 to 8 or a multiple of 8\n";
-      cerr << "  " << line << '\n';
-      return false;
-    }
-
   if (size <= 8)
     {
       uint64_t data = 0;

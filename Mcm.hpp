@@ -472,6 +472,12 @@ namespace WdRiscv
     /// Similar to above but for vector instructions.
     bool commitVecReadOps(Hart<URV>& hart, McmInstr& instr);
 
+    /// Helper to comitVecReadOps for strided with stride 0.
+    bool commitVecReadOpsStride0(Hart<URV>& hart, McmInstr& instr);
+
+    /// Helper to comitVecReadOps for unit stride.
+    bool commitVecReadOpsUnitStride(Hart<URV>& hart, McmInstr& instr);
+
     /// Helper to commitVecReadOps: Collect the reference (Whisper) element info:
     /// address, index, field, data-reg, index-reg. Determine the number of
     /// active (non-masked) elements.
