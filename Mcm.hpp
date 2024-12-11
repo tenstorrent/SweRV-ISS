@@ -103,7 +103,6 @@ namespace WdRiscv
     bool isStore_    : 1 = false;
     bool complete_   : 1 = false;
     bool hasOverlap_ : 1 = false;   // For vector load and store instructions.
-    bool repaired_   : 1 = false;   // True if vec read-op indices adjusted.
 
     /// Return true if this a load/store instruction.
     bool isMemory() const { return isLoad_ or isStore_; }
@@ -482,12 +481,6 @@ namespace WdRiscv
     /// address, index, field, data-reg, index-reg. Determine the number of
     /// active (non-masked) elements.
     void collectVecRefElems(Hart<URV>& hart, McmInstr& instr, unsigned& activeCount);
-
-    /// Heler to commitVecReadOps. A large read-op that covers multiple elements will get
-    /// split into multiple sub-ops of size 8 or less each.  When the split is done we do
-    /// not know the element size, so all the pieces get assigned the same element index
-    /// and field. We assign the correct element index and field here.
-    void repairVecReadOps(Hart<URV>& hart, McmInstr& instr);
 
     /// Compute a mask of the instruction data bytes covered by the
     /// given memory operation. Return 0 if the operation does not

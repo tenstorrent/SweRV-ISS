@@ -2306,76 +2306,6 @@ static bool isUnitStride(const VecLdStInfo& info)
 }
 
 
-template <typename URV>
-void
-Mcm<URV>::repairVecReadOps(Hart<URV>& hart, McmInstr& instr)
-{
-  return;
-  if (instr.memOps_.empty() or instr.repaired_)
-    return;
-
-  const VecLdStInfo& info = hart.getLastVectorMemory();
-  auto& elems = info.elems_;
-  if (elems.empty() or info.allSkipped())
-    return;
-
-  auto fields = info.fields_;
-  if (fields == 0)
-    fields = 1;
-
-  unsigned elemSize = info.elemSize_;
-  assert(elemSize > 0);
-  unsigned stride = fields * elemSize;  // Distance between consecutive elements.
-
-  instr.repaired_ = true;
-
-  if (not isUnitStride(info))
-    return;
-
-  uint64_t base = 0;
-  //uint64_t baseIx = 0;
-  for (auto& elem : elems)
-    if (not elem.skip_)
-      {
-        base = elem.pa_ - stride*elem.ix_;
-        //baseIx = elem.ix_;
-      }
-
-  unsigned offset = base % stride;
-  if (offset)
-    offset = stride - offset;
-
-  MemoryOpIx prevIx = instr.memOps_.at(0);
-
-  for (unsigned i = 1; i < instr.memOps_.size(); ++i)
-    {
-      auto opIx = instr.memOps_.at(i);
-
-      auto& op = sysMemOps_.at(opIx);
-      auto& prev = sysMemOps_.at(prevIx);
-      if (prev.pa_ < base)
-        {
-          // Read ops for masked off elems get an addr of 0.
-          prevIx = opIx;
-          continue;
-        }
-
-      if (op.elemIx_ != prev.elemIx_ or op.field_ != prev.field_ or op.time_ != prev.time_
-          or op.pa_ < prev.pa_)
-	{
-	  prevIx = opIx;
-	  continue;  // Not split from the same large read-op.
-	}
-
-      uint64_t dist = op.pa_ - prev.pa_;
-      dist += ((prev.pa_ + offset) % stride);
-
-      if (dist >= stride)
-        op.elemIx_ += dist / stride;
-    }
-}
-
-
 struct RefElemCoord
 {
   uint64_t addr = 0;
@@ -2616,9 +2546,6 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
   if (isUnitStride(info))
     return commitVecReadOpsUnitStride(hart, instr);
 
-  // Repair memory op indices and fields.
-  repairVecReadOps(hart, instr);
-
   // Special case. Test bench sends a read for up to one element for this case.
   if (info.isStrided_ and info.stride_ == 0)
     return commitVecReadOpsStride0(hart, instr);
@@ -2837,9 +2764,6 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
   McmInstr* instr = findInstr(hartIx, tag);
   if (not instr or instr->isCanceled())
     return false;
-
-  if (isVector)
-    repairVecReadOps(hart, *instr);
 
   // We expect Mcm::retire to be called after this method is called.
   if (instr->isRetired())
