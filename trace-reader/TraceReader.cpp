@@ -39,6 +39,7 @@ static std::unordered_map<std::string, HeaderTag> headerMap = {
   {"pmp",             HeaderTag::Pmp}
 };
 
+static const unsigned cacheLineSize = 64;
 
 TraceReader::TraceReader(const std::string& inputPath)
   : intRegs_(32), fpRegs_(32), csRegs_(4096), vecRegs_(32),
@@ -238,6 +239,8 @@ TraceRecord::print(std::ostream& os) const
     os << " trap=" << std::hex << trap;
   if (not assembly.empty())
     os << " disas=\"" << assembly << '"';
+  if (dataSize)
+    os << " dataSize=" << std::dec << unsigned(dataSize);
   os << '\n';
 
   if (not hasTrap and (instType == 'j' or instType == 'c' or instType == 't'
@@ -744,6 +747,8 @@ determineDataSize(TraceRecord& record, const std::vector<uint64_t>& csRegs)
 {
   if (record.instType == 'v')
     determineVecDataSize(record, csRegs.at(0xc21));
+  else if (record.isCmo())
+    record.dataSize = cacheLineSize;
   else
     {
       if (record.instSize == 4)
