@@ -535,6 +535,9 @@ Args::parseCmdLineArgs(std::span<char*> argv)
         ("noconinput", po::bool_switch(&this->noConInput),
          "Do not use console IO address for input. Loads from the console io address "
          "simply return last value stored there.")
+        ("instlist", po::bool_switch(&this->instList),
+         "List the instructions of the extensions specified by --isa or the \"isa\" configuration"
+         "tag")
 	("verbose,v", po::bool_switch(&this->verbose),
 	 "Be verbose.")
 	("version", po::bool_switch(&this->version),

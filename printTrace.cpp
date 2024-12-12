@@ -930,5 +930,23 @@ Hart<URV>::logStop(const CoreException& ce, uint64_t counter, FILE* traceFile)
 }
 
 
+template <typename URV>
+void
+Hart<URV>::printInstructions(FILE* file) const
+{
+  for (unsigned i = 0; i <= unsigned(InstId::maxId); ++i)
+    {
+      InstId id = InstId(i);
+      auto& entry = decoder_.getInstructionEntry(id);
+      auto extension = entry.extension();
+      if (isa_.isEnabled(extension))
+        {
+          auto name = entry.name();
+          fprintf(file, "%s\n", name.data());
+        }
+    }
+}
+
+
 template class WdRiscv::Hart<uint32_t>;
 template class WdRiscv::Hart<uint64_t>;

@@ -85,7 +85,7 @@ Session<URV>::defineSystem(const Args& args, const HartConfig& config)
 #ifdef LZ4_COMPRESS
       and args.lz4Files.empty()
 #endif
-      and not args.interactive)
+      and not args.interactive and not args.instList)
     {
       std::cerr << "No program file specified.\n";
       return nullptr;
@@ -1191,6 +1191,13 @@ bool
 Session<URV>::run(const Args& args)
 {
   auto& system = *system_;
+
+  if (args.instList)
+    {
+      auto& hart = *(system_ -> ithHart(0));
+      hart.printInstructions(stdout);
+      return true;
+    }
 
   if (not loadTracerLibrary<URV>(args.tracerLib))
     return false;

@@ -2393,6 +2393,9 @@ namespace WdRiscv
     bool isVectorTailAgnostic() const
     { return vecRegs_.isTailAgnostic(); }
 
+    /// Print the instructions of the extensions in the ISA string.
+    void printInstructions(FILE* file) const;
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.

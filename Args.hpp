@@ -153,6 +153,7 @@ namespace WdRiscv
     bool reportub = false;         // Report used blocks with sparse memory.
     bool quitOnAnyHart = false;    // True if run quits when any hart finishes.
     bool noConInput = false;       // If true console io address is not used for input.
+    bool instList = false;         // Print instruction of extensions in isa string if true.
     bool relativeInstCount = false;
     bool tracePtw = false;   // Enable printing of page table walk info in log.
     bool shm = false;        // Enable shared memory IPC for server mode (default is socket).
