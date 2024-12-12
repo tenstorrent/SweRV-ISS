@@ -2543,7 +2543,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
   // Map a reference address/elem-ix to a flag indicating if elem is covered by a read op.
   std::unordered_map<RefElemCoord, bool> addrMap;
 
-  // Check for overlap between elements. Collect reference byte addresses in addrMap.
+  // Collect reference byte addresses in addrMap.
   for (auto& ref : vecRefs.refs_)
     {
       for (unsigned i = 0; i < ref.size_; ++i)
@@ -2785,7 +2785,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
   if (isVector)
     {
       const VecLdStInfo& info = hart.getLastVectorMemory();
-      if (info.isStrided_ and info.stride_ == 0)
+      if (info.isStrided_ and info.stride_ == 0 and info.fields_ == 0)
         {
           for (auto& elem : info.elems_)
             if (not elem.skip_ and elem.ix_ < elemIx)
