@@ -4931,7 +4931,7 @@ template <typename URV>
 bool
 Mcm<URV>::ioPpoChecks(Hart<URV>& hart, const McmInstr& instrB) const
 {
-  return true;
+  // return true;
 
   // We check that IO memory operations are never reordered. This is stronger
   // that what is required by the spec. We will eventually relax this for
