@@ -232,20 +232,21 @@ namespace WdRiscv
     void enableTso(bool flag)
     { isTso_ = flag; }
 
-    /// Return the earliest memory time for the byte at the given
-    /// address. Return 0 if address is not covered by given instruction.
+    /// Return the earliest memory time for the byte at the given address. Return 0 if
+    /// address is not covered by given instruction.
     uint64_t earliestByteTime(const McmInstr& instr, uint64_t addr) const;
 
-    /// Return the earliest memory time for the byte at the given
-    /// address given an element index.
-    /// Return 0 if address is not covered by given instruction.
-    uint64_t earliestByteTime(const McmInstr& instr, uint64_t addr,
-                              unsigned elemIx) const;
+    /// Return the earliest memory time for the byte at the given address and given element
+    /// index.  Return 0 if address is not covered by given instruction.
+    uint64_t earliestByteTime(const McmInstr& instr, uint64_t addr, unsigned ix) const;
 
-    /// Return the latest memory time for the byte at the given
-    /// address. Return max value if address is not covered by given
-    /// instruction.
+    /// Return the latest memory time for the byte at the given address. Return max value
+    /// if address is not covered by given instruction.
     uint64_t latestByteTime(const McmInstr& instr, uint64_t addr) const;
+
+    /// Return the latest memory time for the byte at the given address and given element
+    /// index. Return max value if address is not covered by given instruction.
+    uint64_t latestByteTime(const McmInstr& instr, uint64_t addr, unsigned ix) const;
 
     /// Return the effective earliest memory time for the byte at the given
     /// address. Return 0 if address is not covered by given instruction.

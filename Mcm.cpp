@@ -351,6 +351,17 @@ Mcm<URV>::getLdStIndexVectors(const Hart<URV>& hart, const McmInstr& instr,
 }
 
 
+static bool isUnitStride(const VecLdStInfo& info)
+{
+  if (info.isIndexed_)
+    return false;
+  if (not info.isStrided_)
+    return true;
+  unsigned nf = info.fields_ == 0 ? 1 : info.fields_;
+  return nf * info.elemSize_ == info.stride_;
+}
+
+
 template <typename URV>
 void
 Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr)
@@ -362,6 +373,9 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
   unsigned elemSize = info.elemSize_;
   assert(elemSize != 0);
   unsigned elemsPerVec = hart.vecRegSize() / elemSize;
+
+  bool unitStride = isUnitStride(info);
+  bool stride0 = info.isStrided_ and info.stride_ == 0 and info.fields_ == 0;
 
   unsigned hartIx = hart.sysHartIndex();
 
@@ -403,8 +417,14 @@ Mcm<URV>::updateVecLoadDependencies(const Hart<URV>& hart, const McmInstr& instr
       for (unsigned i = 0; i < size; ++i)
 	{
 	  uint64_t addr = i < size1 ? pa1 + i : pa2 + i - size1;
-          // FIXME: match on element index and field
-	  auto byteTime = latestByteTime(instr, addr);
+	  uint64_t byteTime = 0;
+
+          // For strided with stride=0, test-bench sends one read for all indices.
+          // Don't use element index for that case.
+          if (unitStride or stride0)
+            byteTime = latestByteTime(instr, addr);
+          else
+            byteTime = latestByteTime(instr, addr, elem.ix_);
 	  regTime = std::max(byteTime, regTime);
 	}
 
@@ -988,17 +1008,6 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa,
     }
 
   return result;
-}
-
-
-static bool isUnitStride(const VecLdStInfo& info)
-{
-  if (info.isIndexed_)
-    return false;
-  if (not info.isStrided_)
-    return true;
-  unsigned nf = info.fields_ == 0 ? 1 : info.fields_;
-  return nf * info.elemSize_ == info.stride_;
 }
 
 
@@ -2528,7 +2537,7 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
     return commitVecReadOpsUnitStride(hart, instr);
 
   // Special case. Test bench sends a read for up to one element for this case.
-  if (info.isStrided_ and info.stride_ == 0)
+  if (info.isStrided_ and info.stride_ == 0 and info.fields_ == 0)
     return commitVecReadOpsStride0(hart, instr);
 
   // Map a reference address/elem-ix to a flag indicating if elem is covered by a read op.
@@ -3326,8 +3335,7 @@ Mcm<URV>::earliestByteTime(const McmInstr& instr, uint64_t addr, unsigned elemIx
     if (opIx < sysMemOps_.size())
       {
 	const auto& op = sysMemOps_.at(opIx);
-	if (op.pa_ <= addr and (addr < op.pa_ + op.size_) and
-            op.elemIx_ == elemIx)
+        if (op.pa_ <= addr and (addr < op.pa_ + op.size_) and op.elemIx_ == elemIx)
 	  {
 	    time = found? std::min(time, op.time_) : op.time_;
 	    found = true;
@@ -3350,6 +3358,28 @@ Mcm<URV>::latestByteTime(const McmInstr& instr, uint64_t addr) const
       {
 	const auto& op = sysMemOps_.at(opIx);
 	if (op.pa_ <= addr and addr < op.pa_ + op.size_)
+	  {
+	    time = found? std::max(time, op.time_) : op.time_;
+	    found = true;
+	  }
+      }
+
+  return time;
+}
+
+
+template <typename URV>
+uint64_t
+Mcm<URV>::latestByteTime(const McmInstr& instr, uint64_t addr, unsigned elemIx) const
+{
+  uint64_t time = ~uint64_t(0);
+  bool found = false;
+
+  for (auto opIx : instr.memOps_)
+    if (opIx < sysMemOps_.size())
+      {
+	const auto& op = sysMemOps_.at(opIx);
+	if (op.pa_ <= addr and addr < op.pa_ + op.size_ and op.elemIx_ == elemIx)
 	  {
 	    time = found? std::max(time, op.time_) : op.time_;
 	    found = true;
@@ -4916,7 +4946,7 @@ Mcm<URV>::ioPpoChecks(Hart<URV>& hart, const McmInstr& instrB) const
   for (auto opIx : instrB.memOps_)
     {
       auto& op = sysMemOps_.at(opIx);
-      if (not op.isIo_  and  not op.canceled_)
+      if (op.isIo_  and  not op.canceled_)
 	{
 	  if (op.isRead_)
 	    earlyRead = std::min(earlyRead, op.time_);
