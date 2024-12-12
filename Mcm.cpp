@@ -991,6 +991,17 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa,
 }
 
 
+static bool isUnitStride(const VecLdStInfo& info)
+{
+  if (info.isIndexed_)
+    return false;
+  if (not info.isStrided_)
+    return true;
+  unsigned nf = info.fields_ == 0 ? 1 : info.fields_;
+  return nf * info.elemSize_ == info.stride_;
+}
+
+
 template <typename URV>
 bool
 Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
@@ -1009,8 +1020,6 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
       instr.isStore_ = true;
 
       auto& vecRefs = hartData_.at(hartIx).vecRefMap_[instr.tag_];
-      std::unordered_set<uint64_t> byteCover;
-      bool hasOverlap = false;
 
       for (auto& elem : elems)
         {
@@ -1025,14 +1034,6 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	  if (pa1 == pa2)
             {
               vecRefs.add(elem.ix_, pa1, value, elemSize, dataReg, ixReg, elem.field_);
-              if (not hasOverlap)
-                {
-                  for (unsigned i = 0; i < elemSize; ++i)
-                    {
-                      hasOverlap = hasOverlap or byteCover.contains(pa1 + i);
-                      byteCover.insert(pa1 + i);
-                    }
-                }
             }
 	  else
 	    {
@@ -1043,25 +1044,13 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	      uint64_t val2 = (value >> (size1*8));
 	      vecRefs.add(elem.ix_, pa1, val1, size1, dataReg, ixReg, elem.field_);
 	      vecRefs.add(elem.ix_, pa2, val2, size2, dataReg, ixReg, elem.field_);
-
-              if (not hasOverlap)
-                {
-                  for (unsigned i = 0; i < size1; ++i)
-                    {
-                      hasOverlap = hasOverlap or byteCover.contains(pa1 + i);
-                      byteCover.insert(pa1 + i);
-                    }
-                  for (unsigned i = 0; i < size2; ++i)
-                    {
-                      hasOverlap = hasOverlap or byteCover.contains(pa2 + i);
-                      byteCover.insert(pa2 + i);
-                    }
-                }
 	    }
         }
 
       instr.complete_ = checkStoreComplete(hartIx, instr);
-      instr.hasOverlap_ = hasOverlap;
+
+      // This is conservative as it is possible for a non-unit-stride to have no overlap.
+      instr.hasOverlap_ = not isUnitStride(info);
     }
   else
     {
@@ -2295,17 +2284,6 @@ Mcm<URV>::collectVecRefElems(Hart<URV>& hart, McmInstr& instr, unsigned& activeC
       else
 	vecRefs.add(elem.ix_, ea1, 0, size1, dataReg, ixReg, elem.field_);
     }
-}
-
-
-static bool isUnitStride(const VecLdStInfo& info)
-{
-  if (info.isIndexed_)
-    return false;
-  if (not info.isStrided_)
-    return true;
-  unsigned nf = info.fields_ == 0 ? 1 : info.fields_;
-  return nf * info.elemSize_ == info.stride_;
 }
 
 

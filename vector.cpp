@@ -12928,7 +12928,10 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   unsigned group = groupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemCount, elemSize, vd, group, false /*isLoad*/);
+  if (di->isVectorStoreStrided())
+    ldStInfo.initStrided(elemCount, elemSize, vd, group, stride, false /*isLoad*/);
+  else
+    ldStInfo.init(elemCount, elemSize, vd, group, false /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
