@@ -95,13 +95,13 @@ namespace WdRiscv
       if (address + sizeof(T) > size_)
         return false;
 #else
-      Pma pma1 = pmaMgr_.getPma(address);
+      Pma pma1 = pmaMgr_.accessPma(address, PmaManager::AccessReason::LdSt);
       if (not pma1.isRead())
 	return false;
 
       if (address & (sizeof(T) - 1))  // If address is misaligned
 	{
-          Pma pma2 = pmaMgr_.getPma(address + sizeof(T) - 1);
+          Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1, PmaManager::AccessReason::LdSt);
           if (not pma2.isRead())
             return false;
         }
@@ -223,13 +223,13 @@ namespace WdRiscv
       *(reinterpret_cast<T*>(data_ + address)) = value;
 #else
 
-      Pma pma1 = pmaMgr_.getPma(address);
+      Pma pma1 = pmaMgr_.accessPma(address, PmaManager::AccessReason::LdSt);
       if (not pma1.isWrite())
 	return false;
 
       if (address & (sizeof(T) - 1))  // If address is misaligned
 	{
-          Pma pma2 = pmaMgr_.getPma(address + sizeof(T) - 1);
+          Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1, PmaManager::AccessReason::LdSt);
           if (pma1 != pma2)
 	    return false;
 	}
