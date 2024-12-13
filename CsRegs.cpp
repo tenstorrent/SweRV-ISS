@@ -5068,7 +5068,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       URV val = hie->read() & hieMask;
       URV mieVal = (mie->read() & ~hieMask) | val;
       updateCsr(mie, mieVal);
-      updateCsr(vsie, vsInterruptToS(val));
+      updateCsr(vsie, (vsie->read() & ~URV(0x1fff)) | vsInterruptToS(val));
     }
   else if (num == CsrNumber::MIE)
     {
@@ -5282,7 +5282,7 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 	{
 	  if (hideleg)
 	    val &= hideleg->read();
-          vsie->poke(vsInterruptToS(val));
+          vsie->poke((vsie->read() & ~URV(0x1fff)) | vsInterruptToS(val));
 	}
     }
   else if (num == CsrNumber::MIE)
