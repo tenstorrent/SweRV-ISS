@@ -70,7 +70,8 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
+      if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/) or
+          ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, false /*isLoad*/))
 	{
 	  dataAddrTrig_ = not triggerTripped_;
 	  triggerTripped_ = true;
@@ -138,7 +139,8 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
+      if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/) or
+          ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, false /*isLoad*/))
 	{
 	  dataAddrTrig_ = not triggerTripped_;
 	  triggerTripped_ = true;
