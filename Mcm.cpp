@@ -134,10 +134,9 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsi
   if (instr->isCanceled())
     return true;
 
-  bool io = false;  // FIX  get io from PMA of address.
-  if (instr->isRetired() and not io)
-    cerr << "Warning: Read op time=" << time << " occurs after "
-	 << "instruction retires tag=" << instr->tag_ << '\n';
+  if (instr->isRetired() and not hart.getPma(pa).isIo())
+    cerr << "Warning: hart-id=" << hart.hartId() << " time=" << time <<
+         " tag=" << tag << " read-op seen after instruction retires\n";
 
   MemoryOp op = {};
   op.time_ = time;
@@ -2379,7 +2378,7 @@ Mcm<URV>::commitVecReadOpsStride0(Hart<URV>& hart, McmInstr& instr)
               uint8_t refVal = op.data_ >> (offset*8);
               uint8_t rtlVal = op.rtlData_ >> (offset*8);
 
-              if (false and refVal != rtlVal)    // FIX Enable when RTL/TB is fixed.
+              if (refVal != rtlVal)
                 {
                   if (matched)
                     printReadMismatch(hart, op.time_, op.tag_, byteAddr, op.size_, rtlVal, refVal);
@@ -4932,7 +4931,7 @@ template <typename URV>
 bool
 Mcm<URV>::ioPpoChecks(Hart<URV>& hart, const McmInstr& instrB) const
 {
-  return true;
+  // return true;
 
   // We check that IO memory operations are never reordered. This is stronger
   // that what is required by the spec. We will eventually relax this for

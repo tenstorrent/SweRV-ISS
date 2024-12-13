@@ -9202,6 +9202,8 @@ Hart<URV>::vmvr_v(const DecodedInst* di, unsigned nr)
 
       unsigned groupX8 = nr*8;
       vecRegs_.touchReg(vd, groupX8);
+
+      vecRegs_.setOpEmul(nr, nr);  // Track operand group for logging
     }
 
   postVecSuccess();
