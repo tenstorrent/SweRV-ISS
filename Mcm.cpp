@@ -1256,7 +1256,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
     }
 
   if (instr->isLoad_)
-    ok = checkLoadVsPriorCmo(hart, *instr);
+    ok = checkLoadVsPriorCmo(hart, *instr) and ok;
 
   if (isEnabled(PpoRule::R2))
     ok = ppoRule2(hart, *instr) and ok;
