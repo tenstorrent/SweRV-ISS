@@ -160,7 +160,9 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsi
   instr->addMemOp(sysMemOps_.size());
   sysMemOps_.push_back(op);
   instr->isLoad_ = true;
-  instr->complete_ = checkLoadComplete(*instr);
+
+  if (instr->retired_)
+    instr->complete_ = checkLoadComplete(*instr);
 
   return true;
 }
@@ -1215,7 +1217,10 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
     }
 
   if (instr->isLoad_)
-    ok = commitReadOps(hart, *instr);
+    {
+      ok = commitReadOps(hart, *instr);
+      instr->complete_ = checkLoadComplete(*instr);
+    }
 
   if (instr->di_.instId() == InstId::sfence_vma)
     {
@@ -2331,21 +2336,25 @@ template <typename URV>
 bool
 Mcm<URV>::commitVecReadOpsStride0(Hart<URV>& hart, McmInstr& instr)
 {
-  // Special case: strided with a stride of 0. All we need is for 1 element to be covered.
-
+  // Special case: strided with a stride of 0. All we need is for the elements at one
+  // active index to be covered.  The reference elements vector begins with the 1st active
+  // element. We process vecRefs[0].
   auto& vecRefs = hartData_.at(hart.sysHartIndex()).vecRefMap_[instr.tag_];
 
   auto& info = hart.getLastVectorMemory();
   unsigned nfields = info.fields_ == 0 ? 1 : info.fields_;
   unsigned elemSize = info.elemSize_;
 
-  bool matched = false;   // True until a mismatch.
+  bool matched = true;   // True until a mismatch.
   instr.complete_ = true;  // True until byte not covered.
 
   // Process read ops in reverse order. Trim each op to the reference addresses. Keep ops
   // (marking them as not canceled) where at least one address remains. Mark reference
   // addresses covered by read ops. Set reference (Whisper) values of reference addresses.
   auto& ops = instr.memOps_;
+
+  // Process all the fields of the 1st active element.
+  unsigned elemIx = vecRefs.refs_.front().ix_;  // This is the same for all the fields.
 
   for (unsigned field = 0; field < nfields; ++field)
     {
@@ -2368,7 +2377,7 @@ Mcm<URV>::commitVecReadOpsStride0(Hart<URV>& hart, McmInstr& instr)
                 continue;   // Byte covered by a another read op.
 
               uint64_t byteAddr = vecRef.pa_ + i;  // TODO handle page crosser
-              if (not op.overlaps(byteAddr))
+              if (not vecReadOpOverlapsElemByte(op, byteAddr, elemIx, field, elemSize))
                 continue;
 
               mask &= ~byteMask;
@@ -2831,7 +2840,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
 	  const auto& op = sysMemOps_.at(*iter);
           if (isVector and not unitStride and
               not vecReadOpOverlapsElemByte(op, byteAddr, elemIx, field, elemSize))
-            continue;  // Vector non-unit-stride ops must matc element index.
+            continue;  // Vector non-unit-stride ops must match element index.
 
           uint8_t byte = 0;
           if (not op.getModelReadOpByte(byteAddr, byte))
