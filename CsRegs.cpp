@@ -763,6 +763,18 @@ CsRegs<URV>::updateSstc()
 	findCsr(CsrNumber::STIMECMPH)->setHypervisor(noVs);
     }
 
+  // If henvcfg.VSTCE is cleared, we also clear the VSTIP bit. This is
+  // unspecified behavior and we do this to match RTL.
+  auto mip = findCsr(CsrNumber::MIP);
+  if (mip and not hstce)
+    {
+      URV mask = URV(1) << URV(InterruptCause::VS_TIMER);
+      auto hvip = findCsr(CsrNumber::HVIP);
+      URV vstip = hvip? hvip->read() : 0;
+      mip->poke((mip->read() & ~mask) | vstip);
+      hyperWrite(mip);
+    }
+
   auto hip = findCsr(CsrNumber::HIP);
   if (hip)
     {
