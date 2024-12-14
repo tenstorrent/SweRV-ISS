@@ -763,6 +763,18 @@ CsRegs<URV>::updateSstc()
 	findCsr(CsrNumber::STIMECMPH)->setHypervisor(noVs);
     }
 
+  // If henvcfg.VSTCE is cleared, we also clear the VSTIP bit. This is
+  // unspecified behavior and we do this to match RTL.
+  auto mip = findCsr(CsrNumber::MIP);
+  if (mip and not hstce)
+    {
+      URV mask = URV(1) << URV(InterruptCause::VS_TIMER);
+      auto hvip = findCsr(CsrNumber::HVIP);
+      URV vstip = hvip? hvip->read() : 0;
+      mip->poke((mip->read() & ~mask) | vstip);
+      hyperWrite(mip);
+    }
+
   auto hip = findCsr(CsrNumber::HIP);
   if (hip)
     {
@@ -5068,7 +5080,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       URV val = hie->read() & hieMask;
       URV mieVal = (mie->read() & ~hieMask) | val;
       updateCsr(mie, mieVal);
-      updateCsr(vsie, vsInterruptToS(val));
+      updateCsr(vsie, (vsie->read() & ~URV(0x1fff)) | vsInterruptToS(val));
     }
   else if (num == CsrNumber::MIE)
     {
@@ -5282,7 +5294,7 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 	{
 	  if (hideleg)
 	    val &= hideleg->read();
-          vsie->poke(vsInterruptToS(val));
+          vsie->poke((vsie->read() & ~URV(0x1fff)) | vsInterruptToS(val));
 	}
     }
   else if (num == CsrNumber::MIE)
