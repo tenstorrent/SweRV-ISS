@@ -3806,6 +3806,7 @@ CsRegs<URV>::pokeTrigger(CsrNumber number, URV value)
 }
 
 
+// From section 5.1 of the AIA spec.
 static std::vector<unsigned> iidPrioTable =
 {
 47u, 23u, 46u, 45u, 22u, 44u, 43u, 21u, 42u, 41u, 20u, 40u,
@@ -3912,14 +3913,18 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
             {
               unsigned iid = highestIidPrio(vs & ~(URV(1) << unsigned(IC::S_EXTERNAL)));
               if (iid)
-                value = (iid << 16) | (hvf.bits_.IPRIOM? 0 : 1);
+                {
+                  value = (iid << 16) | (hvf.bits_.IPRIOM? prio : 1);
+                  if (not higherIidPrio(iid, unsigned(IC::S_EXTERNAL))) // hviprio is always 0
+                    prio = 256;
+                }
             }
           else if (hvf.bits_.IID != unsigned(IC::S_EXTERNAL))
             {
               prio = hvf.bits_.IPRIO;
               value = (hvf.bits_.IID << 16) | (hvf.bits_.IPRIOM? prio : 1);
-              if (not hvf.bits_.DPR)
-                return true;
+              if (hvf.bits_.DPR and not prio)
+                prio = 256;
             }
 
           URV prio2 = 0;
@@ -3991,13 +3996,21 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
 
           // if prio == 0, then adjust based on relative priority
           // compared to S_EXTERNAL
-          if (not prio and hvf.bits_.IPRIOM)
+          if ((not prio or (prio == 256)) and hvf.bits_.IPRIOM)
             {
-              unsigned iid = value >> 16;
-              assert(iid != unsigned(IC::S_EXTERNAL));
-              assert((value & 0xff) == 0);
-              if (not higherIidPrio(iid, unsigned(IC::S_EXTERNAL)))
-                value |= 255;
+              if (prio == 256)
+                {
+                  value &= ~URV(0xff);
+                  value |= 255;
+                }
+              else
+                {
+                  unsigned iid = value >> 16;
+                  assert(iid != unsigned(IC::S_EXTERNAL));
+                  assert((value & 0xff) == 0);
+                  if (not higherIidPrio(iid, unsigned(IC::S_EXTERNAL)))
+                    value |= 255;
+                }
             }
         }
 

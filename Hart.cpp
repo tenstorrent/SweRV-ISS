@@ -5471,7 +5471,7 @@ Hart<URV>::setPerfApi(std::shared_ptr<TT_PERF::PerfApi> perfApi)
 
 template <typename URV>
 bool
-Hart<URV>::isInterruptPossible(URV mip, URV sip, URV vsip, InterruptCause& cause, PrivilegeMode& nextMode, bool& nextVirt) const
+Hart<URV>::isInterruptPossible(URV mip, URV sip, [[maybe_unused]] URV vsip, InterruptCause& cause, PrivilegeMode& nextMode, bool& nextVirt) const
 {
   if (debugMode_)
     return false;
@@ -5541,16 +5541,35 @@ Hart<URV>::isInterruptPossible(URV mip, URV sip, URV vsip, InterruptCause& cause
   if (not vsEnabled)
     return false;
 
-  URV vsdest = vsip & effectiveVsie_;
-  if (vsdest)
+  if (not isRvaia())
     {
-      // Only VS interrupts can be delegated in HIDELEG.
-      for (InterruptCause ic : { IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER, IC::LCOF } )
+      URV vsdest = vsip & effectiveVsie_;
+      if (vsdest)
         {
-          URV mask = URV(1) << unsigned(ic);
-          if ((vsdest & mask) != 0)
+          // Only VS interrupts can be delegated in HIDELEG.
+          for (InterruptCause ic : { IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER, IC::LCOF } )
             {
-              cause = ic;
+              URV mask = URV(1) << unsigned(ic);
+              if ((vsdest & mask) != 0)
+                {
+                  cause = ic;
+                  nextMode = PM::Supervisor;
+                  nextVirt = true;
+                  return true;
+                }
+            }
+        }
+    }
+  else
+    {
+      URV vstopi;
+      if (csRegs_.readTopi(CsrNumber::VSTOPI, vstopi, false))
+        {
+          if (vstopi)
+            {
+              // FIXME: This might be buggy because IID does not have
+              // to be a standard interrupt.
+              cause = static_cast<InterruptCause>(vstopi >> 16);
               nextMode = PM::Supervisor;
               nextVirt = true;
               return true;
