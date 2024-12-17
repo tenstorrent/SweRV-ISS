@@ -87,6 +87,15 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "ssqosid", RvExtension::Ssqosid },
   { "sdtrig", RvExtension::Sdtrig },
   { "zicfilp", RvExtension::Zicfilp },
+  { "zic64b", RvExtension::Zic64b },
+  { "ziccamoa", RvExtension::Ziccamoa },
+  { "ziccif", RvExtension::Ziccif },
+  { "zicclsm", RvExtension::Zicclsm },
+  { "ziccrse", RvExtension::Ziccrse },
+  { "za64rs", RvExtension::Za64rs },
+  { "zaamo", RvExtension::Zaamo },
+  { "zalrsc", RvExtension::Zalrsc },
+  { "zihintntl", RvExtension::Zihintntl },
 });
 static_assert(STRING_EXT_PAIRS.size() == static_cast<unsigned>(RvExtension::None));
 
@@ -111,24 +120,26 @@ const std::array<std::string_view, Isa::extIx(RvExtension::None)> Isa::extToStri
 
 Isa::Isa()
 {
-  infoVec_.at(extIx(RvExtension::A)) = Info{ {{2,0}}, {2,0} };
-  infoVec_.at(extIx(RvExtension::B)) = Info{ {{0,93}}, {0,93} };
+  infoVec_.at(extIx(RvExtension::A)) = Info{ {{2,0}, {2,1}}, {2,1} };
+  infoVec_.at(extIx(RvExtension::B)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::C)) = Info{ {{1,0}, {2,0}}, {1,0} };
-  infoVec_.at(extIx(RvExtension::D)) = Info{ {{2,0}}, {2,0} };
+  infoVec_.at(extIx(RvExtension::D)) = Info{ {{2,2}}, {2,2} };
   infoVec_.at(extIx(RvExtension::E)) = Info{ {{2,0}}, {2,0} };
-  infoVec_.at(extIx(RvExtension::F)) = Info{ {{2,0}}, {2,0} };
+  infoVec_.at(extIx(RvExtension::F)) = Info{ {{2,2}}, {2,2} };
   infoVec_.at(extIx(RvExtension::H)) = Info{ {{1,0}}, {1,0} };
-  infoVec_.at(extIx(RvExtension::I)) = Info{ {{2,0}}, {2,0} };
+  infoVec_.at(extIx(RvExtension::I)) = Info{ {{2,0}, {2,1}}, {2,1} };
   infoVec_.at(extIx(RvExtension::M)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::S)) = Info{ {{1,2}}, {1,2} };
   infoVec_.at(extIx(RvExtension::U)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::V)) = Info{ {{1,0}}, {1,0} };
-  infoVec_.at(extIx(RvExtension::Zba)) = Info{ {{0,93}}, {0,93} };
-  infoVec_.at(extIx(RvExtension::Zbb)) = Info{ {{0,93}}, {0,93} };
-  infoVec_.at(extIx(RvExtension::Zbc)) = Info{ {{0,93}}, {0,93} };
-  infoVec_.at(extIx(RvExtension::Zbs)) = Info{ {{0,93}}, {0,93} };
-  infoVec_.at(extIx(RvExtension::Zfh)) = Info{ {{0,1}}, {0,1} };
-  infoVec_.at(extIx(RvExtension::Zfhmin)) = Info{ {{0,1}}, {0,1} };
+  infoVec_.at(extIx(RvExtension::Zba)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zbb)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zbc)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zbs)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zfh)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zcb)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zfa)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zfhmin)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zlsseg)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zknd)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zkne)) = Info{ {{1,0}}, {1,0} };
@@ -145,11 +156,16 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zicbop)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zawrs)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zmmul)) = Info{ {{1,0}}, {1,0} };
-  infoVec_.at(extIx(RvExtension::Zvfh)) = Info{ {{0,1}}, {0,1} };
-  infoVec_.at(extIx(RvExtension::Zvfhmin)) = Info{ {{0,1}}, {0,1} };
-  infoVec_.at(extIx(RvExtension::Zfbfmin)) = Info{ {{0,8}}, {0,8} };
-  infoVec_.at(extIx(RvExtension::Zvfbfmin)) = Info{ {{0,8}}, {0,8} };
-  infoVec_.at(extIx(RvExtension::Zvfbfwma)) = Info{ {{0,8}}, {0,8} };
+  infoVec_.at(extIx(RvExtension::Zvfh)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zvkb)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zvkg)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zicond)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zvfhmin)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zfbfmin)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zvfbfmin)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zvfbfwma)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zvbb)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zvbc)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zvqdot)) = Info{ {{0,1}}, {0,1} };
   infoVec_.at(extIx(RvExtension::Sstc)) = Info{ {{0,5}}, {0,5} };
   infoVec_.at(extIx(RvExtension::Svpbmt)) = Info{ {{1,0}}, {1,0} };
@@ -165,7 +181,7 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zicntr)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::Zihpm)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::Zifencei)) = Info{ {{2,0}}, {2,0} };
-  infoVec_.at(extIx(RvExtension::Zihintpause)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zihintpause)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::Smmpm)) = Info { {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Ssnpm)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Smnpm)) = Info{ {{1,0}}, {1,0} };
@@ -173,6 +189,15 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Ssqosid)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Sdtrig)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zicfilp)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zic64b)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Ziccamoa)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Ziccif)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zicclsm)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Ziccrse)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Za64rs)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zaamo)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zalrsc)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zihintntl)) = Info{ {{1,0}}, {1,0} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
 }
@@ -314,39 +339,41 @@ parseIsa(const std::string_view& token, std::string_view& extension,
       return false;
     }
 
-  size_t ix = 0;
-  for ( ; ix < token.size(); ++ix)
-    if (std::isdigit(token.at(ix)))
-      break;
-  extension = token.substr(0, ix);
+  size_t len = token.size();
 
-  version = token.substr(ix);
-  if (version.empty())
-    return true;
+  // Look for first non-digit from the end of the token.
+  unsigned ix = len;
+  while (ix > 0 and std::isdigit(token.at(ix - 1)))
+    ix--;
 
-  for (ix = 0; ix < version.size(); ++ix)
+  if (ix == len or ix == 0)
     {
-      if (std::isdigit(version.at(ix)))
-	continue;
-      if (version.at(ix) != 'p')
-	{
-	  std::cerr << "Invalid ISA extension: " << token << '\n';
-	  return false;
-	}
-      subversion = version.substr(ix+1);
-      version = version.substr(0, ix);
-      break;
+      extension = token;   // No digits at end of token.
+      return true;
     }
 
-  if (subversion.empty())
-    return true;
+  if (token.at(ix - 1) != 'p')    // Trailing digits but no 'p'
+    {
+      std::cerr << "Invalid ISA extension: " << token << '\n';
+      return false;
+    }
 
-  for (size_t ix = 0; ix < subversion.size(); ++ix)
-    if (not std::isdigit(subversion.at(ix)))
-      {
-	std::cerr << "Invalid ISA extension: " << token << '\n';
-	return false;
-      }
+  size_t pIx = ix - 1;
+
+  // Skip all the digits before 'p'
+  ix = pIx;
+  while (ix > 0 and std::isdigit(token.at(ix - 1)))
+    ix--;
+
+  if (ix == 0 or ix == pIx)      // Token is:  <digits>p<digits>  or <string>p<digits>
+    {
+      std::cerr << "Invalid ISA extension: " << token << '\n';
+      return false;
+    }
+
+  extension = token.substr(0, ix);
+  version = token.substr(ix, pIx - ix);
+  subversion = token.substr(pIx + 1);
 
   return true;
 }
@@ -496,8 +523,7 @@ Isa::applyIsaString(std::string_view isaStr)
       RVE ext = stringToExtension(extension);
       if (ext == RVE::None)
 	{
-	  std::cerr << "Unknown extension: " << extension
-		    << " -- ignored\n";
+	  std::cerr << "Unknown extension: " << extension << " -- ignored\n";
 	  continue;
 	}
 
