@@ -4993,7 +4993,9 @@ Mcm<URV>::ioPpoChecks(Hart<URV>& hart, const McmInstr& instrB) const
 	}
     }
 
-#if 0
+  if (earlyWrite == inf)
+    return true;  // No IO write memory ops.
+
   // Check that all undrained IO ops belong to instructions that follow B in program
   // order.
   const auto& undrained = hartData_.at(hartIx).undrainedStores_;
@@ -5003,17 +5005,82 @@ Mcm<URV>::ioPpoChecks(Hart<URV>& hart, const McmInstr& instrB) const
     {
       if (tag >= instrB.tag_)
 	break;
-      const auto& instrA = instrVec.at(tag);
-      if (instrA.memOps_.empty())
-	;
 
-      // For each reference byte physical address of A.
-      //    If not address is IO continue
-      //    If adress is covered by a memory op of A continue
-      //    error
-      //    return false
+      const auto& instrA = instrVec.at(tag);
+
+      if (not instrA.di_.isVectorStore())
+        {
+          if (instrA.memOps_.empty())
+            {
+              cerr << "Error: IO PPO rule failed: hart-id=" << hart.hartId() << " tag1="
+                   << instrA.tag_ << " tag2=" << instrB.tag_ << " time1=inf"
+                   << " time2=" << earlyWrite << " type=write\n";
+              return false;
+            }
+
+          uint64_t pa1 = instrA.physAddr_, pa2 = instrA.physAddr2_;
+          unsigned size1 = instrA.size_;
+
+          if (pageNum(pa1) != pageNum(pa2))
+            size1 = offsetToNextPage(pa1);
+
+          // For each reference byte address of A.
+          for (unsigned i = 0; i < instrA.size_; ++i)
+            {
+              unsigned byteAddr = i < size1 ? pa1 + 1 : pa2 + i - size1;
+              if (not hart.getPma(byteAddr).isIo())
+                continue;   // Not an IO address
+
+              for (auto opIx: instrA.memOps_)
+                {
+                  auto& aop = sysMemOps_.at(opIx);
+                  if (aop.isRead_ or aop.overlaps(byteAddr))
+                    continue;
+
+                  // Byte addr not drained in A.
+                  cerr << "Error: IO PPO rule failed: hart-id=" << hart.hartId() << " tag1="
+                       << instrA.tag_ << " tag2=" << instrB.tag_ << " time1=inf"
+                       << " time2=" << earlyWrite << " type=write\n";
+                  return false;
+                }
+            }
+        }
+      else
+        {
+          auto& vecRefMap = hartData_.at(hartIx).vecRefMap_;
+          auto iter = vecRefMap.find(instrA.tag_);
+          if (iter == vecRefMap.end())
+            continue;   // No reference data in A.
+
+          auto& vecRefs = iter->second;
+          if (vecRefs.empty())
+            continue;   // No reference data in A.
+
+          // For each reference byte address of A.
+          for (auto& vecRef : vecRefs.refs_)
+            {
+              for (unsigned i = 0; i < vecRef.size_; ++i)
+                {
+                  uint64_t byteAddr = vecRef.pa_ + i;
+                  if (not hart.getPma(byteAddr).isIo())
+                    continue;  // Not an IO address
+
+                  for (auto opIx: instrA.memOps_)
+                    {
+                      auto aop = sysMemOps_.at(opIx);
+                      if (aop.isRead_ or aop.overlaps(byteAddr))
+                        continue;
+
+                      // Byte addr not drained in A.
+                      cerr << "Error: IO PPO rule failed: hart-id=" << hart.hartId() << " tag1="
+                           << instrA.tag_ << " tag2=" << instrB.tag_ << " time1=inf"
+                           << " time2=" << earlyWrite << " type=write\n";
+                      return false;
+                    }
+                }
+            }
+        }
     }
-#endif
 
   return true;
 }
