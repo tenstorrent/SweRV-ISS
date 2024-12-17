@@ -947,6 +947,9 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
   if (args.nmeVec)
     hart.defineNmiExceptionPc(*args.nmeVec);
 
+  if (args.hintOps)
+    hart.enableHintOps(args.hintOps);
+
   return errors == 0;
 }
 

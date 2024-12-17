@@ -159,5 +159,6 @@ namespace WdRiscv
     bool shm = false;        // Enable shared memory IPC for server mode (default is socket).
     bool logPerHart = false; // Enable separate log files for each hart.
     bool loadFromTrace = false;    // Enable loading trace information from snapshot.
+    bool hintOps = false;    // Enable HINT ops.
   };
 }

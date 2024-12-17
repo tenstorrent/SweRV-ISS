@@ -42,9 +42,6 @@ printVersion()
 #ifdef MEM_CALLBACKS
   std::cout << "MEM_CALLBACKS\n";
 #endif
-#ifdef HINT_OPS
-  std::cout << "HINT_OPS\n";
-#endif
 #ifdef PCI
   std::cout << "PCI\n";
 #endif
@@ -538,6 +535,8 @@ Args::parseCmdLineArgs(std::span<char*> argv)
         ("instlist", po::bool_switch(&this->instList),
          "List the instructions of the extensions specified by --isa or the \"isa\" configuration"
          "tag")
+        ("hintops", po::bool_switch(&this->hintOps),
+         "Enable whisper HINT ops.")
 	("verbose,v", po::bool_switch(&this->verbose),
 	 "Be verbose.")
 	("version", po::bool_switch(&this->version),

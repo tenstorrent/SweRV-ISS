@@ -399,6 +399,10 @@ namespace WdRiscv
     void enableSemihosting(bool flag)
     { semihostOn_ = flag; }
 
+    /// Enable whisper HINT ops for various functions.
+    void enableHintOps(bool flag)
+    { hintOps_ = flag; }
+
     /// Enable page based memory types.
     void enableTranslationPbmt(bool flag)
     { enableExtension(RvExtension::Svpbmt, flag); updateTranslationPbmt(); }
@@ -5548,6 +5552,8 @@ namespace WdRiscv
 
     bool semihostOn_ = false;
     uint64_t semihostSlliTag_ = 0;  // Tag (rank) of slli instruction.
+
+    bool hintOps_ = false; // Enable HINT ops.
 
     // For lockless handling of MIP. We assume the software won't
     // trigger multiple interrupts while handling. To be cleared when

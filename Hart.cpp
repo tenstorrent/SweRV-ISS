@@ -1137,16 +1137,17 @@ Hart<URV>::execAddi(const DecodedInst* di)
   SRV v = intRegs_.read(di->op1()) + imm;
   intRegs_.write(di->op0(), v);
 
-#ifdef HINT_OPS
-  if (di->op0() == 0 and di->op1() == 31)
-    throw CoreException(CoreException::Snapshot, "Taking snapshot from HINT.");
-  if (di->op0() == 0 and di->op1() == 30)
-    throw CoreException(CoreException::Stop, "Stopping run from HINT.");
-  if (di->op0() == 0 and di->op1() == 29)
-    throw CoreException(CoreException::SnapshotAndStop, "Taking snapshot and stopping run from HINT.");
-  if (di->op0() == 0 and di->op1() == 26)
-    std::cerr << "Executed instructions: " << instCounter_ << "\n";
-#endif
+  if (hintOps_)
+    {
+      if (di->op0() == 0 and di->op1() == 31)
+        throw CoreException(CoreException::Snapshot, "Taking snapshot from HINT.");
+      if (di->op0() == 0 and di->op1() == 30)
+        throw CoreException(CoreException::Stop, "Stopping run from HINT.");
+      if (di->op0() == 0 and di->op1() == 29)
+        throw CoreException(CoreException::SnapshotAndStop, "Taking snapshot and stopping run from HINT.");
+      if (di->op0() == 0 and di->op1() == 26)
+        std::cerr << "Executed instructions: " << instCounter_ << "\n";
+    }
 }
 
 
