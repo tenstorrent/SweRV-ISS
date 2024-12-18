@@ -852,21 +852,26 @@ Hart<URV>::checkVecLdStIndexedInst(const DecodedInst* di, unsigned vd, unsigned 
   unsigned sew = vecRegs_.elemWidthInBits();
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
 
-  // Normalize fractional groups to 1 and account for field count.
+  // For segment load: Normalize fractional groups to 1 and account for field count.
   unsigned offsetGroup = offsetGroupX8 >= 8 ? offsetGroupX8/8 : 1;
   unsigned group = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned segGroup = group * fieldCount;
 
-  groupX8 = segGroup * 8;   // Account for fields.
-  offsetGroupX8 = offsetGroup * 8;
+  if (fieldCount > 1)   // If segment load.
+    {
+      groupX8 = segGroup * 8;
+      offsetGroupX8 = offsetGroup * 8;
+    }
 
   bool ok = true;
   if (di->ithOperandMode(0) == OperandMode::Write)
     {
       // From 7.8.3 of spec, for indexed segment loads, no overlap between destination
       // (vd) and source (vi) is allowed.
-      if (di->vecFieldCount() > 0)   // If segment load.
+      if (fieldCount > 1)   // If segment load.
         ok = vi >= vd + segGroup  or  vd >= vi + offsetGroup;
+      else
+        ok = checkDestSourceOverlap(vd, sew, groupX8, vi, offsetWidth, offsetGroupX8);
     }
   else
     {
@@ -9197,6 +9202,8 @@ Hart<URV>::vmvr_v(const DecodedInst* di, unsigned nr)
 
       unsigned groupX8 = nr*8;
       vecRegs_.touchReg(vd, groupX8);
+
+      vecRegs_.setOpEmul(nr, nr);  // Track operand group for logging
     }
 
   postVecSuccess();
@@ -11081,6 +11088,8 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 
       if (cause == ExceptionCause::NONE)
         {
+          ldStInfo.setLastElem(pa1, pa2);
+
 	  uint64_t data = 0;
           if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
@@ -11094,8 +11103,6 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 	      return false;
 	    }
 #endif
-
-          ldStInfo.setLastElem(pa1, pa2);
         }
       else
         {
@@ -11501,6 +11508,10 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
       ELEM_TYPE elem = 0;
 
+      bool skip = false;  // Not masked off
+      ldStInfo.addElem(VecLdStElem{addr, pa1, pa2, 0, ix, skip});
+
+
 #ifndef FAST_SLOPPY
       uint64_t gpa2 = addr;
       cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem), false /*hyper*/);
@@ -11508,12 +11519,15 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
       if (hasTrig and ldStAddrTriggerHit(addr, elemBytes, timing, isLd))
 	{
 	  triggerTripped_ = true;
+	  ldStInfo.removeLastElem();
 	  return false;
 	}
 #endif
 
       if (cause == ExceptionCause::NONE)
 	{
+          ldStInfo.setLastElem(pa1, pa2);
+
 	  uint64_t data = 0;
 	  if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
@@ -11522,11 +11536,15 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 #ifndef FAST_SLOPPY
 	  triggerTripped_ = ldStDataTriggerHit(elem, timing, isLd);
 	  if (triggerTripped_)
-	    return false;
+            {
+	      ldStInfo.removeLastElem();
+              return false;
+            }
 #endif
 	}
       else
         {
+          ldStInfo.removeLastElem();
           markVsDirty();
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
@@ -11534,9 +11552,6 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
         }
 
       vecRegs_.write(vd, ix, effGroupX8, elem);
-
-      bool skip = false;  // Not masked off
-      ldStInfo.addElem(VecLdStElem{addr, pa1, pa2, 0, ix, skip});
     }
 
   vecRegs_.touchReg(vd, groupX8);  // We want the group and not the effective group.
@@ -11846,7 +11861,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
   unsigned elemSize = sizeof(ELEM_TYPE);
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemCount, elemSize, vd, group, true /*isLoad*/);
+  ldStInfo.initStrided(elemCount, elemSize, vd, group, stride, true /*isLoad*/);
 
   if (start >= elemCount)
     return true;
@@ -11886,11 +11901,12 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
       if (cause == ExceptionCause::NONE)
         {
+          ldStInfo.setLastElem(pa1, pa2);
+
 	  uint64_t data = 0;
 	  if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
 	  elem = data;
-          ldStInfo.setLastElem(pa1, pa2);
         }
       else
         {
@@ -12019,7 +12035,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   unsigned group = groupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemCount, elemSize, vd, group, false /*isLoad*/);
+  ldStInfo.initStrided(elemCount, elemSize, vd, group, stride, false /*isLoad*/);
 
   dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
   bool hasTrig = hasActiveTrigger();
@@ -12234,12 +12250,13 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
       if (cause == ExceptionCause::NONE)
 	{
+          ldStInfo.setLastElem(pa1, pa2);
+
 	  uint64_t data = 0;
 	  if (not readForLoad<ELEM_TYPE>(di, vaddr, pa1, pa2, data, ix))
 	    assert(0);
 	  elem = data;
 	  vecRegs_.write(vd, ix, groupX8, elem);
-          ldStInfo.setLastElem(pa1, pa2);
 	}
       else
         {
@@ -12688,7 +12705,11 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   unsigned group = groupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemCount, elemSize, vd, group, true /*isLoad*/);
+  
+  if (di->isVectorLoadStrided())
+    ldStInfo.initStrided(elemCount, elemSize, vd, group, stride, true /*isLoad*/);
+  else
+    ldStInfo.init(elemCount, elemSize, vd, group, true /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   if (start >= elemCount)
@@ -12738,11 +12759,12 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
 	  if (cause == ExceptionCause::NONE)
             {
+              ldStInfo.setLastElem(pa1, pa2);
+
 	      uint64_t data = 0;
 	      if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data, ix, field))
 		assert(0);
 	      elem = data;
-              ldStInfo.setLastElem(pa1, pa2);
             }
 	  else
 	    {
@@ -12908,7 +12930,10 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   unsigned group = groupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
-  ldStInfo.init(elemCount, elemSize, vd, group, false /*isLoad*/);
+  if (di->isVectorStoreStrided())
+    ldStInfo.initStrided(elemCount, elemSize, vd, group, stride, false /*isLoad*/);
+  else
+    ldStInfo.init(elemCount, elemSize, vd, group, false /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
   dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
@@ -13312,12 +13337,13 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
 	  if (cause == ExceptionCause::NONE)
 	    {
+              ldStInfo.setLastElem(pa1, pa2);
+
 	      uint64_t data = 0;
 	      if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data, ix, field))
 		assert(0);
 	      elem = data;
 	      vecRegs_.write(dvg, ix, destGroup, elem);
-              ldStInfo.setLastElem(pa1, pa2);
 	    }
 	  else
 	    {

@@ -399,6 +399,10 @@ namespace WdRiscv
     void enableSemihosting(bool flag)
     { semihostOn_ = flag; }
 
+    /// Enable whisper HINT ops for various functions.
+    void enableHintOps(bool flag)
+    { hintOps_ = flag; }
+
     /// Enable page based memory types.
     void enableTranslationPbmt(bool flag)
     { enableExtension(RvExtension::Svpbmt, flag); updateTranslationPbmt(); }
@@ -880,28 +884,6 @@ namespace WdRiscv
     /// Return the current state of the Supervisor external interrupt pin.
     bool getSeiPin() const
     { return seiPin_; }
-
-    /// Peek MIP/SIP and modify by supervisor external interrupt pin and mvip.
-    /// This is OR-ed when mvien does not exist or is set to zero. Otherwise,
-    /// the value of SEIP is solely the value of the pin.
-    URV overrideWithSeiPinAndMvip(URV ip) const
-    {
-      if (not isRvs())
-        return ip;
-
-      if (isRvaia())
-        {
-          URV mvien = csRegs_.peekMvien();
-          if (mvien >> URV(InterruptCause::S_EXTERNAL) & 1)
-            ip &= ~URV(1 << URV(InterruptCause::S_EXTERNAL));
-          else
-            {
-              URV mvip = csRegs_.peekMvip();
-              ip |= mvip & URV(1 << URV(InterruptCause::S_EXTERNAL));
-            }
-        }
-      return ip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
-    }
 
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
@@ -1552,9 +1534,17 @@ namespace WdRiscv
     bool isRvzicond() const
     { return extensionIsEnabled(RvExtension::Zicond); }
 
+    /// Return true if the zca extension is enabled.
+    bool isRvzca() const
+    { return extensionIsEnabled(RvExtension::Zca); }
+
     /// Return true if the zcb extension is enabled.
     bool isRvzcb() const
     { return extensionIsEnabled(RvExtension::Zcb); }
+
+    /// Return true if the zcb extension is enabled.
+    bool isRvzcd() const
+    { return extensionIsEnabled(RvExtension::Zcd); }
 
     /// Return true if the zcb extension is enabled.
     bool isRvzfa() const
@@ -2392,6 +2382,9 @@ namespace WdRiscv
     /// Return true if vector component currently has tail-agnositic policy.
     bool isVectorTailAgnostic() const
     { return vecRegs_.isTailAgnostic(); }
+
+    /// Print the instructions of the extensions in the ISA string.
+    void printInstructions(FILE* file) const;
 
   protected:
 
@@ -5405,6 +5398,7 @@ namespace WdRiscv
 
     bool clearMtvalOnIllInst_ = true;
     bool clearMtvalOnEbreak_ = true;
+    bool lastEbreak_ = false;
 
     bool targetProgFinished_ = false;
     bool stepResult_ = false;        // Set by singleStep on caught exception (program success/fail).
@@ -5544,6 +5538,8 @@ namespace WdRiscv
 
     bool semihostOn_ = false;
     uint64_t semihostSlliTag_ = 0;  // Tag (rank) of slli instruction.
+
+    bool hintOps_ = false; // Enable HINT ops.
 
     // For lockless handling of MIP. We assume the software won't
     // trigger multiple interrupts while handling. To be cleared when

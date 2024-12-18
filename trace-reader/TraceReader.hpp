@@ -122,6 +122,18 @@ namespace WhisperUtil  {
     bool isNotTakenConditionalBranch() const
     { return instType == 'n'; }
 
+    // Return true if this is a cmo instruction.
+    bool isCmo() const
+    {
+      uint64_t opcode = inst & 0xfff07fff;
+      if (opcode == 0x00200f or
+          opcode == 0x10200f or
+          opcode == 0x20200f or
+          opcode == 0x40200f)
+        return true;
+      return false;
+    }
+
     // Return true if this an illegal instruction.
     bool isIllegal() const
     { return inst == 0 or ~inst == 0; }
