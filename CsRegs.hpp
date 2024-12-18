@@ -1338,6 +1338,27 @@ namespace WdRiscv
 	}
     }
 
+    /// MIP is OR-ed when mvien does not exist or is set to zero. Otherwise,
+    /// the value of SEIP is solely the value of the pin.
+    URV overrideWithSeiPinAndMvip(URV ip) const
+    {
+      if (not superEnabled_)
+        return ip;
+
+      if (aiaEnabled_)
+        {
+          URV mvien = peekMvien();
+          if (mvien >> URV(InterruptCause::S_EXTERNAL) & 1)
+            ip &= ~URV(1 << URV(InterruptCause::S_EXTERNAL));
+          else
+            {
+              URV mvip = peekMvip();
+              ip |= mvip & URV(1 << URV(InterruptCause::S_EXTERNAL));
+            }
+        }
+      return ip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+    }
+
     /// Fast peek method for MIP.
     URV peekMip() const
     {
@@ -1380,9 +1401,42 @@ namespace WdRiscv
       return csr.read();
     }
 
+    /// Return the effective MIP value.
+    URV effectiveMip() const
+    {
+      URV mip = overrideWithSeiPinAndMvip(peekMip());
+      return mip;
+    }
+
+    /// Return the effective SIP value.
+    URV effectiveSip() const
+    {
+      URV mip = effectiveMip();
+      URV sip = mip & peekMideleg();
+      if (aiaEnabled_ and superEnabled_)
+        {
+          URV mvip = peekMvip() & ~peekMideleg() & peekMvien();
+          sip |= mvip;
+        }
+      return sip;
+    }
+
+    /// Return the effective VSIP value.
+    URV effectiveVsip() const
+    {
+      URV sip = effectiveSip();
+      URV vsip = sip & peekHideleg();
+      if (aiaEnabled_ and superEnabled_)
+        {
+          URV hvip = peekHvip() & ~peekHideleg() & peekHvien();
+          vsip |= hvip;
+        }
+      return vsip;
+    }
+
     /// Return the machine effective interrupt enable mask. This is
     /// MIE and-ed with non-delegated interrupts.
-    URV effectiveMachineInterruptEnable() const
+    URV effectiveMie() const
     {
       const auto& csr = regs_.at(size_t(CsrNumber::MIE));
       const auto& mideleg = regs_.at(size_t(CsrNumber::MIDELEG));
@@ -1392,7 +1446,7 @@ namespace WdRiscv
     /// Return the effective interrupt enable mask. This is
     /// SIE with mideleg and mvien delegated interrupts and
     /// not delegated by hideleg.
-    URV effectiveSupervisorInterruptEnable() const
+    URV effectiveSie() const
     {
       const auto& mie = regs_.at(size_t(CsrNumber::MIE));
       const auto& mvien = regs_.at(size_t(CsrNumber::MVIEN));
@@ -1403,7 +1457,7 @@ namespace WdRiscv
 
     /// Return the effective interrupt enable mask. This is
     /// VSIE with hideleg and hvien delegated interrupts. 
-    URV effectiveVirtSupervisorInterruptEnable() const
+    URV effectiveVsie() const
     {
       const auto& csr = regs_.at(size_t(CsrNumber::VSIE));
       const auto& mie = regs_.at(size_t(CsrNumber::MIE));
@@ -1412,7 +1466,7 @@ namespace WdRiscv
       const auto& hideleg = regs_.at(size_t(CsrNumber::HIDELEG));
       const auto& hvien = regs_.at(size_t(CsrNumber::HVIEN));
       return ((mie.read() | (shadowSie_ & mvien.read() & ~mideleg.read())) & hideleg.read()) |
-              (csr.read() & ~hideleg.read() & hvien.read());
+              (sInterruptToVs(csr.read()) & ~hideleg.read() & hvien.read());
     }
 
     /// Fast peek method for MSTATUS

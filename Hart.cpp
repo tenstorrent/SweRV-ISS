@@ -647,9 +647,9 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   processExtensions();
 
   csRegs_.reset();
-  effectiveMie_ = csRegs_.effectiveMachineInterruptEnable();
-  effectiveSie_ = csRegs_.effectiveSupervisorInterruptEnable();
-  effectiveVsie_ = csRegs_.effectiveVirtSupervisorInterruptEnable();
+  effectiveMie_ = csRegs_.effectiveMie();
+  effectiveSie_ = csRegs_.effectiveSie();
+  effectiveVsie_ = csRegs_.effectiveVsie();
 
   perfControl_ = ~uint32_t(0);
   URV value = 0;
@@ -3545,9 +3545,9 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 	csRegs_.recordWrite(CN::HSTATUS);
     }
 
-  effectiveMie_ = csRegs_.effectiveMachineInterruptEnable();
-  effectiveSie_ = csRegs_.effectiveSupervisorInterruptEnable();
-  effectiveVsie_ = csRegs_.effectiveVirtSupervisorInterruptEnable();
+  effectiveMie_ = csRegs_.effectiveMie();
+  effectiveSie_ = csRegs_.effectiveSie();
+  effectiveVsie_ = csRegs_.effectiveVsie();
 
   updateCachedTriggerState();  // In case trigger control CSR written.
 }
@@ -5544,7 +5544,8 @@ Hart<URV>::isInterruptPossible(URV mip, URV sip, [[maybe_unused]] URV vsip, Inte
   if (not vsEnabled)
     return false;
 
-  if (not isRvaia())
+  auto hvictl = csRegs_.getImplementedCsr(CsrNumber::HVICTL);
+  if (not isRvaia() or not hvictl)
     {
       URV vsdest = vsip & effectiveVsie_;
       if (vsdest)
@@ -5588,32 +5589,17 @@ template <typename URV>
 bool
 Hart<URV>::isInterruptPossible(InterruptCause& cause, PrivilegeMode& nextMode, bool& nextVirt) const
 {
-  URV mip = csRegs_.peekMip();
-
   // MIP read value is ored with supervisor external interrupt pin and
   // mvip if mvien is not set.
-  mip = overrideWithSeiPinAndMvip(mip);
-
-  URV sip = mip & csRegs_.peekMideleg();
+  URV mip = csRegs_.effectiveMip();
 
   // SIP read value will alias mvip if not delegated and mvien is set.
-  if (isRvaia() and isRvs())
-    {
-      URV mvip = csRegs_.peekMvip() & ~csRegs_.peekMideleg()
-                  & csRegs_.peekMvien();
-      sip |= mvip;
-    }
-
-  URV vsip = sip & csRegs_.peekHideleg();
+  URV sip = csRegs_.effectiveSip();
 
   // VSIP read value may alias hvip (for bits 13-63). These bits don't alias
   // HIP/HIE and are delgated through hvien.
-  if (isRvaia() and isRvh())
-    {
-      URV hvip = csRegs_.peekHvip() & ~csRegs_.peekHideleg()
-                  & csRegs_.peekHvien();
-      vsip |= hvip;
-    }
+  // FIXME: really, this should check for non-zero vstopi (hvictl).
+  URV vsip = csRegs_.effectiveVsip();
 
   mip &= ~deferredInterrupts_;  // Inhibited by test-bench.
   sip &= ~deferredInterrupts_;
@@ -11132,10 +11118,10 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
 
@@ -11183,10 +11169,10 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
 
   if (di->op1() == 0)
     {
@@ -11243,10 +11229,10 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
 
   if (di->op1() == 0)
     {
@@ -11295,10 +11281,10 @@ Hart<URV>::execCsrrwi(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
 
   doCsrWrite(di, csr, di->op1(), di->op0(), prev);
 
@@ -11348,10 +11334,10 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
 
   if (imm == 0)
     {
@@ -11410,10 +11396,10 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
 
   if (imm == 0)
     {

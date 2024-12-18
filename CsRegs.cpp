@@ -3862,9 +3862,8 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
 
   if (number == CsrNumber::MTOPI)
     {
-      auto mip = getImplementedCsr(CsrNumber::MIP)->read();
-      mip |= URV(seiPin_) << URV(IC::S_EXTERNAL);
-      auto mie = getImplementedCsr(CsrNumber::MIE)->read();
+      auto mip = effectiveMip();
+      auto mie = effectiveMie();
 
       unsigned iid = highestIidPrio(mip & mie & ~midelegMask);
       if (iid)
@@ -3879,11 +3878,8 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
           auto hideleg = getImplementedCsr(CsrNumber::HIDELEG);
           URV hidelegMask = hideleg? hideleg->read() : 0;
 
-          URV sip, sie;
-          if (not readSip(sip) or not readSie(sie))
-            return false;
-
-          sip |= (URV(seiPin_) << URV(IC::S_EXTERNAL) & midelegMask);
+          auto sip = effectiveSip();
+          auto sie = effectiveSie();
 
           auto hip = getImplementedCsr(CsrNumber::HIP);
           URV hipVal = hip? hip->read() : 0;
@@ -3897,11 +3893,9 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value, bool virtMode) const
           return true;
         }
 
-      auto vsip = getImplementedCsr(CsrNumber::VSIP);
-      auto vsie = getImplementedCsr(CsrNumber::VSIE);
-      if (not vsip or not vsie)
-        return false;
-      auto vs = vsip->read() & vsie->read();
+      auto vsip = effectiveVsip();
+      auto vsie = effectiveVsie();
+      auto vs = vsInterruptToS(vsip & vsie);
 
       auto hvictl = getImplementedCsr(CsrNumber::HVICTL);
       if (hvictl)
