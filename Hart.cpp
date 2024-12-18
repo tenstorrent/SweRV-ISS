@@ -5589,11 +5589,12 @@ bool
 Hart<URV>::isInterruptPossible(InterruptCause& cause, PrivilegeMode& nextMode, bool& nextVirt) const
 {
   URV mip = csRegs_.peekMip();
-  URV sip = mip;
 
   // MIP read value is ored with supervisor external interrupt pin and
   // mvip if mvien is not set.
-  sip = mip = overrideWithSeiPinAndMvip(mip);
+  mip = overrideWithSeiPinAndMvip(mip);
+
+  URV sip = mip & csRegs_.peekMideleg();
 
   // SIP read value will alias mvip if not delegated and mvien is set.
   if (isRvaia() and isRvs())
