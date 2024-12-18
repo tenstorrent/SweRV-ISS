@@ -4940,7 +4940,9 @@ template <typename URV>
 bool
 Mcm<URV>::ioPpoChecks(Hart<URV>& hart, const McmInstr& instrB) const
 {
-  // return true;
+  // We don't have enough info to do this since PBMT can override the PMA. We will have to
+  // change the API to be able to do this.
+  return true;
 
   // We check that IO memory operations are never reordered. This is stronger
   // that what is required by the spec. We will eventually relax this for
