@@ -60,7 +60,7 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "zicond", RvExtension::Zicond },
   { "zca", RvExtension::Zca },
   { "zcb", RvExtension::Zcb },
-  { "zcb", RvExtension::Zcd },
+  { "zcd", RvExtension::Zcd },
   { "zfa", RvExtension::Zfa },
   { "zfbfmin", RvExtension::Zfbfmin },
   { "zvfbfmin", RvExtension::Zvfbfmin },
@@ -163,6 +163,8 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zvfh)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zvkb)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zvkg)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zvkned)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zvknhb)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zicond)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zvfhmin)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zfbfmin)) = Info{ {{1,0}}, {1,0} };
