@@ -885,28 +885,6 @@ namespace WdRiscv
     bool getSeiPin() const
     { return seiPin_; }
 
-    /// Peek MIP/SIP and modify by supervisor external interrupt pin and mvip.
-    /// This is OR-ed when mvien does not exist or is set to zero. Otherwise,
-    /// the value of SEIP is solely the value of the pin.
-    URV overrideWithSeiPinAndMvip(URV ip) const
-    {
-      if (not isRvs())
-        return ip;
-
-      if (isRvaia())
-        {
-          URV mvien = csRegs_.peekMvien();
-          if (mvien >> URV(InterruptCause::S_EXTERNAL) & 1)
-            ip &= ~URV(1 << URV(InterruptCause::S_EXTERNAL));
-          else
-            {
-              URV mvip = csRegs_.peekMvip();
-              ip |= mvip & URV(1 << URV(InterruptCause::S_EXTERNAL));
-            }
-        }
-      return ip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
-    }
-
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
     /// address of the instruction is identical to the given address.
