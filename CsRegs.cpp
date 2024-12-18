@@ -4780,10 +4780,12 @@ CsRegs<URV>::addHypervisorFields()
   setCsrFields(Csrn::VSTIMECMP, {{"stimecmp", xlen}});
   setCsrFields(Csrn::VSIE,
     {{"zero", 1}, {"SSIE", 1}, {"zero", 3}, {"STIE", 1},
-     {"zero", 3}, {"SEIE", 1}, {"zero", xlen - 10}});
+     {"zero", 3}, {"SEIE", 1}, {"zero", 3}, 
+     {"LCOFIE", 1}, {"zero", xlen - 14}});
   setCsrFields(Csrn::VSIP,
     {{"zero", 1}, {"SSIP", 1}, {"zero", 3}, {"STIP", 1},
-     {"zero", 3}, {"SEIP", 1}, {"zero", xlen - 10}});
+     {"zero", 3}, {"SEIP", 1}, {"zero", 3}, 
+     {"LCOFIP", 1}, {"zero", xlen - 14}});
 
   setCsrFields(Csrn::MTVAL2, {{"mtval2", xlen}});
   setCsrFields(Csrn::MTINST, {{"mtinst", xlen}});
