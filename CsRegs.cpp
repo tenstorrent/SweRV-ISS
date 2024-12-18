@@ -4784,7 +4784,7 @@ CsRegs<URV>::addHypervisorFields()
      {"LCOFIE", 1}, {"zero", xlen - 14}});
   setCsrFields(Csrn::VSIP,
     {{"zero", 1}, {"SSIP", 1}, {"zero", 3}, {"STIP", 1},
-     {"zero", 3}, {"SEIP", 1}, {"zero", xlen - 10}, 
+     {"zero", 3}, {"SEIP", 1}, {"zero", 3}, 
      {"LCOFIP", 1}, {"zero", xlen - 14}});
 
   setCsrFields(Csrn::MTVAL2, {{"mtval2", xlen}});
