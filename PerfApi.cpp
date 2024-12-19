@@ -1132,8 +1132,7 @@ PerfApi::restoreHartValues(Hart64& hart, const InstrPac& packet,
 	case OT::CsReg:
           {
             auto csrn = CSRN(operand);
-            if (not hart.pokeCsr(csrn, prev))
-              assert(0);
+            hart.pokeCsr(csrn, prev);  // May fail because of privilege. It's ok: handled at caller.
           }
 	  break;
 
