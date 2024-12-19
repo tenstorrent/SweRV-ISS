@@ -1401,6 +1401,13 @@ namespace WdRiscv
       return csr.read();
     }
 
+    /// Fast peek method for HVICTL.
+    URV peekHvictl() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::HVICTL));
+      return csr.read();
+    }
+
     /// Return the effective MIP value.
     URV effectiveMip() const
     {

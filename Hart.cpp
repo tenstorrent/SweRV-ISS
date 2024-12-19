@@ -651,6 +651,8 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   effectiveSie_ = csRegs_.effectiveSie();
   effectiveVsie_ = csRegs_.effectiveVsie();
 
+  updateCachedHvictl();
+
   perfControl_ = ~uint32_t(0);
   URV value = 0;
   if (peekCsr(CsrNumber::MCOUNTINHIBIT, value))
@@ -3545,6 +3547,9 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 	csRegs_.recordWrite(CN::HSTATUS);
     }
 
+  if (csr == CN::HVICTL)
+    updateCachedHvictl();
+
   effectiveMie_ = csRegs_.effectiveMie();
   effectiveSie_ = csRegs_.effectiveSie();
   effectiveVsie_ = csRegs_.effectiveVsie();
@@ -5174,7 +5179,7 @@ Hart<URV>::simpleRunWithLimit()
 
       if ((effectiveMie_ or
           (privMode_ != PrivilegeMode::Machine and effectiveSie_) or
-          (virtMode_ and effectiveVsie_))
+          (virtMode_ and (effectiveVsie_ or hasHvi())))
             and processExternalInterrupt(nullptr, instStr))
         continue;  // Next instruction in trap handler.
 
@@ -5598,16 +5603,16 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause, PrivilegeMode& nextMode, b
 
   // VSIP read value may alias hvip (for bits 13-63). These bits don't alias
   // HIP/HIE and are delgated through hvien.
-  // FIXME: really, this should check for non-zero vstopi (hvictl).
   URV vsip = csRegs_.effectiveVsip();
 
   mip &= ~deferredInterrupts_;  // Inhibited by test-bench.
   sip &= ~deferredInterrupts_;
   vsip &= ~deferredInterrupts_;
 
-  if (((mip & effectiveMie_) == 0) and
-      ((sip & effectiveSie_) == 0) and
-      ((vsip & effectiveVsie_) == 0))
+  if (not (mip & effectiveMie_) and
+      not (sip & effectiveSie_) and
+      not (vsip & effectiveVsie_) and
+      not hasHvi())
     return false;
 
   return isInterruptPossible(mip, sip, vsip, cause, nextMode, nextVirt);

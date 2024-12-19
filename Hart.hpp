@@ -2665,6 +2665,13 @@ namespace WdRiscv
     // is written/poked.
     void updateCachedHstatus();
 
+    /// Update cached HVICTL
+    void updateCachedHvictl()
+    {
+      URV val = csRegs_.peekHvictl();
+      hvictl_.value_ = val;
+    }
+
     /// Write the cached value of MSTATUS (or MSTATUS/MSTATUSH) into the CSR.
     void writeMstatus();
 
@@ -3065,6 +3072,11 @@ namespace WdRiscv
     /// it. Return true if an nmi or an interrupt is taken and false
     /// otherwise.
     bool processExternalInterrupt(FILE* traceFile, std::string& insStr);
+
+    /// Return true if there is a hypervisor injected interrupt through
+    /// hvictl.
+    bool hasHvi() const
+    { return (hvictl_.bits_.IID != 9) or (hvictl_.bits_.IPRIO != 0); }
 
     /// Helper to FP execution: Or the given flags values to FCSR
     /// recording a write. No-op if a trigger has already tripped.
@@ -5374,6 +5386,7 @@ namespace WdRiscv
     URV effectiveMie_ = 0;          // Effective machine interrupt enable.
     URV effectiveSie_ = 0;          // Effective supervisor interrupt enable.
     URV effectiveVsie_ = 0;         // Effective v supervisor interrupt enable.
+    HvictlFields hvictl_;           // Cached value of hvictl CSR
 
     bool clearMprvOnRet_ = true;
     bool cancelLrOnTrap_ = false;   // Cancel reservation on traps when true.
