@@ -301,7 +301,7 @@ namespace WdRiscv
 
     /// Configure given CSR. Return true on success and false if no such CSR.
     bool configCsrByUser(std::string_view name, bool implemented, URV resetValue, URV mask,
-			 URV pokeMask, bool shared);
+			 URV pokeMask, bool shared, bool isDebug);
 
     /// Configure given CSR. Return true on success and false if no such CSR.
     bool configCsr(std::string_view name, bool implemented, URV resetValue, URV mask,

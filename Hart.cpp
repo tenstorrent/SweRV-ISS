@@ -3725,9 +3725,9 @@ Hart<URV>::configCsr(std::string_view name, bool implemented, URV resetValue,
 template <typename URV>
 bool
 Hart<URV>::configCsrByUser(std::string_view name, bool implemented, URV resetValue,
-			   URV mask, URV pokeMask, bool shared)
+			   URV mask, URV pokeMask, bool shared, bool isDebug)
 {
-  return csRegs_.configCsrByUser(name, implemented, resetValue, mask, pokeMask, shared);
+  return csRegs_.configCsrByUser(name, implemented, resetValue, mask, pokeMask, shared, isDebug);
 }
 
 
