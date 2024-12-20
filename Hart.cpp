@@ -2211,18 +2211,18 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
 	dumpInitState("store", virtAddr + ldStSize_, pa2 + ldStSize_);
     }
 
-  // If we write to special location, end the simulation.
-  if (isToHostAddr(pa1))
-    {
-      handleStoreToHost(pa1, storeVal);
-      return true;
-    }
-
   ldStWrite_ = true;
   ldStData_ = storeVal;
 
   invalidateDecodeCache(pa1, ldStSize_); // this could be smaller
   invalidateDecodeCache(pa2, ldStSize_);
+
+  // If we write to special location, end the simulation.
+  if (isToHostAddr(pa1) and mcm_)
+    {
+      handleStoreToHost(pa1, storeVal);
+      return true;
+    }
 
   if (ooo_)
     {
@@ -2232,6 +2232,13 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
     }
 
   bool isDevice = isAclintAddr(pa1) or isImsicAddr(pa1) or isPciAddr(pa1);
+
+  // If we write to special location, end the simulation.
+  if (isToHostAddr(pa1))
+    {
+      handleStoreToHost(pa1, storeVal);
+      return true;
+    }
 
   if (isDevice)
     {
