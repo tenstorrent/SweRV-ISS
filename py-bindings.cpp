@@ -408,16 +408,18 @@ static void defineHart(M m)
           return self.mcm()->mergeBufferWrite(self, time, addr, data, mask);
         }, py::doc("MCM merge buffer write operation."))
     .def("mcm_mb_insert", [](Hart<T>& self, uint64_t time, uint64_t tag,
-                             uint64_t addr, unsigned size, uint64_t data) {
+                             uint64_t addr, unsigned size, uint64_t data,
+                             unsigned elem, unsigned field) {
           if (not self.mcm())
             return false;
-          return self.mcm()->mergeBufferInsert(self, time, tag, addr, size, data);
+          return self.mcm()->mergeBufferInsert(self, time, tag, addr, size, data, elem, field);
         }, py::doc("MCM merge buffer insert operation."))
     .def("mcm_bypass", [](Hart<T>& self, uint64_t time, uint64_t tag,
-                          uint64_t addr, unsigned size, uint64_t data) {
+                          uint64_t addr, unsigned size, uint64_t data,
+                          unsigned elem, unsigned field) {
           if (not self.mcm())
             return false;
-          return self.mcm()->bypassOp(self, time, tag, addr, size, data);
+          return self.mcm()->bypassOp(self, time, tag, addr, size, data, elem, field);
         }, py::doc("MCM merge buffer bypass operation."))
     .def("mcm_ifetch", &Hart<T>::mcmIFetch, py::doc("MCM instruction fetch operation."))
     .def("mcm_ievict", &Hart<T>::mcmIEvict, py::doc("MCM instruction cache eviction operation."));

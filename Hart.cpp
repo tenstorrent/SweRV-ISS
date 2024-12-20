@@ -367,7 +367,9 @@ Hart<URV>::processExtensions(bool verbose)
   enableExtension(RvExtension::Zvksh,    isa_.isEnabled(RvExtension::Zvksh));
   enableExtension(RvExtension::Zvkb,     isa_.isEnabled(RvExtension::Zvkb));
   enableExtension(RvExtension::Zicond,   isa_.isEnabled(RvExtension::Zicond));
+  enableExtension(RvExtension::Zca,      isa_.isEnabled(RvExtension::Zca));
   enableExtension(RvExtension::Zcb,      isa_.isEnabled(RvExtension::Zcb));
+  enableExtension(RvExtension::Zcd,      isa_.isEnabled(RvExtension::Zcd));
   enableExtension(RvExtension::Zfa,      isa_.isEnabled(RvExtension::Zfa));
   enableExtension(RvExtension::Zacas,    isa_.isEnabled(RvExtension::Zacas));
   enableExtension(RvExtension::Zimop,    isa_.isEnabled(RvExtension::Zimop));
@@ -645,9 +647,11 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   processExtensions();
 
   csRegs_.reset();
-  effectiveMie_ = csRegs_.effectiveMachineInterruptEnable();
-  effectiveSie_ = csRegs_.effectiveSupervisorInterruptEnable();
-  effectiveVsie_ = csRegs_.effectiveVirtSupervisorInterruptEnable();
+  effectiveMie_ = csRegs_.effectiveMie();
+  effectiveSie_ = csRegs_.effectiveSie();
+  effectiveVsie_ = csRegs_.effectiveVsie();
+
+  updateCachedHvictl();
 
   perfControl_ = ~uint32_t(0);
   URV value = 0;
@@ -1137,16 +1141,17 @@ Hart<URV>::execAddi(const DecodedInst* di)
   SRV v = intRegs_.read(di->op1()) + imm;
   intRegs_.write(di->op0(), v);
 
-#ifdef HINT_OPS
-  if (di->op0() == 0 and di->op1() == 31)
-    throw CoreException(CoreException::Snapshot, "Taking snapshot from HINT.");
-  if (di->op0() == 0 and di->op1() == 30)
-    throw CoreException(CoreException::Stop, "Stopping run from HINT.");
-  if (di->op0() == 0 and di->op1() == 29)
-    throw CoreException(CoreException::SnapshotAndStop, "Taking snapshot and stopping run from HINT.");
-  if (di->op0() == 0 and di->op1() == 26)
-    std::cerr << "Executed instructions: " << instCounter_ << "\n";
-#endif
+  if (hintOps_)
+    {
+      if (di->op0() == 0 and di->op1() == 31)
+        throw CoreException(CoreException::Snapshot, "Taking snapshot from HINT.");
+      if (di->op0() == 0 and di->op1() == 30)
+        throw CoreException(CoreException::Stop, "Stopping run from HINT.");
+      if (di->op0() == 0 and di->op1() == 29)
+        throw CoreException(CoreException::SnapshotAndStop, "Taking snapshot and stopping run from HINT.");
+      if (di->op0() == 0 and di->op1() == 26)
+        std::cerr << "Executed instructions: " << instCounter_ << "\n";
+    }
 }
 
 
@@ -2925,7 +2930,9 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt,
   uint32_t tinst = isRvh()? createTrapInst(di, interrupt, cause, info, info2) : 0;
 
   bool gva = ( isRvh() and not interrupt and
-	       (hyperLs_ or isGvaTrap(gvaVirtMode, cause)) );
+	       (hyperLs_ or isGvaTrap(gvaVirtMode, cause)));
+  if (lastEbreak_ and clearMtvalOnEbreak_)
+    gva = false;
 
   // Update status register saving xIE in xPIE and previous privilege
   // mode in xPP by getting current value of xstatus, updating
@@ -3547,9 +3554,12 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 	csRegs_.recordWrite(CN::HSTATUS);
     }
 
-  effectiveMie_ = csRegs_.effectiveMachineInterruptEnable();
-  effectiveSie_ = csRegs_.effectiveSupervisorInterruptEnable();
-  effectiveVsie_ = csRegs_.effectiveVirtSupervisorInterruptEnable();
+  if (csr == CN::HVICTL)
+    updateCachedHvictl();
+
+  effectiveMie_ = csRegs_.effectiveMie();
+  effectiveSie_ = csRegs_.effectiveSie();
+  effectiveVsie_ = csRegs_.effectiveVsie();
 
   updateCachedTriggerState();  // In case trigger control CSR written.
 }
@@ -3727,9 +3737,9 @@ Hart<URV>::configCsr(std::string_view name, bool implemented, URV resetValue,
 template <typename URV>
 bool
 Hart<URV>::configCsrByUser(std::string_view name, bool implemented, URV resetValue,
-			   URV mask, URV pokeMask, bool shared)
+			   URV mask, URV pokeMask, bool shared, bool isDebug)
 {
-  return csRegs_.configCsrByUser(name, implemented, resetValue, mask, pokeMask, shared);
+  return csRegs_.configCsrByUser(name, implemented, resetValue, mask, pokeMask, shared, isDebug);
 }
 
 
@@ -5176,7 +5186,7 @@ Hart<URV>::simpleRunWithLimit()
 
       if ((effectiveMie_ or
           (privMode_ != PrivilegeMode::Machine and effectiveSie_) or
-          (virtMode_ and effectiveVsie_))
+          (virtMode_ and (effectiveVsie_ or hasHvi())))
             and processExternalInterrupt(nullptr, instStr))
         continue;  // Next instruction in trap handler.
 
@@ -5476,7 +5486,7 @@ Hart<URV>::setPerfApi(std::shared_ptr<TT_PERF::PerfApi> perfApi)
 
 template <typename URV>
 bool
-Hart<URV>::isInterruptPossible(URV mip, URV sip, URV vsip, InterruptCause& cause, PrivilegeMode& nextMode, bool& nextVirt) const
+Hart<URV>::isInterruptPossible(URV mip, URV sip, [[maybe_unused]] URV vsip, InterruptCause& cause, PrivilegeMode& nextMode, bool& nextVirt) const
 {
   if (debugMode_)
     return false;
@@ -5546,16 +5556,36 @@ Hart<URV>::isInterruptPossible(URV mip, URV sip, URV vsip, InterruptCause& cause
   if (not vsEnabled)
     return false;
 
-  URV vsdest = vsip & effectiveVsie_;
-  if (vsdest)
+  auto hvictl = csRegs_.getImplementedCsr(CsrNumber::HVICTL);
+  if (not isRvaia() or not hvictl)
     {
-      // Only VS interrupts can be delegated in HIDELEG.
-      for (InterruptCause ic : { IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER, IC::LCOF } )
+      URV vsdest = vsip & effectiveVsie_;
+      if (vsdest)
         {
-          URV mask = URV(1) << unsigned(ic);
-          if ((vsdest & mask) != 0)
+          // Only VS interrupts can be delegated in HIDELEG.
+          for (InterruptCause ic : { IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER, IC::LCOF } )
             {
-              cause = ic;
+              URV mask = URV(1) << unsigned(ic);
+              if ((vsdest & mask) != 0)
+                {
+                  cause = ic;
+                  nextMode = PM::Supervisor;
+                  nextVirt = true;
+                  return true;
+                }
+            }
+        }
+    }
+  else
+    {
+      URV vstopi;
+      if (csRegs_.readTopi(CsrNumber::VSTOPI, vstopi, false))
+        {
+          if (vstopi)
+            {
+              // FIXME: This might be buggy because IID does not have
+              // to be a standard interrupt.
+              cause = static_cast<InterruptCause>(vstopi >> 16);
               nextMode = PM::Supervisor;
               nextVirt = true;
               return true;
@@ -5571,39 +5601,25 @@ template <typename URV>
 bool
 Hart<URV>::isInterruptPossible(InterruptCause& cause, PrivilegeMode& nextMode, bool& nextVirt) const
 {
-  URV mip = csRegs_.peekMip();
-  URV sip = mip;
-
   // MIP read value is ored with supervisor external interrupt pin and
   // mvip if mvien is not set.
-  sip = mip = overrideWithSeiPinAndMvip(mip);
+  URV mip = csRegs_.effectiveMip();
 
   // SIP read value will alias mvip if not delegated and mvien is set.
-  if (isRvaia() and isRvs())
-    {
-      URV mvip = csRegs_.peekMvip() & ~csRegs_.peekMideleg()
-                  & csRegs_.peekMvien();
-      sip |= mvip;
-    }
-
-  URV vsip = sip & csRegs_.peekHideleg();
+  URV sip = csRegs_.effectiveSip();
 
   // VSIP read value may alias hvip (for bits 13-63). These bits don't alias
   // HIP/HIE and are delgated through hvien.
-  if (isRvaia() and isRvh())
-    {
-      URV hvip = csRegs_.peekHvip() & ~csRegs_.peekHideleg()
-                  & csRegs_.peekHvien();
-      vsip |= hvip;
-    }
+  URV vsip = csRegs_.effectiveVsip();
 
   mip &= ~deferredInterrupts_;  // Inhibited by test-bench.
   sip &= ~deferredInterrupts_;
   vsip &= ~deferredInterrupts_;
 
-  if (((mip & effectiveMie_) == 0) and
-      ((sip & effectiveSie_) == 0) and
-      ((vsip & effectiveVsie_) == 0))
+  if (not (mip & effectiveMie_) and
+      not (sip & effectiveSie_) and
+      not (vsip & effectiveVsie_) and
+      not hasHvi())
     return false;
 
   return isInterruptPossible(mip, sip, vsip, cause, nextMode, nextVirt);
@@ -6692,19 +6708,19 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_addi4spn:
-      if (not isRvc()) illegalInst(di); else execAddi(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execAddi(di);
       return;
 
     case InstId::c_fld:
-      if (not isRvc()) illegalInst(di); else execFld(di);
+      if (isRvc() or (isRvzca() and isRvzcd())) execFld(di); else illegalInst(di);
       return;
 
     case InstId::c_lq:
-      if (not isRvc()) illegalInst(di); else execLq(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execLq(di);
       return;
 
     case InstId::c_lw:
-      if (not isRvc()) illegalInst(di); else execLw(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execLw(di);
       return;
 
     case InstId::c_flw:
@@ -6712,19 +6728,19 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_ld:
-      if (not isRvc()) illegalInst(di); else execLd(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execLd(di);
       return;
 
     case InstId::c_fsd:
-      if (not isRvc()) illegalInst(di); else execFsd(di);
+      if (isRvc() or (isRvzca() and isRvzcd())) execFsd(di); else illegalInst(di); 
       return;
 
     case InstId::c_sq:
-      if (not isRvc()) illegalInst(di); else execSq(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execSq(di);
       return;
 
     case InstId::c_sw:
-      if (not isRvc()) illegalInst(di); else execSw(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execSw(di);
       return;
 
     case InstId::c_fsw:
@@ -6732,28 +6748,28 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_sd:
-      if (not isRvc()) illegalInst(di); else execSd(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execSd(di);
       return;
 
     case InstId::c_addi:
-      if (not isRvc()) illegalInst(di); else execAddi(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execAddi(di);
       return;
 
     case InstId::c_jal:
-      if (not isRvc()) illegalInst(di); else execJal(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execJal(di);
       return;
 
     case InstId::c_li:
     case InstId::c_addi16sp:
-      if (not isRvc()) illegalInst(di); else execAddi(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execAddi(di);
       return;
 
     case InstId::c_lui:
-      if (not isRvc()) illegalInst(di); else execLui(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execLui(di);
       return;
 
     case InstId::c_srli:
-      if (not isRvc()) illegalInst(di); else execSrli(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execSrli(di);
       return;
 
     case InstId::c_srli64:
@@ -6761,7 +6777,7 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_srai:
-      if (not isRvc()) illegalInst(di); else execSrai(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execSrai(di);
       return;
 
     case InstId::c_srai64:
@@ -6769,56 +6785,56 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_andi:
-      if (not isRvc()) illegalInst(di); else execAndi(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execAndi(di);
       return;
 
     case InstId::c_sub:
-      if (not isRvc()) illegalInst(di); else execSub(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execSub(di);
       return;
 
     case InstId::c_xor:
-      if (not isRvc()) illegalInst(di); else execXor(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execXor(di);
       return;
 
     case InstId::c_or:
-      if (not isRvc()) illegalInst(di); else execOr(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execOr(di);
       return;
 
     case InstId::c_and:
-      if (not isRvc()) illegalInst(di); else execAnd(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execAnd(di);
       return;
 
     case InstId::c_subw:
-      if (not isRvc()) illegalInst(di); else execSubw(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execSubw(di);
       return;
 
     case InstId::c_addw:
-      if (not isRvc()) illegalInst(di); else execAddw(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execAddw(di);
       return;
 
     case InstId::c_j:
-      if (not isRvc()) illegalInst(di); else execJal(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execJal(di);
       return;
 
     case InstId::c_beqz:
-      if (not isRvc()) illegalInst(di); else execBeq(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execBeq(di);
       return;
 
     case InstId::c_bnez:
-      if (not isRvc()) illegalInst(di); else execBne(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execBne(di);
       return;
 
     case InstId::c_slli:
     case InstId::c_slli64:
-      if (not isRvc()) illegalInst(di); else execSlli(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execSlli(di);
       return;
 
     case InstId::c_fldsp:
-      if (not isRvc()) illegalInst(di); else execFld(di);
+      if (isRvc() or (isRvzca() and isRvzcd())) execFld(di); else illegalInst(di);
       return;
 
     case InstId::c_lwsp:
-      if (not isRvc()) illegalInst(di); else execLw(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execLw(di);
       return;
 
     case InstId::c_flwsp:
@@ -6826,35 +6842,35 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_ldsp:
-      if (not isRvc()) illegalInst(di); else execLd(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execLd(di);
       return;
 
     case InstId::c_jr:
-      if (not isRvc()) illegalInst(di); else execJalr(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execJalr(di);
       return;
 
     case InstId::c_mv:
-      if (not isRvc()) illegalInst(di); else execAdd(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execAdd(di);
       return;
 
     case InstId::c_ebreak:
-      if (not isRvc()) illegalInst(di); else execEbreak(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execEbreak(di);
       return;
 
     case InstId::c_jalr:
-      if (not isRvc()) illegalInst(di); else execJalr(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execJalr(di);
       return;
 
     case InstId::c_add:
-      if (not isRvc()) illegalInst(di); else execAdd(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execAdd(di);
       return;
 
     case InstId::c_fsdsp:
-      if (not isRvc()) illegalInst(di); else execFsd(di);
+      if (isRvc() or (isRvzca() and isRvzcd())) execFsd(di); else illegalInst(di);
       return;
 
     case InstId::c_swsp:
-      if (not isRvc()) illegalInst(di); else execSw(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execSw(di);
       return;
 
     case InstId::c_fswsp:
@@ -6862,11 +6878,11 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_addiw:
-      if (not isRvc()) illegalInst(di); else execAddiw(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execAddiw(di);
       return;
 
     case InstId::c_sdsp:
-      if (not isRvc()) illegalInst(di); else execSd(di);
+      if (not isRvc() and not isRvzca()) illegalInst(di); else execSd(di);
       return;
 
     case InstId::clz:
@@ -10123,7 +10139,9 @@ Hart<URV>::execEbreak(const DecodedInst* di)
   if (clearMtvalOnEbreak_)
     trapInfo = 0;
 
+  lastEbreak_ = true;
   initiateException(ExceptionCause::BREAKP, savedPc, trapInfo);
+  lastEbreak_ = false;
 }
 
 
@@ -11112,10 +11130,10 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
 
@@ -11163,10 +11181,10 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
 
   if (di->op1() == 0)
     {
@@ -11223,10 +11241,10 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
 
   if (di->op1() == 0)
     {
@@ -11275,10 +11293,10 @@ Hart<URV>::execCsrrwi(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
 
   doCsrWrite(di, csr, di->op1(), di->op0(), prev);
 
@@ -11328,10 +11346,10 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
 
   if (imm == 0)
     {
@@ -11390,10 +11408,10 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
   // supervisor external interrupt is delegated.
   using IC = InterruptCause;
   if (csr == CsrNumber::MIP)
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
   else if (not virtMode_ and csr == CsrNumber::SIP and
             (csRegs_.peekMideleg() & (URV(1) << URV(IC::S_EXTERNAL))))
-    prev = overrideWithSeiPinAndMvip(prev);
+    prev = csRegs_.overrideWithSeiPinAndMvip(prev);
 
   if (imm == 0)
     {

@@ -68,13 +68,14 @@ namespace WdRiscv
 
       isIndexed_ = false;
       isSegmented_ = false;
+      isStrided_ = false;
 
       ixVec_ = 0;
       fields_ = 0;
     }
 
     /// Set element size (in bytes), data vector register, index vector register, data
-    // group multiplier, index group multiplier, and type (load or store).
+    /// group multiplier, index group multiplier, and type (load or store).
     void initIndexed(unsigned elemCount, unsigned elemSize, unsigned vecReg, unsigned ixReg,
 		     unsigned group, unsigned ixGroup, bool isLoad)
     {
@@ -82,6 +83,16 @@ namespace WdRiscv
       isIndexed_ = true;
       ixVec_ = ixReg;
       ixGroup_ = ixGroup;
+    }
+
+    /// For strided load/store. Similar to init. Addes stride inof.
+    /// group multiplier, index group multiplier, and type (load or store).
+    void initStrided(unsigned elemCount, unsigned elemSize, unsigned vecReg,
+                     unsigned group, uint64_t stride, bool isLoad)
+    {
+      init(elemCount, elemSize, vecReg, group, isLoad);
+      isStrided_ = true;
+      stride_ = stride;
     }
 
     /// Set the field count. Used for ld/st segment and ld/st whole regs.
@@ -131,9 +142,11 @@ namespace WdRiscv
     unsigned fields_ = 0;             // For load/store segment.
     unsigned group_ = 0;              // Group multiplier or 1 if fractional.
     unsigned ixGroup_ = 0;            // Group multiplier of index vec or 1 if fractional.
+    uint64_t stride_ = 0;             // For strided load/store.
     bool isLoad_ = false;             // True for load instructions.
     bool isIndexed_ = false;          // True for indexed instructions.
     bool isSegmented_ = false;        // True for load/store segment.
+    bool isStrided_ = false;          // True for load/store strided.
     std::vector<VecLdStElem> elems_;  // Element info.
   };
 

@@ -301,7 +301,7 @@ namespace WdRiscv
 
     /// Configure given CSR. Return true on success and false if no such CSR.
     bool configCsrByUser(std::string_view name, bool implemented, URV resetValue, URV mask,
-			 URV pokeMask, bool shared);
+			 URV pokeMask, bool shared, bool isDebug);
 
     /// Configure given CSR. Return true on success and false if no such CSR.
     bool configCsr(std::string_view name, bool implemented, URV resetValue, URV mask,
@@ -398,6 +398,10 @@ namespace WdRiscv
     /// unprivileged spec.
     void enableSemihosting(bool flag)
     { semihostOn_ = flag; }
+
+    /// Enable whisper HINT ops for various functions.
+    void enableHintOps(bool flag)
+    { hintOps_ = flag; }
 
     /// Enable page based memory types.
     void enableTranslationPbmt(bool flag)
@@ -880,28 +884,6 @@ namespace WdRiscv
     /// Return the current state of the Supervisor external interrupt pin.
     bool getSeiPin() const
     { return seiPin_; }
-
-    /// Peek MIP/SIP and modify by supervisor external interrupt pin and mvip.
-    /// This is OR-ed when mvien does not exist or is set to zero. Otherwise,
-    /// the value of SEIP is solely the value of the pin.
-    URV overrideWithSeiPinAndMvip(URV ip) const
-    {
-      if (not isRvs())
-        return ip;
-
-      if (isRvaia())
-        {
-          URV mvien = csRegs_.peekMvien();
-          if (mvien >> URV(InterruptCause::S_EXTERNAL) & 1)
-            ip &= ~URV(1 << URV(InterruptCause::S_EXTERNAL));
-          else
-            {
-              URV mvip = csRegs_.peekMvip();
-              ip |= mvip & URV(1 << URV(InterruptCause::S_EXTERNAL));
-            }
-        }
-      return ip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
-    }
 
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
@@ -1552,9 +1534,17 @@ namespace WdRiscv
     bool isRvzicond() const
     { return extensionIsEnabled(RvExtension::Zicond); }
 
+    /// Return true if the zca extension is enabled.
+    bool isRvzca() const
+    { return extensionIsEnabled(RvExtension::Zca); }
+
     /// Return true if the zcb extension is enabled.
     bool isRvzcb() const
     { return extensionIsEnabled(RvExtension::Zcb); }
+
+    /// Return true if the zcb extension is enabled.
+    bool isRvzcd() const
+    { return extensionIsEnabled(RvExtension::Zcd); }
 
     /// Return true if the zcb extension is enabled.
     bool isRvzfa() const
@@ -2228,6 +2218,10 @@ namespace WdRiscv
     void configVectorLegalizeForEgs(bool flag)
     { vecRegs_.configLegalizeForEgs(flag); }
 
+    /// If flag is true, apply NaN canonicalization to vfredusum/vfwredusum result.
+    void configVectorFpUnorderedSumCanonical(ElementWidth ew, bool flag)
+    { vecRegs_.configVectorFpUnorderedSumCanonical(ew, flag); }
+
     /// Support memory consistency model (MCM) instruction cache. Read 2 bytes from the
     /// given address (must be even) into inst. Return true on success.  Return false if
     /// the line of the given address is not in the cache.
@@ -2389,9 +2383,14 @@ namespace WdRiscv
     bool isVectorTailAgnostic() const
     { return vecRegs_.isTailAgnostic(); }
 
+
     /// Implement part of TIF protocol for writing the "tohost" magical location.
     template<typename STORE_TYPE>
     void handleStoreToHost(URV physAddr, STORE_TYPE value);
+
+    /// Print the instructions of the extensions in the ISA string.
+    void printInstructions(FILE* file) const;
+
 
   protected:
 
@@ -2671,6 +2670,13 @@ namespace WdRiscv
     // by caching its value in this class. We do this whenever HSTATUS
     // is written/poked.
     void updateCachedHstatus();
+
+    /// Update cached HVICTL
+    void updateCachedHvictl()
+    {
+      URV val = csRegs_.peekHvictl();
+      hvictl_.value_ = val;
+    }
 
     /// Write the cached value of MSTATUS (or MSTATUS/MSTATUSH) into the CSR.
     void writeMstatus();
@@ -3067,6 +3073,11 @@ namespace WdRiscv
     /// it. Return true if an nmi or an interrupt is taken and false
     /// otherwise.
     bool processExternalInterrupt(FILE* traceFile, std::string& insStr);
+
+    /// Return true if there is a hypervisor injected interrupt through
+    /// hvictl.
+    bool hasHvi() const
+    { return (hvictl_.bits_.IID != 9) or (hvictl_.bits_.IPRIO != 0); }
 
     /// Helper to FP execution: Or the given flags values to FCSR
     /// recording a write. No-op if a trigger has already tripped.
@@ -5376,6 +5387,7 @@ namespace WdRiscv
     URV effectiveMie_ = 0;          // Effective machine interrupt enable.
     URV effectiveSie_ = 0;          // Effective supervisor interrupt enable.
     URV effectiveVsie_ = 0;         // Effective v supervisor interrupt enable.
+    HvictlFields hvictl_;           // Cached value of hvictl CSR
 
     bool clearMprvOnRet_ = true;
     bool cancelLrOnTrap_ = false;   // Cancel reservation on traps when true.
@@ -5400,6 +5412,7 @@ namespace WdRiscv
 
     bool clearMtvalOnIllInst_ = true;
     bool clearMtvalOnEbreak_ = true;
+    bool lastEbreak_ = false;
 
     bool targetProgFinished_ = false;
     bool stepResult_ = false;        // Set by singleStep on caught exception (program success/fail).
@@ -5539,6 +5552,8 @@ namespace WdRiscv
 
     bool semihostOn_ = false;
     uint64_t semihostSlliTag_ = 0;  // Tag (rank) of slli instruction.
+
+    bool hintOps_ = false; // Enable HINT ops.
 
     // For lockless handling of MIP. We assume the software won't
     // trigger multiple interrupts while handling. To be cleared when

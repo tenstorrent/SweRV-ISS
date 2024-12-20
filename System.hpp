@@ -339,13 +339,13 @@ namespace WdRiscv
 		    const std::vector<uint8_t>& rtlData,
 		    const std::vector<bool>& mask);
 
-    bool mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
-		     uint64_t addr, unsigned size, uint64_t data);
+    bool mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
+                     unsigned size, uint64_t data, unsigned elem, unsigned field);
 
     /// Initiate a write for a store instruction bypassing the merge
     /// buffer.
-    bool mcmBypass(Hart<URV>& hart, uint64_t time, uint64_t tag,
-		   uint64_t addr, unsigned size, uint64_t data);
+    bool mcmBypass(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
+                   unsigned size, uint64_t data, unsigned elem, unsigned field);
 
     /// Initiate a fetch of a line from memory into the isntruction
     /// cache.

@@ -2099,7 +2099,7 @@ bool
 Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
 			       const std::vector<std::string>& tokens)
 {
-  // Format: mread <instr-tag> <physical-address> <size> <rtl-data> [<elem>] [<field>]
+  // Format: mread <instr-tag> <physical-address> <size> <rtl-data> [<elem> [<field>]]
   if (tokens.size() < 5)
     {
       cerr << "Invalid mread command: " << line << '\n';
@@ -2298,8 +2298,8 @@ bool
 Interactive<URV>::mbinsertCommand(Hart<URV>& hart, const std::string& line,
 				  const std::vector<std::string>& tokens)
 {
-  // Format: mbinsert <instr-tag> <physical-address> <size> <rtl-data>
-  if (tokens.size() != 5)
+  // Format: mbinsert <instr-tag> <physical-address> <size> <rtl-data> [<elem> [<field>]]
+  if (tokens.size() < 5)
     {
       cerr << "Invalid mbinsert command. Expecting: mbinsert <tag> <addr> size> <data>\n";
       cerr << "  " << line << '\n';
@@ -2318,12 +2318,21 @@ Interactive<URV>::mbinsertCommand(Hart<URV>& hart, const std::string& line,
   if (not parseCmdLineNumber("size", tokens.at(3), size))
     return false;
 
+  unsigned elem = 0, field = 0;
+  if (tokens.size() > 5)
+    if (not parseCmdLineNumber("element-index", tokens.at(5), elem))
+      return false;
+
+  if (tokens.size() > 6)
+    if (not parseCmdLineNumber("element-field", tokens.at(6), field))
+      return false;
+
   if (size <= 8)
     {
       uint64_t data = 0;
       if (not parseCmdLineNumber("data", tokens.at(4), data))
 	return false;
-      return system_.mcmMbInsert(hart, this->time_, tag, addr, size, data);
+      return system_.mcmMbInsert(hart, this->time_, tag, addr, size, data, elem, field);
     }
 
   // mbinsert for a vector load, expected size is less than that of cache line (64).
@@ -2361,19 +2370,19 @@ Interactive<URV>::mbinsertCommand(Hart<URV>& hart, const std::string& line,
     {
       const uint64_t* vdata = reinterpret_cast<const uint64_t*> (bytes.data());
       for (unsigned i = 0; i < size and ok; i += 8, ++vdata, addr += 8)
-	ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 8, *vdata);
+	ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 8, *vdata, elem, field);
     }
   else if ((size & 0x3) == 0 and (addr & 0x3) == 0)
     {
       const uint32_t* vdata = reinterpret_cast<const uint32_t*> (bytes.data());
       for (unsigned i = 0; i < size and ok; i += 4, ++vdata, addr += 4)
-	ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 4, *vdata);
+	ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 4, *vdata, elem, field);
     }
   else
     {
       const uint8_t* vdata = bytes.data();
       for (unsigned i = 0; i < size and ok; ++i, ++vdata, ++addr)
-	ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 1, *vdata);
+	ok = system_.mcmMbInsert(hart, this->time_, tag, addr, 1, *vdata, elem, field);
     }
 
   return ok;
@@ -2385,8 +2394,8 @@ bool
 Interactive<URV>::mbbypassCommand(Hart<URV>& hart, const std::string& line,
 				  const std::vector<std::string>& tokens)
 {
-  // Format: mbbypass <instr-tag> <physical-address> <size> <data>
-  if (tokens.size() != 5)
+  // Format: mbbypass <instr-tag> <physical-address> <size> <data> [<elem> [<field>]]
+  if (tokens.size() < 5)
     {
       cerr << "Invalid mbbypass command. Expecting: mbbypass <tag> <addr> size> <data>\n";
       cerr << "  " << line << '\n';
@@ -2405,20 +2414,21 @@ Interactive<URV>::mbbypassCommand(Hart<URV>& hart, const std::string& line,
   if (not parseCmdLineNumber("size", tokens.at(3), size))
     return false;
 
-  // For the cbo.zero instruction the size may be 8, 32, or 64. Data value must be zero.
-  if (size > 8 and (size % 8) != 0)
-    {
-      cerr << "Invalid mbbypass size: " << size << " -- Expecting 0 to 8 or a multiple of 8\n";
-      cerr << "  " << line << '\n';
+  unsigned elem = 0, field = 0;
+  if (tokens.size() > 5)
+    if (not parseCmdLineNumber("element-index", tokens.at(5), elem))
       return false;
-    }
+
+  if (tokens.size() > 6)
+    if (not parseCmdLineNumber("element-field", tokens.at(6), field))
+      return false;
 
   if (size <= 8)
     {
       uint64_t data = 0;
       if (not parseCmdLineNumber("data", tokens.at(4), data))
 	return false;
-      return system_.mcmBypass(hart, this->time_, tag, addr, size, data);
+      return system_.mcmBypass(hart, this->time_, tag, addr, size, data, elem, field);
     }
 
   // mbbypass for a vector load, expected size is less than that of cache line (64).
@@ -2456,19 +2466,19 @@ Interactive<URV>::mbbypassCommand(Hart<URV>& hart, const std::string& line,
     {
       const uint64_t* vdata = reinterpret_cast<const uint64_t*> (bytes.data());
       for (unsigned i = 0; i < size and ok; i += 8, ++vdata, addr += 8)
-	ok = system_.mcmBypass(hart, this->time_, tag, addr, 8, *vdata);
+	ok = system_.mcmBypass(hart, this->time_, tag, addr, 8, *vdata, elem, field);
     }
   else if ((size & 0x3) == 0 and (addr & 0x3) == 0)
     {
       const uint32_t* vdata = reinterpret_cast<const uint32_t*> (bytes.data());
       for (unsigned i = 0; i < size and ok; i += 4, ++vdata, addr += 4)
-	ok = system_.mcmBypass(hart, this->time_, tag, addr, 4, *vdata);
+	ok = system_.mcmBypass(hart, this->time_, tag, addr, 4, *vdata, elem, field);
     }
   else
     {
       const uint8_t* vdata = bytes.data();
       for (unsigned i = 0; i < size and ok; ++i, ++vdata, ++addr)
-	ok = system_.mcmBypass(hart, this->time_, tag, addr, 1, *vdata);
+	ok = system_.mcmBypass(hart, this->time_, tag, addr, 1, *vdata, elem, field);
     }
 
   return ok;

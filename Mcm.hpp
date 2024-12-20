@@ -30,7 +30,6 @@ namespace WdRiscv
     uint64_t   insertTime_     = 0;  // Time of merge buffer insert (if applicable).
     uint16_t   elemIx_         = 0;  // Vector element index.
     uint16_t   field_          = 0;  // Vector element field (for segment load).
-    uint16_t   insertOrder_    = 0;  // Order of mbinsert operation in its instruction.
     uint8_t    hartIx_    : 8  = 0;
     uint8_t    size_      : 8  = 0;
     bool       isRead_    : 1  = false;
@@ -165,7 +164,7 @@ namespace WdRiscv
   public:
 
     enum PpoRule { R1 = 1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12,
-		   R13, Limit };
+		   R13, Io, Limit };
 
     /// Constructor.
     Mcm(unsigned hartCount, unsigned pageSize, unsigned mergeBufferSize);
@@ -183,8 +182,8 @@ namespace WdRiscv
 		unsigned size, uint64_t rtlData, unsigned elemIx, unsigned field);
 
     /// This is a write operation bypassing the merge buffer.
-    bool bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-		  uint64_t physAddr, unsigned size, uint64_t rtlData);
+    bool bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa,
+                  unsigned size, uint64_t rtlData, unsigned elem, unsigned field);
 
     /// Initiate a merge buffer write.  All associated store write
     /// transactions are marked completed. Write instructions where
@@ -202,8 +201,8 @@ namespace WdRiscv
     /// Insert a write operation for the given instruction into the merge buffer removing
     /// it from the store buffer. Return true on success. Size is expected to be less than
     /// or equal to 8. Larger inserts must be split by the caller.
-    bool mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-			   uint64_t physAddr, unsigned size, uint64_t rtlData);
+    bool mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa,
+                           unsigned size, uint64_t rtlData, unsigned elem, unsigned field);
 
     /// Cancel all the memory operations associated with the given tag. This is
     /// done when a speculative instruction is canceled or when an instruction
@@ -233,20 +232,21 @@ namespace WdRiscv
     void enableTso(bool flag)
     { isTso_ = flag; }
 
-    /// Return the earliest memory time for the byte at the given
-    /// address. Return 0 if address is not covered by given instruction.
+    /// Return the earliest memory time for the byte at the given address. Return 0 if
+    /// address is not covered by given instruction.
     uint64_t earliestByteTime(const McmInstr& instr, uint64_t addr) const;
 
-    /// Return the earliest memory time for the byte at the given
-    /// address given an element index.
-    /// Return 0 if address is not covered by given instruction.
-    uint64_t earliestByteTime(const McmInstr& instr, uint64_t addr,
-                              unsigned elemIx) const;
+    /// Return the earliest memory time for the byte at the given address and given element
+    /// index.  Return 0 if address is not covered by given instruction.
+    uint64_t earliestByteTime(const McmInstr& instr, uint64_t addr, unsigned ix) const;
 
-    /// Return the latest memory time for the byte at the given
-    /// address. Return max value if address is not covered by given
-    /// instruction.
+    /// Return the latest memory time for the byte at the given address. Return max value
+    /// if address is not covered by given instruction.
     uint64_t latestByteTime(const McmInstr& instr, uint64_t addr) const;
+
+    /// Return the latest memory time for the byte at the given address and given element
+    /// index. Return max value if address is not covered by given instruction.
+    uint64_t latestByteTime(const McmInstr& instr, uint64_t addr, unsigned ix) const;
 
     /// Return the effective earliest memory time for the byte at the given
     /// address. Return 0 if address is not covered by given instruction.
@@ -310,6 +310,8 @@ namespace WdRiscv
 
     /// Check PPO rule13. See ppoRule1.
     bool ppoRule13(Hart<URV>& hart, const McmInstr& instr) const;
+
+    bool ioPpoChecks(Hart<URV>& hart, const McmInstr& instr) const;
 
     /// Helper to main ppoRule1. Check A against B.
     bool ppoRule1(unsigned hartId, const McmInstr& instrA, const McmInstr& instrB) const;
@@ -431,6 +433,10 @@ namespace WdRiscv
     void printPpo1Error(unsigned hartId, McmInstrIx tag1, McmInstrIx tag2, uint64_t t1,
 			uint64_t t2, uint64_t pa) const;
 
+    /// Helper to read-commit methods: commitReadOps & commitVecReadOPs.
+    void printReadMismatch(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
+                           unsigned size, uint64_t rtlData, uint64_t refData) const;
+
     /// Read up to a double word (size <= 8) from the reference model memory.
     bool referenceModelRead(Hart<URV>& hart, uint64_t pa, unsigned size, uint64_t& val);
 
@@ -465,16 +471,16 @@ namespace WdRiscv
     /// Similar to above but for vector instructions.
     bool commitVecReadOps(Hart<URV>& hart, McmInstr& instr);
 
+    /// Helper to comitVecReadOps for strided with stride 0.
+    bool commitVecReadOpsStride0(Hart<URV>& hart, McmInstr& instr);
+
+    /// Helper to comitVecReadOps for unit stride.
+    bool commitVecReadOpsUnitStride(Hart<URV>& hart, McmInstr& instr);
+
     /// Helper to commitVecReadOps: Collect the reference (Whisper) element info:
     /// address, index, field, data-reg, index-reg. Determine the number of
     /// active (non-masked) elements.
     void collectVecRefElems(Hart<URV>& hart, McmInstr& instr, unsigned& activeCount);
-
-    /// Heler to commitVecReadOps. A large read-op that covers multiple elements will get
-    /// split into multiple sub-ops of size 8 or less each.  When the split is done we do
-    /// not know the element size, so all the pieces get assigned the same element index
-    /// and field. We assign the correct element index and field here.
-    void repairVecReadOps(Hart<URV>& hart, McmInstr& instr);
 
     /// Compute a mask of the instruction data bytes covered by the
     /// given memory operation. Return 0 if the operation does not
