@@ -112,7 +112,6 @@ namespace WdRiscv
     Uint64Vec steesr;
     std::optional<uint64_t> alarmInterval;
     std::optional<uint64_t> clint;        // Advanced core-local-interrupt (CLINT) mem mapped address
-    std::optional<uint64_t> syscallSlam;
     std::optional<uint64_t> instCounter;
     std::optional<uint64_t> branchWindow;
     std::optional<uint64_t> logStart;

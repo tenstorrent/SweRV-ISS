@@ -394,6 +394,11 @@ namespace WdRiscv
     void configAddressTranslationPmms(const std::vector<VirtMem::Pmm>& pmms)
     { virtMem_.setSupportedPmms(pmms); }
 
+    /// Enable support for ebreak semi-hosting.  See ebreak documentation in the
+    /// unprivileged spec.
+    void enableSemihosting(bool flag)
+    { semihostOn_ = flag; }
+
     /// Enable page based memory types.
     void enableTranslationPbmt(bool flag)
     { enableExtension(RvExtension::Svpbmt, flag); updateTranslationPbmt(); }
@@ -488,6 +493,38 @@ namespace WdRiscv
           else if (isRvu())
             virtMem_.enablePointerMasking(VirtMem::Pmm(pmm), PM::User, false);
         }
+    }
+
+    /// Called when landing pad configuration changes.
+    void updateLandingPadEnable()
+    {
+      if (not isRvZicfilp())
+        return;
+
+      mLpEnabled_ = csRegs_.mseccfgMlpe();
+      if (isRvs())
+        {
+          sLpEnabled_ = csRegs_.menvcfgLpe();
+          if (isRvu())
+            uLpEnabled_ = csRegs_.senvcfgLpe();
+          if (isRvh())
+            vsLpEnabled_ = csRegs_.henvcfgLpe();
+        }
+      else
+        {
+          if (isRvu())
+            uLpEnabled_ = csRegs_.menvcfgLpe();
+        }
+    }
+
+    /// Given the privilege and virtual mode, determines if landing
+    /// pad is enabled.
+    bool isLandingPadEnabled(PrivilegeMode mode, bool virt)
+    {
+      return (mode == PrivilegeMode::Machine and mLpEnabled_) or
+             (mode == PrivilegeMode::Supervisor and not virt and sLpEnabled_) or
+             (mode == PrivilegeMode::Supervisor and virt and vsLpEnabled_) or
+             (mode == PrivilegeMode::User and uLpEnabled_);
     }
 
     /// Applies pointer mask w.r.t. effective privilege mode, effective
@@ -806,16 +843,16 @@ namespace WdRiscv
     /// Return true on success and false on failure (address out of
     /// bounds, location not mapped, location not writable etc...)
     /// Bypass physical memory attribute checking if usePma is false.
-    bool pokeMemory(uint64_t addr, uint8_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint8_t val, bool usePma, bool skipFetch = false);
 
     /// Half-word version of the preceding method.
-    bool pokeMemory(uint64_t address, uint16_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint16_t val, bool usePma, bool skipFetch = false);
 
     /// Word version of the preceding method.
-    bool pokeMemory(uint64_t addr, uint32_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint32_t val, bool usePma, bool skipFetch = false);
 
     /// Double-word version of the preceding method.
-    bool pokeMemory(uint64_t addr, uint64_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint64_t val, bool usePma, bool skipFetch = false);
 
     /// Define value of program counter after a reset.
     void defineResetPc(URV addr)
@@ -1034,9 +1071,6 @@ namespace WdRiscv
     bool getLastVecLdStRegsUsed(const DecodedInst& di, unsigned opIx,
                                 unsigned& regBase, unsigned& regCount) const;
 
-    void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const
-    { syscall_.getMemoryChanges(v); }
-
     /// Return data size if last instruction is a ld/st instruction (AMO is considered a
     /// store) setting virtAddr and physAddr to the corresponding virtual and physical
     /// data addresses. Return 0 if last instruction was not a ld/st instruction
@@ -1113,6 +1147,14 @@ namespace WdRiscv
     /// Return count of interrupts seen by this hart.
     uint64_t getInterruptCount() const
     { return interruptCount_; }
+
+    /// Get the value of ELP.
+    bool getElp() const
+    { return elp_; }
+
+    /// Set the ELP value.
+    void setElp(bool val)
+    { elp_ = val; }
 
     /// Set pre and post to the count of "before"/"after" triggers
     /// that tripped by the last executed instruction.
@@ -1196,6 +1238,10 @@ namespace WdRiscv
     /// Enable/disable zkr extension.
     void enableZkr(bool flag)
     { enableExtension(RvExtension::Zkr, flag); csRegs_.enableZkr(flag); }
+
+    /// Enable/disable Zicfilp extension.
+    void enableZicfilp(bool flag)
+    { enableExtension(RvExtension::Zicfilp, flag); csRegs_.enableZicfilp(flag); }
 
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
@@ -1286,6 +1332,10 @@ namespace WdRiscv
     /// Return physical memory attribute region of a given address.
     Pma getPma(uint64_t addr) const
     { return memory_.pmaMgr_.getPma(addr); }
+
+    /// Simialr to above but performs an "access".
+    Pma accessPma(uint64_t addr, PmaManager::AccessReason reason) const
+    { return memory_.pmaMgr_.accessPma(addr, reason); }
 
     /// Return true if given extension is statically enabled (enabled my
     /// --isa but may be turned off by the MSTATUS/MISA CSRs).
@@ -1532,6 +1582,9 @@ namespace WdRiscv
 
     bool isRvSmnpm() const
     { return extensionIsEnabled(RvExtension::Smnpm); }
+
+    bool isRvZicfilp() const
+    { return extensionIsEnabled(RvExtension::Zicfilp); }
 
     /// Return true if current program is considered finished (either
     /// reached stop address or executed exit limit).
@@ -1943,15 +1996,6 @@ namespace WdRiscv
     bool unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
                                 Pmp::Mode& mode, bool& locked,
                                 uint64_t& low, uint64_t& high) const;
-
-
-    /// an emulated system call. If addr is zero, no slamming is done.
-    void defineSyscallSlam(URV addr)
-    { syscallSlam_ = addr; }
-
-    /// Return the address set by defineSyscallSlam.
-    URV syscallSlam() const
-    { return syscallSlam_; }
 
     /// Force floating point rounding mode to the given mode
     /// regardless of the setting of the FRM CSR. This is useful for
@@ -5128,6 +5172,10 @@ namespace WdRiscv
 
     //Zcmop
     void execCmop(const DecodedInst*);
+
+    // Zicfilp
+    void execLpad(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
@@ -5196,7 +5244,6 @@ namespace WdRiscv
     VecRegs vecRegs_;            // Vector register file.
 
     Syscall<URV>& syscall_;
-    URV syscallSlam_ = 0;        // Area in which to slam syscall mem changes.
 
     bool forceRounding_ = false;
     RoundingMode forcedRounding_ = RoundingMode::NearestEven;
@@ -5404,6 +5451,13 @@ namespace WdRiscv
     bool steeInsec1_ = false;  // True if insecure access to a secure region.
     bool steeInsec2_ = false;  // True if insecure access to a secure region.
 
+    // Landing pad (zicfilp)
+    bool mLpEnabled_ = false;
+    bool sLpEnabled_ = false;
+    bool vsLpEnabled_ = false;
+    bool uLpEnabled_ = false;
+    bool elp_ = false;
+
     VirtMem virtMem_;
     Isa isa_;
     Decoder decoder_;
@@ -5482,6 +5536,9 @@ namespace WdRiscv
 
     bool traceHeaderPrinted_ = false;
     bool ownTrace_ = false;
+
+    bool semihostOn_ = false;
+    uint64_t semihostSlliTag_ = 0;  // Tag (rank) of slli instruction.
 
     // For lockless handling of MIP. We assume the software won't
     // trigger multiple interrupts while handling. To be cleared when

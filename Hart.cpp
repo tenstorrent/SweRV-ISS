@@ -424,6 +424,7 @@ Hart<URV>::processExtensions(bool verbose)
   enableSsnpm(isa_.isEnabled(RvExtension::Ssnpm));
   enableSmnpm(isa_.isEnabled(RvExtension::Smnpm));
   enableAiaExtension(isa_.isEnabled(RvExtension::Smaia));
+  enableZicfilp(isa_.isEnabled(RvExtension::Zicfilp));
 
   stimecmpActive_ = csRegs_.menvcfgStce();
   vstimecmpActive_ = csRegs_.henvcfgStce();
@@ -932,13 +933,15 @@ Hart<URV>::peekMemory(uint64_t address, uint64_t& val, bool usePma) const
 
 template <typename URV>
 bool
-Hart<URV>::pokeMemory(uint64_t addr, uint8_t val, bool usePma)
+Hart<URV>::pokeMemory(uint64_t addr, uint8_t val, bool usePma, bool skipFetch)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
   invalidateDecodeCache(addr, sizeof(val));
-  pokeFetchCache(addr, val);
+
+  if (not skipFetch)
+    pokeFetchCache(addr, val);
 
   return memory_.poke(addr, val, usePma);
 }
@@ -946,7 +949,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint8_t val, bool usePma)
 
 template <typename URV>
 bool
-Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
+Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma, bool skipFetch)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
@@ -959,8 +962,11 @@ Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
       return true;
     }
 
-  pokeFetchCache(addr, uint8_t(val));
-  pokeFetchCache(addr + 1, uint8_t(val >> 8));
+  if (not skipFetch)
+    {
+      pokeFetchCache(addr, uint8_t(val));
+      pokeFetchCache(addr + 1, uint8_t(val >> 8));
+    }
 
   return memory_.poke(addr, val, usePma);
 }
@@ -968,7 +974,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
 
 template <typename URV>
 bool
-Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
+Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma, bool skipFetch)
 {
   // We allow poke to bypass masking for memory mapped registers
   // otherwise, there is no way for external driver to clear bits that
@@ -986,8 +992,9 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
       return true;
     }
 
-  for (unsigned i = 0; i < sizeof(val); ++i)
-    pokeFetchCache(addr + i, uint8_t(val >> (i*8)));
+  if (not skipFetch)
+    for (unsigned i = 0; i < sizeof(val); ++i)
+      pokeFetchCache(addr + i, uint8_t(val >> (i*8)));
 
   return memory_.poke(addr, val, usePma);
 }
@@ -995,7 +1002,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
 
 template <typename URV>
 bool
-Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
+Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma, bool skipFetch)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
@@ -1009,8 +1016,9 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
       return true;
     }
 
-  for (unsigned i = 0; i < sizeof(val); ++i)
-    pokeFetchCache(addr + i, uint8_t(val >> (i*8)));
+  if (not skipFetch)
+    for (unsigned i = 0; i < sizeof(val); ++i)
+      pokeFetchCache(addr + i, uint8_t(val >> (i*8)));
 
   return memory_.poke(addr, val, usePma);
 }
@@ -1560,7 +1568,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       uint64_t a1 = addr1;
       if (steeEnabled_)
 	a1 = stee_.clearSecureBits(addr1);
-      Pma pma = getPma(a1);
+      Pma pma = accessPma(a1, PmaManager::AccessReason::LdSt);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
@@ -1615,7 +1623,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
     }
 
   // Check PMA.
-  Pma pma = getPma(addr1);
+  Pma pma = accessPma(addr1, PmaManager::AccessReason::LdSt);
   if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
     return EC::LOAD_ACC_FAULT;
 
@@ -1624,7 +1632,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       uint64_t aligned = addr1 & ~alignMask;
       uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
       ldStFaultAddr_ = va2;
-      pma = getPma(next);
+      pma = accessPma(next, PmaManager::AccessReason::LdSt);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
 	return EC::LOAD_ACC_FAULT;
@@ -2929,6 +2937,8 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt,
       mstatus_.bits_.MIE = 0;
       mstatus_.bits_.GVA = gva;
       mstatus_.bits_.MPV = origVirtMode;
+      if (isRvZicfilp())
+        mstatus_.bits_.MPELP = elp_;
       writeMstatus();
       if (isRvh() and not csRegs_.write(CsrNumber::MTVAL2, privMode_, tval2))
         assert(0 and "Failed to write MTVAL2 register");
@@ -2944,6 +2954,8 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt,
       msf.bits_.SPP = unsigned(origMode);
       msf.bits_.SPIE = msf.bits_.SIE;
       msf.bits_.SIE = 0;
+      if (isRvZicfilp())
+        msf.bits_.SPELP = elp_;
       if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, msf.value_))
 	assert(0 and "Failed to write SSTATUS register");
       if (not virtMode_)
@@ -2984,6 +2996,10 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt,
 
   if (tvecMode == TrapVectorMode::Vectored and interrupt)
     base = base + 4*cause;
+
+  // Reset ELP.
+  if (isRvZicfilp())
+    setElp(false);
 
   // If exception happened while in an NMI handler, we go to the NMI exception
   // handler address.
@@ -3044,6 +3060,12 @@ Hart<URV>::initiateNmi(URV cause, URV pcToSave)
 
       mnf.bits_.MNPV = virtMode_;  // Save virtual mode
       setVirtualMode(false);  // Clear virtual mode
+
+      if (isRvZicfilp())
+        {
+          mnf.bits_.MNPELP = elp_;
+          setElp(false);
+        }
 
       if (not csRegs_.write(CsrNumber::MNEPC, privMode_, pcToSave))
         assert(0 and "Failed to write MNEPC register");
@@ -3476,12 +3498,16 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       updateTranslationPbmt();
       updateTranslationAdu();
       updateTranslationPmm();
+      updateLandingPadEnable();
       csRegs_.updateSstc();
       stimecmpActive_ = csRegs_.menvcfgStce();
       vstimecmpActive_ = csRegs_.henvcfgStce();
     }
   else if (csr == CN::MSECCFG)
-    updateTranslationPmm();
+    {
+      updateTranslationPmm();
+      updateLandingPadEnable();
+    }
 
   if (csr == CN::STIMECMP)
     {
@@ -4396,7 +4422,6 @@ Hart<URV>::clearTraceData()
   fpRegs_.clearLastWrittenReg();
   csRegs_.clearLastWrittenRegs();
   memory_.clearLastWriteInfo(hartIx_);
-  syscall_.clearMemoryChanges();
   vecRegs_.clearTraceData();
   virtMem_.clearPageTableWalk();
   pmpManager_.clearPmpTrace();
@@ -4441,10 +4466,7 @@ bool
 Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args,
                                 const std::vector<std::string>& envVars)
 {
-  URV sp = 0;
-
-  if (not peekIntReg(RegSp, sp))
-    return false;
+  URV sp = peekIntReg(RegSp);
 
   // Make sp 16-byte aligned.
   if ((sp & 0xf) != 0)
@@ -5528,8 +5550,7 @@ Hart<URV>::isInterruptPossible(URV mip, URV sip, URV vsip, InterruptCause& cause
   if (vsdest)
     {
       // Only VS interrupts can be delegated in HIDELEG.
-      for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
-                                 IC::VS_TIMER, IC::LCOF } )
+      for (InterruptCause ic : { IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER, IC::LCOF } )
         {
           URV mask = URV(1) << unsigned(ic);
           if ((vsdest & mask) != 0)
@@ -5857,6 +5878,12 @@ void
 Hart<URV>::execute(const DecodedInst* di)
 {
   const InstEntry* entry = di->instEntry();
+
+  if (isRvZicfilp() and elp_)
+    {
+      execLpad(di);
+      return;
+    }
 
   switch (entry->instId())
     {
@@ -9517,6 +9544,11 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
       dcsr.bits_.CAUSE = URV(cause);
       dcsr.bits_.PRV = URV(privMode_) & 0x3;
       dcsr.bits_.V = virtMode_;
+      if (isRvZicfilp())
+        {
+          dcsr.bits_.PELP = elp_;
+          setElp(false);
+        }
 
       if (nmiPending_)
         dcsr.bits_.NMIP = 1;
@@ -9586,6 +9618,10 @@ Hart<URV>::exitDebugMode()
   // Restore virtual mode.
   bool vm = dcsrf.bits_.V;
   setVirtualMode(vm);
+
+  // Restore ELP.
+  if (isRvZicfilp())
+    setElp(isLandingPadEnabled(pm, vm)? dcsrf.bits_.PELP : false);
 }
 
 
@@ -9694,6 +9730,11 @@ Hart<URV>::execJalr(const DecodedInst* di)
       setPc(nextPc);
       intRegs_.write(di->op0(), temp);
       lastBranchTaken_ = true;
+      if (isRvZicfilp())
+        {
+          if (isLandingPadEnabled(privMode_, virtMode_))
+            setElp((di->op1() != 1) and (di->op1() != 5) and (di->op1() != 7));
+        }
     }
 }
 
@@ -9751,6 +9792,13 @@ Hart<URV>::execSlli(const DecodedInst* di)
 
   URV v = intRegs_.read(di->op1()) << amount;
   intRegs_.write(di->op0(), v);
+
+  if (semihostOn_ and not isCompressedInst(di->inst()))
+    {
+      // Start of semi-hosting sequence: See section 2.8 (ebreak) of unprivileged spec.
+      if (di->op0() == 0 and di->op1() == 0 and amount == 0x1f)
+        semihostSlliTag_ = instCounter_;
+    }
 }
 
 
@@ -9805,8 +9853,22 @@ Hart<URV>::execSrai(const DecodedInst* di)
   if (not checkShiftImmediate(di, amount))
     return;
 
-  URV v = SRV(intRegs_.read(di->op1())) >> amount;
-  intRegs_.write(di->op0(), v);
+  URV val = SRV(intRegs_.read(di->op1())) >> amount;
+
+  // End of semi-hosting sequence: See section 2.8 (ebreak) of unprivileged spec.
+  if (semihostOn_ and not isCompressedInst(di->inst()) and
+      di->op0() == 0 and di->op1() == 0 and amount == 0x7 and
+      instCounter_ == semihostSlliTag_ + 2)
+    {
+      URV a0 = peekIntReg(RegA0);
+      URV a1 = peekIntReg(RegA1);
+      a0 = syscall_.emulateSemihost(hartIx_, a0, a1);
+      intRegs_.write(RegA0, a0);
+    }
+  else
+    intRegs_.write(di->op0(), val);
+
+  semihostSlliTag_ = 0;
 }
 
 
@@ -9960,12 +10022,20 @@ Hart<URV>::execEcall(const DecodedInst*)
   if (triggerTripped_)
     return;
 
-  if (newlib_ or linux_ or syscallSlam_)
+  if (newlib_ or linux_)
     {
-      URV a0 = syscall_.emulate(hartIx_);
+
+      unsigned sysReg = isRve() ? RegT0 : RegA7; // Reg containting syscall number.
+      URV sysIx = peekIntReg(sysReg);  // Syscall number.
+
+      URV a0 = peekIntReg(RegA0);  // Syscall params.
+      URV a1 = peekIntReg(RegA1);
+      URV a2 = peekIntReg(RegA2);
+      URV a3 = peekIntReg(RegA3);
+
+      a0 = syscall_.emulate(hartIx_, sysIx, a0, a1, a2, a3);
       intRegs_.write(RegA0, a0);
-      if (not syscallSlam_)
-        return;
+      return;
     }
 
   if (privMode_ == PrivilegeMode::Machine)
@@ -9984,10 +10054,16 @@ Hart<URV>::execEcall(const DecodedInst*)
 
 template <typename URV>
 void
-Hart<URV>::execEbreak(const DecodedInst*)
+Hart<URV>::execEbreak(const DecodedInst* di)
 {
   if (triggerTripped_)
     return;
+
+  // If semihosting is on and the ebreak follows a special slli, then it is a service call
+  // instead of a debugger break. See section 2.8 (ebreak) of unprivileged spec.
+  if (semihostOn_ and not isCompressedInst(di->inst()) and instCounter_ ==  semihostSlliTag_ + 1)
+    return;
+  semihostSlliTag_ = 0;
 
   if (enableGdb_)
     {
@@ -10214,7 +10290,14 @@ namespace WdRiscv
     // 1.4. Clear virtual (V) mode.
     fields.bits_.MPV = 0;
 
-    // 1.5. Write back MSTATUS.
+    // 1.5. Restore ELP.
+    if (isRvZicfilp())
+      {
+        setElp(isLandingPadEnabled(savedMode, savedVirt)? fields.bits_.MPELP : false);
+        fields.bits_.MPELP = false;
+      }
+
+    // 1.6. Write back MSTATUS.
     if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, fields.value_))
       assert(0 and "Failed to write MSTATUS register\n");
     updateCachedMstatus();
@@ -10275,7 +10358,14 @@ namespace WdRiscv
     // 1.4. Clear virtual (V) mode.
     hvalue &= ~ uint32_t(1 << 7);
 
-    // 1.5. Write back MSTATUS.
+    // 1.5. Restore ELP.
+    if (isRvZicfilp())
+      {
+        setElp(isLandingPadEnabled(savedMode, savedVirt)? ((hvalue >> 9) & 1) : false);
+        hvalue &= ~ uint32_t(1 << 9);
+      }
+
+    // 1.6. Write back MSTATUS.
     if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, fields.value_))
       assert(0 and "Failed to write MSTATUS register\n");
     if (not csRegs_.write(CsrNumber::MSTATUSH, privMode_, hvalue))
@@ -10345,6 +10435,7 @@ Hart<URV>::execSret(const DecodedInst* di)
   // ... updating/unpacking its fields,
   MstatusFields<URV> fields(value);
   PrivilegeMode savedMode = fields.bits_.SPP? PrivilegeMode::Supervisor : PrivilegeMode::User;
+  bool savedVirt = hstatus_.bits_.SPV;
 
   // Restore SIE.
   fields.bits_.SIE = fields.bits_.SPIE;
@@ -10360,14 +10451,20 @@ Hart<URV>::execSret(const DecodedInst* di)
   if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
     fields.bits_.MPRV = 0;
 
+  // Set ELP.
+  if (isRvZicfilp())
+    {
+      setElp(isLandingPadEnabled(savedMode, savedVirt)? fields.bits_.SPELP : false);
+      fields.bits_.SPELP = 0;
+    }
+
   // ... and putting it back
   if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, fields.value_))
     assert(0);
   updateCachedSstatus();
 
   // Clear hstatus.spv if sret executed in M/S modes.
-  bool savedVirtMode = hstatus_.bits_.SPV;
-  if (not virtMode_ and savedVirtMode)
+  if (not virtMode_ and savedVirt)
     {
       hstatus_.bits_.SPV = 0;
       if (not csRegs_.write(CsrNumber::HSTATUS, privMode_, hstatus_.value_))
@@ -10385,7 +10482,7 @@ Hart<URV>::execSret(const DecodedInst* di)
 
   // Update virtual mode.
   if (not virtMode_)
-    setVirtualMode(savedVirtMode);
+    setVirtualMode(savedVirt);
 
   // Update privilege mode.
   privMode_ = savedMode;
@@ -11404,7 +11501,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       uint64_t a1 = addr1;
       if (steeEnabled_)
 	a1 = stee_.clearSecureBits(addr1);
-      Pma pma = getPma(a1);
+      Pma pma = accessPma(a1, PmaManager::AccessReason::LdSt);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
@@ -11459,7 +11556,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
     }
 
   // Check PMA.
-  Pma pma = getPma(addr1);
+  Pma pma = accessPma(addr1, PmaManager::AccessReason::LdSt);
   if (not pma.isWrite())
     return EC::STORE_ACC_FAULT;
 
@@ -11467,7 +11564,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
     {
       uint64_t aligned = addr1 & ~alignMask;
       uint64_t next = addr1 == addr2? aligned + stSize : addr2;
-      pma = getPma(next);
+      pma = accessPma(next, PmaManager::AccessReason::LdSt);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isWrite())
 	{
@@ -12264,39 +12361,61 @@ template <typename URV>
 void
 Hart<URV>::execMop_r(const DecodedInst* di)
 {
-    if (not isRvzimop())
-      {
-        illegalInst(di);
-        return;
-      }
-    URV value = 0;
-    intRegs_.write(di->op0(), value);
+  if (not isRvzimop())
+    {
+      illegalInst(di);
+      return;
+    }
+  URV value = 0;
+  intRegs_.write(di->op0(), value);
 }
 
 template <typename URV>
 void
 Hart<URV>::execMop_rr(const DecodedInst* di)
 {
-    if (not isRvzimop())
-      {
-        illegalInst(di);
-        return;
-      }
-    URV value = 0;
-    intRegs_.write(di->op0(), value);
+  if (not isRvzimop())
+    {
+      illegalInst(di);
+      return;
+    }
+  URV value = 0;
+  intRegs_.write(di->op0(), value);
 }
 
 template <typename URV>
 void
 Hart<URV>::execCmop(const DecodedInst* di)
 {
-    if (not isRvzcmop() || not isRvc())
-      {
-        illegalInst(di);
-        return;
-      }
-    URV value = 0;
-    intRegs_.write(RegX0, value);
+  if (not isRvzcmop() || not isRvc())
+    {
+      illegalInst(di);
+      return;
+    }
+  URV value = 0;
+  intRegs_.write(RegX0, value);
+}
+
+template <typename URV>
+void
+Hart<URV>::execLpad(const DecodedInst* di)
+{
+  if (di->instId() != InstId::auipc or
+      di->op0() != RegX0 or
+      currPc_ & 3) // PC must be word aligned.
+    {
+      initiateException(ExceptionCause::SOFTWARE_CHECK, currPc_, 2 /* Landing pad */);
+      return;
+    }
+
+  uint32_t lpl = di->op1();
+  URV expected = (intRegs_.read(RegX7) & 0xfffff000); // Must match bits 31:12
+  if (lpl != 0 and expected != lpl)
+    {
+      initiateException(ExceptionCause::SOFTWARE_CHECK, currPc_, 2 /* Landing pad */);
+      return;
+    }
+  setElp(false);
 }
 
 template

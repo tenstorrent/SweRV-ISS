@@ -799,9 +799,6 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
 
   hart.enableConsoleInput(! args.noConInput);
 
-  if (args.syscallSlam)
-    hart.defineSyscallSlam(*args.syscallSlam);
-
   if (args.tracePtw)
     hart.tracePtw(true);
 

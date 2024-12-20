@@ -67,6 +67,7 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "sstc", RvExtension::Sstc },
   { "svpbmt", RvExtension::Svpbmt },
   { "svadu", RvExtension::Svadu },
+  { "svade", RvExtension::Svade },
   { "smaia", RvExtension::Smaia },
   { "ssaia", RvExtension::Ssaia },
   { "zacas", RvExtension::Zacas },
@@ -85,6 +86,7 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "smstateen", RvExtension::Smstateen },
   { "ssqosid", RvExtension::Ssqosid },
   { "sdtrig", RvExtension::Sdtrig },
+  { "zicfilp", RvExtension::Zicfilp },
 });
 static_assert(STRING_EXT_PAIRS.size() == static_cast<unsigned>(RvExtension::None));
 
@@ -152,6 +154,7 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Sstc)) = Info{ {{0,5}}, {0,5} };
   infoVec_.at(extIx(RvExtension::Svpbmt)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Svadu)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Svade)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Smaia)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Ssaia)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zacas)) = Info{ {{1,0}}, {1,0} };
@@ -169,6 +172,7 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Sscofpmf)) = Info{ {{0,5}}, {0,5} };
   infoVec_.at(extIx(RvExtension::Ssqosid)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Sdtrig)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zicfilp)) = Info{ {{1,0}}, {1,0} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
 }
