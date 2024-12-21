@@ -4006,16 +4006,6 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
       bool succIn = fence.di_.isFencePredInput();
       bool succOut = fence.di_.isFencePredOutput();
 
-      // We assume that stores following a fence in program order cannot drain before
-      // fence is retired.
-      if (succ.isStore_ and earlyB <= fence.retireTime_)
-	{
-	  cerr << "Error: PPO rule 4 failed: Hart-id=" << hart.hartId() << " tag="
-	       << succ.tag_ << " fence-tag= " << fence.tag_ << " store instruction "
-	       << "drains before preceding fence instruction retires\n";
-	  return false;
-	}
-
       for (auto aOpPtr : reordered)
 	{
 	  const auto& aOp = *aOpPtr;
