@@ -2590,7 +2590,7 @@ HartConfig::getEnabledPpos(std::vector<unsigned>& enabledPpos) const
 	  if (not getJsonBoolean(tag, config_ -> at(tag), flag))
 	    return false;
 	  if (flag)
-	    for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Limit; ++i)
+	    for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Io; ++i) // Temporary: Skip Io.
 	      enabledPpos.push_back(i);
 	}
       else if (ep.is_array())
@@ -2612,8 +2612,8 @@ HartConfig::getEnabledPpos(std::vector<unsigned>& enabledPpos) const
     }
   else
     {
-      // Tag is missing: all rules enabled.
-      for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Limit; ++i)
+      // Tag is missing: all rules enabled. Temporary: Skip Io.
+      for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Io; ++i)
 	enabledPpos.push_back(i);
     }
 
