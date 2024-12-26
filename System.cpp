@@ -833,6 +833,7 @@ System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll,
       {
 	typedef typename Mcm<URV>::PpoRule Rule;
 	Rule rule = Rule(ppoIx);
+        std::cerr << "System::enableMcm:: Enabling " << ppoIx << "\n";
 	mcm_->enablePpo(rule, true);
       }
 
@@ -861,7 +862,7 @@ System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll, bool enablePpos
 
   typedef typename Mcm<URV>::PpoRule Rule;
 
-  for (unsigned ix = 0; ix < Rule::Limit; ++ix)
+  for (unsigned ix = 0; ix < Rule::Io; ++ix)   // Temporary: Disable IO rule.
     {
       Rule rule = Rule(ix);
       mcm_->enablePpo(rule, enablePpos);
