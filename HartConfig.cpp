@@ -2603,6 +2603,7 @@ HartConfig::getEnabledPpos(std::vector<unsigned>& enabledPpos) const
 	  // Keep valid rule numbers
 	  for (auto ix : temp)
 	    {
+              std::cerr << "getEnabledPpos: got " << ix << '\n';
 	      if (ix < Mcm<uint64_t>::PpoRule::Limit)
 		enabledPpos.push_back(ix);
 	      else
