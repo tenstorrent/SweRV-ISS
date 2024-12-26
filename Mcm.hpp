@@ -264,7 +264,11 @@ namespace WdRiscv
 
     /// Skip checking given preserve program order (PPO) rule if flag is false.
     void enablePpo(PpoRule rule, bool flag)
-    { ppoEnabled_.at(rule) = flag; }
+    {
+      if (flag)
+        std::cerr << "Enabling ppo rule " << unsigned(rule) << '\n';
+      ppoEnabled_.at(rule) = flag;
+    }
 
     /// Return true if given rule is enabled.
     bool isEnabled(PpoRule rule) const
