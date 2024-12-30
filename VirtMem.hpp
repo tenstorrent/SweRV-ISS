@@ -65,12 +65,7 @@ namespace WdRiscv
     /// Similar to translate but targeting only execute access.
     ExceptionCause translateForFetch(uint64_t va, PrivilegeMode pm, bool twoStage,
 				     uint64_t& gpa, uint64_t& pa)
-    {
-      forFetch_ = true;
-      auto cause = translate(va, pm, twoStage, false, false, true, gpa, pa);
-      forFetch_ = false;
-      return cause;
-    }
+    { return translate(va, pm, twoStage, false, false, true, gpa, pa); }
 
     /// Similar to translate but targeting only read access.
     [[deprecated("Use translateForLoad2 instead.")]]
@@ -788,6 +783,10 @@ namespace WdRiscv
     /// Return prior trace setting.
     bool enableTrace(bool flag)
     { bool prev = trace_; trace_ = flag; return prev; }
+
+    /// Process table walk trace as for fetch.
+    void setAccReason(bool fetch)
+    { forFetch_ = fetch; }
 
     /// Set byte to the previous PTE value if address is within
     /// the PTE entry updated by the last translation. Leave
