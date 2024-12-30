@@ -301,7 +301,7 @@ namespace WdRiscv
 
     /// Configure given CSR. Return true on success and false if no such CSR.
     bool configCsrByUser(std::string_view name, bool implemented, URV resetValue, URV mask,
-			 URV pokeMask, bool shared);
+			 URV pokeMask, bool shared, bool isDebug);
 
     /// Configure given CSR. Return true on success and false if no such CSR.
     bool configCsr(std::string_view name, bool implemented, URV resetValue, URV mask,
@@ -2386,6 +2386,10 @@ namespace WdRiscv
     /// Print the instructions of the extensions in the ISA string.
     void printInstructions(FILE* file) const;
 
+    /// Implement part of TIF protocol for writing the "tohost" magical location.
+    template<typename STORE_TYPE>
+    void handleStoreToHost(URV physAddr, STORE_TYPE value);
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
@@ -2665,6 +2669,13 @@ namespace WdRiscv
     // is written/poked.
     void updateCachedHstatus();
 
+    /// Update cached HVICTL
+    void updateCachedHvictl()
+    {
+      URV val = csRegs_.peekHvictl();
+      hvictl_.value_ = val;
+    }
+
     /// Write the cached value of MSTATUS (or MSTATUS/MSTATUSH) into the CSR.
     void writeMstatus();
 
@@ -2853,11 +2864,6 @@ namespace WdRiscv
     /// Helper to the cache block operation (cbo) instructions.
     ExceptionCause determineCboException(uint64_t& addr, uint64_t& gpa, uint64_t& pa,
 					 bool isZero);
-
-    /// Implement part of TIF protocol for writing the "tohost" magical
-    /// location.
-    template<typename STORE_TYPE>
-    void handleStoreToHost(URV physAddr, STORE_TYPE value);
 
     /// Helper to sb, sh, sw ... Sore type should be uint8_t, uint16_t
     /// etc... for sb, sh, etc...
@@ -3065,6 +3071,11 @@ namespace WdRiscv
     /// it. Return true if an nmi or an interrupt is taken and false
     /// otherwise.
     bool processExternalInterrupt(FILE* traceFile, std::string& insStr);
+
+    /// Return true if there is a hypervisor injected interrupt through
+    /// hvictl.
+    bool hasHvi() const
+    { return (hvictl_.bits_.IID != 9) or (hvictl_.bits_.IPRIO != 0); }
 
     /// Helper to FP execution: Or the given flags values to FCSR
     /// recording a write. No-op if a trigger has already tripped.
@@ -5374,6 +5385,7 @@ namespace WdRiscv
     URV effectiveMie_ = 0;          // Effective machine interrupt enable.
     URV effectiveSie_ = 0;          // Effective supervisor interrupt enable.
     URV effectiveVsie_ = 0;         // Effective v supervisor interrupt enable.
+    HvictlFields hvictl_;           // Cached value of hvictl CSR
 
     bool clearMprvOnRet_ = true;
     bool cancelLrOnTrap_ = false;   // Cancel reservation on traps when true.

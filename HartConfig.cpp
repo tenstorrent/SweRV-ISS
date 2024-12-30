@@ -230,7 +230,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 {
   unsigned errors = 0;
   URV reset = 0, mask = 0, pokeMask = 0;
-  bool exists = true, shared = false;
+  bool exists = true, shared = false, isDebug = false;
 
   std::string name(nm);
   if (name == "dscratch")
@@ -266,6 +266,9 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 
   if (conf.contains("shared"))
     getJsonBoolean(name + ".shared", conf.at("shared"), shared) or errors++;
+
+  if (conf.contains("is_debug"))
+    getJsonBoolean(name + ".is_debug", conf.at("is_debug"), isDebug) or errors++;
 
   // If number present and csr is not defined, then define a new
   // CSR; otherwise, configure.
@@ -314,6 +317,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
   bool shared0 = csr->isShared();
   URV reset0 = csr->getResetValue(), mask0 = csr->getWriteMask();
   URV pokeMask0 = csr->getPokeMask();
+  bool debug0 = csr->isDebug();
 
   if (name == "mhartid" or name == "vlenb")
     {
@@ -327,14 +331,22 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
       return true;
     }
 
+  if (debug0 and not isDebug)
+    {
+      if (verbose)
+        std::cerr << "CSR " << name << " cannot be marked as not debug-mode.\n";
+      isDebug = true;
+    }
+
   if (errors)
     return false;
 
-  if (not hart.configCsrByUser(name, exists, reset, mask, pokeMask, shared))
+  if (not hart.configCsrByUser(name, exists, reset, mask, pokeMask, shared, isDebug))
     {
       std::cerr << "Invalid CSR (" << name << ") in config file.\n";
       return false;
     }
+
   if ((mask & pokeMask) != mask and hart.sysHartIndex() == 0)
     {
       std::cerr << "Warning: For CSR " << name << " poke mask (0x" << std::hex << pokeMask
@@ -2578,7 +2590,7 @@ HartConfig::getEnabledPpos(std::vector<unsigned>& enabledPpos) const
 	  if (not getJsonBoolean(tag, config_ -> at(tag), flag))
 	    return false;
 	  if (flag)
-	    for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Limit; ++i)
+	    for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Io; ++i) // Temporary: Skip Io.
 	      enabledPpos.push_back(i);
 	}
       else if (ep.is_array())
@@ -2600,8 +2612,8 @@ HartConfig::getEnabledPpos(std::vector<unsigned>& enabledPpos) const
     }
   else
     {
-      // Tag is missing: all rules enabled.
-      for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Limit; ++i)
+      // Tag is missing: all rules enabled. Temporary: Skip Io.
+      for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Io; ++i)
 	enabledPpos.push_back(i);
     }
 

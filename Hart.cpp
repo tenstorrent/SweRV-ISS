@@ -651,6 +651,8 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   effectiveSie_ = csRegs_.effectiveSie();
   effectiveVsie_ = csRegs_.effectiveVsie();
 
+  updateCachedHvictl();
+
   perfControl_ = ~uint32_t(0);
   URV value = 0;
   if (peekCsr(CsrNumber::MCOUNTINHIBIT, value))
@@ -2209,18 +2211,18 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
 	dumpInitState("store", virtAddr + ldStSize_, pa2 + ldStSize_);
     }
 
-  // If we write to special location, end the simulation.
-  if (isToHostAddr(pa1))
-    {
-      handleStoreToHost(pa1, storeVal);
-      return true;
-    }
-
   ldStWrite_ = true;
   ldStData_ = storeVal;
 
   invalidateDecodeCache(pa1, ldStSize_); // this could be smaller
   invalidateDecodeCache(pa2, ldStSize_);
+
+  // If we write to special location, end the simulation.
+  if (isToHostAddr(pa1) and mcm_)
+    {
+      handleStoreToHost(pa1, storeVal);
+      return true;
+    }
 
   if (ooo_)
     {
@@ -2230,6 +2232,13 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
     }
 
   bool isDevice = isAclintAddr(pa1) or isImsicAddr(pa1) or isPciAddr(pa1);
+
+  // If we write to special location, end the simulation.
+  if (isToHostAddr(pa1))
+    {
+      handleStoreToHost(pa1, storeVal);
+      return true;
+    }
 
   if (isDevice)
     {
@@ -3545,6 +3554,9 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 	csRegs_.recordWrite(CN::HSTATUS);
     }
 
+  if (csr == CN::HVICTL)
+    updateCachedHvictl();
+
   effectiveMie_ = csRegs_.effectiveMie();
   effectiveSie_ = csRegs_.effectiveSie();
   effectiveVsie_ = csRegs_.effectiveVsie();
@@ -3725,9 +3737,9 @@ Hart<URV>::configCsr(std::string_view name, bool implemented, URV resetValue,
 template <typename URV>
 bool
 Hart<URV>::configCsrByUser(std::string_view name, bool implemented, URV resetValue,
-			   URV mask, URV pokeMask, bool shared)
+			   URV mask, URV pokeMask, bool shared, bool isDebug)
 {
-  return csRegs_.configCsrByUser(name, implemented, resetValue, mask, pokeMask, shared);
+  return csRegs_.configCsrByUser(name, implemented, resetValue, mask, pokeMask, shared, isDebug);
 }
 
 
@@ -5174,7 +5186,7 @@ Hart<URV>::simpleRunWithLimit()
 
       if ((effectiveMie_ or
           (privMode_ != PrivilegeMode::Machine and effectiveSie_) or
-          (virtMode_ and effectiveVsie_))
+          (virtMode_ and (effectiveVsie_ or hasHvi())))
             and processExternalInterrupt(nullptr, instStr))
         continue;  // Next instruction in trap handler.
 
@@ -5598,16 +5610,16 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause, PrivilegeMode& nextMode, b
 
   // VSIP read value may alias hvip (for bits 13-63). These bits don't alias
   // HIP/HIE and are delgated through hvien.
-  // FIXME: really, this should check for non-zero vstopi (hvictl).
   URV vsip = csRegs_.effectiveVsip();
 
   mip &= ~deferredInterrupts_;  // Inhibited by test-bench.
   sip &= ~deferredInterrupts_;
   vsip &= ~deferredInterrupts_;
 
-  if (((mip & effectiveMie_) == 0) and
-      ((sip & effectiveSie_) == 0) and
-      ((vsip & effectiveVsie_) == 0))
+  if (not (mip & effectiveMie_) and
+      not (sip & effectiveSie_) and
+      not (vsip & effectiveVsie_) and
+      not hasHvi())
     return false;
 
   return isInterruptPossible(mip, sip, vsip, cause, nextMode, nextVirt);

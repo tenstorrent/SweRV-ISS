@@ -28,6 +28,9 @@ Mcm<URV>::Mcm(unsigned hartCount, unsigned pageSize, unsigned mergeBufferSize)
 
   // Enable all rules.
   ppoEnabled_.resize(PpoRule::Limit, true);
+
+  // Currently Io PPO is disabled by default.
+  ppoEnabled_.at(unsigned(PpoRule::Io)) = false;
 }
 
 
@@ -1299,7 +1302,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (isEnabled(PpoRule::R13))
     ok = ppoRule13(hart, *instr) and ok;
 
-  ok = ioPpoChecks(hart, *instr) and ok;
+  if (isEnabled(PpoRule::Io))
+    ok = ioPpoChecks(hart, *instr) and ok;
 
   updateDependencies(hart, *instr);
   setBranchMemTime(hart, *instr);
@@ -4002,16 +4006,6 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instrB) const
       bool succIn = fence.di_.isFencePredInput();
       bool succOut = fence.di_.isFencePredOutput();
 
-      // We assume that stores following a fence in program order cannot drain before
-      // fence is retired.
-      if (succ.isStore_ and earlyB <= fence.retireTime_)
-	{
-	  cerr << "Error: PPO rule 4 failed: Hart-id=" << hart.hartId() << " tag="
-	       << succ.tag_ << " fence-tag= " << fence.tag_ << " store instruction "
-	       << "drains before preceding fence instruction retires\n";
-	  return false;
-	}
-
       for (auto aOpPtr : reordered)
 	{
 	  const auto& aOp = *aOpPtr;
@@ -4941,8 +4935,8 @@ bool
 Mcm<URV>::ioPpoChecks(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // We don't have enough info to do this since PBMT can override the PMA. We will have to
-  // change the API to be able to do this.
-  return true;
+  // change the API to be able to do this. Currenttly this should be enabled only when
+  // test has no PBMT.
 
   // We check that IO memory operations are never reordered. This is stronger
   // that what is required by the spec. We will eventually relax this for

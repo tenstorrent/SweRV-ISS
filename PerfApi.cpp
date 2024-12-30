@@ -371,7 +371,9 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
     saveImsicTopei(hart, CSRN(di.ithOperand(2)), imsicId, imsicGuest);
 
   // Execute
+  skipIoLoad_ = true;   // Load from IO space takes effect at retire.
   hart.singleStep();
+  skipIoLoad_ = false;
 
   bool trap = hart.lastInstructionTrapped();
   packet.trap_ = packet.trap_ or trap;
@@ -392,20 +394,23 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
 
   // Restore CSRs modified by the instruction or trap. TODO: For vector ld/st we have to
   // restore partially modified vectors.
-  if (not trap)
-    {   // Must be an MRET/SRET/... Privilege lowered.  Restore it before restoring CSRs.
+  if (di.isXRet() and not trap)
+    {   // For an MRET/SRET/... Privilege may have been lowered. Restore it before restoring CSRs.
       hart.setVirtualMode(hart.lastVirtMode());
       hart.setPrivilegeMode(hart.lastPrivMode());
     }
 
-  // Restore changed CSRs. This also restores hart sate for traps or Xrest-instructions.
-  std::vector<CSRN> csrns;
-  hart.lastCsr(csrns);
-  for (auto csrn : csrns)
+  // Restore changed CSR changes due to a trap or to mret/sret.
+  if (trap or di.isXRet())
     {
-      uint64_t value = hart.lastCsrValue(csrn);
-      if (not hart.pokeCsr(csrn, value))
-	assert(0);
+      std::vector<CSRN> csrns;
+      hart.lastCsr(csrns);
+      for (auto csrn : csrns)
+	{
+	  uint64_t value = hart.lastCsrValue(csrn);
+	  if (not hart.pokeCsr(csrn, value))
+	    assert(0);
+	}
     }
 
   if (trap)
@@ -414,9 +419,8 @@ PerfApi::execute(unsigned hartIx, InstrPac& packet)
       hart.setPrivilegeMode(hart.lastPrivMode());
     }
 
-  // Restore hart registers.
-  if (not trap and not di.isXRet())
-    restoreHartValues(hart, packet, prevVal);
+  // Restore hart registers that we changed before single step.
+  restoreHartValues(hart, packet, prevVal);
 
   if (di.isCsr())
     restoreImsicTopei(hart, CSRN(di.ithOperand(2)), imsicId, imsicGuest);
@@ -655,14 +659,19 @@ PerfApi::getLoadData(unsigned hartIx, uint64_t tag, uint64_t va, uint64_t pa1,
       return true;
     }
 
+  data = 0;
   bool isDev = hart->isAclintMtimeAddr(pa1) or hart->isImsicAddr(pa1) or hart->isPciAddr(pa1);
   if (isDev)
     {
+#if 0
+      // FIX : enable after coordinating with Arch team
+      if (skipIoLoad_)
+        return true;  // Load from IO space happens at execute.
+#endif
       hart->deviceRead(pa1, size, data);
       return true;
     }
 
-  data = 0;
   if (uint64_t toHost = 0; hart->getToHostAddress(toHost) && toHost == pa1)
     return true;  // Reading from toHost yields 0.
 
@@ -757,6 +766,12 @@ PerfApi::setStoreData(unsigned hartIx, uint64_t tag, uint64_t value)
 bool
 PerfApi::commitMemoryWrite(Hart64& hart, uint64_t addr, unsigned size, uint64_t value)
 {
+  if (hart.isToHostAddr(addr))
+    {
+      hart.handleStoreToHost(addr, value);
+      return true;
+    }
+
   switch (size)
     {
     case 1:  return hart.pokeMemory(addr, uint8_t(value), true);
@@ -785,6 +800,7 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
 
   auto& packetMap = hartPacketMaps_.at(hartIx);
   auto& storeMap =  hartStoreMaps_.at(hartIx);
+  auto& producers = hartRegProducers_.at(hartIx);
 
   // Flush tag and all older packets. Flush in reverse order to undo register renaming.
   for (auto iter = packetMap.rbegin(); iter != packetMap.rend(); )
@@ -801,7 +817,6 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
 
       auto& packet = *pacPtr;
       auto& di = packet.di_;
-      auto& producers = hartRegProducers_.at(hartIx);
       for (size_t i = 0; i < di.operandCount(); ++i)
         {
 	  auto mode = di.effectiveIthOperandMode(i);
@@ -810,7 +825,12 @@ PerfApi::flush(unsigned hartIx, uint64_t time, uint64_t tag)
             {
               unsigned regNum = di.ithOperand(i);
               unsigned gri = globalRegIx(di.ithOperandType(i), regNum);
-              producers.at(gri) = packet.opProducers_.at(i);
+	      if (gri != 0)
+		assert(producers.at(gri)->tag_ == packet.tag_);
+              auto prev = packet.opProducers_.at(i);
+	      if (prev and prev->retired_)
+                prev = nullptr;
+	      producers.at(gri) = prev;
             }
         }
 
@@ -1110,11 +1130,10 @@ PerfApi::restoreHartValues(Hart64& hart, const InstrPac& packet,
 	  break;
 
 	case OT::CsReg:
-	  {
-	    auto csrn = CSRN(operand);
-	    if (not hart.pokeCsr(csrn, prev))
-	      assert(0);
-	  }
+          {
+            auto csrn = CSRN(operand);
+            hart.pokeCsr(csrn, prev);  // May fail because of privilege. It's ok: handled at caller.
+          }
 	  break;
 
 	case OT::VecReg:

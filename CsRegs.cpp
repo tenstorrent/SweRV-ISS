@@ -87,6 +87,7 @@ CsRegs<URV>::defineCsr(std::string name, CsrNumber csrn, bool mandatory,
     priv = PrivilegeMode::Supervisor;
   }
   csr.definePrivilegeMode(priv);
+  csr.setIsDebug(csrn >= CsrNumber::_MIN_DBG and csrn <= CsrNumber::_MAX_DBG);
 
   csr.setDefined(true);
 
@@ -2228,7 +2229,7 @@ CsRegs<URV>::configCsr(std::string_view name, bool implemented, URV resetValue,
 template <typename URV>
 bool
 CsRegs<URV>::configCsrByUser(std::string_view name, bool implemented, URV resetValue,
-			     URV mask, URV pokeMask, bool shared)
+			     URV mask, URV pokeMask, bool shared, bool isDebug)
 {
   auto iter = nameToNumber_.find(name);
   if (iter == nameToNumber_.end())
@@ -2240,17 +2241,22 @@ CsRegs<URV>::configCsrByUser(std::string_view name, bool implemented, URV resetV
 
   bool ok = configCsr(CsrNumber(num), implemented, resetValue, mask, pokeMask, shared);
 
-  // Make user choice to disable a CSR sticky.
-  if (not implemented)
+  auto csr = findCsr(CsrNumber(num));
+  if (csr->isDebug() and not isDebug)
     {
-      auto csr = findCsr(CsrNumber(num));
-      if (csr)
-	{
-	  if (csr->isMandatory())
-	    std::cerr << "Error: Cannot disable mandatory CSR " << csr->getName() << '\n';
-	  else
-	    csr->setUserDisabled(true);
-	}
+      std::cerr << "Error: cannot set debug-mode CSR as not debug-mode\n";
+      return false;
+    }
+  else
+    csr->setIsDebug(isDebug);
+
+  // Make user choice to disable a CSR sticky.
+  if (not implemented and csr)
+    {
+      if (csr->isMandatory())
+        std::cerr << "Error: Cannot disable mandatory CSR " << csr->getName() << '\n';
+      else
+        csr->setUserDisabled(true);
     }
 
   return ok;
@@ -2282,7 +2288,6 @@ CsRegs<URV>::configCsr(CsrNumber csrNum, bool implemented, URV resetValue,
   csr.setWriteMask(mask);
   csr.setPokeMask(pokeMask);
   csr.pokeNoMask(resetValue);
-  csr.setIsDebug(csrNum >= CsrNumber::_MIN_DBG and csrNum <= CsrNumber::_MAX_DBG);
   csr.setIsShared(shared);
 
   // Cache interrupt enable.
