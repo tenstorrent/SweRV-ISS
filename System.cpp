@@ -75,13 +75,19 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
 
 #ifdef MEM_CALLBACKS
   sparseMem_ = std::make_unique<SparseMem>();
+
   auto readf = [this](uint64_t addr, unsigned size, uint64_t& value) -> bool {
                  return sparseMem_->read(addr, size, value); };
+
   auto writef = [this](uint64_t addr, unsigned size, uint64_t value) -> bool {
                   return sparseMem_->write(addr, size, value); };
 
+  auto initf = [this](uint64_t addr, const uint8_t* buffer) -> bool {
+                 return sparseMem_->initializePage(addr, buffer); };
+
   mem.defineReadMemoryCallback(readf);
   mem.defineWriteMemoryCallback(writef);
+  mem.defineInitPageCallback(initf);
 #endif
 }
 

@@ -205,3 +205,15 @@ SparseMem::getUsedBlocks(std::vector<std::pair<uint64_t, uint64_t>>& vec) const
   auto newEnd = std::remove_if(vec.begin(), vec.end(), [](const Pair& x) { return x.second == 0; });
   vec.resize(newEnd - vec.begin());
 }
+
+
+bool
+SparseMem::initializePage(uint64_t addr, const uint8_t buffer[])
+{
+  if (((addr >> pageShift_) << pageShift_) != addr)
+    return false;  // Addr is not page aligned.
+
+  std::vector<uint8_t>& page = findOrCreatePage(getPageRank(addr));
+  memcpy(page.data(), buffer, pageSize_);
+  return true;
+}

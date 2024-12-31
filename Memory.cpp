@@ -252,7 +252,9 @@ Memory::loadBinaryFile(const std::string& fileName, uint64_t addr)
   return true;
 }
 
+
 #ifdef LZ4_COMPRESS
+
 std::pair<std::unique_ptr<uint8_t[]>, size_t>
 Memory::loadFile(const std::string& filename)
 {
@@ -276,20 +278,19 @@ Memory::loadFile(const std::string& filename)
 bool
 Memory::loadLz4File(const std::string& fileName, uint64_t addr)
 {
-  LZ4F_dctx *dctx;
+  using std::cerr;
+
+  LZ4F_dctx *dctx = nullptr;
   LZ4F_errorCode_t ret = LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
   if (LZ4F_isError(ret))
-    {
-      throw std::runtime_error("Couldn't initialize LZ4 context");
-    }
+    throw std::runtime_error("Couldn't initialize LZ4 context");
 
   auto [src, src_size] = loadFile(fileName);
   size_t dst_size = BLOCK_SIZE;
   auto dst = std::make_unique<uint8_t[]>(dst_size);
   size_t src_offset = 0;
 
-  // unmapped and out of bounds addresses
-  size_t unmappedCount = 0, oob = 0, num = 0;
+  size_t unmappedCount = 0, num = 0;  // Unmapped addresses, byte in file.
 
   while (src_size)
     {
@@ -298,56 +299,62 @@ Memory::loadLz4File(const std::string& fileName, uint64_t addr)
 
       size_t ret = LZ4F_decompress(dctx, dst.get(), &dst_bytes_written, &src[src_offset], &src_bytes_read, NULL);
       if (LZ4F_isError(ret))
-	{
-	  throw std::runtime_error("LZ4F_decompress failed");
-	}
+        throw std::runtime_error("LZ4F_decompress failed");
 
-      for (size_t n = 0; n < dst_bytes_written; n++)
+      for (size_t n = 0; n < dst_bytes_written; ++n, ++addr, ++num)
 	{
-	  char b = dst[n];
+          size_t remaining = dst_bytes_written - n;
+          if (isPageAligned(addr) and remaining >= pageSize_ and addr < size_ and
+              addr + pageSize_ - 1 < size_)
+            {
+              // Optimization: If page is regular memory, write it in one shot.
+
+              Pma pma;
+              if (pmaMgr_.isRangeInSameRegion(addr, addr + pageSize_ - 1, pma) and
+                  not pma.hasMemMappedReg())
+                {
+                  if (not initializePage(addr, dst.get() + n))
+                    assert(0);
+                  addr += pageSize_ - 1;
+                  n += pageSize_ - 1;
+                  num += pageSize_ - 1;
+                  continue;
+                }
+            }
 
 	  if (addr < size_)
 	    {
-	      // Speed things up but not initalizing zero bytes
+	      // Speed things up by not initalizing zero bytes
+              char b = dst[n];
 	      if (b and not initializeByte(addr, b))
 		{
 		  if (unmappedCount == 0)
-		    std::cerr << "Failed to copy binary file byte at address 0x"
-			      << std::hex << addr << std::dec
-			      << ": corresponding location is not mapped\n";
+		    cerr << "File " << fileName << ", Byte " << num << ": "
+                         << "Warning: Address is not mapped: "
+                         << std::hex << addr << std::dec << '\n';
 		  unmappedCount++;
 		  if (checkUnmappedElf_)
 		    return false;
 		}
-	      addr++;
 	    }
 	  else
 	    {
-	      if (not oob)
-		std::cerr << "File " << fileName << ", Byte " << num << ": "
-			  << "Warning: Address out of bounds: "
-			  << std::hex << addr << '\n' << std::dec;
-	      oob++;
+              cerr << "File " << fileName << ", Byte " << num << ": "
+                   << "Warning: Address out of bounds: "
+                   << std::hex << addr << std::dec << '\n';
+              break;
 	    }
-	  num++;
 	}
 
       src_offset = src_offset + src_bytes_read;
       src_size = src_size - src_bytes_read;
     }
 
-  if (oob > 1)
-    std::cerr << "File " << fileName << ": Warning: File contained "
-	      << oob << " out of bounds addresses.\n";
-
-  // In case writing ELF data modified last-written-data associated
-  // with each hart.
-  for (unsigned hartId = 0; hartId < reservations_.size(); ++hartId)
-    clearLastWriteInfo(hartId);
-
   return true;
 }
+
 #endif
+
 
 bool
 Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, uint64_t& end)
@@ -1187,6 +1194,40 @@ Memory::initializeByte(uint64_t addr, uint8_t value)
   else
     data_[addr] = value;
   return true;
+}
+
+
+bool
+Memory::initializePage(uint64_t addr, const uint8_t buffer[])
+{
+  if (not isPageAligned(addr))
+    return false;
+
+  if (addr >= size_ or addr + pageSize_ - 1 >= size_)
+    return false;
+
+  // Caller is responsible for checking that the page is all in regular memory.
+
+#ifndef MEM_CALLBACKS
+
+  memcpy(data_ + addr, buffer, pageSize_);
+  return true;
+
+#else
+  
+  if (initPageCallback_)
+    return initPageCallback_(addr, buffer);
+
+  const uint8_t* ba = buffer;
+  for (unsigned i = 0; i < pageSize_; i += 8, addr += 8, ba += 8)
+    {
+      uint64_t value = *(reinterpret_cast<const uint64_t*>(ba));
+      writeCallback_(addr, 8, value);
+    }
+
+  return true;
+
+#endif
 }
 
 

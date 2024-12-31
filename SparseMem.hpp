@@ -55,6 +55,10 @@ namespace WdRiscv
     /// used memory areas (pages) sorted in ascending order.
     void getUsedBlocks(std::vector<std::pair<uint64_t, uint64_t>>& vec) const;
 
+    /// Initialize page at the given address with the contents of given buffer. Buffer
+    /// size must be greater than or equal to the page size.
+    bool initializePage(uint64_t addr, const uint8_t buffer[]);
+
   protected:
 
     /// Read from given target-machine address an item of type U
