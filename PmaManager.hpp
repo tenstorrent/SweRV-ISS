@@ -312,7 +312,8 @@ namespace WdRiscv
               }
             return false;
           }
-      return false;
+      pma = defaultPma_;
+      return true;
     }
 
     const std::vector<PmaTrace>& getPmaTrace() const
