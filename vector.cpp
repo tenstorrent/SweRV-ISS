@@ -12240,7 +12240,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
       uint64_t gpa2 = vaddr;
       cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/);
 
-      if (hasTrig and ldStAddrTriggerHit(addr, elemSize, timing, isLd))
+      if (hasTrig and ldStAddrTriggerHit(vaddr, elemSize, timing, isLd))
 	{
 	  triggerTripped_ = true;
 	  ldStInfo.removeLastElem();
