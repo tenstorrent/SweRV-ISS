@@ -4925,7 +4925,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  if (triggerTripped_)
 	    {
-	      URV tval = ldStAddr_;
+	      URV tval = ldStFaultAddr_;
 	      if (takeTriggerAction(traceFile, currPc_, tval, instCounter_, true))
 		return true;
 	      continue;
@@ -5851,7 +5851,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 
       if (triggerTripped_)
 	{
-	  URV tval = ldStAddr_;
+          URV tval = ldStFaultAddr_;
 	  takeTriggerAction(traceFile, currPc_, tval, instCounter_, true);
 	  return;
 	}
