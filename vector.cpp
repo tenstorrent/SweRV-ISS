@@ -11079,6 +11079,8 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 	{
 	  triggerTripped_ = true;
 	  ldStInfo.removeLastElem();
+          markVsDirty();
+          csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	  return false;
 	}
 #else
@@ -11520,6 +11522,8 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 	{
 	  triggerTripped_ = true;
 	  ldStInfo.removeLastElem();
+          markVsDirty();
+          csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	  return false;
 	}
 #endif
@@ -11895,6 +11899,8 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 	{
 	  triggerTripped_ = true;
 	  ldStInfo.removeLastElem();
+          markVsDirty();
+          csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	  return false;
 	}
 #endif
@@ -12244,6 +12250,8 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	{
 	  triggerTripped_ = true;
 	  ldStInfo.removeLastElem();
+          markVsDirty();
+          csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	  return false;
 	}
 #endif
@@ -12753,6 +12761,8 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	    {
 	      triggerTripped_ = true;
 	      ldStInfo.removeLastElem();
+              markVsDirty();
+	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      return false;
 	    }
 #endif
@@ -13331,6 +13341,8 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 	    {
 	      triggerTripped_ = true;
 	      ldStInfo.removeLastElem();
+              markVsDirty();
+	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      return false;
 	    }
 #endif

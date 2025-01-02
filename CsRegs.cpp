@@ -3649,6 +3649,14 @@ CsRegs<URV>::poke(CsrNumber num, URV value, bool virtMode)
       if (value >= triggers_.size())
 	return true; // New value out of bounds. Preserve old.
     }
+  else if (num == CN::MTOPEI)
+    {
+      return writeMtopei();
+    }
+  else if (num == CN::STOPEI)
+    {
+      return writeStopei();
+    }
 
   csr->poke(value);
 
