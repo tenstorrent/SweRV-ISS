@@ -240,6 +240,8 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
           hart.setDeferredInterrupts(val);
         else if (req.address == WhisperSpecialResource::Seipin)
 	  hart.setSeiPin(val);
+        else if (req.address == WhisperSpecialResource::ExceptionByUser)
+          hart.setExceptionByUser(val, req.instrTag, bool(req.type));
 	else
           ok = false;
         if (ok)
@@ -988,6 +990,7 @@ specialResourceToStr(uint64_t v)
     case WhisperSpecialResource::Seipin:              return "seipin";
     case WhisperSpecialResource::EffMemAttr:          return "effma";
     case WhisperSpecialResource::LastLdStAddress:     return "lastldst";
+    case WhisperSpecialResource::ExceptionByUser:     return "excbu";
     }
   return "?";
 }

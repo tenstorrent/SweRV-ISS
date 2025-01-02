@@ -888,6 +888,17 @@ namespace WdRiscv
     bool getSeiPin() const
     { return seiPin_; }
 
+    /// Set/clear low priorty exception for fetch/ld/st scenarios. This is
+    /// useful for RAS errors. We also write the approriate *tval value. 
+    void setExceptionByUser(URV code, URV tval, bool fetch)
+    {
+      if (fetch)
+        fetchExceptionByUser_ = static_cast<ExceptionCause>(code);
+      else
+        ldStExceptionByUser_ = static_cast<ExceptionCause>(code);
+      tvalByUser_ = tval;
+    }
+
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
     /// address of the instruction is identical to the given address.
@@ -5506,6 +5517,11 @@ namespace WdRiscv
     TT_STEE::Stee stee_;
     bool steeInsec1_ = false;  // True if insecure access to a secure region.
     bool steeInsec2_ = false;  // True if insecure access to a secure region.
+
+    // Low priority exceptions
+    ExceptionCause fetchExceptionByUser_ = ExceptionCause::NONE;   // Raise exception code if non-zero.
+    ExceptionCause ldStExceptionByUser_ = ExceptionCause::NONE;    // Raise exception code if non-zero.
+    URV tvalByUser_ = 0;                        // Value to write to *tval.
 
     // Landing pad (zicfilp)
     bool mLpEnabled_ = false;

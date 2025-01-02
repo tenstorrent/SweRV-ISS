@@ -4805,10 +4805,14 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst, FI
   setMemProtAccIsFetch(true);
 
   // Fetch instruction.
-  if (not fetchInst(addr, physAddr, inst))
+  bool fetch = fetchInst(addr, physAddr, inst);
+  if (not fetch or URV(fetchExceptionByUser_))
     {
       if (mcycleEnabled())
 	++cycleCount_;
+
+      if (fetch)
+        initiateException(fetchExceptionByUser_, pc_, pc_);
 
       std::string instStr;
       printInstTrace(inst, instCounter_, instStr, file);
@@ -5853,8 +5857,14 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       pc_ += di.instSize();
       execute(&di);
 
-      if (hasException_ or hasInterrupt_)
+      if (lastInstructionTrapped() or URV(ldStExceptionByUser_))
 	{
+          if (not lastInstructionTrapped())
+            {
+              assert(di.isLoad() or di.isStore() or di.isAtomic() or
+                     di.isCmo() or di.isVectorLoad() or di.isVectorStore());
+              initiateException(ldStExceptionByUser_, pc_, tvalByUser_);
+            }
 	  if (doStats)
 	    accumulateInstructionStats(di);
 	  printDecodedInstTrace(di, instCounter_, instStr, traceFile);
