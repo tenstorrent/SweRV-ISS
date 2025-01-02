@@ -166,11 +166,6 @@ namespace WdRiscv
     /// Similar to getPmp but it also updates the access count associated with
     /// each PMP entry.
     inline const Pmp& accessPmp(uint64_t addr) const
-    { return accessPmp(addr, AccessReason::None); }
-
-    /// Similar to getPmp but it also updates the access count associated with
-    /// each PMP entry.
-    inline const Pmp& accessPmp(uint64_t addr, AccessReason reason) const
     {
       addr = (addr >> 2) << 2;
       for (const auto& region : regions_)
@@ -181,7 +176,7 @@ namespace WdRiscv
               auto ix = pmp.pmpIndex();
               auto val = pmp.val();
               if (trace_)
-                pmpTrace_.push_back({ix, addr, val, reason});
+                pmpTrace_.push_back({ix, addr, val, reason_});
               return region.pmp_;
             }
         }
@@ -238,6 +233,10 @@ namespace WdRiscv
     void enableTrace(bool flag)
     { trace_ = flag; }
 
+    /// This is to differentiate fetch from ld/st accesses.
+    void setAccReason(AccessReason reason)
+    { reason_ = reason; }
+
   private:
 
     struct Region
@@ -269,5 +268,6 @@ namespace WdRiscv
 
     // PMPs used in most recent instruction
     mutable std::vector<PmpTrace> pmpTrace_;
+    AccessReason reason_;
   };
 }

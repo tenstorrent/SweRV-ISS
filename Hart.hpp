@@ -1316,8 +1316,18 @@ namespace WdRiscv
     { return memory_.pmaMgr_.getPma(addr); }
 
     /// Simialr to above but performs an "access".
-    Pma accessPma(uint64_t addr, PmaManager::AccessReason reason) const
-    { return memory_.pmaMgr_.accessPma(addr, reason); }
+    Pma accessPma(uint64_t addr) const
+    { return memory_.pmaMgr_.accessPma(addr); }
+
+    /// Set memory protection access reason.
+    void setMemProtAccIsFetch(bool fetch)
+    {
+      pmpManager_.setAccReason(fetch? PmpManager::AccessReason::Fetch :
+                                      PmpManager::AccessReason::LdSt);
+      memory_.pmaMgr_.setAccReason(fetch? PmaManager::AccessReason::Fetch :
+                                          PmaManager::AccessReason::LdSt);
+      virtMem_.setAccReason(fetch);
+    }
 
     /// Return true if given extension is statically enabled (enabled my
     /// --isa but may be turned off by the MSTATUS/MISA CSRs).
@@ -2165,7 +2175,8 @@ namespace WdRiscv
       auto fetchMem =  [this](uint64_t addr, uint32_t& value) -> bool {
 	if (pmpEnabled_)
 	  {
-	    const Pmp& pmp = pmpManager_.accessPmp(addr, PmpManager::AccessReason::Fetch);
+            pmpManager_.setAccReason(PmpManager::AccessReason::Fetch);
+	    const Pmp& pmp = pmpManager_.accessPmp(addr);
 	    if (not pmp.isExec(privMode_))
 	      return false;
 	  }

@@ -1553,6 +1553,8 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       va2 = (va1 + ldSize) & ~alignMask;
     }
 
+  setMemProtAccIsFetch(false);
+
   // Address translation
   if (isRvs())     // Supervisor extension
     {
@@ -1573,7 +1575,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       uint64_t a1 = addr1;
       if (steeEnabled_)
 	a1 = stee_.clearSecureBits(addr1);
-      Pma pma = accessPma(a1, PmaManager::AccessReason::LdSt);
+      Pma pma = accessPma(a1);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
@@ -1585,7 +1587,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       auto effPm = effectivePrivilege();
       if (hyper)
 	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-      const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
+      const Pmp& pmp = pmpManager_.accessPmp(addr1);
       if (not pmp.isRead(effPm)  or  (virtMem_.isExecForRead() and not pmp.isExec(effPm)))
 	return EC::LOAD_ACC_FAULT;
 
@@ -1593,7 +1595,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	{
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
-	  const Pmp& pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
+	  const Pmp& pmp2 = pmpManager_.accessPmp(next);
 	  if (not pmp2.isRead(effPm) or (virtMem_.isExecForRead() and not pmp2.isExec(effPm)))
 	    {
 	      ldStFaultAddr_ = va2;
@@ -1628,7 +1630,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
     }
 
   // Check PMA.
-  Pma pma = accessPma(addr1, PmaManager::AccessReason::LdSt);
+  Pma pma = accessPma(addr1);
   if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
     return EC::LOAD_ACC_FAULT;
 
@@ -1637,7 +1639,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       uint64_t aligned = addr1 & ~alignMask;
       uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
       ldStFaultAddr_ = va2;
-      pma = accessPma(next, PmaManager::AccessReason::LdSt);
+      pma = accessPma(next);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isRead()  or  (virtMem_.isExecForRead() and not pma.isExec()))
 	return EC::LOAD_ACC_FAULT;
@@ -2454,7 +2456,7 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, [[maybe_unuse
 
   if (pmpEnabled_)
     {
-      const Pmp& pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
+      const Pmp& pmp = pmpManager_.accessPmp(physAddr);
       if (not pmp.isExec(privMode_))
 	return ExceptionCause::INST_ACC_FAULT;
     }
@@ -2506,7 +2508,7 @@ Hart<URV>::fetchInstNoTrap(uint64_t& virtAddr, uint64_t& physAddr, [[maybe_unuse
 
   if (pmpEnabled_)
     {
-      const Pmp& pmp2 = pmpManager_.accessPmp(physAddr2, PmpManager::AccessReason::Fetch);
+      const Pmp& pmp2 = pmpManager_.accessPmp(physAddr2);
       if (not pmp2.isExec(privMode_))
 	{
 	  virtAddr += 2; // To report faulting portion of fetch.
@@ -4772,6 +4774,8 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst, FI
       return false;  // Next instruction in trap handler.
     }
 
+  setMemProtAccIsFetch(true);
+
   // Fetch instruction.
   if (not fetchInst(addr, physAddr, inst))
     {
@@ -4921,7 +4925,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  if (triggerTripped_)
 	    {
-	      URV tval = ldStAddr_;
+	      URV tval = ldStFaultAddr_;
 	      if (takeTriggerAction(traceFile, currPc_, tval, instCounter_, true))
 		return true;
 	      continue;
@@ -5847,7 +5851,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 
       if (triggerTripped_)
 	{
-	  URV tval = ldStAddr_;
+          URV tval = ldStFaultAddr_;
 	  takeTriggerAction(traceFile, currPc_, tval, instCounter_, true);
 	  return;
 	}
@@ -11499,6 +11503,8 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       va2 = (va1 + stSize) & ~alignMask;
     }
 
+  setMemProtAccIsFetch(false);
+
   // Address translation
   if (isRvs())     // Supervisor extension
     {
@@ -11519,7 +11525,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       uint64_t a1 = addr1;
       if (steeEnabled_)
 	a1 = stee_.clearSecureBits(addr1);
-      Pma pma = accessPma(a1, PmaManager::AccessReason::LdSt);
+      Pma pma = accessPma(a1);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
@@ -11531,7 +11537,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       auto effPm = effectivePrivilege();
       if (hyper)
 	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-      const Pmp& pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
+      const Pmp& pmp = pmpManager_.accessPmp(addr1);
       if (not pmp.isWrite(effPm))
 	return EC::STORE_ACC_FAULT;
 
@@ -11539,7 +11545,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	{
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + stSize : addr2;
-	  const Pmp& pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
+	  const Pmp& pmp2 = pmpManager_.accessPmp(next);
 	  if (not pmp2.isWrite(effPm))
 	    {
 	      ldStFaultAddr_ = va2;
@@ -11574,7 +11580,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
     }
 
   // Check PMA.
-  Pma pma = accessPma(addr1, PmaManager::AccessReason::LdSt);
+  Pma pma = accessPma(addr1);
   if (not pma.isWrite())
     return EC::STORE_ACC_FAULT;
 
@@ -11582,7 +11588,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
     {
       uint64_t aligned = addr1 & ~alignMask;
       uint64_t next = addr1 == addr2? aligned + stSize : addr2;
-      pma = accessPma(next, PmaManager::AccessReason::LdSt);
+      pma = accessPma(next);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isWrite())
 	{
