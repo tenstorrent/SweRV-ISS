@@ -297,23 +297,18 @@ namespace WdRiscv
     void enableInDefaultPma(Pma::Attrib a)
     { defaultPma_.enable(a); }
 
-    /// Return true if the first region containing the start address of the range also
-    /// contains the end address and set pma to the pma of that region. Return false
-    /// otherwise leaving pma unmodified.
-    bool isRangeInSameRegion(uint64_t start, uint64_t end, Pma& pma) const
+    /// Return true if the given range [start,end] overlaps a memory mapped register
+    /// region.
+    bool overlapsMemMappedRegs(uint64_t start, uint64_t end) const
     {
-      for (const auto& region : regions_)
-        if (region.valid_ and region.overlaps(start))
-          {
-            if (region.overlaps(end))
-              {
-                pma = region.pma_;
-                return true;
-              }
-            return false;
-          }
-      pma = defaultPma_;
-      return true;
+      for (const auto& region : memMappedRanges_)
+        {
+          auto [low, high] = region;
+          if (not (end < low or start > high))
+            return true;
+        }
+
+      return false;
     }
 
     const std::vector<PmaTrace>& getPmaTrace() const

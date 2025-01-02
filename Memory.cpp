@@ -310,11 +310,15 @@ Memory::loadLz4File(const std::string& fileName, uint64_t addr)
               // Optimization: If page is regular memory, write it in one shot.
 
               Pma pma;
-              if (pmaMgr_.isRangeInSameRegion(addr, addr + pageSize_ - 1, pma) and
-                  not pma.hasMemMappedReg())
+              if (not pmaMgr_.overlapsMemMappedRegs(addr, addr + pageSize_ - 1))
                 {
-                  if (not initializePage(addr, dst.get() + n))
-                    assert(0);
+                  uint8_t* data = dst.get() + n;
+                  uint64_t allZero = 0;
+                  for (unsigned i = 0; i < pageSize_; i += 8)
+                    allZero |= *((uint64_t*) (data + i));
+                  if (not allZero)
+                    if (not initializePage(addr, data))
+                      assert(0);
                   addr += pageSize_ - 1;
                   n += pageSize_ - 1;
                   num += pageSize_ - 1;
