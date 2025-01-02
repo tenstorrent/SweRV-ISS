@@ -3,6 +3,7 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <queue>
 #include "IoDevice.hpp"
 
 
@@ -25,10 +26,8 @@ namespace WdRiscv
 
     /// This runs in its own thread. It monitors the standard input and
     /// marks interrupt pending when input is possible placing the input
-    /// character in byte_ for the Uart to consme.
+    /// character in the rx_fifo for the Uart to consme.
     void monitorStdin();
-
-    uint32_t byte_ = 0;  // Pending input byte.
 
     uint8_t ier_ = 0;     // Interrupt enable
     uint8_t iir_ = 1;     // Interrupt id
@@ -45,5 +44,6 @@ namespace WdRiscv
     std::thread stdinThread_;
     std::atomic<bool> terminate_ = false;
     std::mutex mutex_;   // Synchronize access to byte_ with stdinThread_.
+    std::queue<uint8_t> rx_fifo;
   };
 }

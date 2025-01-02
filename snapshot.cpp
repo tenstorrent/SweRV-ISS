@@ -31,6 +31,7 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
   ofs << "po " << getInstructionCount() << '\n';
   ofs << "pb 0x" << std::hex << syscall_.targetProgramBreak() << std::dec << '\n';
   ofs << "pc 0x" << std::hex << peekPc() << std::dec << '\n';
+  ofs << "elp " << unsigned(getElp()) << '\n';
 
   // write integer registers
   for (unsigned i = 1; i < 32; i++)
@@ -267,6 +268,13 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
         {
           if (loadSnapshotValue(iss, val))
 	    setTargetProgramBreak(val);
+	  else
+	    errors++;
+        }
+      else if (type == "elp") // ELP
+        {
+          if (loadSnapshotValue(iss, val))
+	    setElp(val);
 	  else
 	    errors++;
         }

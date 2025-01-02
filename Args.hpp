@@ -112,7 +112,6 @@ namespace WdRiscv
     Uint64Vec steesr;
     std::optional<uint64_t> alarmInterval;
     std::optional<uint64_t> clint;        // Advanced core-local-interrupt (CLINT) mem mapped address
-    std::optional<uint64_t> syscallSlam;
     std::optional<uint64_t> instCounter;
     std::optional<uint64_t> branchWindow;
     std::optional<uint64_t> logStart;
@@ -154,10 +153,12 @@ namespace WdRiscv
     bool reportub = false;         // Report used blocks with sparse memory.
     bool quitOnAnyHart = false;    // True if run quits when any hart finishes.
     bool noConInput = false;       // If true console io address is not used for input.
+    bool instList = false;         // Print instruction of extensions in isa string if true.
     bool relativeInstCount = false;
     bool tracePtw = false;   // Enable printing of page table walk info in log.
     bool shm = false;        // Enable shared memory IPC for server mode (default is socket).
     bool logPerHart = false; // Enable separate log files for each hart.
     bool loadFromTrace = false;    // Enable loading trace information from snapshot.
+    bool hintOps = false;    // Enable HINT ops.
   };
 }

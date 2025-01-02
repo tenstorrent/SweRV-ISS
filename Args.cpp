@@ -25,7 +25,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 846;
+  unsigned subversion = 849;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 #ifdef GIT_SHA
@@ -41,9 +41,6 @@ printVersion()
 #endif
 #ifdef MEM_CALLBACKS
   std::cout << "MEM_CALLBACKS\n";
-#endif
-#ifdef HINT_OPS
-  std::cout << "HINT_OPS\n";
 #endif
 #ifdef PCI
   std::cout << "PCI\n";
@@ -191,13 +188,6 @@ Args::collectCommandLineValues(const boost::program_options::variables_map& varM
           std::cerr << "Error: clint address must be a multiple of 8\n";
           ok = false;
         }
-    }
-
-  if (varMap.count("syscallslam"))
-    {
-      auto numStr = varMap["syscallslam"].as<std::string>();
-      if (not parseCmdLineNumber("syscallslam", numStr, this->syscallSlam))
-        ok = false;
     }
 
   if (varMap.count("mcmls"))
@@ -348,7 +338,7 @@ Args::parseCmdLineArgs(std::span<char*> argv)
 	("binary,b", po::value(&this->binaryFiles)->multitoken(),
 	 "Binary file to load into simulator memory. File path may be suffixed with a colon followed "
 	 "by an address (integer) in which case data will be loaded at address as opposed to zero. "
-	 "An addional suffix of :u may be added to write back the file with the contents of memory "
+	 "An additional suffix of :u may be added to write back the file with the contents of memory "
 	 "at the end of the run. "
 	 "Example: -b file1 -b file2:0x1040 -b file3:0x20000:u")
 #ifdef LZ4_COMPRESS
@@ -447,7 +437,7 @@ Args::parseCmdLineArgs(std::span<char*> argv)
 	("bblockfile", po::value(&this->bblockFile),
 	 "Basic blocks output stats file.")
 	("bblockinterval", po::value(&this->bblockInsts),
-	 "Basic block stats are reported even mulitples of given instruction counts and once at end of run.")
+	 "Basic block stats are reported even multiples of given instruction counts and once at end of run.")
 	("snapshotdir", po::value(&this->snapshotDir),
 	 "Directory prefix for saving snapshots.")
 	("snapshotperiod", po::value(&this->snapshotPeriods)->multitoken(),
@@ -465,9 +455,11 @@ Args::parseCmdLineArgs(std::span<char*> argv)
 	("stdin", po::value(&this->stdinFile),
 	 "Redirect standard input of newlib/Linux target program to this.")
 	("datalines", po::value(&this->dataLines),
-	 "Generate data line address trace to the given file.")
+	 "Generate data line address trace to the given file with format <vl>:<pl> where "
+         "<vl>/<pl> stands for virtual/physical line number. A line number is an address "
+         "divided by the cache line size.")
 	("instrlines", po::value(&this->instrLines),
-	 "Generate instruction line address trace to the given file.")
+	 "Generate instruction line address trace to the given file. See --datalines for file format.")
 	("initstate", po::value(&this->initStateFile),
 	 "Generate to given file the initial state of accessed memory lines.")
 	("abinames", po::bool_switch(&this->abiNames),
@@ -503,14 +495,6 @@ Args::parseCmdLineArgs(std::span<char*> argv)
          "of these double words sets the timer-limit of the corresponding hart. "
          "A timer interrupt in such a hart becomes pending when the timer value "
          "equals or exceeds the timer limit.")
-        ("syscallslam", po::value<std::string>(),
-         "Define address, a, of a non-cached memory area in which the "
-         "memory changes of an emulated system call will be slammed. This "
-         "is used in server mode to relay the effects of a system call "
-         "to the RTL simulator. The memory area at location a will be filled "
-         "with a sequence of pairs of double words designating addresses and "
-         "corresponding values. A zero/zero pair will indicate the end of "
-         "sequence.")
 	("mcm", po::bool_switch(&this->mcm),
 	 "Enable memory consistency checks. This is meaningful in server/interactive mode.")
 	("noppo",
@@ -550,6 +534,11 @@ Args::parseCmdLineArgs(std::span<char*> argv)
         ("noconinput", po::bool_switch(&this->noConInput),
          "Do not use console IO address for input. Loads from the console io address "
          "simply return last value stored there.")
+        ("instlist", po::bool_switch(&this->instList),
+         "List the instructions of the extensions specified by --isa or the \"isa\" configuration "
+         "tag")
+        ("hintops", po::bool_switch(&this->hintOps),
+         "Enable whisper HINT ops.")
 	("verbose,v", po::bool_switch(&this->verbose),
 	 "Be verbose.")
 	("version", po::bool_switch(&this->version),
@@ -565,7 +554,6 @@ Args::parseCmdLineArgs(std::span<char*> argv)
       auto parsed = parser.options(desc).positional(pdesc).run();
       po::store(parsed, varMap);
       po::notify(varMap);
-
 
       bool earlyExit = false;
       if (this->version)

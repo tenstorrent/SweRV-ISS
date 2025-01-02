@@ -13,9 +13,10 @@ namespace WdRiscv
     unsigned MBE      : 1;
     unsigned GVA      : 1;
     unsigned MPV      : 1;
+    unsigned res1     : 1;
     unsigned MPELP    : 1;
     unsigned MDT      : 1;
-    unsigned res1     : 22;
+    unsigned res2     : 21;
   };
 
 
@@ -162,7 +163,8 @@ namespace WdRiscv
       unsigned TVM      : 1;
       unsigned TW       : 1;
       unsigned TSR      : 1;
-      unsigned res1     : 8;  // Reserved
+      unsigned SPELP    : 1;
+      unsigned res1     : 7;  // Reserved
       unsigned SD       : 1;
 
       // mstatush
@@ -171,7 +173,9 @@ namespace WdRiscv
       unsigned MBE      : 1;
       unsigned GVA      : 1;
       unsigned MPV      : 1;
-      unsigned res3     : 24;
+      unsigned res3     : 1;
+      unsigned MPELP    : 1;
+      unsigned res4     : 22;
     } bits_;
   };
 
@@ -568,7 +572,8 @@ namespace WdRiscv
       unsigned EBREAKM : 1;
       unsigned EBREAKVU : 1;
       unsigned EBREAKVS : 1;
-      unsigned reserved2 : 10;
+      unsigned PELP : 1;
+      unsigned reserved2 : 9;
       unsigned DEBUGVER : 4;
     } bits_;
   };
@@ -584,7 +589,7 @@ namespace WdRiscv
     struct
     {
       unsigned PRV         : 2;     // bits 1-0
-      unsigned STEP        : 1;     // bit  2 
+      unsigned STEP        : 1;     // bit  2
       unsigned NMIP        : 1;     // bit  3
       unsigned MPRVEN      : 1;     // bit  4
       unsigned V           : 1;     // bit  5
@@ -598,7 +603,8 @@ namespace WdRiscv
       unsigned EBREAKM     : 1;     // bit  15
       unsigned EBREAKVU    : 1;     // bit  16
       unsigned EBREAKVS    : 1;     // bit  17
-      unsigned reserved2   : 10;    // bit  27-18
+      unsigned PELP        : 1;     // bit  18
+      unsigned reserved2   : 10;    // bit  27-19
       unsigned DEBUGVER    : 4;     // bit  31-28
     } bits_;
   };
@@ -748,7 +754,7 @@ namespace WdRiscv
       unsigned res0  : 5;   // Bits 7:3
       unsigned USEED : 1;   // Bit  8
       unsigned SSEED : 1;   // Bit  9
-      unsigned MLPTE : 1;   // Bit  10
+      unsigned MLPE  : 1;   // Bit  10
       unsigned res1  : 21;  // Bit  31:11
     } bits_;
   };
@@ -769,7 +775,7 @@ namespace WdRiscv
       unsigned res0  : 5;   // Bits 7:3
       unsigned USEED : 1;   // Bit  8
       unsigned SSEED : 1;   // Bit  9
-      unsigned MLPTE : 1;   // Bit  10
+      unsigned MLPE  : 1;   // Bit  10
       unsigned res1  : 21;  // Bit  31:11
       unsigned PMM   : 2;   // Bits 33:32
       unsigned res2  : 30;  // Bits 63:34

@@ -512,6 +512,8 @@ namespace TT_PERF         // Tenstorrent Whisper Performance Model API
 
     uint64_t time_ = 0;
 
+    bool skipIoLoad_ = false;  // Avoid speculative execute of load from IO space.
+
     FILE* commandLog_ = nullptr;
     std::vector<FILE*> traceFiles_;   // One per hart.
 

@@ -85,7 +85,7 @@ Session<URV>::defineSystem(const Args& args, const HartConfig& config)
 #ifdef LZ4_COMPRESS
       and args.lz4Files.empty()
 #endif
-      and not args.interactive)
+      and not args.interactive and not args.instList)
     {
       std::cerr << "No program file specified.\n";
       return nullptr;
@@ -799,9 +799,6 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
 
   hart.enableConsoleInput(! args.noConInput);
 
-  if (args.syscallSlam)
-    hart.defineSyscallSlam(*args.syscallSlam);
-
   if (args.tracePtw)
     hart.tracePtw(true);
 
@@ -949,6 +946,9 @@ Session<URV>::applyCmdLineArgs(const Args& args, Hart<URV>& hart,
 
   if (args.nmeVec)
     hart.defineNmiExceptionPc(*args.nmeVec);
+
+  if (args.hintOps)
+    hart.enableHintOps(args.hintOps);
 
   return errors == 0;
 }
@@ -1194,6 +1194,13 @@ bool
 Session<URV>::run(const Args& args)
 {
   auto& system = *system_;
+
+  if (args.instList)
+    {
+      auto& hart = *(system_ -> ithHart(0));
+      hart.printInstructions(stdout);
+      return true;
+    }
 
   if (not loadTracerLibrary<URV>(args.tracerLib))
     return false;

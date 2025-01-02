@@ -301,7 +301,7 @@ namespace WdRiscv
 
     /// Configure given CSR. Return true on success and false if no such CSR.
     bool configCsrByUser(std::string_view name, bool implemented, URV resetValue, URV mask,
-			 URV pokeMask, bool shared);
+			 URV pokeMask, bool shared, bool isDebug);
 
     /// Configure given CSR. Return true on success and false if no such CSR.
     bool configCsr(std::string_view name, bool implemented, URV resetValue, URV mask,
@@ -393,6 +393,15 @@ namespace WdRiscv
     /// Configure the address translation pointer masking modes supported by this hart.
     void configAddressTranslationPmms(const std::vector<VirtMem::Pmm>& pmms)
     { virtMem_.setSupportedPmms(pmms); }
+
+    /// Enable support for ebreak semi-hosting.  See ebreak documentation in the
+    /// unprivileged spec.
+    void enableSemihosting(bool flag)
+    { semihostOn_ = flag; }
+
+    /// Enable whisper HINT ops for various functions.
+    void enableHintOps(bool flag)
+    { hintOps_ = flag; }
 
     /// Enable page based memory types.
     void enableTranslationPbmt(bool flag)
@@ -488,6 +497,38 @@ namespace WdRiscv
           else if (isRvu())
             virtMem_.enablePointerMasking(VirtMem::Pmm(pmm), PM::User, false);
         }
+    }
+
+    /// Called when landing pad configuration changes.
+    void updateLandingPadEnable()
+    {
+      if (not isRvZicfilp())
+        return;
+
+      mLpEnabled_ = csRegs_.mseccfgMlpe();
+      if (isRvs())
+        {
+          sLpEnabled_ = csRegs_.menvcfgLpe();
+          if (isRvu())
+            uLpEnabled_ = csRegs_.senvcfgLpe();
+          if (isRvh())
+            vsLpEnabled_ = csRegs_.henvcfgLpe();
+        }
+      else
+        {
+          if (isRvu())
+            uLpEnabled_ = csRegs_.menvcfgLpe();
+        }
+    }
+
+    /// Given the privilege and virtual mode, determines if landing
+    /// pad is enabled.
+    bool isLandingPadEnabled(PrivilegeMode mode, bool virt)
+    {
+      return (mode == PrivilegeMode::Machine and mLpEnabled_) or
+             (mode == PrivilegeMode::Supervisor and not virt and sLpEnabled_) or
+             (mode == PrivilegeMode::Supervisor and virt and vsLpEnabled_) or
+             (mode == PrivilegeMode::User and uLpEnabled_);
     }
 
     /// Applies pointer mask w.r.t. effective privilege mode, effective
@@ -806,16 +847,16 @@ namespace WdRiscv
     /// Return true on success and false on failure (address out of
     /// bounds, location not mapped, location not writable etc...)
     /// Bypass physical memory attribute checking if usePma is false.
-    bool pokeMemory(uint64_t addr, uint8_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint8_t val, bool usePma, bool skipFetch = false);
 
     /// Half-word version of the preceding method.
-    bool pokeMemory(uint64_t address, uint16_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint16_t val, bool usePma, bool skipFetch = false);
 
     /// Word version of the preceding method.
-    bool pokeMemory(uint64_t addr, uint32_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint32_t val, bool usePma, bool skipFetch = false);
 
     /// Double-word version of the preceding method.
-    bool pokeMemory(uint64_t addr, uint64_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint64_t val, bool usePma, bool skipFetch = false);
 
     /// Define value of program counter after a reset.
     void defineResetPc(URV addr)
@@ -843,28 +884,6 @@ namespace WdRiscv
     /// Return the current state of the Supervisor external interrupt pin.
     bool getSeiPin() const
     { return seiPin_; }
-
-    /// Peek MIP/SIP and modify by supervisor external interrupt pin and mvip.
-    /// This is OR-ed when mvien does not exist or is set to zero. Otherwise,
-    /// the value of SEIP is solely the value of the pin.
-    URV overrideWithSeiPinAndMvip(URV ip) const
-    {
-      if (not isRvs())
-        return ip;
-
-      if (isRvaia())
-        {
-          URV mvien = csRegs_.peekMvien();
-          if (mvien >> URV(InterruptCause::S_EXTERNAL) & 1)
-            ip &= ~URV(1 << URV(InterruptCause::S_EXTERNAL));
-          else
-            {
-              URV mvip = csRegs_.peekMvip();
-              ip |= mvip & URV(1 << URV(InterruptCause::S_EXTERNAL));
-            }
-        }
-      return ip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
-    }
 
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
@@ -952,6 +971,11 @@ namespace WdRiscv
     bool lastInstructionTrapped() const
     { return hasException_ or hasInterrupt_; }
 
+    /// Return true if the last execution instruction entered debug
+    /// mode because of a trigger or ebreak or if interrupt/exception.
+    bool lastInstructionCancelled() const
+    { return enteredDebugMode_ or hasException_ or hasInterrupt_; }
+
     /// Return true if the last executed instruction was interrupted.
     bool lastInstructionInterrupted() const
     { return hasInterrupt_; }
@@ -1029,9 +1053,6 @@ namespace WdRiscv
     bool getLastVecLdStRegsUsed(const DecodedInst& di, unsigned opIx,
                                 unsigned& regBase, unsigned& regCount) const;
 
-    void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const
-    { syscall_.getMemoryChanges(v); }
-
     /// Return data size if last instruction is a ld/st instruction (AMO is considered a
     /// store) setting virtAddr and physAddr to the corresponding virtual and physical
     /// data addresses. Return 0 if last instruction was not a ld/st instruction
@@ -1108,6 +1129,14 @@ namespace WdRiscv
     /// Return count of interrupts seen by this hart.
     uint64_t getInterruptCount() const
     { return interruptCount_; }
+
+    /// Get the value of ELP.
+    bool getElp() const
+    { return elp_; }
+
+    /// Set the ELP value.
+    void setElp(bool val)
+    { elp_ = val; }
 
     /// Set pre and post to the count of "before"/"after" triggers
     /// that tripped by the last executed instruction.
@@ -1191,6 +1220,10 @@ namespace WdRiscv
     /// Enable/disable zkr extension.
     void enableZkr(bool flag)
     { enableExtension(RvExtension::Zkr, flag); csRegs_.enableZkr(flag); }
+
+    /// Enable/disable Zicfilp extension.
+    void enableZicfilp(bool flag)
+    { enableExtension(RvExtension::Zicfilp, flag); csRegs_.enableZicfilp(flag); }
 
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
@@ -1281,6 +1314,20 @@ namespace WdRiscv
     /// Return physical memory attribute region of a given address.
     Pma getPma(uint64_t addr) const
     { return memory_.pmaMgr_.getPma(addr); }
+
+    /// Simialr to above but performs an "access".
+    Pma accessPma(uint64_t addr) const
+    { return memory_.pmaMgr_.accessPma(addr); }
+
+    /// Set memory protection access reason.
+    void setMemProtAccIsFetch(bool fetch)
+    {
+      pmpManager_.setAccReason(fetch? PmpManager::AccessReason::Fetch :
+                                      PmpManager::AccessReason::LdSt);
+      memory_.pmaMgr_.setAccReason(fetch? PmaManager::AccessReason::Fetch :
+                                          PmaManager::AccessReason::LdSt);
+      virtMem_.setAccReason(fetch);
+    }
 
     /// Return true if given extension is statically enabled (enabled my
     /// --isa but may be turned off by the MSTATUS/MISA CSRs).
@@ -1497,9 +1544,17 @@ namespace WdRiscv
     bool isRvzicond() const
     { return extensionIsEnabled(RvExtension::Zicond); }
 
+    /// Return true if the zca extension is enabled.
+    bool isRvzca() const
+    { return extensionIsEnabled(RvExtension::Zca); }
+
     /// Return true if the zcb extension is enabled.
     bool isRvzcb() const
     { return extensionIsEnabled(RvExtension::Zcb); }
+
+    /// Return true if the zcb extension is enabled.
+    bool isRvzcd() const
+    { return extensionIsEnabled(RvExtension::Zcd); }
 
     /// Return true if the zcb extension is enabled.
     bool isRvzfa() const
@@ -1527,6 +1582,9 @@ namespace WdRiscv
 
     bool isRvSmnpm() const
     { return extensionIsEnabled(RvExtension::Smnpm); }
+
+    bool isRvZicfilp() const
+    { return extensionIsEnabled(RvExtension::Zicfilp); }
 
     /// Return true if current program is considered finished (either
     /// reached stop address or executed exit limit).
@@ -1678,8 +1736,8 @@ namespace WdRiscv
     void enableClearMtvalOnIllInst(bool flag)
     { clearMtvalOnIllInst_ = flag; }
 
-    /// Clear MTVAL on illegal instruction exception if flag is true.
-    /// Otherwise, set MTVAL to the opcode of the illegal instruction.
+    /// Clear MTVAL on breakpoint exception if flag is true.
+    /// Otherwise, set MTVAL to the virtual address of the instruction.
     void enableClearMtvalOnEbreak(bool flag)
     { clearMtvalOnEbreak_ = flag; }
 
@@ -1939,15 +1997,6 @@ namespace WdRiscv
                                 Pmp::Mode& mode, bool& locked,
                                 uint64_t& low, uint64_t& high) const;
 
-
-    /// an emulated system call. If addr is zero, no slamming is done.
-    void defineSyscallSlam(URV addr)
-    { syscallSlam_ = addr; }
-
-    /// Return the address set by defineSyscallSlam.
-    URV syscallSlam() const
-    { return syscallSlam_; }
-
     /// Force floating point rounding mode to the given mode
     /// regardless of the setting of the FRM CSR. This is useful for
     /// testing/bringup.
@@ -2027,16 +2076,20 @@ namespace WdRiscv
 
     /// Return true if external interrupts are enabled and one or more
     /// external interrupt that is pending is also enabled. Set cause
-    /// to the type of interrupt if one is possible; otherwise, leave
+    /// to the type of interrupt if one is possible, nextMode/nextVirt to
+    /// which mode it should be taken; otherwise, leave
     /// it unmodified. If more than one interrupt is possible, set
     /// cause to the possible interrupt with the highest priority.
-    bool isInterruptPossible(InterruptCause& cause) const;
+    bool isInterruptPossible(InterruptCause& cause, PrivilegeMode& nextMode, bool& nextVirt) const;
 
-    /// Return true if this hart would take an interrupt if the MIP
-    /// CSR were to have the given value. Do not change MIP, do not
+    /// Return true if this hart would take an interrupt if the interrupt
+    /// pending CSRs would have the given value. Do not change MIP, do not
     /// change processor state. If interrupt is possible, set cause
-    /// to the interrupt cause; otherwise, leave cause unmodified.
-    bool isInterruptPossible(URV mipValue, InterruptCause& cause) const;
+    /// to the interrupt cause, nextMode/nextVirt to which mode it
+    /// should be taken; otherwise, leave cause unmodified.
+    bool isInterruptPossible(URV mipValue, URV sipValue, URV vsipValue,
+                              InterruptCause& cause, PrivilegeMode& nextMode,
+                              bool& nextVirt) const;
 
     /// Configure this hart to set its program counter to the given addr on entering debug
     /// mode. If addr bits are all set, then the PC is not changed on entering debug mode.
@@ -2122,7 +2175,8 @@ namespace WdRiscv
       auto fetchMem =  [this](uint64_t addr, uint32_t& value) -> bool {
 	if (pmpEnabled_)
 	  {
-	    const Pmp& pmp = pmpManager_.accessPmp(addr, PmpManager::AccessReason::Fetch);
+            pmpManager_.setAccReason(PmpManager::AccessReason::Fetch);
+	    const Pmp& pmp = pmpManager_.accessPmp(addr);
 	    if (not pmp.isExec(privMode_))
 	      return false;
 	  }
@@ -2174,6 +2228,10 @@ namespace WdRiscv
     /// mulitple of EGS for such instrucions.
     void configVectorLegalizeForEgs(bool flag)
     { vecRegs_.configLegalizeForEgs(flag); }
+
+    /// If flag is true, apply NaN canonicalization to vfredusum/vfwredusum result.
+    void configVectorFpUnorderedSumCanonical(ElementWidth ew, bool flag)
+    { vecRegs_.configVectorFpUnorderedSumCanonical(ew, flag); }
 
     /// Support memory consistency model (MCM) instruction cache. Read 2 bytes from the
     /// given address (must be even) into inst. Return true on success.  Return false if
@@ -2335,6 +2393,13 @@ namespace WdRiscv
     /// Return true if vector component currently has tail-agnositic policy.
     bool isVectorTailAgnostic() const
     { return vecRegs_.isTailAgnostic(); }
+
+    /// Print the instructions of the extensions in the ISA string.
+    void printInstructions(FILE* file) const;
+
+    /// Implement part of TIF protocol for writing the "tohost" magical location.
+    template<typename STORE_TYPE>
+    void handleStoreToHost(URV physAddr, STORE_TYPE value);
 
   protected:
 
@@ -2615,6 +2680,13 @@ namespace WdRiscv
     // is written/poked.
     void updateCachedHstatus();
 
+    /// Update cached HVICTL
+    void updateCachedHvictl()
+    {
+      URV val = csRegs_.peekHvictl();
+      hvictl_.value_ = val;
+    }
+
     /// Write the cached value of MSTATUS (or MSTATUS/MSTATUSH) into the CSR.
     void writeMstatus();
 
@@ -2735,8 +2807,11 @@ namespace WdRiscv
     /// can undo such instruction on behalf of the test-bench.
     void recordDivInst(unsigned rd, URV value);
 
-    /// Undo the effect of the last executed instruction given that
-    /// that a trigger has tripped.
+    // We have to undo an instruction execute when there is an instruction trigger. If
+    // there is an instruction trigger, a higher priority exception trigger may exist (such as a
+    // load/store exception) or it may need chaining so we execute the instruction to determine this.
+    // In this case, we have to restore the original value if a trigger does fire. We never
+    // commit load/store values if a trigger is fired (so no need to restore here).
     void undoForTrigger();
 
     /// Return true if the mie bit of the mstatus register is on.
@@ -2800,11 +2875,6 @@ namespace WdRiscv
     /// Helper to the cache block operation (cbo) instructions.
     ExceptionCause determineCboException(uint64_t& addr, uint64_t& gpa, uint64_t& pa,
 					 bool isZero);
-
-    /// Implement part of TIF protocol for writing the "tohost" magical
-    /// location.
-    template<typename STORE_TYPE>
-    void handleStoreToHost(URV physAddr, STORE_TYPE value);
 
     /// Helper to sb, sh, sw ... Sore type should be uint8_t, uint16_t
     /// etc... for sb, sh, etc...
@@ -2997,7 +3067,8 @@ namespace WdRiscv
 			   const DecodedInst* di = nullptr);
 
     /// Start an asynchronous exception (interrupt).
-    void initiateInterrupt(InterruptCause cause, URV pc);
+    void initiateInterrupt(InterruptCause cause, PrivilegeMode nextMode,
+                           bool nextVirt, URV pc);
 
     /// Start a non-maskable interrupt. Return true if successful. Return false
     /// if Smrnmi and nmis are disabled.
@@ -3011,6 +3082,11 @@ namespace WdRiscv
     /// it. Return true if an nmi or an interrupt is taken and false
     /// otherwise.
     bool processExternalInterrupt(FILE* traceFile, std::string& insStr);
+
+    /// Return true if there is a hypervisor injected interrupt through
+    /// hvictl.
+    bool hasHvi() const
+    { return (hvictl_.bits_.IID != 9) or (hvictl_.bits_.IPRIO != 0); }
 
     /// Helper to FP execution: Or the given flags values to FCSR
     /// recording a write. No-op if a trigger has already tripped.
@@ -3030,8 +3106,9 @@ namespace WdRiscv
     /// exception or the instruction to resume after asynchronous
     /// exception is handled). The info and info2 value holds additional
     /// information about an exception.
-    void initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pcToSave, URV info,
-                      URV info2 = 0);
+    void initiateTrap(const DecodedInst* di, bool interrupt, URV cause,
+                      PrivilegeMode nextMode, bool nextVirt,
+                      URV pcToSave, URV info, URV info2 = 0);
 
     /// Create trap instruction information for mtinst/htinst.
     uint32_t createTrapInst(const DecodedInst* di, bool interrupt, unsigned cause, URV info, URV info2) const;
@@ -4123,6 +4200,7 @@ namespace WdRiscv
     void execVmv_v_x(const DecodedInst*);
     void execVmv_v_i(const DecodedInst*);
 
+    void vmvr_v(const DecodedInst*, unsigned nr);
     void execVmv1r_v(const DecodedInst*);
     void execVmv2r_v(const DecodedInst*);
     void execVmv4r_v(const DecodedInst*);
@@ -5114,6 +5192,10 @@ namespace WdRiscv
 
     //Zcmop
     void execCmop(const DecodedInst*);
+
+    // Zicfilp
+    void execLpad(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
@@ -5150,7 +5232,7 @@ namespace WdRiscv
     inline
     void resetExecInfo()
     {
-      triggerTripped_ = hasInterrupt_ = hasException_ = false;
+      triggerTripped_ = enteredDebugMode_ =hasInterrupt_ = hasException_ = false;
       ebreakInstDebug_ = false;
       ldStSize_ = 0;
       lastPriv_ = privMode_;
@@ -5182,7 +5264,6 @@ namespace WdRiscv
     VecRegs vecRegs_;            // Vector register file.
 
     Syscall<URV>& syscall_;
-    URV syscallSlam_ = 0;        // Area in which to slam syscall mem changes.
 
     bool forceRounding_ = false;
     RoundingMode forcedRounding_ = RoundingMode::NearestEven;
@@ -5312,7 +5393,10 @@ namespace WdRiscv
     Emstatus<URV> mstatus_;         // Cached value of mstatus CSR or mstatush/mstatus.
     MstatusFields<URV> vsstatus_;   // Cached value of vsstatus CSR
     HstatusFields<URV> hstatus_;    // Cached value of hstatus CSR
-    URV effectiveIe_ = 0;           // Effective interrupt enable.
+    URV effectiveMie_ = 0;          // Effective machine interrupt enable.
+    URV effectiveSie_ = 0;          // Effective supervisor interrupt enable.
+    URV effectiveVsie_ = 0;         // Effective v supervisor interrupt enable.
+    HvictlFields hvictl_;           // Cached value of hvictl CSR
 
     bool clearMprvOnRet_ = true;
     bool cancelLrOnTrap_ = false;   // Cancel reservation on traps when true.
@@ -5331,11 +5415,13 @@ namespace WdRiscv
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
     URV debugParkLoop_ = ~URV(0);    // Jump to this address on entering debug mode.
     URV debugTrapAddr_ = ~URV(0);    // Jump to this address on exception in debug mode.
+    bool enteredDebugMode_ = false;  // True if entered debug mode because of trigger or ebreak.
 
     bool inDebugParkLoop_ = false;    // True if BREAKP exception goes to DPL.
 
     bool clearMtvalOnIllInst_ = true;
     bool clearMtvalOnEbreak_ = true;
+    bool lastEbreak_ = false;
 
     bool targetProgFinished_ = false;
     bool stepResult_ = false;        // Set by singleStep on caught exception (program success/fail).
@@ -5386,6 +5472,13 @@ namespace WdRiscv
     TT_STEE::Stee stee_;
     bool steeInsec1_ = false;  // True if insecure access to a secure region.
     bool steeInsec2_ = false;  // True if insecure access to a secure region.
+
+    // Landing pad (zicfilp)
+    bool mLpEnabled_ = false;
+    bool sLpEnabled_ = false;
+    bool vsLpEnabled_ = false;
+    bool uLpEnabled_ = false;
+    bool elp_ = false;
 
     VirtMem virtMem_;
     Isa isa_;
@@ -5465,6 +5558,11 @@ namespace WdRiscv
 
     bool traceHeaderPrinted_ = false;
     bool ownTrace_ = false;
+
+    bool semihostOn_ = false;
+    uint64_t semihostSlliTag_ = 0;  // Tag (rank) of slli instruction.
+
+    bool hintOps_ = false; // Enable HINT ops.
 
     // For lockless handling of MIP. We assume the software won't
     // trigger multiple interrupts while handling. To be cleared when

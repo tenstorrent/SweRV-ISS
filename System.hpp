@@ -287,7 +287,7 @@ namespace WdRiscv
 		   const std::vector<unsigned>& enabledPpos);
 
     /// Similar to preceding method but with all PPO rules enabled/disabled.
-    bool enableMcm(unsigned mbSize, bool mbLineCheckAll, bool enablePpos = true);
+    bool enableMcm(unsigned mbSize, bool mbLineCheckAll, bool enablePpos);
 
     /// Terminate MCM. Experimental. This unlikely to be useful except for executing one
     /// extra instruction at the end of a test to simplify some debugging.
@@ -339,13 +339,13 @@ namespace WdRiscv
 		    const std::vector<uint8_t>& rtlData,
 		    const std::vector<bool>& mask);
 
-    bool mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
-		     uint64_t addr, unsigned size, uint64_t data);
+    bool mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
+                     unsigned size, uint64_t data, unsigned elem, unsigned field);
 
     /// Initiate a write for a store instruction bypassing the merge
     /// buffer.
-    bool mcmBypass(Hart<URV>& hart, uint64_t time, uint64_t tag,
-		   uint64_t addr, unsigned size, uint64_t data);
+    bool mcmBypass(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
+                   unsigned size, uint64_t data, unsigned elem, unsigned field);
 
     /// Initiate a fetch of a line from memory into the isntruction
     /// cache.

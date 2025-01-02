@@ -230,7 +230,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 {
   unsigned errors = 0;
   URV reset = 0, mask = 0, pokeMask = 0;
-  bool exists = true, shared = false;
+  bool exists = true, shared = false, isDebug = false;
 
   std::string name(nm);
   if (name == "dscratch")
@@ -266,6 +266,9 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 
   if (conf.contains("shared"))
     getJsonBoolean(name + ".shared", conf.at("shared"), shared) or errors++;
+
+  if (conf.contains("is_debug"))
+    getJsonBoolean(name + ".is_debug", conf.at("is_debug"), isDebug) or errors++;
 
   // If number present and csr is not defined, then define a new
   // CSR; otherwise, configure.
@@ -314,6 +317,7 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
   bool shared0 = csr->isShared();
   URV reset0 = csr->getResetValue(), mask0 = csr->getWriteMask();
   URV pokeMask0 = csr->getPokeMask();
+  bool debug0 = csr->isDebug();
 
   if (name == "mhartid" or name == "vlenb")
     {
@@ -327,14 +331,22 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
       return true;
     }
 
+  if (debug0 and not isDebug)
+    {
+      if (verbose)
+        std::cerr << "CSR " << name << " cannot be marked as not debug-mode.\n";
+      isDebug = true;
+    }
+
   if (errors)
     return false;
 
-  if (not hart.configCsrByUser(name, exists, reset, mask, pokeMask, shared))
+  if (not hart.configCsrByUser(name, exists, reset, mask, pokeMask, shared, isDebug))
     {
       std::cerr << "Invalid CSR (" << name << ") in config file.\n";
       return false;
     }
+
   if ((mask & pokeMask) != mask and hart.sysHartIndex() == 0)
     {
       std::cerr << "Warning: For CSR " << name << " poke mask (0x" << std::hex << pokeMask
@@ -1013,6 +1025,32 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         hart.configVectorLegalizeForEgs(flag);
     }
 
+  tag = "fp_usum_nan_canonicalize";
+  if (vconf.contains(tag))
+    {
+      const auto& items = vconf.at(tag);
+      for (const auto& item : items)
+	{
+          if (not item.is_string())
+            {
+              std::cerr << "Error: Invalid value in config file item " << tag
+		   << " -- expecting string\n";
+              errors++;
+	      continue;
+            }
+
+          std::string_view sew = item.get<std::string_view>();
+          ElementWidth ew;
+          if (not VecRegs::to_sew(sew, ew))
+            {
+              std::cerr << "Error: can't convert to valid SEW: " << tag << '\n';
+              errors++;
+              continue;
+            }
+          hart.configVectorFpUnorderedSumCanonical(ew, true);
+        }
+    }
+
   return errors == 0;
 }
 
@@ -1517,8 +1555,9 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableSdtrig(flag);
-      cerr << "Config file tag \"" << tag << "\" deprecated: "
-	   << "Add extension string \"sdtrig\" to \"isa\" tag instead.\n";
+      if (hart.sysHartIndex() == 0)
+	cerr << "Config file tag \"" << tag << "\" deprecated: "
+	     << "Add extension string \"sdtrig\" to \"isa\" tag instead.\n";
     }
 
   // Enable performance counters.
@@ -1656,19 +1695,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
           else
             errors++;
 	}
-    }
-
-  tag = "syscall_slam_area";
-  if (config_ -> contains(tag))
-    {
-      uint64_t addr = 0;
-      if (getJsonUnsigned(tag, config_ -> at(tag), addr))
-        {
-          hart.defineSyscallSlam(addr);
-          hart.enableLinux(true);
-        }
-      else
-        errors++;
     }
 
   tag = "physical_memory_protection_grain";
@@ -2063,6 +2089,14 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       bool flag = false;
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.hfenceGvmaIgnoresGpa(flag);
+    }
+
+  tag = "enable_semihosting";
+  if (config_ ->contains(tag))
+    {
+      bool flag = false;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableSemihosting(flag);
     }
 
   return errors == 0;
@@ -2556,7 +2590,7 @@ HartConfig::getEnabledPpos(std::vector<unsigned>& enabledPpos) const
 	  if (not getJsonBoolean(tag, config_ -> at(tag), flag))
 	    return false;
 	  if (flag)
-	    for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Limit; ++i)
+	    for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Io; ++i) // Temporary: Skip Io.
 	      enabledPpos.push_back(i);
 	}
       else if (ep.is_array())
@@ -2578,8 +2612,8 @@ HartConfig::getEnabledPpos(std::vector<unsigned>& enabledPpos) const
     }
   else
     {
-      // Tag is missing: all rules enabled.
-      for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Limit; ++i)
+      // Tag is missing: all rules enabled. Temporary: Skip Io.
+      for (unsigned i = 0; i < Mcm<uint64_t>::PpoRule::Io; ++i)
 	enabledPpos.push_back(i);
     }
 

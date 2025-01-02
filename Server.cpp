@@ -433,75 +433,6 @@ Server<URV>::disassembleAnnotateInst(Hart<URV>& hart,
 }
 
 
-/// Collect the double-words overlapping the areas of memory modified
-/// by the most recent emulated system call. It is assumed that
-/// memory protection boundaries are double-word aligned.
-template <typename URV>
-static void
-collectSyscallMemChanges(Hart<URV>& hart,
-                         const std::vector<std::pair<uint64_t, uint64_t>>& scVec,
-                         std::vector<WhisperMessage>& changes,
-                         uint64_t slamAddr)
-{
-  for (auto al : scVec)
-    {
-      uint64_t addr = al.first;
-      uint64_t len = al.second;
-
-      uint64_t offset = addr & 7;  // Offset from double word address.
-      if (offset)
-        {
-          addr -= offset;   // Make double word aligned.
-          len += offset;    // Keep last byte the same.
-        }
-
-      for (uint64_t ix = 0; ix < len; ix += 8, addr += 8)
-        {
-          uint64_t val = 0;
-          if (not hart.peekMemory(addr, val, true))
-            {
-              std::cerr << "Peek-memory fail at 0x" << std::hex << addr << std::dec
-                        << " in collectSyscallMemChanges\n";
-              break;
-            }
-
-          if (not slamAddr)
-            continue;
-
-          bool ok = hart.pokeMemory(slamAddr, addr, true);
-          if (ok)
-            {
-              changes.emplace_back(0, Change, 'm', slamAddr, addr, 8);
-
-              slamAddr += 8;
-              ok = hart.pokeMemory(slamAddr, val, true);
-              if (ok)
-                {
-                  changes.emplace_back(0, Change, 'm', slamAddr, val, 8);
-                  slamAddr += 8;
-                }
-            }
-
-          if (not ok)
-            {
-              std::cerr << "Poke-memory fail at 0x" << std::hex << slamAddr << std::dec
-                        << " in collectSyscallMemChanges\n";
-              break;
-            }
-        }
-    }
-
-  // Put a zero to mark end of syscall changes in slam area.
-  if (slamAddr)
-    {
-      if (hart.pokeMemory(slamAddr, uint64_t(0), true))
-        changes.emplace_back(0, Change, 'm', slamAddr, 0);
-      if (hart.pokeMemory(slamAddr + 8, uint64_t(0), true))
-        changes.emplace_back(0, Change, 'm', slamAddr+8, 0);
-    }
-}
-
-
 template <typename URV>
 void
 Server<URV>::processStepChanges(Hart<URV>& hart,
@@ -615,34 +546,13 @@ Server<URV>::processStepChanges(Hart<URV>& hart,
   // Map to keep CSRs in order and to drop duplicate entries.
   std::map<URV,URV> csrMap;
 
-  // Collect changed CSRs and their values. Collect components of changed trigger.
+  // Collect changed CSRs and their values.
   for (CsrNumber csr : csrs)
     {
       URV value;
       // We always record the real csr number for VS/S mappings
       if (hart.peekCsr(csr, value, false))
-	{
-	  if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TINFO)
-	    ; // Trigger data collected below.
-	  else
-	    csrMap[URV(csr)] = value;
-	}
-    }
-
-  // Collect changes associated with trigger register.
-  for (unsigned trigger : triggers)
-    {
-      // Components of trigger that were changed by instruction.
-      std::vector<std::pair<CsrNumber, uint64_t>> trigChanges;
-      hart.getTriggerChange(trigger, trigChanges);
-      
-      for (auto& pair : trigChanges)
-	{
-	  auto csrn = pair.first;
-	  auto val = pair.second;
-	  URV ecsr = (trigger << 16) | unsigned(csrn); // effective csr number.
-	  csrMap[ecsr] = val;
-	}
+	csrMap[URV(csr)] = value;
     }
 
   for (const auto& [key, val] : csrMap)
@@ -670,16 +580,6 @@ Server<URV>::processStepChanges(Hart<URV>& hart,
 	    WhisperMessage msg(0, Change, 'm', einfo.va_, einfo.stData_, elemSize);
 	    pendingChanges.push_back(msg);
 	  }
-    }
-
-  // Collect emulated system call changes.
-  uint64_t slamAddr = hart.syscallSlam();
-  if (slamAddr)
-    {
-      std::vector<std::pair<uint64_t, uint64_t>> scVec;
-      hart.lastSyscallChanges(scVec);
-      if (not scVec.empty())
-        collectSyscallMemChanges(hart, scVec, pendingChanges, slamAddr);
     }
 
   // Add count of changes to reply.
@@ -756,9 +656,8 @@ Server<URV>::stepCommand(const WhisperMessage& req,
       hart.setInstructionCount(req.instrTag - 1);
       hart.singleStep(di, traceFile);
       if (not di.isValid())
-	assert(hart.lastInstructionTrapped());
-      bool trapped = hart.lastInstructionTrapped();
-      ok = system_.mcmRetire(hart, req.time, req.instrTag, di, trapped);
+	assert(hart.lastInstructionCancelled());
+      ok = system_.mcmRetire(hart, req.time, req.instrTag, di, hart.lastInstructionCancelled());
     }
   else
     hart.singleStep(di, traceFile);
@@ -912,14 +811,16 @@ Server<URV>::mcmInsertCommand(const WhisperMessage& req, WhisperMessage& reply,
 {
   bool ok = true;
   uint32_t hartId = req.hart;
+  unsigned elem = uint16_t(req.resource >> 16);  // Vector element ix.
+  unsigned field = uint16_t(req.resource);       // Vector element field (for segment store).
 
   if (req.size <= 8)
     {
-      ok = system_.mcmMbInsert(hart, req.time, req.instrTag, req.address, req.size, req.value);
+      ok = system_.mcmMbInsert(hart, req.time, req.instrTag, req.address, req.size, req.value, elem, field);
 
       if (cmdLog)
-	fprintf(cmdLog, "hart=%" PRIu32 " time=%" PRIu64 " mbinsert %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
-		hartId, req.time, req.instrTag, req.address, req.size, req.value);
+	fprintf(cmdLog, "hart=%" PRIu32 " time=%" PRIu64 " mbinsert %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 " %d %d\n",
+		hartId, req.time, req.instrTag, req.address, req.size, req.value, elem, field);
     }
   else
     {
@@ -937,19 +838,19 @@ Server<URV>::mcmInsertCommand(const WhisperMessage& req, WhisperMessage& reply,
 	    {
 	      const uint64_t* data = reinterpret_cast<const uint64_t*>(req.buffer.data());
 	      for (unsigned i = 0; i < size and ok; i += 8, ++data)
-		ok = system_.mcmMbInsert(hart, time, tag, addr + i, 8, *data);
+		ok = system_.mcmMbInsert(hart, time, tag, addr + i, 8, *data, elem, field);
 	    }
 	  else if ((size & 0x3) == 0 and (addr & 0x3) == 0)
 	    {
 	      const uint32_t* data = reinterpret_cast<const uint32_t*>(req.buffer.data());
 	      for (unsigned i = 0; i < size and ok; i += 4, ++data)
-		ok = system_.mcmMbInsert(hart, time, tag, addr + i, 4, *data);
+		ok = system_.mcmMbInsert(hart, time, tag, addr + i, 4, *data, elem, field);
 	    }
 	  else
 	    {
 	      const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
 	      for (unsigned i = 0; i < size and ok; ++i, ++data)
-		ok = system_.mcmMbInsert(hart, time, tag, addr + i, 1, *data);
+		ok = system_.mcmMbInsert(hart, time, tag, addr + i, 1, *data, elem, field);
 	    }
 
 	  if (cmdLog)
@@ -962,7 +863,7 @@ Server<URV>::mcmInsertCommand(const WhisperMessage& req, WhisperMessage& reply,
 		  unsigned val = data[i-1];
 		  fprintf(cmdLog, "%02x", val);
 		}
-	      fprintf(cmdLog, "\n");
+	      fprintf(cmdLog, " %d %d\n", elem, field);
 	    }
 	}
     }
@@ -981,14 +882,16 @@ Server<URV>::mcmBypassCommand(const WhisperMessage& req, WhisperMessage& reply,
 {
   bool ok = true;
   uint32_t hartId = req.hart;
+  unsigned elem = uint16_t(req.resource >> 16);  // Vector element ix.
+  unsigned field = uint16_t(req.resource);       // Vector element field (for segment store).
 
   if (req.size <= 8)
     {
-      ok = system_.mcmBypass(hart, req.time, req.instrTag, req.address, req.size, req.value);
+      ok = system_.mcmBypass(hart, req.time, req.instrTag, req.address, req.size, req.value, elem, field);
 
       if (cmdLog)
-	fprintf(cmdLog, "hart=%" PRIu32 " time=%" PRIu64 " mbbypass %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
-		hartId, req.time, req.instrTag, req.address, req.size, req.value);
+	fprintf(cmdLog, "hart=%" PRIu32 " time=%" PRIu64 " mbbypass %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 " %d %d\n",
+		hartId, req.time, req.instrTag, req.address, req.size, req.value, elem, field);
     }
   else
     {
@@ -1006,19 +909,19 @@ Server<URV>::mcmBypassCommand(const WhisperMessage& req, WhisperMessage& reply,
 	    {
 	      const uint64_t* data = reinterpret_cast<const uint64_t*>(req.buffer.data());
 	      for (unsigned i = 0; i < size and ok; i += 8, ++data)
-		ok = system_.mcmBypass(hart, time, tag, addr + i, 8, *data);
+		ok = system_.mcmBypass(hart, time, tag, addr + i, 8, *data, elem, field);
 	    }
 	  else if ((size & 0x3) == 0 and (addr & 0x3) == 0)
 	    {
 	      const uint32_t* data = reinterpret_cast<const uint32_t*>(req.buffer.data());
 	      for (unsigned i = 0; i < size and ok; i += 4, ++data)
-		ok = system_.mcmBypass(hart, time, tag, addr + i, 4, *data);
+		ok = system_.mcmBypass(hart, time, tag, addr + i, 4, *data, elem, field);
 	    }
 	  else
 	    {
 	      const uint8_t* data = reinterpret_cast<const uint8_t*>(req.buffer.data());
 	      for (unsigned i = 0; i < size and ok; ++i, ++data)
-		ok = system_.mcmBypass(hart, time, tag, addr + i, 1, *data);
+		ok = system_.mcmBypass(hart, time, tag, addr + i, 1, *data, elem, field);
 	    }
 
 	  if (cmdLog)
@@ -1031,7 +934,7 @@ Server<URV>::mcmBypassCommand(const WhisperMessage& req, WhisperMessage& reply,
 		  unsigned val = data[i-1];
 		  fprintf(cmdLog, "%02x", val);
 		}
-	      fprintf(cmdLog, "\n");
+	      fprintf(cmdLog, " %d %d\n", elem, field);
 	    }
 	}
     }
@@ -1484,15 +1387,18 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 	  hart.setDeferredInterrupts(0);
 
           URV mipVal = msg.address;
+          URV sipVal = msg.value;
+          URV vsipVal = msg.instrTag;
           InterruptCause cause = InterruptCause{0};
-          reply.flags = hart.isInterruptPossible(mipVal, cause);
+          PrivilegeMode nextMode; bool nextVirt;
+          reply.flags = hart.isInterruptPossible(mipVal, sipVal, vsipVal, cause, nextMode, nextVirt);
           reply.value = static_cast<uint64_t>(cause);
 
 	  hart.setDeferredInterrupts(deferred);
 
           if (commandLog)
-            fprintf(commandLog, "hart=%" PRIu32 " check_interrupt 0x%" PRIxMAX "\n", hartId,
-                    uintmax_t(msg.address));
+            fprintf(commandLog, "hart=%" PRIu32 " check_interrupt 0x%" PRIxMAX " 0x%" PRIxMAX " 0x%" PRIxMAX "\n", hartId,
+                    uintmax_t(msg.address), uintmax_t(msg.value), uintmax_t(msg.instrTag));
         }
         break;
 

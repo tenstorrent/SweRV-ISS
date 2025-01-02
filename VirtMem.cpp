@@ -1,7 +1,6 @@
 #include <cmath>
 #include <iostream>
 #include <ios>
-#include "PmpManager.hpp"
 #include "VirtMem.hpp"
 
 using namespace WdRiscv;
@@ -535,7 +534,7 @@ ExceptionCause
 VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool write,
 		       bool exec, uint64_t& pa, TlbEntry& tlbEntry)
 {
-  // 1. Root is "a" in section 4.3.2 of the privileged spec, ii is "i" in that section.
+  // 1. Root is "a" in section 11.3.2 of the privileged spec, ii is "i" in that section.
   uint64_t root = rootPage_ * pageSize_;
 
   PTE pte(0);
@@ -567,15 +566,9 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
           walkEntryIx = walkVec.back().size() - 1;
         }
 
-      // Check PMP. The privMode here is the effective one that
-      // already accounts for MPRV.
-      if (pmpMgr_.isEnabled())
-	{
-	  const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
-	  if (not pmp.isRead(privMode))
-	    return accessFaultType(read, write, exec);
-	}
-
+      // Check PMP. The privMode here is the effective one that already accounts for MPRV.
+      if (not pmpIsReadable(pteAddr, privMode))
+	return accessFaultType(read, write, exec);
 
       if (! memRead(pteAddr, bigEnd_, pte.data_))
         return accessFaultType(read, write, exec);
@@ -636,14 +629,9 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
 	  // Or B
 	  saveUpdatedPte(pteAddr, sizeof(pte.data_), pte.data_);  // For logging
 
-	  // B1. Check PMP. The privMode here is the effective one that
-	  // already accounts for MPRV.
-	  if (pmpMgr_.isEnabled())
-	    {
-	      const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
-	      if (not pmp.isWrite(privMode))
-		return accessFaultType(read, write, exec);
-	    }
+	  // B1. Check PMP.
+	  if (not pmpIsWritable(pteAddr, privMode))
+	    return accessFaultType(read, write, exec);
 
 	  {
 	    // B2. Compare pte to memory.
@@ -703,7 +691,7 @@ ExceptionCause
 VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool write,
 			     bool exec, bool isPteAddr, uint64_t& pa, TlbEntry& tlbEntry)
 {
-  // 1. Root is "a" in section 4.3.2 of the privileged spec, ii is "i" in that section.
+  // 1. Root is "a" in section 11.3.2 of the privileged spec, ii is "i" in that section.
   uint64_t root = rootPageStage2_ * pageSize_;
 
   PTE pte(0);
@@ -735,14 +723,9 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
           walkEntryIx = walkVec.back().size() - 1;
         }
 
-      // Check PMP. The privMode here is the effective one that
-      // already accounts for MPRV.
-      if (pmpMgr_.isEnabled())
-	{
-	  const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
-	  if (not pmp.isRead(privMode))
-	    return accessFaultType(read, write, exec);
-	}
+      // Check PMP. The privMode here is the effective one that already accounts for MPRV.
+      if (not pmpIsReadable(pteAddr, privMode))
+	return accessFaultType(read, write, exec);
 
       if (! memRead(pteAddr, bigEnd_, pte.data_))
         return accessFaultType(read, write, exec);
@@ -802,14 +785,9 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  // Or B
 	  saveUpdatedPte(pteAddr, sizeof(pte.data_), pte.data_);  // For logging
 
-	  // B1. Check PMP. The privMode here is the effective one that
-	  // already accounts for MPRV.
-	  if (pmpMgr_.isEnabled())
-	    {
-	      const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
-	      if (not pmp.isWrite(privMode))
-		return accessFaultType(read, write, exec);
-	    }
+	  // B1. Check PMP.
+	  if (not pmpIsWritable(pteAddr, privMode))
+	    return accessFaultType(read, write, exec);
 
 	  {
 	    // B2. Compare pte to memory.
@@ -870,7 +848,7 @@ ExceptionCause
 VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool write,
 			     bool exec, uint64_t& pa, TlbEntry& tlbEntry)
 {
-  // 1. Root is "a" in section 4.3.2 of the privileged spec, ii is "i" in that section.
+  // 1. Root is "a" in section 11.3.2 of the privileged spec, ii is "i" in that section.
   uint64_t root = vsRootPage_ * pageSize_;
 
   PTE pte(0);
@@ -911,14 +889,9 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
           walkEntryIx = walkVec.back().size() - 1;
         }
 
-      // Check PMP. The privMode here is the effective one that
-      // already accounts for MPRV.
-      if (pmpMgr_.isEnabled())
-	{
-	  const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
-	  if (not pmp.isRead(privMode))
-	    return accessFaultType(read, write, exec);
-	}
+      // Check PMP. The privMode here is the effective one that already accounts for MPRV.
+      if (not pmpIsReadable(pteAddr, privMode))
+	return accessFaultType(read, write, exec);
 
       if (! memRead(pteAddr, bigEnd_, pte.data_))
         return accessFaultType(read, write, exec);
@@ -983,14 +956,9 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  saveUpdatedPte(pteAddr, sizeof(pte.data_), pte.data_);  // For logging
 
           s1ADUpdate_ = true;
-	  // B1. Check PMP. The privMode here is the effective one that
-	  // already accounts for MPRV.
-	  if (pmpMgr_.isEnabled())
-	    {
-	      const Pmp& pmp = pmpMgr_.accessPmp(pteAddr);
-	      if (not pmp.isWrite(privMode))
-		return accessFaultType(read, write, exec);
-	    }
+	  // B1. Check PMP.
+	  if (not pmpIsWritable(pteAddr, privMode))
+	    return accessFaultType(read, write, exec);
 
 	  {
 	    // B2. Compare pte to memory.
@@ -1126,7 +1094,7 @@ VirtMem::printEntries(std::ostream& os, uint64_t addr, const std::string& path) 
   for (unsigned ix = 0; ix < entryCount; ++ix, eaddr += entrySize)
     {
       PTE pte(0);
-      memory_.read(eaddr, pte.data_);
+      memRead(eaddr, false /*bigEndian*/, pte.data_);
 
       if (not pte.valid())
         continue;
@@ -1142,7 +1110,7 @@ VirtMem::printEntries(std::ostream& os, uint64_t addr, const std::string& path) 
   for (unsigned ix = 0; ix < entryCount; ++ix, eaddr += entrySize)
     {
       PTE pte(0);
-      memory_.read(eaddr, pte.data_);
+      memRead(eaddr, false /*bigEnding*/, pte.data_);
 
       if (not pte.valid())
         continue;

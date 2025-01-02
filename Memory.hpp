@@ -95,13 +95,13 @@ namespace WdRiscv
       if (address + sizeof(T) > size_)
         return false;
 #else
-      Pma pma1 = pmaMgr_.accessPma(address, PmaManager::AccessReason::LdSt);
+      Pma pma1 = pmaMgr_.accessPma(address);
       if (not pma1.isRead())
 	return false;
 
       if (address & (sizeof(T) - 1))  // If address is misaligned
 	{
-          Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1, PmaManager::AccessReason::LdSt);
+          Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1);
           if (not pma2.isRead())
             return false;
         }
@@ -130,14 +130,14 @@ namespace WdRiscv
     template <typename T>
     bool readInst(uint64_t address, T& value) const
     {
-      Pma pma = pmaMgr_.accessPma(address, PmaManager::AccessReason::Fetch);
+      Pma pma = pmaMgr_.accessPma(address);
       if (not pma.isExec())
 	return false;
 
       if (address & (sizeof(T) -1))
 	{
 	  // Misaligned address: Check next address.
-	  Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1, PmaManager::AccessReason::Fetch);
+	  Pma pma2 = pmaMgr_.getPma(address + sizeof(T) - 1);
 	  if (not pma2.isExec())
 	    return false;  // No exec.
 	}
@@ -223,13 +223,13 @@ namespace WdRiscv
       *(reinterpret_cast<T*>(data_ + address)) = value;
 #else
 
-      Pma pma1 = pmaMgr_.accessPma(address, PmaManager::AccessReason::LdSt);
+      Pma pma1 = pmaMgr_.accessPma(address);
       if (not pma1.isWrite())
 	return false;
 
       if (address & (sizeof(T) - 1))  // If address is misaligned
 	{
-          Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1, PmaManager::AccessReason::LdSt);
+          Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1);
           if (pma1 != pma2)
 	    return false;
 	}
@@ -557,7 +557,7 @@ namespace WdRiscv
 
     /// Return true if given address has reserve-eventual attribute.
     bool hasReserveAttribute(uint64_t addr) const
-    { return pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt).isRsrv(); }
+    { return pmaMgr_.accessPma(addr).isRsrv(); }
 
   protected:
 

@@ -195,12 +195,10 @@ namespace WdRiscv
       AccessReason reason_;
     };
 
-    /// Similar to getPma but updates trace associated with each PMA entry
-    inline Pma accessPma(uint64_t addr) const
-    { return accessPma(addr, AccessReason::None); }
+    ///
 
     /// Similar to getPma but updates trace associated with each PMA entry
-    inline Pma accessPma(uint64_t addr, AccessReason reason) const
+    inline Pma accessPma(uint64_t addr) const
     {
       addr = (addr >> 2) << 2; // Make word aligned.
 
@@ -215,7 +213,7 @@ namespace WdRiscv
         {
           if (trace_)
             pmaTrace_.push_back({unsigned(std::distance(regions_.begin(), it)),
-                                  addr, it->firstAddr_, it->lastAddr_, reason});
+                                  addr, it->firstAddr_, it->lastAddr_, reason_});
 	  auto& region = *it;
 	  if (not region.pma_.hasMemMappedReg())
 	    return region.pma_;
@@ -310,6 +308,10 @@ namespace WdRiscv
 
     void enableTrace(bool flag)
     { trace_ = flag; }
+
+    /// This is to differentiate fetch from ld/st accesses.
+    void setAccReason(AccessReason reason)
+    { reason_ = reason; }
 
     /// Print current pma map matching a particular address.
     void printPmas(std::ostream& os, uint64_t address) const;
@@ -433,6 +435,7 @@ namespace WdRiscv
 
     bool trace_ = false;  // Collect stats if true.
     mutable std::vector<PmaTrace> pmaTrace_;
+    AccessReason reason_;
 
     Pma defaultPma_{Pma::Attrib::Default};
     Pma noAccessPma_{Pma::Attrib::None};

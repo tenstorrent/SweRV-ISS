@@ -400,7 +400,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     }
 
   // Process memory diff.
-  if (di.instId() == InstId::cbo_zero)
+  if (di.instId() == InstId::cbo_zero and not hasException_)
     {
       for (unsigned i = 0; i < cacheLineSize_; i += sizeof(URV))
 	{
@@ -420,28 +420,6 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       pending = true;
     }
 
-  // Process syscal memory diffs
-  if (syscallSlam_ and di.instEntry()->instId() == InstId::ecall)
-    {
-      std::vector<std::pair<uint64_t, uint64_t>> scVec;
-      lastSyscallChanges(scVec);
-      for (auto al: scVec)
-        {
-          uint64_t addr = al.first, len = al.second;
-          for (uint64_t ix = 0; ix < len; ix += 8, addr += 8)
-            {
-              uint64_t val = 0;
-              peekMemory(addr, val, true);
-
-              if (pending)
-                fprintf(out, "  +\n");
-              formatInstTrace<URV>(out, tag, *this, instSV, 'm',
-                                   addr, val, tmp);
-              pending = true;
-            }
-        }
-    }
-
   // Process CSR diffs.
   std::vector<CsrNumber> csrs;
   std::vector<unsigned> triggers;
@@ -451,32 +429,13 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   std::vector< CVP > cvps; // CSR-value pairs
   cvps.reserve(csrs.size() + triggers.size());
 
-  // Collect non-trigger CSRs and their values.
+  // Collect changed CSRs and their values.
   for (CsrNumber csr : csrs)
     {
       // We always record the real csr number for VS/S mappings
       if (not csRegs_.peek(csr, value, false))
         continue;
-      if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TINFO)
-        continue; // Debug trigger values collected below.
       cvps.push_back(CVP(URV(csr), value));
-    }
-
-  // Collect trigger CSRs and their values. A synthetic CSR number is used encoding the
-  // trigger number and the trigger component.
-  for (unsigned trigger : triggers)
-    {
-      // Components of trigger that were changed by instruction.
-      std::vector<std::pair<CsrNumber, uint64_t>> trigChanges;
-      getTriggerChange(trigger, trigChanges);
-
-      for (auto& pair : trigChanges)
-	{
-	  auto csrn = pair.first;
-	  auto val = pair.second;
-          URV ecsr = (trigger << 16) | URV(csrn);
-          cvps.push_back(CVP(ecsr, URV(val)));
-        }
     }
 
   // Sort by CSR number.
@@ -968,6 +927,24 @@ Hart<URV>::logStop(const CoreException& ce, uint64_t counter, FILE* traceFile)
   }
 
   return success;
+}
+
+
+template <typename URV>
+void
+Hart<URV>::printInstructions(FILE* file) const
+{
+  for (unsigned i = 0; i <= unsigned(InstId::maxId); ++i)
+    {
+      InstId id = InstId(i);
+      auto& entry = decoder_.getInstructionEntry(id);
+      auto extension = entry.extension();
+      if (isa_.isEnabled(extension))
+        {
+          auto name = entry.name();
+          fprintf(file, "%s\n", name.data());
+        }
+    }
 }
 
 

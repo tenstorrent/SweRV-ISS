@@ -1181,7 +1181,7 @@ namespace WdRiscv
     /// csr (implemented == false) as user-disabled so that internal code cannot enable
     /// them.
     bool configCsrByUser(std::string_view name, bool implemented, URV resetValue,
-			 URV mask, URV pokeMask, bool shared);
+			 URV mask, URV pokeMask, bool shared, bool isDebug);
 
     /// Configure CSR. Return true on success and false on failure.
     bool configCsr(CsrNumber csr, bool implemented, URV resetValue,
@@ -1338,6 +1338,27 @@ namespace WdRiscv
 	}
     }
 
+    /// MIP is OR-ed when mvien does not exist or is set to zero. Otherwise,
+    /// the value of SEIP is solely the value of the pin.
+    URV overrideWithSeiPinAndMvip(URV ip) const
+    {
+      if (not superEnabled_)
+        return ip;
+
+      if (aiaEnabled_)
+        {
+          URV mvien = peekMvien();
+          if (mvien >> URV(InterruptCause::S_EXTERNAL) & 1)
+            ip &= ~URV(1 << URV(InterruptCause::S_EXTERNAL));
+          else
+            {
+              URV mvip = peekMvip();
+              ip |= mvip & URV(1 << URV(InterruptCause::S_EXTERNAL));
+            }
+        }
+      return ip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+    }
+
     /// Fast peek method for MIP.
     URV peekMip() const
     {
@@ -1380,12 +1401,79 @@ namespace WdRiscv
       return csr.read();
     }
 
-    /// Return the effective interrupt enable mask: This is MIE ored
-    /// with the virtual interrupt enable implied by MVIEN.
-    URV effectiveInterruptEnable() const
+    /// Fast peek method for HVICTL.
+    URV peekHvictl() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::HVICTL));
+      return csr.read();
+    }
+
+    /// Return the effective MIP value.
+    URV effectiveMip() const
+    {
+      URV mip = overrideWithSeiPinAndMvip(peekMip());
+      return mip;
+    }
+
+    /// Return the effective SIP value.
+    URV effectiveSip() const
+    {
+      URV mip = effectiveMip();
+      URV sip = mip & peekMideleg();
+      if (aiaEnabled_ and superEnabled_)
+        {
+          URV mvip = peekMvip() & ~peekMideleg() & peekMvien();
+          sip |= mvip;
+        }
+      return sip;
+    }
+
+    /// Return the effective VSIP value.
+    URV effectiveVsip() const
+    {
+      URV sip = effectiveSip();
+      URV vsip = sip & peekHideleg();
+      if (aiaEnabled_ and superEnabled_)
+        {
+          URV hvip = peekHvip() & ~peekHideleg() & peekHvien();
+          vsip |= hvip;
+        }
+      return vsip;
+    }
+
+    /// Return the machine effective interrupt enable mask. This is
+    /// MIE and-ed with non-delegated interrupts.
+    URV effectiveMie() const
     {
       const auto& csr = regs_.at(size_t(CsrNumber::MIE));
-      return csr.read() | shadowSie_;
+      const auto& mideleg = regs_.at(size_t(CsrNumber::MIDELEG));
+      return csr.read() & ~mideleg.read();
+    }
+
+    /// Return the effective interrupt enable mask. This is
+    /// SIE with mideleg and mvien delegated interrupts and
+    /// not delegated by hideleg.
+    URV effectiveSie() const
+    {
+      const auto& mie = regs_.at(size_t(CsrNumber::MIE));
+      const auto& mvien = regs_.at(size_t(CsrNumber::MVIEN));
+      const auto& mideleg = regs_.at(size_t(CsrNumber::MIDELEG));
+      const auto& hideleg = regs_.at(size_t(CsrNumber::HIDELEG));
+      return (mie.read() | (shadowSie_ & mvien.read() & ~mideleg.read())) & ~hideleg.read();
+    }
+
+    /// Return the effective interrupt enable mask. This is
+    /// VSIE with hideleg and hvien delegated interrupts. 
+    URV effectiveVsie() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::VSIE));
+      const auto& mie = regs_.at(size_t(CsrNumber::MIE));
+      const auto& mvien = regs_.at(size_t(CsrNumber::MVIEN));
+      const auto& mideleg = regs_.at(size_t(CsrNumber::MIDELEG));
+      const auto& hideleg = regs_.at(size_t(CsrNumber::HIDELEG));
+      const auto& hvien = regs_.at(size_t(CsrNumber::HVIEN));
+      return ((mie.read() | (shadowSie_ & mvien.read() & ~mideleg.read())) & hideleg.read()) |
+              (sInterruptToVs(csr.read()) & ~hideleg.read() & hvien.read());
     }
 
     /// Fast peek method for MSTATUS
@@ -1539,19 +1627,13 @@ namespace WdRiscv
     /// Return adjusted value.
     URV adjustPmpValue(CsrNumber csrn, URV value) const;
 
-    /// Read value of SIP (MIP masked with MIDELEG). This never
-    /// maps to VSIP.
+    /// Read value of SIP (MIP masked with MIDELEG). This may
+    /// map to VSIP with AIA.
     bool readSip(URV& value) const;
 
-    /// Read value of SIE (MIE masked with MIDELEG). This never
-    /// maps to VSIP.
+    /// Read value of SIE (MIE masked with MIDELEG). This may
+    /// map to VSIE with AIA.
     bool readSie(URV& value) const;
-
-    /// Helper to read method.
-    bool readVsip(URV& value) const;
-
-    /// Helper to read method.
-    bool readVsie(URV& value) const;
 
     /// Helper to read method.
     bool readMvip(URV& value) const;
@@ -1585,10 +1667,10 @@ namespace WdRiscv
     bool readVsireg(CsrNumber num, URV& value, bool virtMode) const;
 
     /// Helper to write method: Mask with MIP/MIDELEG.
-    bool writeSip(URV value);
+    bool writeSip(URV value, bool recordWr = true);
 
     /// Helper to write method: Mask with SIP/MIDELEG.
-    bool writeSie(URV value);
+    bool writeSie(URV value, bool recordWr = true);
 
     /// Helper to write method.
     bool writeVsip(URV value);
@@ -1747,6 +1829,10 @@ namespace WdRiscv
     /// read-only zero if false.
     void enableZkr(bool flag);
 
+    /// Enable/disable zicfilp extension. Sets mseccfg/menvcfg/henvcfg/senvcfg.LPE
+    /// to read-only zero if false.
+    void enableZicfilp(bool flag);
+
     /// Enable/disable virtual supervisor. When enabled, the trap-related
     /// CSRs point to their virtual counterpars (e.g. reading writing sstatus will
     /// actually read/write vsstatus).
@@ -1758,10 +1844,6 @@ namespace WdRiscv
     /// Called after an MHPMEVENT CSR is written/poked to update the
     /// contorl of the underlying counter.
     void updateCounterControl(CsrNumber number);
-
-    /// Update bits of SIE that are distinct for MIE (happens where MVIEN bits are set and
-    /// corresponding bits in MIDELEG are clear).
-    void updateShadowSie();
 
     /// Turn on/off virtual mode. When virtual mode is on read/write to
     /// supervisor CSRs get redirected to virtual supervisor CSRs and read/write
@@ -2014,6 +2096,54 @@ namespace WdRiscv
           HenvcfgFields<uint64_t> fields(value);
           return fields.bits_.PMM;
         }
+    }
+
+    /// Return the LPE bits of MSECCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t mseccfgMlpe()
+    {
+      auto csr = getImplementedCsr(CsrNumber::MSECCFG);
+      if (not csr)
+        return 0;
+      URV value = csr->read();
+      MseccfgFields<uint64_t> fields(value);
+      return fields.bits_.MLPE;
+    }
+
+    /// Return the LPE bits of MENVCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t menvcfgLpe()
+    {
+      auto csr = getImplementedCsr(CsrNumber::MENVCFG);
+      if (not csr)
+        return 0;
+      URV value = csr->read();
+      MenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.LPE;
+    }
+
+    /// Return the LPE bits of SENVCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t senvcfgLpe()
+    {
+      auto csr = getImplementedCsr(CsrNumber::SENVCFG);
+      if (not csr)
+        return 0;
+      URV value = csr->read();
+      SenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.LPE;
+    }
+
+    /// Return the LPE bits of HENVCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t henvcfgLpe()
+    {
+      auto csr = getImplementedCsr(CsrNumber::HENVCFG);
+      if (not csr)
+        return 0;
+      URV value = csr->read();
+      HenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.LPE;
     }
 
     /// Return the SSEED and USEED bits of the MSECCFG CSR.
