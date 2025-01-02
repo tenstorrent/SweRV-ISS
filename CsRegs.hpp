@@ -1709,12 +1709,15 @@ namespace WdRiscv
     /// the grain factor G is greater than or equal to 1, then the NA4
     /// mode is not selectable in the A field. If a field is locked it
     /// is replaced by the current value. Return the legalized value.
-    URV legalizePmpcfgValue(URV current, URV value) const;
+    URV legalizePmpcfg(URV current, URV value) const;
 
-    /// Legalize a PMACFG value.
-    URV legalizePmacfgValue(URV current, URV value) const;
+    /// Legalize a PMACFG value. Return legalized value.
+    URV legalizePmacfg(URV current, URV value) const;
 
-    /// Legalize scountovf, matching OF bit of given mhpmevent CSR.
+    /// Legalize an SRMCFG value. Return legalized value.
+    URV legalizeSrmcfg(Csr<URV>* csr, URV current, URV value) const;
+
+    /// Update scountovf, matching OF bit of given mhpmevent CSR.
     void updateScountovfValue(CsrNumber mhpmevent);
 
     /// Return true if given CSR number is a PMPADDR register and if
@@ -1838,8 +1841,8 @@ namespace WdRiscv
     /// actually read/write vsstatus).
     void enableVirtualSupervisor(bool flag);
 
-    /// Return a legal mstatus value (chanign mpp if necessary).
-    URV legalizeMstatusValue(URV value) const;
+    /// Return a legal mstatus value (changing mpp if necessary).
+    URV legalizeMstatus(URV value) const;
 
     /// Called after an MHPMEVENT CSR is written/poked to update the
     /// contorl of the underlying counter.
