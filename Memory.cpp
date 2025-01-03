@@ -313,9 +313,7 @@ Memory::loadLz4File(const std::string& fileName, uint64_t addr)
               if (not pmaMgr_.overlapsMemMappedRegs(addr, addr + pageSize_ - 1))
                 {
                   uint8_t* data = dst.get() + n;
-                  uint64_t allZero = 0;
-                  for (unsigned i = 0; i < pageSize_; i += 8)
-                    allZero |= *((uint64_t*) (data + i));
+                  bool allZero = *data == 0 && memcmp(data, data + 1, pageSize_ - 1) == 0;
                   if (not allZero)
                     if (not initializePage(addr, data))
                       assert(0);
