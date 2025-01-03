@@ -3651,6 +3651,10 @@ CsRegs<URV>::poke(CsrNumber num, URV value, bool virtMode)
     {
       return writeStopei();
     }
+  else if (num == CN::VSTOPEI)
+    {
+      return writeVstopei();
+    }
 
   csr->poke(value);
 
