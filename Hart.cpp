@@ -1798,6 +1798,7 @@ bool
 Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool hyper, uint64_t& data)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
+  ldStFaultAddr_ = virtAddr;
   ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = sizeof(LOAD_TYPE);
 
@@ -1814,6 +1815,9 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
 	}
     }
 
+  if (triggerTripped_)
+    return false;
+
   uint64_t addr1 = virtAddr;
   uint64_t addr2 = addr1;
   uint64_t gaddr1 = virtAddr;
@@ -1821,8 +1825,6 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
   auto cause = determineLoadException(addr1, addr2, gaddr1, gaddr2, ldStSize_, hyper);
   if (cause != ExceptionCause::NONE)
     {
-      if (triggerTripped_)
-        return false;
       initiateLoadException(di, cause, ldStFaultAddr_, gaddr1);
       return false;
     }
@@ -2143,6 +2145,7 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
 		 STORE_TYPE storeVal, [[maybe_unused]] bool amoLock)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
+  ldStFaultAddr_ = virtAddr;
   ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = sizeof(STORE_TYPE);
 
@@ -2166,6 +2169,9 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
       triggerTripped_ = true;
     }
 
+  if (triggerTripped_)
+    return false;
+
   // Determine if a store exception is possible. Determine sore exception will do address
   // translation and change pa1/pa2 to physical addresses. Ga1/ga2 are the guest addresses
   // for 2-stage address translation.
@@ -2174,9 +2180,6 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   ExceptionCause cause = determineStoreException(pa1, pa2, ga1, ga2, ldStSize_, hyper);
   ldStPhysAddr1_ = pa1;
   ldStPhysAddr2_ = pa2;
-
-  if (triggerTripped_)
-    return false;
 
   if (cause != ExceptionCause::NONE)
     {
@@ -4925,7 +4928,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  if (triggerTripped_)
 	    {
-	      URV tval = ldStAddr_;
+	      URV tval = ldStFaultAddr_;
 	      if (takeTriggerAction(traceFile, currPc_, tval, instCounter_, true))
 		return true;
 	      continue;
@@ -5851,7 +5854,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 
       if (triggerTripped_)
 	{
-	  URV tval = ldStAddr_;
+          URV tval = ldStFaultAddr_;
 	  takeTriggerAction(traceFile, currPc_, tval, instCounter_, true);
 	  return;
 	}

@@ -147,7 +147,7 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
-  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
+  ldStAddr_ = ldStFaultAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
 #ifndef FAST_SLOPPY
@@ -215,7 +215,7 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
-  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
+  ldStAddr_ = ldStFaultAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
 #ifndef FAST_SLOPPY
@@ -302,7 +302,7 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
-  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
+  ldStAddr_ = ldStFaultAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
 #ifndef FAST_SLOPPY
@@ -370,7 +370,7 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
-  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
+  ldStAddr_ = ldStFaultAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
 #ifndef FAST_SLOPPY
