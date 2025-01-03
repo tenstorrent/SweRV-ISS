@@ -18,6 +18,7 @@
 #include <cstring>
 #include <memory>
 #include <vector>
+#include <span>
 #include <unordered_map>
 #include <mutex>
 
@@ -57,7 +58,7 @@ namespace WdRiscv
 
     /// Initialize page at the given address with the contents of given buffer. Buffer
     /// size must be greater than or equal to the page size.
-    bool initializePage(uint64_t addr, const uint8_t buffer[]);
+    bool initializePage(uint64_t addr, const std::span<uint8_t> buffer);
 
   protected:
 

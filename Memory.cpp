@@ -315,7 +315,7 @@ Memory::loadLz4File(const std::string& fileName, uint64_t addr)
                   uint8_t* data = dst.get() + n;
                   bool allZero = *data == 0 && memcmp(data, data + 1, pageSize_ - 1) == 0;
                   if (not allZero)
-                    if (not initializePage(addr, data))
+                    if (not initializePage(addr, std::span(data, pageSize_)))
                       assert(0);
                   addr += pageSize_ - 1;
                   n += pageSize_ - 1;
@@ -1200,7 +1200,7 @@ Memory::initializeByte(uint64_t addr, uint8_t value)
 
 
 bool
-Memory::initializePage(uint64_t addr, const uint8_t buffer[])
+Memory::initializePage(uint64_t addr, const std::span<uint8_t> buffer)
 {
   if (not isPageAligned(addr))
     return false;
@@ -1210,9 +1210,11 @@ Memory::initializePage(uint64_t addr, const uint8_t buffer[])
 
   // Caller is responsible for checking that the page is all in regular memory.
 
+  assert(buffer.size() >= pageSize_);
+
 #ifndef MEM_CALLBACKS
 
-  memcpy(data_ + addr, buffer, pageSize_);
+  memcpy(data_ + addr, buffer.data(), pageSize_);
   return true;
 
 #else
@@ -1220,7 +1222,7 @@ Memory::initializePage(uint64_t addr, const uint8_t buffer[])
   if (initPageCallback_)
     return initPageCallback_(addr, buffer);
 
-  const uint8_t* ba = buffer;
+  const uint8_t* ba = buffer.data();
   for (unsigned i = 0; i < pageSize_; i += 8, addr += 8, ba += 8)
     {
       uint64_t value = *(reinterpret_cast<const uint64_t*>(ba));

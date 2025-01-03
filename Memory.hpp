@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include <span>
 #include <unordered_map>
 #include <functional>
 #include <shared_mutex>
@@ -450,7 +451,7 @@ namespace WdRiscv
 
     /// Define page initialization callback. This is used to speed-up memory insitialization
     /// for the sparse-memory mode..
-    void defineInitPageCallback(std::function<bool(uint64_t, const uint8_t*)> callback)
+    void defineInitPageCallback(std::function<bool(uint64_t, const std::span<uint8_t>)> callback)
     { initPageCallback_ = std::move(callback); }
 
     /// Enable tracing of memory data lines referenced by current
@@ -575,7 +576,7 @@ namespace WdRiscv
 
     /// Write given buffer to the page at the given address. Buffer size
     /// must be >= pageSize_.
-    bool initializePage(uint64_t addr, const uint8_t buffer[]);
+    bool initializePage(uint64_t addr, const std::span<uint8_t> buffer);
 
     /// Clear the information associated with last write.
     void clearLastWriteInfo(unsigned sysHartIx)
@@ -783,7 +784,7 @@ namespace WdRiscv
     std::function<bool(uint64_t, unsigned, uint64_t)> writeCallback_ = nullptr;
 
     /// Callback to initialize a page of memory.
-    std::function<bool(uint64_t, const uint8_t*)> initPageCallback_ = nullptr;
+    std::function<bool(uint64_t, const std::span<uint8_t>)> initPageCallback_ = nullptr;
 
     std::pair<std::unique_ptr<uint8_t[]>, size_t> loadFile(const std::string& filename);
   };
