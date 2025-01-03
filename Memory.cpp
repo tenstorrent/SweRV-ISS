@@ -380,57 +380,6 @@ Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, uint64_t& end)
 
   size_t unmappedCount = 0;
 
-#if 0
-
-  // Load sections of segment. This is not ideal since it fails to load
-  // orphaned data (data not belonging to any section).
-  auto segSecCount = seg->get_sections_num();
-  for (int secOrder = 0; secOrder < segSecCount; ++secOrder)
-    {
-      auto secIx = seg->get_section_index_at(secOrder);
-      auto sec = reader.sections[secIx];
-      const char* secData = sec->get_data();
-      if (not secData)
-        continue;
-
-      size_t size = sec->get_size();
-      size_t addr = sec->get_address();
-
-      for (size_t i = 0; i < size; ++i)
-        {
-          if (not initializeByte(addr + i, secData[i]))
-            {
-              if (unmappedCount == 0)
-                std::cerr << "Failed to copy ELF byte at address 0x"
-                          << std::hex << (addr + i) << std::dec
-                          << ": corresponding location is not mapped\n";
-              unmappedCount++;
-              if (checkUnmappedElf_)
-                return false;
-            }
-        }
-
-      #if 0
-      // Debug code. Dump on standard output in verilog hex format.
-      printf("@%lx\n", addr);
-      size_t remain = size;
-      while (remain)
-        {
-          size_t chunk = std::min(remain, size_t(16));
-          const char* sep = "";
-          for (size_t ii = 0; ii < chunk; ++ii)
-            {
-              printf("%s%02x", sep, (*secData++) & 0xff);
-              sep = " ";
-            }
-          printf("\n");
-          remain -= chunk;
-        }
-      #endif
-    }
-
-#else
-
   // Load segment directly.
   const char* segData = seg->get_data();
   for (size_t i = 0; i < segSize; ++i)
@@ -446,8 +395,6 @@ Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, uint64_t& end)
             return false;
         }
     }
-
-#endif
 
   end = paddr + uint64_t(seg->get_memory_size());
   return true;
