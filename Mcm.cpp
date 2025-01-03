@@ -157,8 +157,31 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsi
   // Read Whisper memory and keep it in op, this will be updated when the load is retired
   // by forwarding from preceding stores.
   uint64_t refVal = 0;
-  op.failRead_ = not referenceModelRead(hart, pa, size, refVal);
-  op.data_ = refVal;
+  if (referenceModelRead(hart, pa, size, refVal))
+    op.data_ = refVal;
+  else
+    {
+      // See if a page crosser and split in two discarding part that fails to read.
+      if (size == 1 or pageNum(pa) == pageNum(pa + size - 1))
+        op.failRead_ = true;
+      else
+        {
+          unsigned size1 = offsetToNextPage(pa);
+          if (referenceModelRead(hart, pa, size1, refVal))
+            {
+              op.size_ = size1;
+              op.data_ = refVal;
+            }
+          else if (referenceModelRead(hart, pa + size1, size - size1, refVal))
+            {
+              op.pa_ = pa + size1;
+              op.size_ = size - size1;
+              op.data_ = refVal;
+            }
+          else
+            op.failRead_ = true;
+        }
+    }
 
   instr->addMemOp(sysMemOps_.size());
   sysMemOps_.push_back(op);

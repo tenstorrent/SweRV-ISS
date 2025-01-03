@@ -59,6 +59,7 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 		     [[maybe_unused]] Pma::Attrib  attrib, URV& value)
 {
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
+  ldStFaultAddr_ = virtAddr;
   ldStPhysAddr1_ = ldStAddr_;
   ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = 4;
@@ -128,6 +129,7 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 		     [[maybe_unused]] Pma::Attrib attrib, URV& value)
 {
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
+  ldStFaultAddr_ = virtAddr;
   ldStPhysAddr1_ = ldStAddr_;
   ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = 8;
@@ -199,6 +201,7 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
   URV virtAddr = intRegs_.read(rs1);
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
+  ldStFaultAddr_ = virtAddr;
   ldStPhysAddr1_ = ldStAddr_;
   ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = sizeof(LOAD_TYPE);
@@ -320,6 +323,7 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   ldStAtomic_ = true;
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
+  ldStFaultAddr_ = virtAddr;
   ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = sizeof(STORE_TYPE);
 
