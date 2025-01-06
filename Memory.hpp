@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include <span>
 #include <unordered_map>
 #include <functional>
 #include <shared_mutex>
@@ -95,13 +96,13 @@ namespace WdRiscv
       if (address + sizeof(T) > size_)
         return false;
 #else
-      Pma pma1 = pmaMgr_.accessPma(address, PmaManager::AccessReason::LdSt);
+      Pma pma1 = pmaMgr_.accessPma(address);
       if (not pma1.isRead())
 	return false;
 
       if (address & (sizeof(T) - 1))  // If address is misaligned
 	{
-          Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1, PmaManager::AccessReason::LdSt);
+          Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1);
           if (not pma2.isRead())
             return false;
         }
@@ -130,7 +131,7 @@ namespace WdRiscv
     template <typename T>
     bool readInst(uint64_t address, T& value) const
     {
-      Pma pma = pmaMgr_.accessPma(address, PmaManager::AccessReason::Fetch);
+      Pma pma = pmaMgr_.accessPma(address);
       if (not pma.isExec())
 	return false;
 
@@ -223,13 +224,13 @@ namespace WdRiscv
       *(reinterpret_cast<T*>(data_ + address)) = value;
 #else
 
-      Pma pma1 = pmaMgr_.accessPma(address, PmaManager::AccessReason::LdSt);
+      Pma pma1 = pmaMgr_.accessPma(address);
       if (not pma1.isWrite())
 	return false;
 
       if (address & (sizeof(T) - 1))  // If address is misaligned
 	{
-          Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1, PmaManager::AccessReason::LdSt);
+          Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1);
           if (pma1 != pma2)
 	    return false;
 	}
@@ -437,20 +438,21 @@ namespace WdRiscv
     /// Delete currently configured cache.
     void deleteCache();
 
-    /// Define read memory callback. This (along with
-    /// defineWriteMemoryCallback) allows the caller to bypass the
-    /// memory model with their own.
+    /// Define read memory callback. This (along with defineWriteMemoryCallback) allows
+    /// the caller to bypass the memory model with their own.
     void defineReadMemoryCallback(
          std::function<bool(uint64_t, unsigned, uint64_t&)> callback )
-    {
-      readCallback_ = std::move(callback);
-    }
+    { readCallback_ = std::move(callback); }
 
-    /// Define write memory callback. This (along with
-    /// defineReadMemoryCallback) allows the caller to bypass the
-    /// memory model with their own.
+    /// Define write memory callback. This (along with defineReadMemoryCallback) allows
+    /// the caller to bypass the memory model with their own.
     void defineWriteMemoryCallback(std::function<bool(uint64_t, unsigned, uint64_t)> callback)
     { writeCallback_ = std::move(callback); }
+
+    /// Define page initialization callback. This is used to speed-up memory insitialization
+    /// for the sparse-memory mode..
+    void defineInitPageCallback(std::function<bool(uint64_t, const std::span<uint8_t>)> callback)
+    { initPageCallback_ = std::move(callback); }
 
     /// Enable tracing of memory data lines referenced by current
     /// run. A memory data line is typically 64-bytes long and corresponds to
@@ -557,7 +559,11 @@ namespace WdRiscv
 
     /// Return true if given address has reserve-eventual attribute.
     bool hasReserveAttribute(uint64_t addr) const
-    { return pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt).isRsrv(); }
+    { return pmaMgr_.accessPma(addr).isRsrv(); }
+
+    /// Return true if given address is page aligned.
+    bool isPageAligned(uint64_t addr) const
+    { return ((addr >> pageShift_) << pageShift_) == addr; }
 
   protected:
 
@@ -567,6 +573,10 @@ namespace WdRiscv
     /// memory-mapped-register region, then both mem-mapped-register
     /// and external memory are written.
     bool initializeByte(uint64_t address, uint8_t value);
+
+    /// Write given buffer to the page at the given address. Buffer size
+    /// must be >= pageSize_.
+    bool initializePage(uint64_t addr, const std::span<uint8_t> buffer);
 
     /// Clear the information associated with last write.
     void clearLastWriteInfo(unsigned sysHartIx)
@@ -773,8 +783,8 @@ namespace WdRiscv
     /// Callback for write: bool func(uint64_t addr, unsigned size, uint64_t val);
     std::function<bool(uint64_t, unsigned, uint64_t)> writeCallback_ = nullptr;
 
-    /// Callback to obtain pointer to memory; uint8_t*(uint64_t addr, size_t len);
-    std::function<uint8_t*(uint64_t, size_t)> mapCallback_ = nullptr;
+    /// Callback to initialize a page of memory.
+    std::function<bool(uint64_t, const std::span<uint8_t>)> initPageCallback_ = nullptr;
 
     std::pair<std::unique_ptr<uint8_t[]>, size_t> loadFile(const std::string& filename);
   };

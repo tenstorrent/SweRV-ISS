@@ -588,15 +588,18 @@ namespace WdRiscv
 		      std::unordered_map<GroupMultiplier, unsigned>* maxSewPerLmul)
     { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem, minSewPerLmul, maxSewPerLmul); }
 
-    /// Configure mask agnostic policy. Allones if flag is true, undisturb if
-    /// false.
+    /// Configure mask agnostic policy. Allones if flag is true, undisturb if false.
     void configMaskAgnosticAllOnes(bool flag)
     { vecRegs_.configMaskAgnosticAllOnes(flag); }
 
-    /// Configure tail agnostic policy. Allones if flag is true, undisturb if
-    /// false.
+    /// Configure tail agnostic policy. Allones if flag is true, undisturb if false.
     void configTailAgnosticAllOnes(bool flag)
     { vecRegs_.configTailAgnosticAllOnes(flag); }
+
+    /// Configure partial vector load/store segment update. If flag is false, then none of
+    /// a segment fields are committed if any field encouters an exception.
+    void configVectorPartialSegmentUpdate(bool flag)
+    { vecRegs_.configPartialSegmentUpdate(flag); }
 
     /// Return currently configured element width
     ElementWidth elemWidth() const
@@ -1316,8 +1319,18 @@ namespace WdRiscv
     { return memory_.pmaMgr_.getPma(addr); }
 
     /// Simialr to above but performs an "access".
-    Pma accessPma(uint64_t addr, PmaManager::AccessReason reason) const
-    { return memory_.pmaMgr_.accessPma(addr, reason); }
+    Pma accessPma(uint64_t addr) const
+    { return memory_.pmaMgr_.accessPma(addr); }
+
+    /// Set memory protection access reason.
+    void setMemProtAccIsFetch(bool fetch)
+    {
+      pmpManager_.setAccReason(fetch? PmpManager::AccessReason::Fetch :
+                                      PmpManager::AccessReason::LdSt);
+      memory_.pmaMgr_.setAccReason(fetch? PmaManager::AccessReason::Fetch :
+                                          PmaManager::AccessReason::LdSt);
+      virtMem_.setAccReason(fetch);
+    }
 
     /// Return true if given extension is statically enabled (enabled my
     /// --isa but may be turned off by the MSTATUS/MISA CSRs).
@@ -2165,7 +2178,8 @@ namespace WdRiscv
       auto fetchMem =  [this](uint64_t addr, uint32_t& value) -> bool {
 	if (pmpEnabled_)
 	  {
-	    const Pmp& pmp = pmpManager_.accessPmp(addr, PmpManager::AccessReason::Fetch);
+            pmpManager_.setAccReason(PmpManager::AccessReason::Fetch);
+	    const Pmp& pmp = pmpManager_.accessPmp(addr);
 	    if (not pmp.isExec(privMode_))
 	      return false;
 	  }

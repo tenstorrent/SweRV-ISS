@@ -59,6 +59,7 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 		     [[maybe_unused]] Pma::Attrib  attrib, URV& value)
 {
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
+  ldStFaultAddr_ = virtAddr;
   ldStPhysAddr1_ = ldStAddr_;
   ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = 4;
@@ -73,7 +74,7 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
       if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/) or
           ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, false /*isLoad*/))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
     }
@@ -85,7 +86,7 @@ Hart<URV>::amoLoad32([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (cause == ExceptionCause::NONE)
     {
-      Pma pma = memory_.pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt);
+      Pma pma = memory_.pmaMgr_.accessPma(addr);
       // Check for non-cacheable pbmt
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.hasAttrib(attrib))
@@ -128,6 +129,7 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 		     [[maybe_unused]] Pma::Attrib attrib, URV& value)
 {
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
+  ldStFaultAddr_ = virtAddr;
   ldStPhysAddr1_ = ldStAddr_;
   ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = 8;
@@ -142,7 +144,7 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
       if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/) or
           ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, false /*isLoad*/))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
     }
@@ -154,7 +156,7 @@ Hart<URV>::amoLoad64([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr,
 
   if (cause == ExceptionCause::NONE)
     {
-      Pma pma = memory_.pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt);
+      Pma pma = memory_.pmaMgr_.accessPma(addr);
       // Check for non-cacheable pbmt
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.hasAttrib(attrib))
@@ -199,6 +201,7 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
   URV virtAddr = intRegs_.read(rs1);
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
+  ldStFaultAddr_ = virtAddr;
   ldStPhysAddr1_ = ldStAddr_;
   ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = sizeof(LOAD_TYPE);
@@ -209,7 +212,7 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
       bool isLd = true;
       if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, isLd))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
       if (triggerTripped_)
@@ -241,7 +244,7 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
 
   if (cause == ExceptionCause::NONE)
     {
-      Pma pma = memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt);
+      Pma pma = memory_.pmaMgr_.accessPma(addr1);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       fail = fail or not pma.isRsrv();
     }
@@ -320,6 +323,7 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   ldStAtomic_ = true;
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
+  ldStFaultAddr_ = virtAddr;
   ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = sizeof(STORE_TYPE);
 
@@ -331,7 +335,7 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
   if (hasTrig and (ldStAddrTriggerHit(virtAddr, ldStSize_, timing, isLd) or
                    ldStDataTriggerHit(storeVal, timing, isLd)))
     {
-      dataAddrTrig_ = not triggerTripped_;
+      dataAddrTrig_ = true;
       triggerTripped_ = true;
     }
 
@@ -357,7 +361,7 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
 
   if (cause == EC::NONE)
     {
-      Pma pma = memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt);
+      Pma pma = memory_.pmaMgr_.accessPma(addr1);
       pma = virtMem_.overridePmaWithPbmt(pma, virtMem_.lastEffectivePbmt(virtMode_));
       if (not pma.isRsrv())
 	cause = EC::STORE_ACC_FAULT;

@@ -18,6 +18,7 @@
 #include <cstring>
 #include <memory>
 #include <vector>
+#include <span>
 #include <unordered_map>
 #include <mutex>
 
@@ -54,6 +55,10 @@ namespace WdRiscv
     /// Fill the given vector with the addresses/sizes of the
     /// used memory areas (pages) sorted in ascending order.
     void getUsedBlocks(std::vector<std::pair<uint64_t, uint64_t>>& vec) const;
+
+    /// Initialize page at the given address with the contents of given buffer. Buffer
+    /// size must be greater than or equal to the page size.
+    bool initializePage(uint64_t addr, const std::span<uint8_t> buffer);
 
   protected:
 

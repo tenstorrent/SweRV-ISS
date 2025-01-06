@@ -825,4 +825,53 @@ namespace WdRiscv
     } bits_;
   };
 
+
+  /// Struct used to pack/unpack SRMCFG in RV32.
+  struct Srmcfg32
+  {
+    unsigned rcid_     : 12;
+    unsigned           : 4;    // Reserved
+    unsigned mcid_     : 12;
+    unsigned           : 4;    // Reserved
+  };
+
+  /// Struct used to pack/unpack SRMCFG in RV64.
+  struct Srmcfg64
+  {
+    unsigned rcid_     : 12;
+    unsigned           : 4;    // Reserved
+    unsigned mcid_     : 12;
+    unsigned           : 4;    // Reserved
+    unsigned           : 32;   // Reserved
+  };
+
+
+  /// Union to pack/unpack the fields of the SRMCFG register
+  template <typename URV>
+  union SrmcfgFields;
+
+  /// 32-bit version.
+  template <>
+  union SrmcfgFields<uint32_t>
+  {
+    SrmcfgFields(uint32_t value = 0)
+    : value_(value)
+    { }
+
+    uint32_t value_;   // SRMCFG register value.
+    Srmcfg32 bits_;    // Bit fields.
+  };
+    
+
+  /// 32-bit version.
+  template <>
+  union SrmcfgFields<uint64_t>
+  {
+    SrmcfgFields(uint64_t value = 0)
+    : value_(value)
+    { }
+
+    uint64_t value_;   // SRMCFG register value.
+    Srmcfg64 bits_;    // Bit fields.
+  };
 }

@@ -1025,6 +1025,16 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         hart.configVectorLegalizeForEgs(flag);
     }
 
+  tag = "partial_segment_update";
+  if (vconf.contains(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, vconf.at(tag), flag))
+        errors++;
+      else
+        hart.configVectorPartialSegmentUpdate(flag);
+    }
+
   tag = "fp_usum_nan_canonicalize";
   if (vconf.contains(tag))
     {

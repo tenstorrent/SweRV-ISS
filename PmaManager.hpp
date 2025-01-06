@@ -174,7 +174,7 @@ namespace WdRiscv
 
       // Search regions in order. Return first matching.
       for (const auto& region : regions_)
-	if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
+	if (region.valid_ and region.overlaps(addr))
 	  {
 	    if (not region.pma_.hasMemMappedReg())
 	      return region.pma_;
@@ -197,25 +197,20 @@ namespace WdRiscv
 
     /// Similar to getPma but updates trace associated with each PMA entry
     inline Pma accessPma(uint64_t addr) const
-    { return accessPma(addr, AccessReason::None); }
-
-    /// Similar to getPma but updates trace associated with each PMA entry
-    inline Pma accessPma(uint64_t addr, AccessReason reason) const
     {
       addr = (addr >> 2) << 2; // Make word aligned.
 
       // Search regions in order. Return first matching.
       auto it = std::find_if(regions_.begin(), regions_.end(),
           [addr] (const auto& region) {
-              return region.valid_ and addr >= region.firstAddr_ and
-                      addr <= region.lastAddr_;
+            return region.valid_ and region.overlaps(addr);
           });
 
       if (it != regions_.end())
         {
           if (trace_)
             pmaTrace_.push_back({unsigned(std::distance(regions_.begin(), it)),
-                                  addr, it->firstAddr_, it->lastAddr_, reason});
+                                  addr, it->firstAddr_, it->lastAddr_, reason_});
 	  auto& region = *it;
 	  if (not region.pma_.hasMemMappedReg())
 	    return region.pma_;
@@ -232,7 +227,7 @@ namespace WdRiscv
     {
       bool hit = false;
       for (const auto& region : regions_)
-	if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
+	if (region.valid_ and region.overlaps(addr))
           {
             if (hit)
               return true;
@@ -302,6 +297,20 @@ namespace WdRiscv
     void enableInDefaultPma(Pma::Attrib a)
     { defaultPma_.enable(a); }
 
+    /// Return true if the given range [start,end] overlaps a memory mapped register
+    /// region.
+    bool overlapsMemMappedRegs(uint64_t start, uint64_t end) const
+    {
+      for (const auto& region : memMappedRanges_)
+        {
+          auto [low, high] = region;
+          if (not (end < low or start > high))
+            return true;
+        }
+
+      return false;
+    }
+
     const std::vector<PmaTrace>& getPmaTrace() const
     { return pmaTrace_; }
 
@@ -310,6 +319,10 @@ namespace WdRiscv
 
     void enableTrace(bool flag)
     { trace_ = flag; }
+
+    /// This is to differentiate fetch from ld/st accesses.
+    void setAccReason(AccessReason reason)
+    { reason_ = reason; }
 
     /// Print current pma map matching a particular address.
     void printPmas(std::ostream& os, uint64_t address) const;
@@ -392,6 +405,9 @@ namespace WdRiscv
 
     struct Region
     {
+      bool overlaps(uint64_t addr) const
+      { return addr >= firstAddr_ and addr <= lastAddr_; }
+
       bool overlaps(uint64_t low, uint64_t high) const
       { return not (high < firstAddr_ or low > lastAddr_); }
 
@@ -416,7 +432,7 @@ namespace WdRiscv
     {
       addr = (addr >> 2) << 2;
       for (const auto& region : regions_)
-	if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
+	if (region.valid_ and region.overlaps(addr))
           return region;
 
       if (addr >= memSize_)
@@ -433,6 +449,7 @@ namespace WdRiscv
 
     bool trace_ = false;  // Collect stats if true.
     mutable std::vector<PmaTrace> pmaTrace_;
+    AccessReason reason_;
 
     Pma defaultPma_{Pma::Attrib::Default};
     Pma noAccessPma_{Pma::Attrib::None};

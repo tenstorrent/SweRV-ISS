@@ -16,6 +16,7 @@
 #include <cinttypes>
 #include <cstdio>
 #include <algorithm>
+#include <cassert>
 #include "SparseMem.hpp"
 
 
@@ -204,4 +205,18 @@ SparseMem::getUsedBlocks(std::vector<std::pair<uint64_t, uint64_t>>& vec) const
   // Delete merged pages.
   auto newEnd = std::remove_if(vec.begin(), vec.end(), [](const Pair& x) { return x.second == 0; });
   vec.resize(newEnd - vec.begin());
+}
+
+
+bool
+SparseMem::initializePage(uint64_t addr, const std::span<uint8_t> buffer)
+{
+  if (((addr >> pageShift_) << pageShift_) != addr)
+    return false;  // Addr is not page aligned.
+
+  assert(buffer.size() >= pageSize_);
+
+  std::vector<uint8_t>& page = findOrCreatePage(getPageRank(addr));
+  memcpy(page.data(), buffer.data(), pageSize_);
+  return true;
 }

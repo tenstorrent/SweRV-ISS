@@ -39,6 +39,8 @@ Hart<URV>::determineCboException(uint64_t& addr, uint64_t& gpa, uint64_t& pa, bo
 
   gpa = pa = addr = applyPointerMask(addr, false);
 
+  setMemProtAccIsFetch(false);
+
   if (isRvs())
     {
       if (pm != PrivilegeMode::Machine)
@@ -71,7 +73,7 @@ Hart<URV>::determineCboException(uint64_t& addr, uint64_t& gpa, uint64_t& pa, bo
 
   for (uint64_t offset = 0; offset < cacheLineSize_; offset += 8)
     {
-      Pma pma = accessPma(pa + offset, PmaManager::AccessReason::LdSt);
+      Pma pma = accessPma(pa + offset);
       if (isZero)
         {
           if (not pma.isWrite())
@@ -90,7 +92,7 @@ Hart<URV>::determineCboException(uint64_t& addr, uint64_t& gpa, uint64_t& pa, bo
       for (uint64_t offset = 0; offset < cacheLineSize_; offset += 8)
 	{
 	  uint64_t dwa = pa + offset;  // Double word address
-	  Pmp pmp = pmpManager_.accessPmp(dwa, PmpManager::AccessReason::LdSt);
+	  Pmp pmp = pmpManager_.accessPmp(dwa);
 	  if (isZero)
 	    {
 	      if (not pmp.isWrite(ep))
@@ -145,7 +147,7 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
-  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
+  ldStAddr_ = ldStFaultAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
 #ifndef FAST_SLOPPY
@@ -153,7 +155,7 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
     {
       if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
     }
@@ -213,7 +215,7 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
-  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
+  ldStAddr_ = ldStFaultAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
 #ifndef FAST_SLOPPY
@@ -221,7 +223,7 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
     {
       if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
     }
@@ -300,7 +302,7 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
-  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
+  ldStAddr_ = ldStFaultAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
 #ifndef FAST_SLOPPY
@@ -308,7 +310,7 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
     {
       if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
     }
@@ -368,7 +370,7 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
-  ldStAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
+  ldStAddr_ = ldStFaultAddr_ = ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = cacheLineSize_;
 
 #ifndef FAST_SLOPPY
@@ -376,7 +378,7 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
     {
       if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
     }

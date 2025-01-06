@@ -1368,7 +1368,7 @@ CsRegs<URV>::enableZicfilp(bool flag)
 
 template <typename URV>
 URV
-CsRegs<URV>::legalizeMstatusValue(URV value) const
+CsRegs<URV>::legalizeMstatus(URV value) const
 {
   MstatusFields<URV> fields(value);
   PrivilegeMode mpp = PrivilegeMode(fields.bits_.MPP);
@@ -2032,7 +2032,7 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
   if (num == CN::MSTATUS or num == CN::SSTATUS or num == CN::VSSTATUS)
     {
       value &= csr->getWriteMask() & csr->getReadMask();
-      value = legalizeMstatusValue(value);
+      value = legalizeMstatus(value);
       csr->write(value);  // Record write. Save previous value.
       csr->poke(value);   // Write cannot modify SD bit of status: poke it.
       recordWrite(csrn);
@@ -2067,18 +2067,15 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
   else if (num == CN::VSTOPEI)
     return writeVstopei();
 
+  URV prev = 0;
+  peek(num, prev);
+
   if (num >= CN::PMPCFG0 and num <= CN::PMPCFG15)
-    {
-      URV prev = 0;
-      peek(num, prev);
-      value = legalizePmpcfgValue(prev, value);
-    }
+    value = legalizePmpcfg(prev, value);
   else if (num >= CN::PMACFG0 and num <= CN::PMACFG15)
-    {
-      URV prev = 0;
-      peek(num, prev);
-      value = legalizePmacfgValue(prev, value);
-    }
+    value = legalizePmacfg(prev, value);
+  else if (num == CN::SRMCFG)
+    value = legalizeSrmcfg(csr, prev, value);
   else if (num == CN::MNSTATUS)
     {
       using MNF = MnstatusFields;
@@ -3627,27 +3624,36 @@ CsRegs<URV>::poke(CsrNumber num, URV value, bool virtMode)
       return true;
     }
 
+  URV prev = 0;
+  peek(num, prev);
+
   if (num >= CN::PMPCFG0 and num <= CN::PMPCFG15)
-    {
-      URV prev = 0;
-      peek(num, prev);
-      value = legalizePmpcfgValue(prev, value);
-    }
+    value = legalizePmpcfg(prev, value);
   else if (num >= CN::PMACFG0 and num <= CN::PMACFG15)
-    {
-      URV prev = 0;
-      peek(num, prev);
-      value = legalizePmacfgValue(prev, value);
-    }
+    value = legalizePmacfg(prev, value);
+  else if (num == CN::SRMCFG)
+    value = legalizeSrmcfg(csr, prev, value);
   else if (num == CN::MSTATUS or num == CN::SSTATUS or num == CN::VSSTATUS)
     {
       value &= csr->getPokeMask() & csr->getReadMask();
-      value = legalizeMstatusValue(value);
+      value = legalizeMstatus(value);
     }
   else if (num == CN::TSELECT)
     {
       if (value >= triggers_.size())
 	return true; // New value out of bounds. Preserve old.
+    }
+  else if (num == CN::MTOPEI)
+    {
+      return writeMtopei();
+    }
+  else if (num == CN::STOPEI)
+    {
+      return writeStopei();
+    }
+  else if (num == CN::VSTOPEI)
+    {
+      return writeVstopei();
     }
 
   csr->poke(value);
@@ -4089,7 +4095,7 @@ CsRegs<URV>::adjustPmpValue(CsrNumber csrn, URV value) const
 
 template <typename URV>
 URV
-CsRegs<URV>::legalizePmpcfgValue(URV current, URV value) const
+CsRegs<URV>::legalizePmpcfg(URV current, URV value) const
 {
   URV legal = 0;
   for (unsigned i = 0; i < sizeof(value); ++i)
@@ -4130,7 +4136,7 @@ CsRegs<URV>::legalizePmpcfgValue(URV current, URV value) const
 
 template <typename URV>
 URV
-CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
+CsRegs<URV>::legalizePmacfg(URV prev, URV next) const
 {
   // If any of the fields are illegal, keep current value.
 
@@ -4178,6 +4184,28 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
     }
 
   return next;
+}
+
+
+template <typename URV>
+URV
+CsRegs<URV>::legalizeSrmcfg(Csr<URV>* csr, URV prev, URV next) const
+{
+  SrmcfgFields<URV> pf(prev);    // Previous value of csr.
+
+  SrmcfgFields<URV> nf(next);    // Value to be written.
+
+  // If value to be written does not fit in implemented bits of a field, previous value is
+  // retained.
+  SrmcfgFields<URV> masked(next & csr->getPokeMask());
+
+  if (nf.bits_.rcid_ != masked.bits_.rcid_)
+    nf.bits_.rcid_ = pf.bits_.rcid_;
+
+  if (nf.bits_.mcid_ != masked.bits_.mcid_)
+    nf.bits_.mcid_ = pf.bits_.mcid_;
+
+  return nf.value_;
 }
 
 
