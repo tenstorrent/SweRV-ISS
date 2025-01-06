@@ -441,11 +441,16 @@ namespace WdRiscv
     void configMaskAgnosticAllOnes(bool flag)
     { maskAgnOnes_ = flag; }
 
-    /// If flag is true, configure vector engine for writing ones in
-    /// tail destination register elements when tail-agnostic is
-    /// on. Otherwise, preserve tail elements.
+    /// If flag is true, configure vector engine for writing ones in tail destination
+    /// register elements when tail-agnostic is on. Otherwise, preserve tail elements.
     void configTailAgnosticAllOnes(bool flag)
     { tailAgnOnes_ = flag; }
+
+    /// If flag is false then vector segment load/store will not commit any of the fields
+    /// at a given index if any of those fields encouters an exception. Otherwise, the
+    /// fields up to the one that encoutered the exception are updated.
+    void configPartialSegmentUpdate(bool flag)
+    { partialSegUpdate_ = flag; }
 
     /// When flag is true, trap on invalid/unsuported vtype configuraions in vsetvl,
     /// vsetvli, vsetivli. When flag is false, set vtype.vill instead.
@@ -906,6 +911,7 @@ namespace WdRiscv
     bool legalizeVsetvlAvl_ = false; // If true legalize VL to VLMAX if vtype is legal (if applicable).
     bool legalizeVsetvliAvl_ = false; // If true legalize VL to VLMAX if vtype is legal (if applicable).
     bool legalizeForEgs_ = false;
+    bool partialSegUpdate_ = true;
 
     uint32_t groupX8_ = 8;    // Group multiplier as a number scaled by 8.
     uint32_t sewInBits_ = 8;  // SEW expressed in bits (Byte corresponds to 8).

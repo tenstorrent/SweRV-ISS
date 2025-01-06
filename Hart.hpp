@@ -588,15 +588,18 @@ namespace WdRiscv
 		      std::unordered_map<GroupMultiplier, unsigned>* maxSewPerLmul)
     { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem, minSewPerLmul, maxSewPerLmul); }
 
-    /// Configure mask agnostic policy. Allones if flag is true, undisturb if
-    /// false.
+    /// Configure mask agnostic policy. Allones if flag is true, undisturb if false.
     void configMaskAgnosticAllOnes(bool flag)
     { vecRegs_.configMaskAgnosticAllOnes(flag); }
 
-    /// Configure tail agnostic policy. Allones if flag is true, undisturb if
-    /// false.
+    /// Configure tail agnostic policy. Allones if flag is true, undisturb if false.
     void configTailAgnosticAllOnes(bool flag)
     { vecRegs_.configTailAgnosticAllOnes(flag); }
+
+    /// Configure partial vector load/store segment update. If flag is false, then none of
+    /// a segment fields are committed if any field encouters an exception.
+    void configVectorPartialSegmentUpdate(bool flag)
+    { vecRegs_.configPartialSegmentUpdate(flag); }
 
     /// Return currently configured element width
     ElementWidth elemWidth() const
