@@ -155,7 +155,7 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
     {
       if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
     }
@@ -223,7 +223,7 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
     {
       if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
     }
@@ -310,7 +310,7 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
     {
       if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
     }
@@ -378,7 +378,7 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
     {
       if (ldStAddrTriggerHit(virtAddr, cacheLineSize_, TriggerTiming::Before, false /* isLoad */))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
     }

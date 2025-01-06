@@ -1810,7 +1810,7 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
     {
       if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
 	{
-	  dataAddrTrig_ = not triggerTripped_;  // Mark data unless instruction already tripped.
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
     }
@@ -2030,7 +2030,7 @@ Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr
       bool isLoad = true;
       if (ldStDataTriggerHit(uval, timing, isLoad))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
     }
@@ -2165,7 +2165,7 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   if (hasTrig and (ldStAddrTriggerHit(virtAddr, ldStSize_, timing, isLd) or
                    ldStDataTriggerHit(storeVal, timing, isLd)))
     {
-      dataAddrTrig_ = not triggerTripped_;
+      dataAddrTrig_ = true;
       triggerTripped_ = true;
     }
 

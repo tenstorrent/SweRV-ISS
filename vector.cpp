@@ -11050,7 +11050,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   if (start >= elemCount)
     return true;
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = true;
@@ -11256,7 +11256,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   auto& ldStInfo = vecRegs_.ldStInfo_;
   ldStInfo.init(elemCount, elemSize, vd, group, false /*isLoad*/);
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
@@ -11497,7 +11497,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   if (start >= elemCount)
     return true;
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = true;
@@ -11674,7 +11674,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di)
   auto& ldStInfo = vecRegs_.ldStInfo_;
   ldStInfo.init(elemCount, elemBytes, vd, group*fieldCount, false /*isLoad*/);
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
@@ -11870,7 +11870,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   if (start >= elemCount)
     return true;
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = true;
@@ -12043,7 +12043,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   auto& ldStInfo = vecRegs_.ldStInfo_;
   ldStInfo.initStrided(elemCount, elemSize, vd, group, stride, false /*isLoad*/);
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
@@ -12212,7 +12212,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   if (start >= elemCount)
     return true;
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = true;
@@ -12444,7 +12444,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   auto& ldStInfo = vecRegs_.ldStInfo_;
   ldStInfo.initIndexed(elemCount, elemSize, vd, vi, group, ixGroup, false /*isLoad*/);
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
@@ -12725,7 +12725,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
   unsigned destGroup = 8*eg;
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = true;
@@ -12946,7 +12946,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
     ldStInfo.init(elemCount, elemSize, vd, group, false /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
@@ -13298,7 +13298,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
   unsigned destGroup = 8*eg;
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = true;
@@ -13492,7 +13492,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   ldStInfo.initIndexed(elemCount, elemSize, vd, vi, group, ixGroup, false /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
