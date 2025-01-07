@@ -597,7 +597,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
   else if ((num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3) or
            (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H))
     value = adjustHstateenValue(num, value);
-  else if (num == CN::SCOUNTOVF)
+  else if (num == CN::SCOUNTOVF and mode != PrivilegeMode::Machine)
     value = adjustScountovfValue(value, virtMode_);
 
   return true;
