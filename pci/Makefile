@@ -11,7 +11,7 @@ DEPS := $(OBJS:.o=.d)
 	$(CXX) -c $(CXXFLAGS) $(DEPFLAGS) -o $@ $<
 
 libpci.a: $(OBJS)
-	ar rcs $@ $^
+	$(AR) rcs $@ $^
 
 -include $(DEPS)
 
