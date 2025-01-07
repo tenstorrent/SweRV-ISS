@@ -12697,20 +12697,19 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   uint64_t addr = intRegs_.read(rs1) + start*stride;
   unsigned elemMax = vecRegs_.elemMax(eew);  // Includes tail elements.
   unsigned elemCount = vecRegs_.elemCount();  // Does not include tail elements.
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;  // Effective group.
 
-  // Used registers must not exceed 32.
-  if (vd + fieldCount*eg > 32)
+  // Effective group. If group is fractional, snap to 1.
+  groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
+  unsigned group = groupX8 / 8;
+
+  // Used registers must not exceed register count (32).
+  if (vd + fieldCount*group > vecRegs_.registerCount())
     {
       postVecFail(di);
       return false;
     }
 
   unsigned elemSize = sizeof(ELEM_TYPE);
-
-  // Effective group. If group is fractional, snap to 1.
-  groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
-  unsigned group = groupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
   
@@ -12722,8 +12721,6 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
   if (start >= elemCount)
     return true;
-
-  unsigned destGroup = 8*eg;
 
   dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
@@ -12738,16 +12735,16 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
       for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
 	{
-	  unsigned dvg = vd + field*eg;   // Destination vector gorup.
+	  unsigned fdv = vd + field*group;   // Field destination register
 	  ELEM_TYPE elem(0);
-	  bool skip = not vecRegs_.isDestActive(dvg, ix, destGroup, masked, elem);
+	  bool skip = not vecRegs_.isDestActive(fdv, ix, groupX8, masked, elem);
 
 	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
 
 	  if (skip)
 	    {
               if (vecRegs_.partialSegUpdate_)
-                vecRegs_.write(dvg, ix, destGroup, elem);
+                vecRegs_.write(fdv, ix, groupX8, elem);
               else
                 fieldValues.push_back(elem);
 	      continue;
@@ -12802,15 +12799,15 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 		  for (unsigned ti = vecRegs_.elemCount(); ti < elemMax; ti++)
 		    for (unsigned fi = 0; fi < fieldCount; ++fi)
 		      {
-			unsigned dvg = vd + fi*eg;   // Destination vector gorup.
-			vecRegs_.write(dvg, ti, destGroup, ones);
+			unsigned fdv = vd + fi*group;   // Field destination vector.
+			vecRegs_.write(fdv, ti, groupX8, ones);
 		      }
 		}
 	      return false;
 	    }
 
           if (vecRegs_.partialSegUpdate_)
-            vecRegs_.write(dvg, ix, destGroup, elem);
+            vecRegs_.write(fdv, ix, groupX8, elem);
           else
             fieldValues.push_back(elem);
 	}
@@ -12821,8 +12818,8 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
           assert(fieldValues.size() == fieldCount);
           for (unsigned field = 0; field < fieldCount; ++field)
             {
-              unsigned dvg = vd + field*eg;   // Destination vector gorup.
-              vecRegs_.write(dvg, ix, destGroup, fieldValues.at(field));
+              unsigned fdv = vd + field*group;   // Field destination vector.
+              vecRegs_.write(fdv, ix, groupX8, fieldValues.at(field));
             }
         }
     }
@@ -13305,18 +13302,17 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   unsigned start = csRegs_.peekVstart(), elemSize = elemWidth / 8;
   unsigned elemMax = vecRegs_.elemMax();  // Includes tail elements.
   unsigned elemCount = vecRegs_.elemCount();  // Does not include tail elements.
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-
-  // Used registers must not exceed 32.
-  if (vd + fieldCount*eg > 32)
-    {
-      postVecFail(di);
-      return false;
-    }
 
   // Effective group. If group is fractional, snap to 1.
   groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
   unsigned group = groupX8 / 8;
+
+  // Used registers must not exceed register count (32).
+  if (vd + fieldCount*group > vecRegs_.registerCount())
+    {
+      postVecFail(di);
+      return false;
+    }
 
   // Effective index reg group. If group is fractional, snap to 1.
   offsetGroupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), offsetGroupX8);
@@ -13328,8 +13324,6 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
   if (start >= elemCount)
     return true;
-
-  unsigned destGroup = 8*eg;
 
   dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
@@ -13343,9 +13337,9 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
       for (unsigned field = 0; field < fieldCount; ++field)
         {
           uint64_t faddr = 0;
-          unsigned dvg = vd + field*eg;  // Destination vector grop.
-          ELEM_TYPE elem = 0;
-          bool skip = not vecRegs_.isDestActive(dvg, ix, destGroup, masked, elem);
+          unsigned fdv = vd + field*group;  // Field destination register
+          ELEM_TYPE elem(0);
+          bool skip = not vecRegs_.isDestActive(fdv, ix, groupX8, masked, elem);
           if (ix < vecRegs_.elemCount())
             {
               uint64_t offset = 0;
@@ -13360,7 +13354,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
           if (skip)
             {
               if (vecRegs_.partialSegUpdate_)
-                vecRegs_.write(dvg, ix, destGroup, elem);
+                vecRegs_.write(fdv, ix, groupX8, elem);
               else
                 fieldValues.push_back(elem);
               continue;
@@ -13395,7 +13389,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
               elem = data;
 
               if (vecRegs_.partialSegUpdate_)
-                vecRegs_.write(dvg, ix, destGroup, elem);
+                vecRegs_.write(fdv, ix, groupX8, elem);
               else
                 fieldValues.push_back(elem);
             }
@@ -13415,8 +13409,8 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
           assert(fieldValues.size() == fieldCount);
           for (unsigned field = 0; field < fieldCount; ++field)
             {
-              unsigned dvg = vd + field*eg;   // Destination vector gorup.
-              vecRegs_.write(dvg, ix, destGroup, fieldValues.at(field));
+              unsigned fdv = vd + field*group;   // Field destination vector.
+              vecRegs_.write(fdv, ix, groupX8, fieldValues.at(field));
             }
         }
     }
