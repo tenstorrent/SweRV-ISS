@@ -5447,6 +5447,13 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode pm, bool vm) const
 
   if (rv32_) enableBit -= 8*sizeof(URV);
   URV value = csr->read();
+
+  if ((csrn >= CN::HSTATEEN0 and csrn <= CN::HSTATEEN3) or
+      (csrn >= CN::HSTATEEN0H and csrn <= CN::HSTATEEN3H))
+    value = adjustHstateenValue(csrn, value);
+  else if (csrn >= CN::SSTATEEN0 and csrn <= CN::SSTATEEN3)
+    value = adjustSstateenValue(csrn, value, vm);
+
   return (value >> enableBit) & 1;
 }
 
