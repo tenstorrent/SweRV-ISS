@@ -8,7 +8,7 @@ DEPS := $(OBJS:.o=.d)
 default: sample-reader
 
 TraceReader.a: $(OBJS)
-	ar cr $@ $^
+	$(AR) cr $@ $^
 
 sample-reader: sample-reader.o TraceReader.a
 	$(CXX) -o $@ $^ -lboost_iostreams -lz
