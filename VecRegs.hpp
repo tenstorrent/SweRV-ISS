@@ -911,7 +911,7 @@ namespace WdRiscv
     bool legalizeVsetvlAvl_ = false; // If true legalize VL to VLMAX if vtype is legal (if applicable).
     bool legalizeVsetvliAvl_ = false; // If true legalize VL to VLMAX if vtype is legal (if applicable).
     bool legalizeForEgs_ = false;
-    bool partialSegUpdate_ = true;
+    bool partialSegUpdate_ = false;
 
     uint32_t groupX8_ = 8;    // Group multiplier as a number scaled by 8.
     uint32_t sewInBits_ = 8;  // SEW expressed in bits (Byte corresponds to 8).

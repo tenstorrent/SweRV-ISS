@@ -739,6 +739,7 @@ The vector configuration is an object with the following fields:
 * legalize_vsetvli_avl: when true, legalize VL to VLMAX if it would be greater than VLMAX after a vsetvli instruction.
 * tt_fp_usum_tree_reduction: for each EEW, enables Tenstorrent tree reduction-style vfredusum/vfwredusum, default is false.
 * fp_usum_nan_canonicalize: for each EEW, enables NaN canonicalization of vfredusum/vfwredusum result, default is false.
+* partial_segment_update: partially commit the fields of a load/store segment encountering an exception/trigger-hit at a given index when true and commit no field in the case of an exception when false, default is false.
 
 Example:
 ```
