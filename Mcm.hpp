@@ -420,6 +420,11 @@ namespace WdRiscv
 
   protected:
 
+    /// Helper to public readOp which splits line crossing ops into two calling this
+    /// method for each.
+    bool readOp_(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsigned size,
+                 uint64_t rtlData, unsigned elemIx, unsigned field);
+
     using MemoryOpVec = std::vector<MemoryOp>;
 
     enum VecKind
@@ -799,10 +804,15 @@ namespace WdRiscv
     /// have 96.
     unsigned effectiveRegIx(const DecodedInst& di, unsigned opIx) const;
 
-    /// Return the difference between the next page boundary and the
-    /// current address. Return 0 if address is on a page boundary.
+    /// Return the difference between the next page boundary and the current
+    /// address. Return 0 if address is on a page boundary.
     unsigned offsetToNextPage(uint64_t addr) const
     { return pageSize_ - (addr & (pageSize_ - 1)); }
+
+    /// Return the difference between the next line boundary and the current
+    /// address. Return 0 if address is on a line boundary.
+    unsigned offsetToNextLine(uint64_t addr) const
+    { return lineSize_ - (addr & (lineSize_ - 1)); }
 
   private:
 
