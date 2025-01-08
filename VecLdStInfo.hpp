@@ -25,7 +25,7 @@ namespace WdRiscv
     uint64_t va_ = 0;      // Virtual address of data.
     uint64_t pa_ = 0;      // Physical address of data.
     uint64_t pa2_ = 0;     // For page crossers: addr on 2nd page, otherwise same as pa_.
-    uint64_t stData_ = 0;  // Store data.
+    uint64_t data_ = 0;    // Load/store data.
     unsigned ix_ = 0;      // Index of element in vector register group.
     unsigned field_ = 0;   // For segment load store: field of element.
     bool skip_ = false;    // True if element is not active (masked off or tail).
@@ -35,7 +35,7 @@ namespace WdRiscv
 
     VecLdStElem(uint64_t va, uint64_t pa, uint64_t pa2, uint64_t data, unsigned ix,
 		bool skipped, unsigned field = 0)
-      : va_{va}, pa_{pa}, pa2_{pa2}, stData_{data}, ix_{ix}, field_{field},
+      : va_{va}, pa_{pa}, pa2_{pa2}, data_{data}, ix_{ix}, field_{field},
 	skip_{skipped}
     { }
   };
@@ -108,19 +108,12 @@ namespace WdRiscv
       elems_.push_back(elem);
     }
 
-    /// Set the physical addresses of the last added element.
-    void setLastElem(uint64_t pa, uint64_t pa2)
-    {
-      elems_.back().pa_ = pa;
-      elems_.back().pa2_ = pa2;
-    }
-
-    /// Set the physical addresses and the store data value of the last added element.
+    /// Set the physical addresses and data value of the last added element.
     void setLastElem(uint64_t pa, uint64_t pa2, uint64_t data)
     {
       elems_.back().pa_ = pa;
       elems_.back().pa2_ = pa2;
-      elems_.back().stData_ = data;
+      elems_.back().data_ = data;
     }
 
     /// Remove last added element.

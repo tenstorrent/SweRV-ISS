@@ -1069,7 +1069,7 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	  unsigned dataReg = hart.identifyDataRegister(info, elem);
 	  unsigned ixReg = info.isIndexed_ ? dataReg - elem.field_ : 0;
 
-	  uint64_t pa1 = elem.pa_, pa2 = elem.pa2_, value = elem.stData_;
+	  uint64_t pa1 = elem.pa_, pa2 = elem.pa2_, value = elem.data_;
 
 	  if (pa1 == pa2)
             {

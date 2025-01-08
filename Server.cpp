@@ -584,7 +584,7 @@ Server<URV>::processStepChanges(Hart<URV>& hart,
       if (not info.empty() and not info.isLoad_)
 	for (auto& einfo : info.elems_)
 	  {
-	    WhisperMessage msg(0, Change, 'm', einfo.va_, einfo.stData_, elemSize);
+	    WhisperMessage msg(0, Change, 'm', einfo.va_, einfo.data_, elemSize);
 	    pendingChanges.push_back(msg);
 	  }
     }

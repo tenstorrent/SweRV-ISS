@@ -11060,7 +11060,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, groupX8, masked, elem);
 
-      ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
+      ldStInfo.addElem(VecLdStElem{addr, addr, addr, elem, ix, skip});
 
       if (skip)
 	{
@@ -11090,12 +11090,11 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 
       if (cause == ExceptionCause::NONE)
         {
-          ldStInfo.setLastElem(pa1, pa2);
-
 	  uint64_t data = 0;
           if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
 	  elem = data;
+          ldStInfo.setLastElem(pa1, pa2, elem);
 
 #ifndef FAST_SLOPPY
 	  triggerTripped_ = ldStDataTriggerHit(elem, timing, isLd);
@@ -11508,20 +11507,13 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
       uint64_t gpa1 = addr;
 
-      ELEM_TYPE elem = 0;
-
-      bool skip = false;  // Not masked off
-      ldStInfo.addElem(VecLdStElem{addr, pa1, pa2, 0, ix, skip});
-
-
 #ifndef FAST_SLOPPY
       uint64_t gpa2 = addr;
-      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem), false /*hyper*/);
+      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(ELEM_TYPE), false /*hyper*/);
 
       if (hasTrig and ldStAddrTriggerHit(addr, elemBytes, timing, isLd))
 	{
 	  triggerTripped_ = true;
-	  ldStInfo.removeLastElem();
           markVsDirty();
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	  return false;
@@ -11530,32 +11522,30 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
       if (cause == ExceptionCause::NONE)
 	{
-          ldStInfo.setLastElem(pa1, pa2);
-
 	  uint64_t data = 0;
 	  if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
-	  elem = data;
+	  ELEM_TYPE elem = data;
 
 #ifndef FAST_SLOPPY
-	  triggerTripped_ = ldStDataTriggerHit(elem, timing, isLd);
-	  if (triggerTripped_)
+          if (hasTrig and ldStDataTriggerHit(elem, timing, isLd))
             {
-	      ldStInfo.removeLastElem();
+              triggerTripped_ = true;
+              markVsDirty();
+              csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
               return false;
             }
 #endif
+          ldStInfo.addElem(VecLdStElem{addr, pa1, pa2, elem, ix, false /*skip*/});
+          vecRegs_.write(vd, ix, effGroupX8, elem);
 	}
       else
         {
-          ldStInfo.removeLastElem();
           markVsDirty();
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
           return false;
         }
-
-      vecRegs_.write(vd, ix, effGroupX8, elem);
     }
 
   vecRegs_.touchReg(vd, groupX8);  // We want the group and not the effective group.
@@ -11879,7 +11869,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
     {
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, groupX8, masked, elem);
-      ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
+      ldStInfo.addElem(VecLdStElem{addr, addr, addr, elem, ix, skip});
 
       if (skip)
 	{
@@ -11907,12 +11897,11 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
       if (cause == ExceptionCause::NONE)
         {
-          ldStInfo.setLastElem(pa1, pa2);
-
 	  uint64_t data = 0;
 	  if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
 	  elem = data;
+          ldStInfo.setLastElem(pa1, pa2, elem);
         }
       else
         {
@@ -12229,7 +12218,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
           vaddr = addr + offset;
         }
 
-      ldStInfo.addElem(VecLdStElem{vaddr, vaddr, vaddr, 0, ix, skip});
+      ldStInfo.addElem(VecLdStElem{vaddr, vaddr, vaddr, elem, ix, skip});
 
       if (skip)
 	{
@@ -12258,12 +12247,11 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
       if (cause == ExceptionCause::NONE)
 	{
-          ldStInfo.setLastElem(pa1, pa2);
-
 	  uint64_t data = 0;
 	  if (not readForLoad<ELEM_TYPE>(di, vaddr, pa1, pa2, data, ix))
 	    assert(0);
 	  elem = data;
+          ldStInfo.setLastElem(pa1, pa2, elem);
 	  vecRegs_.write(vd, ix, groupX8, elem);
 	}
       else
@@ -12739,7 +12727,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	  ELEM_TYPE elem(0);
 	  bool skip = not vecRegs_.isDestActive(fdv, ix, groupX8, masked, elem);
 
-	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
+	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, elem, ix, skip, field});
 
 	  if (skip)
 	    {
@@ -12771,12 +12759,11 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
 	  if (cause == ExceptionCause::NONE)
             {
-              ldStInfo.setLastElem(pa1, pa2);
-
 	      uint64_t data = 0;
 	      if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data, ix, field))
 		assert(0);
 	      elem = data;
+              ldStInfo.setLastElem(pa1, pa2, elem);
             }
 	  else
 	    {
@@ -13015,7 +13002,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
         {
           for (const auto& elem : ldStInfo.elems_)
             {
-              ELEM_TYPE val = ELEM_TYPE(elem.stData_);
+              ELEM_TYPE val = ELEM_TYPE(elem.data_);
               if (not writeForStore(elem.va_, elem.pa_, elem.pa2_, val))
                 assert(0);
             }
@@ -13349,7 +13336,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
               faddr = addr + offset + field*elemSize;
             }
 
-          ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
+          ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, elem, ix, skip, field});
 
           if (skip)
             {
@@ -13381,12 +13368,11 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
           if (cause == ExceptionCause::NONE)
             {
-              ldStInfo.setLastElem(pa1, pa2);
-
               uint64_t data = 0;
               if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data, ix, field))
                 assert(0);
               elem = data;
+              ldStInfo.setLastElem(pa1, pa2, elem);
 
               if (vecRegs_.partialSegUpdate_)
                 vecRegs_.write(fdv, ix, groupX8, elem);
@@ -13596,7 +13582,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
         {
           for (const auto& elem : ldStInfo.elems_)
             {
-              ELEM_TYPE val = ELEM_TYPE(elem.stData_);
+              ELEM_TYPE val = ELEM_TYPE(elem.data_);
               if (not writeForStore(elem.va_, elem.pa_, elem.pa2_, val))
                 assert(0);
             }
