@@ -13002,7 +13002,10 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
         {
           for (const auto& elem : ldStInfo.elems_)
             {
-              ELEM_TYPE val = ELEM_TYPE(elem.data_);
+              if (elem.skip_)
+                continue;
+
+              ELEM_TYPE val = ELEM_TYPE(elem.stData_);
               if (not writeForStore(elem.va_, elem.pa_, elem.pa2_, val))
                 assert(0);
             }
@@ -13582,7 +13585,10 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
         {
           for (const auto& elem : ldStInfo.elems_)
             {
-              ELEM_TYPE val = ELEM_TYPE(elem.data_);
+              if (elem.skip_)
+                continue;
+
+              ELEM_TYPE val = ELEM_TYPE(elem.stData_);
               if (not writeForStore(elem.va_, elem.pa_, elem.pa2_, val))
                 assert(0);
             }
