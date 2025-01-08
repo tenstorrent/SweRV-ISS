@@ -338,19 +338,19 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
 	  case WhisperSpecialResource::FpFlags:
 	    reply.value = hart.lastFpFlags();
 	    return true;
-          case WhisperSpecialResource::IncrementalVec:
-            {
-              std::vector<uint8_t> fpFlags; std::vector<uint8_t> vxsat;
-              std::vector<VecRegs::Step> steps;
-              hart.lastIncVec(fpFlags, vxsat, steps);
-              assert((fpFlags.size() != 0 and vxsat.size() == 0) or
-                     (fpFlags.size() == 0 and vxsat.size() != 0));
-              for (unsigned i = 0; i < fpFlags.size(); ++i)
-                reply.buffer[i] = fpFlags.at(i);
-              for (unsigned i = 0; i < vxsat.size(); ++i)
-                reply.buffer[i] = vxsat.at(i);
-              return true;
-            }
+      case WhisperSpecialResource::IncrementalVec:
+        {
+          std::vector<uint8_t> fpFlags; std::vector<uint8_t> vxsat;
+          std::vector<VecRegs::Step> steps;
+          hart.lastIncVec(fpFlags, vxsat, steps);
+          assert((fpFlags.size() != 0 and vxsat.size() == 0) or
+                 (fpFlags.size() == 0 and vxsat.size() != 0));
+          for (unsigned i = 0; i < fpFlags.size(); ++i)
+            reply.buffer[i] = fpFlags.at(i);
+          for (unsigned i = 0; i < vxsat.size(); ++i)
+            reply.buffer[i] = vxsat.at(i);
+          return true;
+        }
 	  case WhisperSpecialResource::Trap:
 	    reply.value = hart.lastInstructionTrapped()? 1 : 0;
 	    return true;
@@ -360,22 +360,29 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
 	  case WhisperSpecialResource::Seipin:
 	    reply.value = hart.getSeiPin();
 	    return true;
-          case WhisperSpecialResource::EffMemAttr:
-            // Special resource so we don't have to re-translate.
-            {
-            uint64_t va = 0, pa = 0;
-            if (hart.lastLdStAddress(va, pa))
-              {
-                auto pma = hart.getPma(pa);
-                auto effpbmt = VirtMem::effectivePbmt(hart.lastVirtMode(), hart.lastVsPageMode(),
-                                                      hart.virtMem().lastVsPbmt(), hart.virtMem().lastPbmt());
-                pma = VirtMem::overridePmaWithPbmt(pma, effpbmt);
-                reply.value = pma.attributesToInt();
-                return true;
-              }
-            else
-              break;
-            }
+      case WhisperSpecialResource::EffMemAttr:
+        // Special resource so we don't have to re-translate.
+        {
+        uint64_t va = 0, pa = 0;
+        if (hart.lastLdStAddress(va, pa))
+          {
+            auto pma = hart.getPma(pa);
+            auto effpbmt = VirtMem::effectivePbmt(hart.lastVirtMode(), hart.lastVsPageMode(),
+                                                  hart.virtMem().lastVsPbmt(), hart.virtMem().lastPbmt());
+            pma = VirtMem::overridePmaWithPbmt(pma, effpbmt);
+            reply.value = pma.attributesToInt();
+            return true;
+          }
+        else
+          break;
+        }
+      case WhisperSpecialResource::LastLdStAddress:
+        {
+        uint64_t va = 0, pa = 0;
+        if (hart.lastLdStAddress(va, pa))
+            reply.value = pa;
+        return true;
+        }
 	  default:
 	    break;
 	  }
@@ -979,6 +986,7 @@ specialResourceToStr(uint64_t v)
     case WhisperSpecialResource::DeferredInterrupts:  return "defi";
     case WhisperSpecialResource::Seipin:              return "seipin";
     case WhisperSpecialResource::EffMemAttr:          return "effma";
+    case WhisperSpecialResource::LastLdStAddress:     return "lastldst";
     }
   return "?";
 }
