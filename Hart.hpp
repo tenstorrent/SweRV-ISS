@@ -2331,6 +2331,7 @@ namespace WdRiscv
     void setWrsCancelsLr(bool flag)
     { wrsCancelsLr_ = flag; }
 
+#if 0
     /// Set hart suspend state. If true, run will have no effect. If suspended,
     /// reset the resume time.
     void setSuspendState(bool flag, uint64_t timeout = 0)
@@ -2342,6 +2343,7 @@ namespace WdRiscv
     /// Return true if hart is suspended.
     bool isSuspended()
     { return suspended_; }
+#endif
 
     /// Set value to the value read from the device associated with the given physical
     /// address.
@@ -5581,9 +5583,6 @@ namespace WdRiscv
       uint8_t value_ = 0;
     };
     InterruptAlarm swInterrupt_;
-
-    bool suspended_ = false;      // If true, don't execute instructions.
-    uint64_t resumeTime_ = 0;     // If non-zero, resume from suspension after time is greater than this value.
   };
 }
 

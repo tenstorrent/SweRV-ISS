@@ -4830,13 +4830,6 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
       if (userStop)
         break;
 
-      if (suspended_)
-        {
-          if (resumeTime_ and time_ > resumeTime_)
-            setSuspendState(false);
-          continue;
-        }
-
       resetExecInfo(); clearTraceData();
 
       if (enableGdb_ and ++gdbCount >= gdbLimit)
@@ -4874,13 +4867,6 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
           if (not hartIx_)
 	    tickTime();  // Hart 0 increments timer.
-
-          if (suspended_)
-            {
-              if (resumeTime_ and time_ > resumeTime_)
-                setSuspendState(false);
-              continue;
-            }
 
           uint32_t inst = 0;
 	  currPc_ = pc_;
@@ -5176,13 +5162,6 @@ Hart<URV>::simpleRunWithLimit()
       if (not hartIx_)
 	tickTime();
 
-      if (suspended_)
-        {
-          if (resumeTime_ and time_ > resumeTime_)
-            setSuspendState(false);
-          continue;
-        }
-
       resetExecInfo();
 
       currPc_ = pc_;
@@ -5240,13 +5219,6 @@ Hart<URV>::simpleRunNoLimit()
     {
       if (not hartIx_)
 	tickTime();
-
-      if (suspended_)
-        {
-          if (resumeTime_ and time_ > resumeTime_)
-            setSuspendState(false);
-          continue;
-        }
 
       currPc_ = pc_;
       ++instCounter_;
@@ -5812,13 +5784,6 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
     {
       if (not hartIx_)
 	tickTime();
-
-      if (suspended_)
-        {
-          if (resumeTime_ and time_ > resumeTime_)
-            setSuspendState(false);
-          return;
-        }
 
       uint32_t inst = 0;
       currPc_ = pc_;

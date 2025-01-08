@@ -176,7 +176,7 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
     if (not system.loadSnapshot(args.loadFrom, args.loadFromTrace))
       return false;
 
-
+#if 0
   if (linux and checkForOpenMp(args))
     {
       if (args.verbose)
@@ -188,6 +188,7 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
           hart.setSuspendState(true);
         }
     }
+#endif
 
   // Set instruction count limit.
   if (args.instCountLim)
