@@ -794,6 +794,12 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
               out << (boost::format("0x%x") % pma.attributesToInt()) << std::endl;
 	    }
 	}
+      else if (addrStr == "lastldst")
+    {
+      uint64_t va = 0, pa = 0;
+      if (hart.lastLdStAddress(va, pa))
+	out << (boost::format("0x%x") % pa) << std::endl;
+    }
       else
 	ok = false;
 

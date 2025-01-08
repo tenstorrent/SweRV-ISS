@@ -30,7 +30,7 @@ enum WhisperMessageType
 
 /// Resource identifiers for peek special.
 enum WhisperSpecialResource { PrivMode, PrevPrivMode, FpFlags, IncrementalVec, Trap,
-                              DeferredInterrupts, Seipin, EffMemAttr };
+                              DeferredInterrupts, Seipin, EffMemAttr, LastLdStAddress };
 
 
 /// Structure used to communicate with the whisper program using

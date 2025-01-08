@@ -131,6 +131,29 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsi
       return false;
     }
 
+  // Split in two ops Crossing a line boundary to avoid being too pessimistic
+  // when checking for overlap with stores from other harts
+  if (lineNum(pa) != lineNum(pa + size - 1))
+    {
+      unsigned size1 = offsetToNextLine(pa);
+      unsigned size2 = size - size1;
+      uint64_t pa2 = pa + size1;
+      uint64_t rtlData1 = rtlData & ((uint64_t(1) << (size1*8)) - 1);
+      uint64_t rtlData2 = rtlData >> (size1*8);
+      bool ok = readOp_(hart, time, tag, pa, size1, rtlData1, elemIx, field);
+      ok = readOp_(hart, time, tag, pa2, size2, rtlData2, elemIx, field) and ok;
+      return ok;
+    }
+
+  return readOp_(hart, time, tag, pa, size, rtlData, elemIx, field);
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::readOp_(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsigned size,
+                  uint64_t rtlData, unsigned elemIx, unsigned field)
+{
   unsigned hartIx = hart.sysHartIndex();
 
   McmInstr* instr = findOrAddInstr(hartIx, tag);
@@ -154,34 +177,15 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsi
   op.field_ = field;
   op.isIo_ = hart.getPma(op.pa_).isIo();
 
+  assert(pageNum(pa) == pageNum(pa + size - 1));
+
   // Read Whisper memory and keep it in op, this will be updated when the load is retired
   // by forwarding from preceding stores.
   uint64_t refVal = 0;
   if (referenceModelRead(hart, pa, size, refVal))
     op.data_ = refVal;
   else
-    {
-      // See if a page crosser and split in two discarding part that fails to read.
-      if (size == 1 or pageNum(pa) == pageNum(pa + size - 1))
-        op.failRead_ = true;
-      else
-        {
-          unsigned size1 = offsetToNextPage(pa);
-          if (referenceModelRead(hart, pa, size1, refVal))
-            {
-              op.size_ = size1;
-              op.data_ = refVal;
-            }
-          else if (referenceModelRead(hart, pa + size1, size - size1, refVal))
-            {
-              op.pa_ = pa + size1;
-              op.size_ = size - size1;
-              op.data_ = refVal;
-            }
-          else
-            op.failRead_ = true;
-        }
-    }
+    op.failRead_ = true;
 
   instr->addMemOp(sysMemOps_.size());
   sysMemOps_.push_back(op);
@@ -4151,12 +4155,21 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrA, const McmInstr& inst
   for (size_t ix = sysMemOps_.size(); ix != 0; ix--)
     {
       const auto& op = sysMemOps_.at(ix-1);
-      if (op.isCanceled() or op.time_ > timeA)
+      if (op.isCanceled() or op.time_ > timeA or op.isRead_)
 	continue;
+
       if (op.time_ < timeB)
 	break;
-      if (not op.isRead_ and overlaps(instrB, op) and op.hartIx_ != hartIx)
-	return false;
+
+      for (auto bopIx : instrB.memOps_)
+        {
+          const auto bop = sysMemOps_.at(bopIx);
+          auto bopTime = std::max(bop.time_, bop.forwardTime_);
+          if (bopTime > timeA or op.time_ < bopTime)
+            continue;
+          if (bop.overlaps(op) and op.hartIx_ != hartIx)
+            return false;
+        }
     }
 
   return true;
