@@ -200,6 +200,15 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
 	hart.setInstructionCountLimit(count);
       }
 
+  if (args.retInstCountLim)
+    for (unsigned i = 0; i < system.hartCount(); ++i)
+      {
+	auto& hart = *system.ithHart(i);
+	uint64_t count = args.relativeInstCount? hart.getRetiredInstructionCount() : 0;
+	count += *args.retInstCountLim;
+	hart.setRetiredInstructionCountLimit(count);
+      }
+
   if (not args.initStateFile.empty())
     {
       if (system.hartCount() > 1)

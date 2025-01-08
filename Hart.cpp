@@ -4815,7 +4815,9 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
   std::string instStr;
   instStr.reserve(128);
 
-  uint64_t limit = instCountLim_;
+  const uint64_t instLim = instCountLim_;
+  const uint64_t retInstLim = retInstCountLim_;
+
   bool doStats = instFreq_ or enableCounters_;
   bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
 
@@ -4825,7 +4827,8 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
   if (enableGdb_)
     handleExceptionForGdb(*this, gdbInputFd_);
 
-  while (pc_ != address and instCounter_ < limit)
+  while (pc_ != address and instCounter_ < instLim and
+           retInstCounter_ < retInstLim)
     {
       if (userStop)
         break;
@@ -4929,6 +4932,9 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
           if (minstretEnabled())
             ++retiredInsts_;
 
+          // Unlike minstret, this is not inhibited.
+          ++retInstCounter_;
+
 	  if (bbFile_)
 	    {
 	      countBasicBlocks(bbPrevIsBranch_, physPc);
@@ -4968,7 +4974,8 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
   struct timeval t0;
   gettimeofday(&t0, nullptr);
 
-  uint64_t limit = instCountLim_;
+  const uint64_t instLim = instCountLim_;
+  const uint64_t retInstLim = retInstCountLim_;
   uint64_t counter0 = instCounter_;
 
   // Setup signal handlers. Restore on destruction.
@@ -4976,7 +4983,8 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
 
   bool success = untilAddress(address, traceFile);
 
-  if (instCounter_ >= limit)
+  if (instCounter_ >= instLim or
+      retInstCounter_ >= retInstLim)
     std::cerr << "Stopped -- Reached instruction limit hart=" << hartIx_ << "\n";
   else if (pc_ == address)
     std::cerr << "Stopped -- Reached end address hart=" << hartIx_ << "\n";
@@ -5002,13 +5010,15 @@ Hart<URV>::runSteps(uint64_t steps, bool& stop, FILE* traceFile)
   // Setup signal handlers. Restore on destruction.
   SignalHandlers handlers;
 
-  uint64_t limit = instCountLim_;
+  const uint64_t instLim = instCountLim_;
+  const uint64_t retInstLim = retInstCountLim_;
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
   stop = false;
 
   for (unsigned i = 0; i < steps; i++)
     {
-      if (instCounter_ >= limit)
+      if (instCounter_ >= instLim or
+          retInstCounter_ >= retInstLim)
         {
           stop = true;
           std::cerr << "Stopped -- Reached instruction limit\n";
@@ -5152,12 +5162,16 @@ template <typename URV>
 bool
 Hart<URV>::simpleRunWithLimit()
 {
-  uint64_t limit = instCountLim_;
   std::string instStr;
 
   bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
 
-  while (noUserStop and instCounter_ < limit)
+  const uint64_t instLim = instCountLim_;
+  const uint64_t retInstLim = retInstCountLim_;
+
+  while (noUserStop and
+         instCounter_ < instLim and
+         retInstCounter_ < retInstLim)
     {
       if (not hartIx_)
 	tickTime();
@@ -5191,8 +5205,11 @@ Hart<URV>::simpleRunWithLimit()
       execute(di);
 
       if (not hasException_)
-	if (minstretEnabled())
-	  ++retiredInsts_;
+        {
+          if (minstretEnabled())
+            ++retiredInsts_;
+          ++retInstCounter_;
+        }
 
       if (instrLineTrace_)
 	memory_.traceInstructionLine(currPc_, physPc);
