@@ -12719,8 +12719,6 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
     {
       uint64_t faddr = addr;  // Field address
 
-      std::vector<ELEM_TYPE> fieldValues;
-
       for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
 	{
 	  unsigned fdv = vd + field*group;   // Field destination register
@@ -12733,8 +12731,6 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	    {
               if (vecRegs_.partialSegUpdate_)
                 vecRegs_.write(fdv, ix, groupX8, elem);
-              else
-                fieldValues.push_back(elem);
 	      continue;
 	    }
 
@@ -12795,18 +12791,19 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
           if (vecRegs_.partialSegUpdate_)
             vecRegs_.write(fdv, ix, groupX8, elem);
-          else
-            fieldValues.push_back(elem);
 	}
 
-      // If we get here then no excpections were encoutered. Commit all the fields.
+      // If we get here then no excpections were encoutered. Commit all the fields if
+      // partial update is not on.
       if (not vecRegs_.partialSegUpdate_)
         {
-          assert(fieldValues.size() == fieldCount);
+          unsigned nelems = ldStInfo.elems_.size();
+          assert(nelems >= fieldCount);
           for (unsigned field = 0; field < fieldCount; ++field)
             {
+              const auto& elem = ldStInfo.elems_.at(nelems - fieldCount + field);
               unsigned fdv = vd + field*group;   // Field destination vector.
-              vecRegs_.write(fdv, ix, groupX8, fieldValues.at(field));
+              vecRegs_.write(fdv, ix, groupX8, ELEM_TYPE(elem.data_));
             }
         }
     }
@@ -13322,8 +13319,6 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
   for (unsigned ix = start; ix < elemMax; ++ix)
     {
-      std::vector<ELEM_TYPE> fieldValues;
-
       for (unsigned field = 0; field < fieldCount; ++field)
         {
           uint64_t faddr = 0;
@@ -13345,8 +13340,6 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
             {
               if (vecRegs_.partialSegUpdate_)
                 vecRegs_.write(fdv, ix, groupX8, elem);
-              else
-                fieldValues.push_back(elem);
               continue;
             }
 
@@ -13379,8 +13372,6 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
               if (vecRegs_.partialSegUpdate_)
                 vecRegs_.write(fdv, ix, groupX8, elem);
-              else
-                fieldValues.push_back(elem);
             }
           else
             {
@@ -13392,14 +13383,17 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
             }
         }
 
-      // If we get here then no excpections were encoutered. Commit all the fields.
+      // If we get here then no excpections were encoutered. Commit all the fields if
+      // partial update is not on.
       if (not vecRegs_.partialSegUpdate_)
         {
-          assert(fieldValues.size() == fieldCount);
+          unsigned nelems = ldStInfo.elems_.size();
+          assert(nelems >= fieldCount);
           for (unsigned field = 0; field < fieldCount; ++field)
             {
+              const auto& elem = ldStInfo.elems_.at(nelems - fieldCount + field);
               unsigned fdv = vd + field*group;   // Field destination vector.
-              vecRegs_.write(fdv, ix, groupX8, fieldValues.at(field));
+              vecRegs_.write(fdv, ix, groupX8, ELEM_TYPE(elem.data_));
             }
         }
     }
