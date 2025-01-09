@@ -308,6 +308,7 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
             std::vector<uint8_t> vecVal;
             if (hart.peekVecReg(reg, vecVal) and reply.buffer.size() >= vecVal.size())
               {
+                std::reverse(vecVal.begin(), vecVal.end());
                 for (unsigned i = 0; i < vecVal.size(); ++i)
                   reply.buffer[i] = vecVal.at(i);
                 return true;
