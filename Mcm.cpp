@@ -2954,7 +2954,8 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
       if (drained)
 	continue;   // Cannot forward from a drained write.
 
-      fwdTime = lastWopTime;
+      if (writeCount)
+        fwdTime = (fwdTime == 0) ? lastWopTime : std::min(fwdTime, lastWopTime);
 
       // Process reference model writes in reverse order so that later ones forward first.
       for (auto iter = vecRefs.refs_.rbegin(); iter != vecRefs.refs_.rend(); ++iter)
@@ -4165,7 +4166,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrA, const McmInstr& inst
         {
           const auto bop = sysMemOps_.at(bopIx);
           auto bopTime = std::max(bop.time_, bop.forwardTime_);
-          if (bopTime > timeA or op.time_ < bopTime)
+          if (bopTime > timeA or op.time_ < bopTime or op.time_ > timeA)
             continue;
           if (bop.overlaps(op) and op.hartIx_ != hartIx)
             return false;
