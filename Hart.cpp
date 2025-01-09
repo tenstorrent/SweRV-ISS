@@ -90,7 +90,7 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory, Syscall<URV>& sysca
     syscall_(syscall),
     time_(time),
     pmpManager_(memory.size(), UINT64_C(1024)*1024),
-    virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16)
+    virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 2048)
 {
   // Enable default extensions
   for (RvExtension ext : { RvExtension::C,
