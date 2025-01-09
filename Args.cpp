@@ -116,6 +116,15 @@ Args::collectCommandLineValues(const boost::program_options::variables_map& varM
       this->relativeInstCount = not numStr.empty() and numStr.at(0) == '+';
     }
 
+  if (varMap.count("maxretinst"))
+    {
+      auto numStr = varMap["maxretinst"].as<std::string>();
+      if (not parseCmdLineNumber("maxretinst", numStr, this->retInstCountLim))
+	ok = false;
+      // TODO: use a separate flag here
+      this->relativeInstCount = not numStr.empty() and numStr.at(0) == '+';
+    }
+
   if (varMap.count("memorysize"))
     {
       auto numStr = varMap["memorysize"].as<std::string>();
@@ -388,6 +397,8 @@ Args::parseCmdLineArgs(std::span<char*> argv)
          "\"__whisper_console_io\".")
 	("maxinst,m", po::value<std::string>(),
 	 "Limit executed instruction count to arg. With a leading plus sign interpret the count as relative to the loaded (from a snapshot) instruction count.")
+        ("maxretinst,r", po::value<std::string>(),
+         "Limit retired instruction count to arg. With a leading plus sign interpret the count as relative to the loaded (from a snapshot) retired instruction count.")
 	("memorysize", po::value<std::string>(),
 	 "Memory size (must be a multiple of 4096).")
 	("tlbsize", po::value<std::string>(),

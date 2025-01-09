@@ -335,7 +335,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 	      if (einfo.pa_ != einfo.va_)
 		oss << ":0x" << einfo.pa_;
 	      if (not vecInfo.isLoad_)
-		oss << '=' << "0x" << std::setfill('0') << std::setw(num_nibbles) << einfo.stData_;
+		oss << '=' << "0x" << std::setfill('0') << std::setw(num_nibbles) << einfo.data_;
 	    }
 	  tmp += " [" + oss.str() + "]";
 	}
@@ -712,7 +712,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
           if (einfo.skip_)
             buffer.printChar('m');
           if (not vecInfo.isLoad_)
-            buffer.printChar('=').print(einfo.stData_);
+            buffer.printChar('=').print(einfo.data_);
         }
     }
   else if (lastLdStAddress(virtDataAddr, physDataAddr))
@@ -856,7 +856,7 @@ Hart<URV>::reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop)
 
   if (userStop)
     std::cerr << "User stop\n";
-  std::cerr << "Retired " << instCount << " instruction"
+  std::cerr << "Executed " << instCount << " instruction"
 	    << (instCount > 1? "s" : "") << " in "
 	    << secStr;
   if (elapsed > 0)

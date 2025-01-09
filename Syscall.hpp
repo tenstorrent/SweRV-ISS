@@ -117,6 +117,7 @@ namespace WdRiscv
       return fd;
     }
 
+#if 0
     Hart<URV>* nextAvailHart()
     {
       for (auto hptr : harts_)
@@ -124,6 +125,7 @@ namespace WdRiscv
           return hptr.get();
       return nullptr;
     }
+#endif
 
   private:
 

@@ -104,6 +104,7 @@ namespace WdRiscv
     std::optional<uint64_t> fromHost;
     std::optional<uint64_t> consoleIo;
     std::optional<uint64_t> instCountLim;
+    std::optional<uint64_t> retInstCountLim;
     std::optional<uint64_t> memorySize;
     std::optional<uint64_t> tlbSize;
     std::optional<uint64_t> nmiVec;
