@@ -856,7 +856,7 @@ Hart<URV>::reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop)
 
   if (userStop)
     std::cerr << "User stop\n";
-  std::cerr << "Retired " << instCount << " instruction"
+  std::cerr << "Executed " << instCount << " instruction"
 	    << (instCount > 1? "s" : "") << " in "
 	    << secStr;
   if (elapsed > 0)
