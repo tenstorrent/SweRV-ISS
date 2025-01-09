@@ -29,6 +29,7 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
   ofs << "pm " << unsigned(privilegeMode()) << '\n';
   ofs << "vm " << unsigned(virtMode()) << '\n';
   ofs << "po " << getInstructionCount() << '\n';
+  ofs << "pr " << getRetiredInstructionCount() << '\n';
   ofs << "pb 0x" << std::hex << syscall_.targetProgramBreak() << std::dec << '\n';
   ofs << "pc 0x" << std::hex << peekPc() << std::dec << '\n';
   ofs << "elp " << unsigned(getElp()) << '\n';
@@ -263,6 +264,13 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
 	    setInstructionCount(val);
 	  else
 	    errors++;
+        }
+      else if (type == "pr")  // Program retired
+        {
+          if (loadSnapshotValue(iss, val))
+            setRetiredInstructionCount(val);
+          else
+            errors++;
         }
       else if (type == "pb")  // Program break
         {

@@ -1116,6 +1116,17 @@ namespace WdRiscv
     uint64_t getInstructionCount() const
     { return instCounter_; }
 
+    /// Performs similar function to instCounter_ but operates on
+    /// retired instruction counts.
+    void setRetiredInstructionCountLimit(uint64_t limit)
+    { retInstCountLim_ = limit; }
+
+    void setRetiredInstructionCount(uint64_t count)
+    { retInstCounter_ = count; }
+
+    uint64_t getRetiredInstructionCount() const
+    { return retInstCounter_; }
+
     /// Get the time CSR value.
     uint64_t getTime() const
     { return time_; }
@@ -5346,8 +5357,10 @@ namespace WdRiscv
     uint64_t retiredInsts_ = 0;  // Proxy for minstret CSR.
     uint64_t cycleCount_ = 0;    // Proxy for mcycle CSR.
     URV      fcsrValue_ = 0;     // Proxy for FCSR.
-    uint64_t instCounter_ = 0;   // Absolute retired instruction count.
+    uint64_t instCounter_ = 0;   // Absolute executed instruction count.
+    uint64_t retInstCounter_ = 0; // Similar to minstret, but cannot be disabled.
     uint64_t instCountLim_ = ~uint64_t(0);
+    uint64_t retInstCountLim_ = ~uint64_t(0);
     uint64_t stimecmp_ = 0;      // Value of STIMECMP CSR.
     uint64_t vstimecmp_ = 0;     // Value of VSTIMECMP CSR.
     uint64_t htimedelta_ = 0;    // Value of HTIMEDELTA CSR.
