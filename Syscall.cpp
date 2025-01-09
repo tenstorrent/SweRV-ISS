@@ -1401,6 +1401,7 @@ Syscall<URV>::emulate(unsigned hartIx, unsigned syscallIx, URV a0, URV a1, URV a
 	return copyOk? rc : SRV(-1);
       }
 
+#if 0
     case 98:  // futex
       {
         if (a1 == FUTEX_WAIT_PRIVATE)
@@ -1450,6 +1451,7 @@ Syscall<URV>::emulate(unsigned hartIx, unsigned syscallIx, URV a0, URV a1, URV a
         std::cerr << "Warning: unimplemented futex operation " << a1 << std::endl;
         return 0;
       }
+#endif
 
     case 214: // brk
        {
@@ -1721,6 +1723,7 @@ Syscall<URV>::emulate(unsigned hartIx, unsigned syscallIx, URV a0, URV a1, URV a
         return (result == -1) ? -errno : result;
       }
 
+#if 0
     case 435:  // clone3
       {
         auto nextAvail = nextAvailHart();
@@ -1750,6 +1753,7 @@ Syscall<URV>::emulate(unsigned hartIx, unsigned syscallIx, URV a0, URV a1, URV a
 
         return nextAvail->sysHartIndex();
       }
+#endif
 
     case 1024: // open
       {

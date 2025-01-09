@@ -308,6 +308,7 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
             std::vector<uint8_t> vecVal;
             if (hart.peekVecReg(reg, vecVal) and reply.buffer.size() >= vecVal.size())
               {
+                std::reverse(vecVal.begin(), vecVal.end());
                 for (unsigned i = 0; i < vecVal.size(); ++i)
                   reply.buffer[i] = vecVal.at(i);
                 return true;
@@ -584,7 +585,7 @@ Server<URV>::processStepChanges(Hart<URV>& hart,
       if (not info.empty() and not info.isLoad_)
 	for (auto& einfo : info.elems_)
 	  {
-	    WhisperMessage msg(0, Change, 'm', einfo.va_, einfo.stData_, elemSize);
+	    WhisperMessage msg(0, Change, 'm', einfo.va_, einfo.data_, elemSize);
 	    pendingChanges.push_back(msg);
 	  }
     }

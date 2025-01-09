@@ -176,7 +176,7 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
     if (not system.loadSnapshot(args.loadFrom, args.loadFromTrace))
       return false;
 
-
+#if 0
   if (linux and checkForOpenMp(args))
     {
       if (args.verbose)
@@ -188,6 +188,7 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
           hart.setSuspendState(true);
         }
     }
+#endif
 
   // Set instruction count limit.
   if (args.instCountLim)
@@ -197,6 +198,15 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
 	uint64_t count = args.relativeInstCount? hart.getInstructionCount() : 0;
 	count += *args.instCountLim;
 	hart.setInstructionCountLimit(count);
+      }
+
+  if (args.retInstCountLim)
+    for (unsigned i = 0; i < system.hartCount(); ++i)
+      {
+	auto& hart = *system.ithHart(i);
+	uint64_t count = args.relativeInstCount? hart.getRetiredInstructionCount() : 0;
+	count += *args.retInstCountLim;
+	hart.setRetiredInstructionCountLimit(count);
       }
 
   if (not args.initStateFile.empty())
