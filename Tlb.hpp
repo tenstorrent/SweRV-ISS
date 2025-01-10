@@ -25,19 +25,6 @@ namespace WdRiscv
   /// Translation lookaside buffer entry.
   struct TlbEntry
   {
-    /// Return the size of the underlying page in units of 4k-bytes.
-    unsigned sizeIn4kbytes() const
-    {
-      switch (levels_)
-        {
-        case 1: return 1;         // 4k bytes
-        case 2: return 512;       // 2M bytes
-        case 3: return 128*1204;  // 1G bytes
-        default: assert(0);
-        }
-      return 0;
-    }
-
     uint64_t virtPageNum_ = 0;
     uint64_t physPageNum_ = 0;
     uint64_t counter_ = 0;   // 2-bit counter for replacement.
@@ -51,7 +38,7 @@ namespace WdRiscv
     bool exec_ = false;      // Execute Access.
     bool accessed_ = false;
     bool dirty_ = false;
-    uint8_t levels_ = 3;
+    uint8_t level_ = 0;      // Level of corresponding PTE in address translation walk.
     uint8_t pbmt_ = 0;
   };
 
@@ -60,6 +47,10 @@ namespace WdRiscv
   class Tlb
   {
   public:
+
+    /// Address translation mode.
+    enum class Mode : uint32_t { Bare = 0, Sv32 = 1, Sv39 = 8, Sv48 = 9, Sv57 = 10,
+				 Sv64 = 11, Limit_ = 12};
 
     /// Define a a TLB with the given size (number of entries).
     Tlb(unsigned size);
@@ -120,11 +111,15 @@ namespace WdRiscv
       return entry;
     }
 
-    /// print TLB content
+    /// Print TLB content
     void printTlb(std::ostream& ost) const;
 
-    /// print TLB entry
-    static void printEntry(std::ostream& ost, const TlbEntry& te);
+    /// Print TLB entry
+    void printEntry(std::ostream& ost, const TlbEntry& te) const;
+
+    /// Return as a string the page/megapage size corresponding to given translation mode
+    /// and page table entry level.
+    static const char* ptePageSize(Mode m, uint32_t level);
 
     /// Set number of TLB entries.
     void setTlbSize(unsigned size)
@@ -168,7 +163,7 @@ namespace WdRiscv
     {
       for (auto& entry : entries_)
         {
-          unsigned size = entry.sizeIn4kbytes();
+          unsigned size = sizeIn4kBytes(mode_, entry.level_);
 
           if (entry.virtPageNum_ <= vpn and vpn < entry.virtPageNum_ + size)
             {
@@ -184,7 +179,7 @@ namespace WdRiscv
     {
       for (auto& entry : entries_)
         {
-          unsigned size = entry.sizeIn4kbytes();
+          unsigned size = sizeIn4kBytes(mode_, entry.level_);
 
           if (entry.virtPageNum_ <= vpn and vpn < entry.virtPageNum_ + size and
               entry.asid_ == asid and not entry.global_)
@@ -201,7 +196,7 @@ namespace WdRiscv
     {
       for (auto& entry : entries_)
         {
-          unsigned size = entry.sizeIn4kbytes();
+          unsigned size = sizeIn4kBytes(mode_, entry.level_);
 
           if (entry.virtPageNum_ == vpn and vpn < entry.virtPageNum_ + size and
               entry.vmid_ == vmid and not entry.global_)
@@ -222,7 +217,51 @@ namespace WdRiscv
         }
     }
 
-  protected:
+    /// Set the address translation mode.
+    void setMode(Mode m)
+    {
+      mode_ = m;
+      invalidate();
+    }
+
+    /// Return the size of a page/megapage for the given mode and TLB entry level in units
+    /// of 4k-bytes.
+    uint64_t sizeIn4kBytes(Mode mode, unsigned level) const
+    {
+      if (mode == Mode::Bare)
+        return 0;
+
+      if (level <= 1) return 1;                 // 4K bytes
+
+      if (mode == Mode::Sv32)
+        {
+          if (level == 2) return 1024;          // 4M bytes
+        }
+      else if (mode == Mode::Sv39)
+        {
+          if (level == 2) return 512;           // 2M bytes
+          if (level == 3) return 128*1024;      // 1G bytes
+        }
+      else if (mode == Mode::Sv48)
+        {
+          if (level == 2) return 128;           // 1M bytes
+          if (level == 3) return 128*1024;      // 1G bytes
+          if (level == 4) return 128*1024*1024; // 1T bytes
+        }
+      else if (mode == Mode::Sv57)
+        {
+          if (level == 2) return 128;           // 1M bytes
+          if (level == 3) return 128*1024;      // 1G bytes
+          if (level == 4) return 128*1024*1024; // 1T bytes
+          if (level == 5) return uint64_t(128)*1024*1204*1024;  // 1P bytes
+        }
+
+      assert(0);
+      return 0;
+    }
+
+    /// Return the size of the page/megapage corresponding to the given TLB entry.
+
 
   private:
 
@@ -235,6 +274,8 @@ namespace WdRiscv
     }
 
     std::vector<TlbEntry> entries_;
+
+    Mode mode_ = Mode::Bare;
   };
 }
 
