@@ -884,6 +884,18 @@ template <typename URV>
 void
 System<URV>::endMcm()
 {
+  if (mcm_)
+    {
+      auto& path = memory_->dataLineTracePath();
+      if (not path.empty())
+        {
+          memory_->saveDataAddressTrace(path, true /* writeValues */);
+
+          std::string emptyPath;
+          memory_->enableDataLineTrace(emptyPath);  // Disable
+        }
+    }
+
   for (auto& hart :  sysHarts_)
     hart->setMcm(nullptr);
   mcm_ = nullptr;

@@ -454,17 +454,20 @@ namespace WdRiscv
     void defineInitPageCallback(std::function<bool(uint64_t, const std::span<uint8_t>)> callback)
     { initPageCallback_ = std::move(callback); }
 
-    /// Enable tracing of memory data lines referenced by current
-    /// run. A memory data line is typically 64-bytes long and corresponds to
-    /// a cachable line.
+    /// Enable tracing of memory data lines referenced by current run. A memory data line
+    /// is typically 64-bytes long and corresponds to a cachable line.
     void enableDataLineTrace(const std::string& path)
-    { dataLineTrace_ = true; dataLineFile_ = path; }
+    { dataLineFile_ = path; dataLineTrace_ = not path.empty(); }
+
+    /// Return the path to the file of the data line trace.
+    const std::string& dataLineTracePath() const
+    { return dataLineFile_; }
 
     /// Enable tracing of memory instruction fetch lines referenced by
     /// current run. A memory line is typically 64-bytes long and
     /// corresponds to a cachable line.
     void enableInstructionLineTrace(const std::string& path)
-    { instrLineTrace_ = true;  instrLineFile_ = path; }
+    { instrLineFile_ = path; instrLineTrace_ = not path.empty(); }
 
     void registerIoDevice(std::shared_ptr<IoDevice> dev)
     { assert(dev); ioDevs_.push_back(std::move(dev)); }
@@ -481,7 +484,7 @@ namespace WdRiscv
 
     /// If address tracing enabled, then write the accumulated data
     /// addresses into the given file.
-    bool saveDataAddressTrace(const std::string& path) const;
+    bool saveDataAddressTrace(const std::string& path, bool writeValues = false) const;
 
     /// If instruction tracing enabled, then write the accumulated
     /// addresses into the given file.
@@ -718,13 +721,10 @@ namespace WdRiscv
     };
     typedef std::unordered_map<uint64_t, LineEntry> LineMap;
 
-    static bool saveAddressTrace(std::string_view tag,
-                                 const LineMap& lineMap,
-                                 const std::string& path);
+    bool saveAddressTrace(std::string_view tag, const LineMap& lineMap,
+                          const std::string& path, bool writeValues = false) const;
 
-    static bool loadAddressTrace(LineMap& lineMap,
-                                 uint64_t& refCount,
-                                 const std::string& path);
+    bool loadAddressTrace(LineMap& lineMap, uint64_t& refCount, const std::string& path);
 
     /// Add line of given address to the data line address trace.
     void traceDataLine(uint64_t vaddr, uint64_t paddr)
