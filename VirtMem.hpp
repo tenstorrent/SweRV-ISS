@@ -297,6 +297,14 @@ namespace WdRiscv
     Pbmt lastEffectivePbmt(bool twoStage) const
     { return effectivePbmt(twoStage, vsMode_, vsPbmt_, pbmt_); }
 
+    /// Return a string representing the page/megapage size associated with the
+    /// given translation mode and the given PTE level in a table walk. This
+    /// should be renamed ptePageSize.
+    static constexpr const char* pageSize(Mode m, uint32_t level)
+    {
+      return Tlb::ptePageSize(m, level);
+    }
+
     /// Return string representing translation mode. Example: Sv32 yields "sv32".
     static constexpr std::string_view to_string(Mode mode)
     {
