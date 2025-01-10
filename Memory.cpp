@@ -1015,16 +1015,13 @@ Memory::loadSnapshot(const std::string & filename,
 
 
 bool
-Memory::saveAddressTrace(std::string_view tag,
-			 const LineMap& lineMap,
-			 const std::string& path)
+Memory::saveAddressTrace(std::string_view tag, const LineMap& lineMap,
+			 const std::string& path, bool writeValues) const
 {
   std::ofstream out(path, std::ios::trunc);
-
   if (not out)
     {
-      std::cerr << "Memory::saveAddressTrace failed - cannot open " << path
-		<< " for write\n";
+      std::cerr << "Memory::saveAddressTrace: Failed to open " << path << " for write\n";
       return false;
     }
 
@@ -1043,10 +1040,25 @@ Memory::saveAddressTrace(std::string_view tag,
 
   out << std::hex;
 
+  unsigned lineSize = 1 << lineShift_;
+
   for (auto vaddr : addrVec)
     {
       uint64_t paddr = lineMap.at(vaddr).paddr;
       out << vaddr << ':' << paddr;
+
+      if (writeValues)
+        {
+          out << ':';
+          uint64_t lineAddr = paddr << lineShift_;
+          for (unsigned i = 0; i < lineSize; ++i)
+            {
+              uint8_t byte = 0;
+              uint64_t byteAddr = lineAddr + lineSize - 1 - i;
+              peek(byteAddr, byte, false);
+              out << unsigned(byte >> 4) << unsigned(byte & 0xf);
+            }
+        }
       out << '\n';
     }
 
@@ -1073,7 +1085,7 @@ Memory::loadAddressTrace(LineMap& lineMap, uint64_t& refCount, const std::string
       std::vector<std::string> tokens;
       boost::split(tokens, line, boost::is_any_of(":"));
 
-      if (tokens.size() != 2)
+      if (tokens.size() < 2)
         {
           std::cerr << "Error: Failed to load addresses from line.\n";
           return false;
@@ -1089,11 +1101,11 @@ Memory::loadAddressTrace(LineMap& lineMap, uint64_t& refCount, const std::string
 
 
 bool
-Memory::saveDataAddressTrace(const std::string& path) const
+Memory::saveDataAddressTrace(const std::string& path, bool writeValues) const
 {
   if (not dataLineTrace_)
     return true;
-  return saveAddressTrace("data", dataLineMap_, path);
+  return saveAddressTrace("data", dataLineMap_, path, writeValues);
 }
 
 

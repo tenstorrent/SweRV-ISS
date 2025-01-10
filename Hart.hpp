@@ -5257,7 +5257,7 @@ namespace WdRiscv
       ldStAtomic_ = false;
       lastPageMode_ = virtMem_.mode();
       lastVsPageMode_ = virtMem_.vsMode();
-      lastPageModeStage2_ = virtMem_.modeStage2();
+      lastPageModeStage2_ = virtMem_.stage2Mode();
       virtMem_.clearExecInfo();
       vecRegs_.clearTraceData();
     }
