@@ -2399,8 +2399,10 @@ namespace WdRiscv
     unsigned identifyDataRegister(const VecLdStInfo& info, const VecLdStElem& elem) const
     { return vecRegs_.identifyDataRegister(info, elem); }
 
-    /// Report the number of retired instruction count and the simulation rate.
-    void reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop);
+    /// Report the number of executed and retired instruction count
+    /// and the simulation rate.
+    void reportInstsPerSec(uint64_t instCount, uint64_t retInstCount,
+                           double elapsed, bool userStop);
 
     /// Return true if vector component currently has mask-agnositic policy.
     bool isVectorMaskAgnostic() const
