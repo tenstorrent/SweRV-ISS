@@ -49,7 +49,6 @@ Hart<URV>::execHfence_vvma(const DecodedInst* di)
 
   auto& tlb = virtMem_.vsTlb_;
 
-  // Invalidate whole VS TLB. This is overkill.
   if (di->op0() == 0 and di->op1() == 0)
     tlb.invalidate();
   else if (di->op0() == 0 and di->op1() != 0)

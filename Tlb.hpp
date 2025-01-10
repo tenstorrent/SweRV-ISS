@@ -25,6 +25,19 @@ namespace WdRiscv
   /// Translation lookaside buffer entry.
   struct TlbEntry
   {
+    /// Return the size of the underlying page in units of 4k-bytes.
+    unsigned sizeIn4kbytes() const
+    {
+      switch (levels_)
+        {
+        case 1: return 1;         // 4k bytes
+        case 2: return 512;       // 2M bytes
+        case 3: return 128*1204;  // 1G bytes
+        default: assert(0);
+        }
+      return 0;
+    }
+
     uint64_t virtPageNum_ = 0;
     uint64_t physPageNum_ = 0;
     uint64_t counter_ = 0;   // 2-bit counter for replacement.
@@ -139,7 +152,7 @@ namespace WdRiscv
           }
     }
 
-    /// Invalidate every entry matching given virtual mahine identifier.
+    /// Invalidate every entry matching given virtual-machine identifier.
     void invalidateVmid(uint32_t vmid)
     {
       for (auto& entry : entries_)
@@ -154,23 +167,32 @@ namespace WdRiscv
     void invalidateVirtualPage(uint64_t vpn)
     {
       for (auto& entry : entries_)
-	if (entry.virtPageNum_ == vpn)
-          {
-            entry.valid_ = false;
-            entry.counter_ = 0;
-          }
+        {
+          unsigned size = entry.sizeIn4kbytes();
+
+          if (entry.virtPageNum_ <= vpn and vpn < entry.virtPageNum_ + size)
+            {
+              entry.valid_ = false;
+              entry.counter_ = 0;
+            }
+        }
     }
 
-    /// Invalidate every entry matching given virtual page number and
-    /// address space identifer except for global entries.
+    /// Invalidate every entry matching given virtual page number and address space
+    /// identifer except for global entries.
     void invalidateVirtualPageAsid(uint64_t vpn, uint32_t asid)
     {
       for (auto& entry : entries_)
-        if (entry.virtPageNum_ == vpn and entry.asid_ == asid and not entry.global_)
-          {
-            entry.valid_ = false;
-            entry.counter_ = 0;
-          }
+        {
+          unsigned size = entry.sizeIn4kbytes();
+
+          if (entry.virtPageNum_ <= vpn and vpn < entry.virtPageNum_ + size and
+              entry.asid_ == asid and not entry.global_)
+            {
+              entry.valid_ = false;
+              entry.counter_ = 0;
+            }
+        }
     }
 
     /// Invalidate every entry matching given virtual page number and
@@ -178,11 +200,16 @@ namespace WdRiscv
     void invalidateVirtualPageVmid(uint64_t vpn, uint32_t vmid)
     {
       for (auto& entry : entries_)
-        if (entry.virtPageNum_ == vpn and entry.vmid_ == vmid and not entry.global_)
-          {
-            entry.valid_ = false;
-            entry.counter_ = 0;
-          }
+        {
+          unsigned size = entry.sizeIn4kbytes();
+
+          if (entry.virtPageNum_ == vpn and vpn < entry.virtPageNum_ + size and
+              entry.vmid_ == vmid and not entry.global_)
+            {
+              entry.valid_ = false;
+              entry.counter_ = 0;
+            }
+        }
     }
 
     /// Invalidate all entries.
