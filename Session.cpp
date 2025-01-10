@@ -1256,9 +1256,12 @@ Session<URV>::run(const Args& args)
       uint64_t count = 0;
       for (unsigned i = 0; i < system.hartCount(); ++i)
 	count += system.ithHart(i)->getInstructionCount();
+      uint64_t count1 = 0;
+      for (unsigned i = 0; i < system.hartCount(); ++i)
+	count1 += system.ithHart(i)->getRetiredInstructionCount();
       double elapsed = (double(t1.tv_sec - t0.tv_sec) +
 			double(t1.tv_usec - t0.tv_usec)*1e-6);
-      system.ithHart(0)->reportInstsPerSec(count, elapsed, false);
+      system.ithHart(0)->reportInstsPerSec(count, count1, elapsed, false);
     }
 
   return ok;
