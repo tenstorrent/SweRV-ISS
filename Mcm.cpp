@@ -5206,16 +5206,21 @@ template <typename URV>
 bool
 Mcm<URV>::checkSfenceWInval(Hart<URV>& hart, const McmInstr& instr) const
 {
-  // This is very crude: Check that there are no pending stores (stores in the
-  // store/merge buffer) when the sfence.w.inval is retired.
+  // This is very crude: Check that there are no earlier (in program order) stores pending
+  // in the store/merge buffer when the sfence.w.inval is retired.
 
   unsigned hartIx = hart.sysHartIndex();
   const auto& pendingWrites = hartData_.at(hartIx).pendingWrites_;
-  if (pendingWrites.empty())
-    return true;
 
-  cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << instr.tag_
-       << " sfence.w.inval retired while there are pending stores in the store/merge buffer\n";
+  for (auto& op : pendingWrites)
+    if (op.tag_ < instr.tag_)
+      {
+        cerr << "Error: Hart-id=" << hart.hartId() << " sfence-tag=" << instr.tag_
+             << " store-tag=" << op.tag_ << " sfence.w.inval retires while an older"
+             << " store is still the store/merge buffer\n";
+        return false;
+      }
+
   return false;
 }
 
