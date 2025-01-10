@@ -4976,7 +4976,8 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
 
   const uint64_t instLim = instCountLim_;
   const uint64_t retInstLim = retInstCountLim_;
-  uint64_t counter0 = instCounter_;
+  const uint64_t counter0 = instCounter_;
+  const uint64_t counter1 = retInstCounter_;
 
   // Setup signal handlers. Restore on destruction.
   SignalHandlers handlers;
@@ -4996,9 +4997,9 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
 		    double(t1.tv_usec - t0.tv_usec)*1e-6);
 
   uint64_t numInsts = instCounter_ - counter0;
+  uint64_t numRetInsts = retInstCounter_ - counter1;
 
-  reportInstsPerSec(numInsts, elapsed, userStop);
-
+  reportInstsPerSec(numInsts, numRetInsts, elapsed, userStop);
   return success;
 }
 
@@ -5435,7 +5436,8 @@ Hart<URV>::run(FILE* file)
   if (complex)
     return runUntilAddress(stopAddr, file);
 
-  uint64_t counter0 = instCounter_;
+  const uint64_t counter0 = instCounter_;
+  const uint64_t counter1 = retInstCounter_;
 
   struct timeval t0;
   gettimeofday(&t0, nullptr);
@@ -5452,7 +5454,9 @@ Hart<URV>::run(FILE* file)
 		    double(t1.tv_usec - t0.tv_usec)*1e-6);
 
   uint64_t numInsts = instCounter_ - counter0;
-  reportInstsPerSec(numInsts, elapsed, userStop);
+  uint64_t numRetInsts = retInstCounter_ - counter1;
+
+  reportInstsPerSec(numInsts, numRetInsts, elapsed, userStop);
   return success;
 }
 

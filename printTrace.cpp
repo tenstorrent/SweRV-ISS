@@ -840,11 +840,12 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 }
 
 
-/// Report the number of retired instruction count and the simulation
+/// Report the number of executed and retired instruction count and the simulation
 /// rate.
 template <typename URV>
 void
-Hart<URV>::reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop)
+Hart<URV>::reportInstsPerSec(uint64_t instCount, uint64_t retInstCount, double elapsed,
+                             bool userStop)
 {
   std::lock_guard<std::mutex> guard(printInstTraceMutex());
 
@@ -857,8 +858,10 @@ Hart<URV>::reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop)
   if (userStop)
     std::cerr << "User stop\n";
   std::cerr << "Executed " << instCount << " instruction"
-	    << (instCount > 1? "s" : "") << " in "
-	    << secStr;
+	    << (instCount > 1? "s" : "") << " and "
+            << "retired " << retInstCount << " instruction"
+            << (retInstCount > 1? "s" : "")
+            << " in " << secStr;
   if (elapsed > 0)
     std::cerr << "  " << uint64_t(double(instCount)/elapsed) << " inst/s";
   std::cerr << " hart=" << hartIx_ << '\n';

@@ -119,7 +119,40 @@ namespace WdRiscv
 
     /// Return as a string the page/megapage size corresponding to given translation mode
     /// and page table entry level.
-    static const char* ptePageSize(Mode m, uint32_t level);
+    static constexpr const char* ptePageSize(Mode m, uint32_t level)
+    {
+      if (m == Mode::Bare)
+        return "";
+
+      if (level <= 1) return "4K";
+
+      if (m == Mode::Sv32)
+        {
+          if (level == 2) return "4M";
+        }
+      else if (m == Mode::Sv39)
+        {
+          if (level == 2) return "2M";
+          if (level == 3) return "1G";
+        }
+      else if (m == Mode::Sv48)
+        {
+          if (level == 2) return "1M";
+          if (level == 3) return "1G";
+          if (level == 4) return "1T";
+        }
+      else if (m == Mode::Sv57)
+        {
+          if (level == 2) return "1M";
+          if (level == 3) return "1G";
+          if (level == 4) return "1T";
+          if (level == 5) return "1P";
+        }
+
+      assert(0);
+      return "";
+    }
+
 
     /// Set number of TLB entries.
     void setTlbSize(unsigned size)
