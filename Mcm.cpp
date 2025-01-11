@@ -5221,7 +5221,7 @@ Mcm<URV>::checkSfenceWInval(Hart<URV>& hart, const McmInstr& instr) const
         return false;
       }
 
-  return false;
+  return true;
 }
 
 

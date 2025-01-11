@@ -118,38 +118,38 @@ namespace WdRiscv
     void printEntry(std::ostream& ost, const TlbEntry& te) const;
 
     /// Return as a string the page/megapage size corresponding to given translation mode
-    /// and page table entry level.
+    /// and page table entry level. The level starts at 0 (0 corresponds to a leaf 4k-page)
+    /// which is incosistent with sizeIn4kBytes where level starts at 1.
     static constexpr const char* ptePageSize(Mode m, uint32_t level)
     {
       if (m == Mode::Bare)
         return "";
 
-      if (level <= 1) return "4K";
+      if (level == 0) return "4K";
 
       if (m == Mode::Sv32)
         {
-          if (level == 2) return "4M";
+          if (level == 1) return "4M";
         }
       else if (m == Mode::Sv39)
         {
-          if (level == 2) return "2M";
-          if (level == 3) return "1G";
+          if (level == 1) return "2M";
+          if (level == 2) return "1G";
         }
       else if (m == Mode::Sv48)
         {
-          if (level == 2) return "1M";
-          if (level == 3) return "1G";
-          if (level == 4) return "1T";
+          if (level == 1) return "2M";
+          if (level == 2) return "1G";
+          if (level == 3) return "512G";
         }
       else if (m == Mode::Sv57)
         {
-          if (level == 2) return "1M";
-          if (level == 3) return "1G";
-          if (level == 4) return "1T";
-          if (level == 5) return "1P";
+          if (level == 1) return "2M";
+          if (level == 2) return "1G";
+          if (level == 3) return "512G";
+          if (level == 4) return "256T";
         }
 
-      assert(0);
       return "";
     }
 
@@ -273,20 +273,20 @@ namespace WdRiscv
       else if (mode == Mode::Sv39)
         {
           if (level == 2) return 512;           // 2M bytes
-          if (level == 3) return 128*1024;      // 1G bytes
+          if (level == 3) return 256*1024;      // 1G bytes
         }
       else if (mode == Mode::Sv48)
         {
-          if (level == 2) return 128;           // 1M bytes
-          if (level == 3) return 128*1024;      // 1G bytes
-          if (level == 4) return 128*1024*1024; // 1T bytes
+          if (level == 2) return 512;           // 2M bytes
+          if (level == 3) return 256*1024;      // 1G bytes
+          if (level == 4) return 128*1024*1024; // 512G bytes
         }
       else if (mode == Mode::Sv57)
         {
-          if (level == 2) return 128;           // 1M bytes
-          if (level == 3) return 128*1024;      // 1G bytes
-          if (level == 4) return 128*1024*1024; // 1T bytes
-          if (level == 5) return uint64_t(128)*1024*1204*1024;  // 1P bytes
+          if (level == 2) return 512;           // 2M bytes
+          if (level == 3) return 256*1024;      // 1G bytes
+          if (level == 4) return 128*1024*1024; // 512G bytes
+          if (level == 5) return uint64_t(64)*1024*1204*1024;  // 256T bytes
         }
 
       assert(0);
