@@ -118,7 +118,8 @@ namespace WdRiscv
     void printEntry(std::ostream& ost, const TlbEntry& te) const;
 
     /// Return as a string the page/megapage size corresponding to given translation mode
-    /// and page table entry level.
+    /// and page table entry level. The level starts at 0 (0 corresponds to a leaf 4k-page)
+    /// which is incosistent with sizeIn4kBytes where level starts at 1.
     static constexpr const char* ptePageSize(Mode m, uint32_t level)
     {
       if (m == Mode::Bare)
@@ -149,7 +150,6 @@ namespace WdRiscv
           if (level == 4) return "256T";
         }
 
-      assert(0);
       return "";
     }
 
