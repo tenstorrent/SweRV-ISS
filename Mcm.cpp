@@ -2837,10 +2837,15 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
     {
       if (auto& op = sysMemOps_.at(opIx); op.isRead_)
         {
-          if (isVector  and  not unitStride  and
-              not vecReadOpOverlapsElem(op, pa1, pa2, size, elemIx, field, elemSize))
-            continue;  // Vector non-unit-stride ops must match element index.
-          forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
+          if (not isVector or unitStride)
+            forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
+          else
+            {
+              if (info.stride_ == 0 and elemIx != op.elemIx_)
+                continue;
+              if (vecReadOpOverlapsElem(op, pa1, pa2, size, elemIx, field, elemSize))
+                forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
+            }
         }
     }
 
@@ -2869,9 +2874,13 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
       for (auto iter = instr->memOps_.rbegin(); iter  != instr->memOps_.rend(); ++iter)
 	{
 	  const auto& op = sysMemOps_.at(*iter);
-          if (isVector and not unitStride and
-              not vecReadOpOverlapsElemByte(op, byteAddr, elemIx, field, elemSize))
-            continue;  // Vector non-unit-stride ops must match element index.
+          if (isVector and not unitStride)
+            {
+              if (info.stride_ == 0 and elemIx != op.elemIx_)
+                continue;
+              if (not vecReadOpOverlapsElemByte(op, byteAddr, elemIx, field, elemSize))
+                continue;  // Vector non-unit-stride ops must match element index.
+            }
 
           uint8_t byte = 0;
           if (not op.getModelReadOpByte(byteAddr, byte))
