@@ -124,29 +124,29 @@ namespace WdRiscv
       if (m == Mode::Bare)
         return "";
 
-      if (level <= 1) return "4K";
+      if (level == 0) return "4K";
 
       if (m == Mode::Sv32)
         {
-          if (level == 2) return "4M";
+          if (level == 1) return "4M";
         }
       else if (m == Mode::Sv39)
         {
-          if (level == 2) return "2M";
-          if (level == 3) return "1G";
+          if (level == 1) return "2M";
+          if (level == 2) return "1G";
         }
       else if (m == Mode::Sv48)
         {
-          if (level == 2) return "2M";
-          if (level == 3) return "1G";
-          if (level == 4) return "512G";
+          if (level == 1) return "2M";
+          if (level == 2) return "1G";
+          if (level == 3) return "512G";
         }
       else if (m == Mode::Sv57)
         {
-          if (level == 2) return "2M";
-          if (level == 3) return "1G";
-          if (level == 4) return "512G";
-          if (level == 5) return "256T";
+          if (level == 1) return "2M";
+          if (level == 2) return "1G";
+          if (level == 3) return "512G";
+          if (level == 4) return "256T";
         }
 
       assert(0);
