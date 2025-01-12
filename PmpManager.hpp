@@ -136,10 +136,8 @@ namespace WdRiscv
     {
       addr = (addr >> 2) << 2;
       if (fastRegion_.region_)
-        {
-          if (addr >= fastRegion_.firstAddr_ and addr <= fastRegion_.lastAddr_)
-            return fastRegion_.region_->pmp_;
-        }
+        if (addr >= fastRegion_.firstAddr_ and addr <= fastRegion_.lastAddr_)
+          return fastRegion_.region_->pmp_;
       for (unsigned ix = 0; ix < regions_.size(); ++ix)
         {
           const auto& region = regions_.at(ix);
@@ -305,17 +303,17 @@ namespace WdRiscv
       uint64_t lastAddr = region.lastAddr_;
       for (unsigned i = 0; i < ix; ++i)
         {
-          auto a1 = regions_.at(i).firstAddr_;
+          // By common use case, shrink lower bound address instead
+          // of computing maximum size.
           auto a2 = regions_.at(i).lastAddr_;
-          if (firstAddr >= a1 and
-              firstAddr <= a2)
-            firstAddr = a2 + 4;
-          if (lastAddr >= a1 and
-              lastAddr <= a2)
-            lastAddr = a1 - 4;
+          if (firstAddr <= a2)
+            {
+              firstAddr = a2 + 4;
+              continue;
+            }
         }
       if (firstAddr <= lastAddr)
-        fastRegion_ = FastRegion{firstAddr, lastAddr, &regions_.at(ix)};
+        fastRegion_ = FastRegion{firstAddr, lastAddr, &region};
     }
 
     std::vector<Region> regions_;
