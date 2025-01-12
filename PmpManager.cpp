@@ -46,6 +46,7 @@ PmpManager::defineRegion(uint64_t a0, uint64_t a1, Pmp::Type type,
   Pmp pmp(mode, pmpIx, lock, type);
   Region region{a0, a1, pmp};
   regions_.push_back(region);
+  fastRegion_.region_ = nullptr;
 }
 
 
