@@ -177,21 +177,27 @@ namespace WdRiscv
       value = data[elemIx];
     }
 
-    /// Set the element with given index within the vector register of
-    /// the given number to the given value. Throw an exception
-    /// if the combination of element index, vector number and group
-    /// multiplier (pre-scaled by 8) is invalid. We require a
-    /// pre-scaled multiplier to avoid passing a fraction.
+    /// Set the element with given index within the vector register of the given number to
+    /// the given value. Throw an exception if the combination of element index, vector
+    /// number and group multiplier (pre-scaled by 8) is invalid. We require a pre-scaled
+    /// multiplier to avoid passing a fraction. Keep track of register written and
+    /// associated group multiplier to use when reporting currently executing instruction.
     template<typename T>
     void write(uint32_t regNum, uint64_t elemIx, uint32_t groupX8, const T& value)
     {
       if (not isValidIndex(regNum, elemIx, groupX8, sizeof(T)))
         throw std::runtime_error("invalid vector register index");
       std::size_t regOffset = static_cast<std::size_t>(regNum)*bytesPerReg_;
+
+      if (not lastWrittenReg_.has_value())
+        {
+          lastWrittenReg_ = regNum;
+          lastGroupX8_ = groupX8;
+          saveRegValue(regNum, groupX8);
+        }
+
       T* data = reinterpret_cast<T*>(data_.data() + regOffset);
       data[elemIx] = value;
-      lastWrittenReg_ = regNum;
-      lastGroupX8_ = groupX8;
     }
 
     /// Return true if the combination regNum, elemIx, eew, and
@@ -668,14 +674,32 @@ namespace WdRiscv
     void setOpEmul(unsigned emul0, unsigned emul1 = 1, unsigned emul2 = 1)
     { opsEmul_.at(0) = emul0; opsEmul_.at(1) = emul1; opsEmul_.at(2) = emul2; }
 
-    /// For instructions that do not use the write method, mark the
-    /// last written register and the effective group multiplier.
+    /// For instructions that do not use the write method, mark the last written register
+    /// and the effective group multiplier.
     void touchReg(uint32_t reg, uint32_t groupX8)
-    { lastWrittenReg_ = reg; lastGroupX8_ = groupX8; }
+    {
+      lastWrittenReg_ = reg;
+      lastGroupX8_ = groupX8;
+      if (not lastWrittenReg_.has_value())
+        saveRegValue(reg, groupX8);
+    }
 
     /// Same as above for mask registers
     void touchMask(uint32_t reg)
     { touchReg(reg, 8); }  // Grouping of of 1
+
+    /// Save value of register so that register write can be later undone.
+    /// This supports Perfapi.
+    void saveRegValue(uint32_t reg, uint32_t groupX8)
+    {
+      unsigned effGroup = groupX8 < 8 ? 1 : groupX8 / 8;
+      assert(reg + effGroup <= registerCount());
+      unsigned byteCount = effGroup * bytesPerReg_;
+      lastWrittenRegData_.resize(byteCount);
+      std::size_t regOffset = static_cast<std::size_t>(reg)*bytesPerReg_;
+      assert(regOffset + byteCount <= data_.size());
+      memcpy(lastWrittenRegData_.data(), data_.data() + regOffset, byteCount);
+    }
 
     /// Return true if element of given index is active with respect
     /// to the given mask vector register. Element is active if the
@@ -790,8 +814,13 @@ namespace WdRiscv
         data[byteIx] |= mask;
       else
         data[byteIx] &= ~mask;
-      lastWrittenReg_ = maskReg;
-      lastGroupX8_ = 8;
+
+      if (not lastWrittenReg_.has_value())
+        {
+          lastWrittenReg_ = maskReg;
+          lastGroupX8_ = 8;
+          saveRegValue(maskReg, 8);
+        }
     }
 
     /// Set value to the ith bit of the given mask register.
@@ -919,6 +948,7 @@ namespace WdRiscv
     GroupsForWidth legalConfigs_;
 
     std::optional<unsigned> lastWrittenReg_;
+    std::vector<uint8_t> lastWrittenRegData_;
     uint32_t lastGroupX8_ = 8;   // 8 times last grouping factor
     uint32_t lastVstart_ = 0;    // Vstart at beginning of last vec instruction.
 

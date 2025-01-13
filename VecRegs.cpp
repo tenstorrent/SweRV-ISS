@@ -189,6 +189,8 @@ VecRegs::config(unsigned bytesPerReg, unsigned minBytesPerElem,
 
   data_.resize(bytesInRegFile_);
   std::fill(data_.begin(), data_.end(), 0);
+
+  lastWrittenRegData_.reserve(regCount_ * bytesPerReg_);
 }
 
 
@@ -197,6 +199,7 @@ VecRegs::reset()
 {
   std::fill(data_.begin(), data_.end(), 0);
   lastWrittenReg_ = -1;
+  lastWrittenRegData_.clear();
   lastGroupX8_ = 8;
 }
 
