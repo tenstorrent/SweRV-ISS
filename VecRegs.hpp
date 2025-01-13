@@ -200,48 +200,10 @@ namespace WdRiscv
       data[elemIx] = value;
     }
 
-    /// Return true if the combination regNum, elemIx, eew, and
-    /// groupX8 is valid setting stride to the value of the designated
-    /// register element. Return false otherwise leaving stride
-    /// unmodified.
-    bool readStride(uint32_t regNum, uint32_t elemIx, ElementWidth eew,
-		    uint32_t groupX8, uint64_t& stride) const
-    {
-      switch(eew)
-        {
-        case ElementWidth::Byte:
-          {
-            uint8_t temp = 0;
-            read(regNum, elemIx, groupX8, temp);
-            stride = temp;
-	    return true;
-          }
-        case ElementWidth::Half:
-          {
-            uint16_t temp = 0;
-            read(regNum, elemIx, groupX8, temp);
-            stride = temp;
-            return true;
-          }
-        case ElementWidth::Word:
-          {
-            uint32_t temp = 0;
-	    read(regNum, elemIx, groupX8, temp);
-            stride = temp;
-            return true;
-          }
-        case ElementWidth::Word2:
-          {
-            uint64_t temp = 0;
-	    read(regNum, elemIx, groupX8, temp);
-            stride = temp;
-            return true;
-          }
-        default:
-          return false;
-        }
-      return false;
-    }
+    /// Similar to th read method except that the value is always uint64_t. Used to read
+    /// the value of an index register of an indexed load/store instruction.
+    uint64_t readIndexReg(uint32_t vecReg, uint32_t elemIx, ElementWidth eew,
+                          uint32_t groupX8) const;
 
     /// Return the count of registers in this register file.
     size_t size() const
@@ -263,6 +225,11 @@ namespace WdRiscv
     /// example if SEW is Byte, then this returns 8).
     uint32_t elemWidthInBits() const
     { return sewInBits_; }
+
+
+    /// Return the currently configured element width in bytes.
+    uint32_t elemWidthInBytes() const
+    { return sewInBits_ / 8; }
 
     /// Return the width in bits corresponding to the given symbolic
     /// element width. Return 0 if symbolic value is out of bounds.
@@ -491,20 +458,7 @@ namespace WdRiscv
     /// Return true if elems/vstart is a multiple of EGS or if it is legalized to be a
     /// multiple of egs. Return false if legalization is not enabled and elems/vstart is
     /// not a multiple of EGS. This is for some vector-crypto instructions.
-    bool validateForEgs(unsigned egs, unsigned& vl, unsigned& vstart) const
-    {
-      if (legalizeForEgs_)
-	{
-	  if ((vl % egs) != 0)
-	    vl = vl - (vl % egs);
-
-	  if ((vstart % egs) != 0)
-	    vstart = vstart - (vstart % egs);
-	  return true;
-	}
-
-      return (vl % egs) == 0  and  (vstart % egs) == 0;
-    }
+    bool validateForEgs(unsigned egs, unsigned& vl, unsigned& vstart) const;
 
     /// Return a string representation of the given group multiplier.
     static constexpr std::string_view to_string(GroupMultiplier group)
@@ -601,6 +555,7 @@ namespace WdRiscv
       uint64_t result_;
     };
 
+    /// Incremental floating point flag changes from last vector instruction.
     void lastIncVec(std::vector<uint8_t>& fpFlags, std::vector<uint8_t>& vxsat,
                     std::vector<Step>& steps) const
     {

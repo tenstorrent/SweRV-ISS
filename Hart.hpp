@@ -2419,6 +2419,14 @@ namespace WdRiscv
     template<typename STORE_TYPE>
     void handleStoreToHost(URV physAddr, STORE_TYPE value);
 
+    /// Return the element size in bytes of the given instruction which must be a vector
+    /// load/store.
+    unsigned vecLdStElemSize(const DecodedInst& di) const;
+
+    /// Return the element size in bytes of the index-vector of the given instruction
+    /// which must be an indexed vector load/store.
+    unsigned vecLdStIndexElemSize(const DecodedInst& di) const;
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.

@@ -348,7 +348,7 @@ Mcm<URV>::getLdStIndexVectors(const Hart<URV>& hart, const McmInstr& instr,
 
   auto& elems = info.elems_;
 
-  unsigned ixElemSize = instr.di_.vecLoadOrStoreElemSize();
+  unsigned ixElemSize = hart.vecLdStIndexElemSize(instr.di_);
   assert(ixElemSize != 0);
   unsigned elemsPerVec = hart.vecRegSize() / ixElemSize;
 
@@ -5254,7 +5254,7 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
   unsigned elemSize = info.elemSize_;
   assert(elemSize != 0);
 
-  unsigned ixElemSize = instr.di_.vecLoadOrStoreElemSize();
+  unsigned ixElemSize = hart.vecLdStIndexElemSize(di);
   assert(ixElemSize != 0);
   unsigned ixElemsPerVec = hart.vecRegSize() / ixElemSize;
 

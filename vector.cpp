@@ -12213,8 +12213,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
       bool skip = not vecRegs_.isDestActive(vd, ix, groupX8, masked, elem);
       if (ix < vecRegs_.elemCount())
         {
-          uint64_t offset = 0;
-          vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset);
+          uint64_t offset = vecRegs_.readIndexReg(vi, ix, offsetEew, offsetGroupX8);
           vaddr = addr + offset;
         }
 
@@ -12439,9 +12438,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
-      uint64_t offset = 0;
-      if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
-	assert(0);
+      uint64_t offset = vecRegs_.readIndexReg(vi, ix, offsetEew, offsetGroupX8);
 
       uint64_t vaddr = addr + offset, data = 0;
       bool skip = masked and not vecRegs_.isActive(0, ix);
@@ -13327,10 +13324,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
           bool skip = not vecRegs_.isDestActive(fdv, ix, groupX8, masked, elem);
           if (ix < vecRegs_.elemCount())
             {
-              uint64_t offset = 0;
-              if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
-                assert(0);
-
+              uint64_t offset = vecRegs_.readIndexReg(vi, ix, offsetEew, offsetGroupX8);
               faddr = addr + offset + field*elemSize;
             }
 
@@ -13529,10 +13523,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
-      uint64_t offset = 0;
-      if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
-        assert(0);
-
+      uint64_t offset = vecRegs_.readIndexReg(vi, ix, offsetEew, offsetGroupX8);
       uint64_t faddr = addr + offset;
 
       for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)

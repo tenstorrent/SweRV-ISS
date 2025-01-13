@@ -2364,6 +2364,28 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 
 
 template <typename URV>
+unsigned
+Hart<URV>::vecLdStElemSize(const DecodedInst& di) const
+{
+  assert(di.isVectorLoad() or di.isVectorStore());
+
+  if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
+    return vecRegs_.elemWidthInBytes();
+
+  return di.vecLoadOrStoreElemSize();
+}
+
+
+template <typename URV>
+unsigned
+Hart<URV>::vecLdStIndexElemSize(const DecodedInst& di) const
+{
+  assert(di.isVectorLoadIndexed() or di.isVectorStoreIndexed());
+  return di.vecLoadOrStoreElemSize();
+}
+
+
+template <typename URV>
 inline
 void
 Hart<URV>::execSw(const DecodedInst* di)
