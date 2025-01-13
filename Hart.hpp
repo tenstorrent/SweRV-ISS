@@ -588,15 +588,18 @@ namespace WdRiscv
 		      std::unordered_map<GroupMultiplier, unsigned>* maxSewPerLmul)
     { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem, minSewPerLmul, maxSewPerLmul); }
 
-    /// Configure mask agnostic policy. Allones if flag is true, undisturb if
-    /// false.
+    /// Configure mask agnostic policy. Allones if flag is true, undisturb if false.
     void configMaskAgnosticAllOnes(bool flag)
     { vecRegs_.configMaskAgnosticAllOnes(flag); }
 
-    /// Configure tail agnostic policy. Allones if flag is true, undisturb if
-    /// false.
+    /// Configure tail agnostic policy. Allones if flag is true, undisturb if false.
     void configTailAgnosticAllOnes(bool flag)
     { vecRegs_.configTailAgnosticAllOnes(flag); }
+
+    /// Configure partial vector load/store segment update. If flag is false, then none of
+    /// a segment fields are committed if any field encouters an exception.
+    void configVectorPartialSegmentUpdate(bool flag)
+    { vecRegs_.configPartialSegmentUpdate(flag); }
 
     /// Return currently configured element width
     ElementWidth elemWidth() const
@@ -1112,6 +1115,17 @@ namespace WdRiscv
     /// Get executed instruction count.
     uint64_t getInstructionCount() const
     { return instCounter_; }
+
+    /// Performs similar function to instCounter_ but operates on
+    /// retired instruction counts.
+    void setRetiredInstructionCountLimit(uint64_t limit)
+    { retInstCountLim_ = limit; }
+
+    void setRetiredInstructionCount(uint64_t count)
+    { retInstCounter_ = count; }
+
+    uint64_t getRetiredInstructionCount() const
+    { return retInstCounter_; }
 
     /// Get the time CSR value.
     uint64_t getTime() const
@@ -2328,6 +2342,7 @@ namespace WdRiscv
     void setWrsCancelsLr(bool flag)
     { wrsCancelsLr_ = flag; }
 
+#if 0
     /// Set hart suspend state. If true, run will have no effect. If suspended,
     /// reset the resume time.
     void setSuspendState(bool flag, uint64_t timeout = 0)
@@ -2339,6 +2354,7 @@ namespace WdRiscv
     /// Return true if hart is suspended.
     bool isSuspended()
     { return suspended_; }
+#endif
 
     /// Set value to the value read from the device associated with the given physical
     /// address.
@@ -2383,8 +2399,10 @@ namespace WdRiscv
     unsigned identifyDataRegister(const VecLdStInfo& info, const VecLdStElem& elem) const
     { return vecRegs_.identifyDataRegister(info, elem); }
 
-    /// Report the number of retired instruction count and the simulation rate.
-    void reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop);
+    /// Report the number of executed and retired instruction count
+    /// and the simulation rate.
+    void reportInstsPerSec(uint64_t instCount, uint64_t retInstCount,
+                           double elapsed, bool userStop);
 
     /// Return true if vector component currently has mask-agnositic policy.
     bool isVectorMaskAgnostic() const
@@ -2400,6 +2418,14 @@ namespace WdRiscv
     /// Implement part of TIF protocol for writing the "tohost" magical location.
     template<typename STORE_TYPE>
     void handleStoreToHost(URV physAddr, STORE_TYPE value);
+
+    /// Return the element size in bytes of the given instruction which must be a vector
+    /// load/store.
+    unsigned vecLdStElemSize(const DecodedInst& di) const;
+
+    /// Return the element size in bytes of the index-vector of the given instruction
+    /// which must be an indexed vector load/store.
+    unsigned vecLdStIndexElemSize(const DecodedInst& di) const;
 
   protected:
 
@@ -5241,7 +5267,7 @@ namespace WdRiscv
       ldStAtomic_ = false;
       lastPageMode_ = virtMem_.mode();
       lastVsPageMode_ = virtMem_.vsMode();
-      lastPageModeStage2_ = virtMem_.modeStage2();
+      lastPageModeStage2_ = virtMem_.stage2Mode();
       virtMem_.clearExecInfo();
       vecRegs_.clearTraceData();
     }
@@ -5341,8 +5367,10 @@ namespace WdRiscv
     uint64_t retiredInsts_ = 0;  // Proxy for minstret CSR.
     uint64_t cycleCount_ = 0;    // Proxy for mcycle CSR.
     URV      fcsrValue_ = 0;     // Proxy for FCSR.
-    uint64_t instCounter_ = 0;   // Absolute retired instruction count.
+    uint64_t instCounter_ = 0;   // Absolute executed instruction count.
+    uint64_t retInstCounter_ = 0; // Similar to minstret, but cannot be disabled.
     uint64_t instCountLim_ = ~uint64_t(0);
+    uint64_t retInstCountLim_ = ~uint64_t(0);
     uint64_t stimecmp_ = 0;      // Value of STIMECMP CSR.
     uint64_t vstimecmp_ = 0;     // Value of VSTIMECMP CSR.
     uint64_t htimedelta_ = 0;    // Value of HTIMEDELTA CSR.
@@ -5578,9 +5606,6 @@ namespace WdRiscv
       uint8_t value_ = 0;
     };
     InterruptAlarm swInterrupt_;
-
-    bool suspended_ = false;      // If true, don't execute instructions.
-    uint64_t resumeTime_ = 0;     // If non-zero, resume from suspension after time is greater than this value.
   };
 }
 

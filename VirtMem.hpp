@@ -38,8 +38,7 @@ namespace WdRiscv
     friend class Hart<uint64_t>;
 
     /// Address translation mode.
-    enum class Mode : uint32_t { Bare = 0, Sv32 = 1, Sv39 = 8, Sv48 = 9, Sv57 = 10,
-				 Sv64 = 11, Limit_ = 12};
+    using Mode = Tlb::Mode;
 
     /// Page based memory type.
     enum class Pbmt : uint32_t { None = 0, Nc = 1, Io = 2, Reserved = 3 };
@@ -298,26 +297,12 @@ namespace WdRiscv
     Pbmt lastEffectivePbmt(bool twoStage) const
     { return effectivePbmt(twoStage, vsMode_, vsPbmt_, pbmt_); }
 
+    /// Return a string representing the page/megapage size associated with the
+    /// given translation mode and the given PTE level in a table walk. This
+    /// should be renamed ptePageSize.
     static constexpr const char* pageSize(Mode m, uint32_t level)
     {
-      if (m == Mode::Bare)
-        return "";
-      if (m == Mode::Sv32)
-        {
-          if (level == 0)
-            return "4K";
-          return "4M";
-        }
-
-      switch (level)
-        {
-          case 0: return "4K";
-          case 1: return "2M";
-          case 2: return "1G";
-          case 3: return "512G";
-          case 4: return "256T";
-          default: return "";
-        }
+      return Tlb::ptePageSize(m, level);
     }
 
     /// Return string representing translation mode. Example: Sv32 yields "sv32".
@@ -578,16 +563,16 @@ namespace WdRiscv
 
     // Change the translation mode to m.
     void setMode(Mode m)
-    { mode_ = m; }
+    { mode_ = m; tlb_.setMode(m); }
 
     // Change the translation mode of VS (V==1) to m.
     void setVsMode(Mode m)
-    { vsMode_ = m; }
+    { vsMode_ = m; vsTlb_.setMode(m); }
 
     // Change the translation mode to m for the 2nd stage of 2-stage
     // (VS) translation.
     void setStage2Mode(Mode m)
-    { modeStage2_ = m; }
+    { stage2Mode_ = m; stage2Tlb_.setMode(m); }
 
     /// Set the address space id (asid).
     void setAsid(uint32_t asid)
@@ -727,8 +712,8 @@ namespace WdRiscv
     Mode vsMode() const
     { return vsMode_; }
 
-    Mode modeStage2() const
-    { return modeStage2_; }
+    Mode stage2Mode() const
+    { return stage2Mode_; }
 
     /// Return current address space id.
     uint32_t asid() const
@@ -840,7 +825,7 @@ namespace WdRiscv
     uint64_t rootPageStage2_ = 0;  // Root page of VS 2nd stage translation (V == 1).
     Mode mode_ = Mode::Bare;
     Mode vsMode_ = Mode::Bare;
-    Mode modeStage2_ = Mode::Bare; // For 2nd stage translation.
+    Mode stage2Mode_ = Mode::Bare; // For 2nd stage translation.
     uint32_t asid_ = 0;
     uint32_t vsAsid_ = 0;
     uint32_t vmid_ = 0;

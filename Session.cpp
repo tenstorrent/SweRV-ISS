@@ -176,7 +176,7 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
     if (not system.loadSnapshot(args.loadFrom, args.loadFromTrace))
       return false;
 
-
+#if 0
   if (linux and checkForOpenMp(args))
     {
       if (args.verbose)
@@ -188,6 +188,7 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
           hart.setSuspendState(true);
         }
     }
+#endif
 
   // Set instruction count limit.
   if (args.instCountLim)
@@ -197,6 +198,15 @@ Session<URV>::configureSystem(const Args& args, const HartConfig& config)
 	uint64_t count = args.relativeInstCount? hart.getInstructionCount() : 0;
 	count += *args.instCountLim;
 	hart.setInstructionCountLimit(count);
+      }
+
+  if (args.retInstCountLim)
+    for (unsigned i = 0; i < system.hartCount(); ++i)
+      {
+	auto& hart = *system.ithHart(i);
+	uint64_t count = args.relativeInstCount? hart.getRetiredInstructionCount() : 0;
+	count += *args.retInstCountLim;
+	hart.setRetiredInstructionCountLimit(count);
       }
 
   if (not args.initStateFile.empty())
@@ -1246,9 +1256,12 @@ Session<URV>::run(const Args& args)
       uint64_t count = 0;
       for (unsigned i = 0; i < system.hartCount(); ++i)
 	count += system.ithHart(i)->getInstructionCount();
+      uint64_t count1 = 0;
+      for (unsigned i = 0; i < system.hartCount(); ++i)
+	count1 += system.ithHart(i)->getRetiredInstructionCount();
       double elapsed = (double(t1.tv_sec - t0.tv_sec) +
 			double(t1.tv_usec - t0.tv_usec)*1e-6);
-      system.ithHart(0)->reportInstsPerSec(count, elapsed, false);
+      system.ithHart(0)->reportInstsPerSec(count, count1, elapsed, false);
     }
 
   return ok;

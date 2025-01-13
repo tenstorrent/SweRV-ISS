@@ -131,6 +131,29 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsi
       return false;
     }
 
+  // Split in two ops Crossing a line boundary to avoid being too pessimistic
+  // when checking for overlap with stores from other harts
+  if (lineNum(pa) != lineNum(pa + size - 1))
+    {
+      unsigned size1 = offsetToNextLine(pa);
+      unsigned size2 = size - size1;
+      uint64_t pa2 = pa + size1;
+      uint64_t rtlData1 = rtlData & ((uint64_t(1) << (size1*8)) - 1);
+      uint64_t rtlData2 = rtlData >> (size1*8);
+      bool ok = readOp_(hart, time, tag, pa, size1, rtlData1, elemIx, field);
+      ok = readOp_(hart, time, tag, pa2, size2, rtlData2, elemIx, field) and ok;
+      return ok;
+    }
+
+  return readOp_(hart, time, tag, pa, size, rtlData, elemIx, field);
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::readOp_(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsigned size,
+                  uint64_t rtlData, unsigned elemIx, unsigned field)
+{
   unsigned hartIx = hart.sysHartIndex();
 
   McmInstr* instr = findOrAddInstr(hartIx, tag);
@@ -154,11 +177,15 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, unsi
   op.field_ = field;
   op.isIo_ = hart.getPma(op.pa_).isIo();
 
+  assert(pageNum(pa) == pageNum(pa + size - 1));
+
   // Read Whisper memory and keep it in op, this will be updated when the load is retired
   // by forwarding from preceding stores.
   uint64_t refVal = 0;
-  op.failRead_ = not referenceModelRead(hart, pa, size, refVal);
-  op.data_ = refVal;
+  if (referenceModelRead(hart, pa, size, refVal))
+    op.data_ = refVal;
+  else
+    op.failRead_ = true;
 
   instr->addMemOp(sysMemOps_.size());
   sysMemOps_.push_back(op);
@@ -321,7 +348,7 @@ Mcm<URV>::getLdStIndexVectors(const Hart<URV>& hart, const McmInstr& instr,
 
   auto& elems = info.elems_;
 
-  unsigned ixElemSize = instr.di_.vecLoadOrStoreElemSize();
+  unsigned ixElemSize = hart.vecLdStIndexElemSize(instr.di_);
   assert(ixElemSize != 0);
   unsigned elemsPerVec = hart.vecRegSize() / ixElemSize;
 
@@ -1042,7 +1069,7 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 	  unsigned dataReg = hart.identifyDataRegister(info, elem);
 	  unsigned ixReg = info.isIndexed_ ? dataReg - elem.field_ : 0;
 
-	  uint64_t pa1 = elem.pa_, pa2 = elem.pa2_, value = elem.stData_;
+	  uint64_t pa1 = elem.pa_, pa2 = elem.pa2_, value = elem.data_;
 
 	  if (pa1 == pa2)
             {
@@ -2810,10 +2837,15 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
     {
       if (auto& op = sysMemOps_.at(opIx); op.isRead_)
         {
-          if (isVector  and  not unitStride  and
-              not vecReadOpOverlapsElem(op, pa1, pa2, size, elemIx, field, elemSize))
-            continue;  // Vector non-unit-stride ops must match element index.
-          forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
+          if (not isVector or unitStride)
+            forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
+          else
+            {
+              if (info.stride_ == 0 and elemIx != op.elemIx_)
+                continue;
+              if (vecReadOpOverlapsElem(op, pa1, pa2, size, elemIx, field, elemSize))
+                forwardToRead(hart, stores, op);   // Let forwarding override read-op ref data.
+            }
         }
     }
 
@@ -2842,9 +2874,13 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
       for (auto iter = instr->memOps_.rbegin(); iter  != instr->memOps_.rend(); ++iter)
 	{
 	  const auto& op = sysMemOps_.at(*iter);
-          if (isVector and not unitStride and
-              not vecReadOpOverlapsElemByte(op, byteAddr, elemIx, field, elemSize))
-            continue;  // Vector non-unit-stride ops must match element index.
+          if (isVector and not unitStride)
+            {
+              if (info.stride_ == 0 and elemIx != op.elemIx_)
+                continue;
+              if (not vecReadOpOverlapsElemByte(op, byteAddr, elemIx, field, elemSize))
+                continue;  // Vector non-unit-stride ops must match element index.
+            }
 
           uint8_t byte = 0;
           if (not op.getModelReadOpByte(byteAddr, byte))
@@ -2927,7 +2963,8 @@ Mcm<URV>::vecStoreToReadForward(const McmInstr& store, MemoryOp& readOp, uint64_
       if (drained)
 	continue;   // Cannot forward from a drained write.
 
-      fwdTime = lastWopTime;
+      if (writeCount)
+        fwdTime = (fwdTime == 0) ? lastWopTime : std::min(fwdTime, lastWopTime);
 
       // Process reference model writes in reverse order so that later ones forward first.
       for (auto iter = vecRefs.refs_.rbegin(); iter != vecRefs.refs_.rend(); ++iter)
@@ -4128,12 +4165,21 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrA, const McmInstr& inst
   for (size_t ix = sysMemOps_.size(); ix != 0; ix--)
     {
       const auto& op = sysMemOps_.at(ix-1);
-      if (op.isCanceled() or op.time_ > timeA)
+      if (op.isCanceled() or op.time_ > timeA or op.isRead_)
 	continue;
+
       if (op.time_ < timeB)
 	break;
-      if (not op.isRead_ and overlaps(instrB, op) and op.hartIx_ != hartIx)
-	return false;
+
+      for (auto bopIx : instrB.memOps_)
+        {
+          const auto bop = sysMemOps_.at(bopIx);
+          auto bopTime = std::max(bop.time_, bop.forwardTime_);
+          if (bopTime > timeA or op.time_ < bopTime or op.time_ > timeA)
+            continue;
+          if (bop.overlaps(op) and op.hartIx_ != hartIx)
+            return false;
+        }
     }
 
   return true;
@@ -5169,17 +5215,22 @@ template <typename URV>
 bool
 Mcm<URV>::checkSfenceWInval(Hart<URV>& hart, const McmInstr& instr) const
 {
-  // This is very crude: Check that there are no pending stores (stores in the
-  // store/merge buffer) when the sfence.w.inval is retired.
+  // This is very crude: Check that there are no earlier (in program order) stores pending
+  // in the store/merge buffer when the sfence.w.inval is retired.
 
   unsigned hartIx = hart.sysHartIndex();
   const auto& pendingWrites = hartData_.at(hartIx).pendingWrites_;
-  if (pendingWrites.empty())
-    return true;
 
-  cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << instr.tag_
-       << " sfence.w.inval retired while there are pending stores in the store/merge buffer\n";
-  return false;
+  for (auto& op : pendingWrites)
+    if (op.tag_ < instr.tag_)
+      {
+        cerr << "Error: Hart-id=" << hart.hartId() << " sfence-tag=" << instr.tag_
+             << " store-tag=" << op.tag_ << " sfence.w.inval retires while an older"
+             << " store is still the store/merge buffer\n";
+        return false;
+      }
+
+  return true;
 }
 
 
@@ -5203,7 +5254,7 @@ Mcm<URV>::isVecIndexOutOfOrder(Hart<URV>& hart, const McmInstr& instr, unsigned&
   unsigned elemSize = info.elemSize_;
   assert(elemSize != 0);
 
-  unsigned ixElemSize = instr.di_.vecLoadOrStoreElemSize();
+  unsigned ixElemSize = hart.vecLdStIndexElemSize(di);
   assert(ixElemSize != 0);
   unsigned ixElemsPerVec = hart.vecRegSize() / ixElemSize;
 

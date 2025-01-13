@@ -189,6 +189,8 @@ VecRegs::config(unsigned bytesPerReg, unsigned minBytesPerElem,
 
   data_.resize(bytesInRegFile_);
   std::fill(data_.begin(), data_.end(), 0);
+
+  lastWrittenRegData_.reserve(regCount_ * bytesPerReg_);
 }
 
 
@@ -197,6 +199,7 @@ VecRegs::reset()
 {
   std::fill(data_.begin(), data_.end(), 0);
   lastWrittenReg_ = -1;
+  lastWrittenRegData_.clear();
   lastGroupX8_ = 8;
 }
 
@@ -225,4 +228,58 @@ VecRegs::findReg(std::string_view name, unsigned& ix)
 
   ix = n;
   return true;
+}
+
+
+bool
+VecRegs::validateForEgs(unsigned egs, unsigned& vl, unsigned& vstart) const
+{
+  if (legalizeForEgs_)
+    {
+      if ((vl % egs) != 0)
+        vl = vl - (vl % egs);
+
+      if ((vstart % egs) != 0)
+        vstart = vstart - (vstart % egs);
+      return true;
+    }
+
+  return (vl % egs) == 0  and  (vstart % egs) == 0;
+}
+
+
+uint64_t
+VecRegs::readIndexReg(uint32_t vecReg, uint32_t elemIx, ElementWidth eew, uint32_t groupX8) const
+{
+  switch(eew)
+    {
+    case ElementWidth::Byte:
+      {
+        uint8_t temp = 0;
+        read(vecReg, elemIx, groupX8, temp);
+        return temp;
+      }
+    case ElementWidth::Half:
+      {
+        uint16_t temp = 0;
+        read(vecReg, elemIx, groupX8, temp);
+        return temp;
+      }
+    case ElementWidth::Word:
+      {
+        uint32_t temp = 0;
+        read(vecReg, elemIx, groupX8, temp);
+        return temp;
+      }
+    case ElementWidth::Word2:
+      {
+        uint64_t temp = 0;
+        read(vecReg, elemIx, groupX8, temp);
+        return  temp;
+      }
+    default:
+      assert(0);
+    }
+
+  return 0;
 }

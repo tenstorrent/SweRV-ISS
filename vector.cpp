@@ -11050,7 +11050,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   if (start >= elemCount)
     return true;
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = true;
@@ -11060,7 +11060,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, groupX8, masked, elem);
 
-      ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
+      ldStInfo.addElem(VecLdStElem{addr, addr, addr, elem, ix, skip});
 
       if (skip)
 	{
@@ -11090,12 +11090,11 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 
       if (cause == ExceptionCause::NONE)
         {
-          ldStInfo.setLastElem(pa1, pa2);
-
 	  uint64_t data = 0;
           if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
 	  elem = data;
+          ldStInfo.setLastElem(pa1, pa2, elem);
 
 #ifndef FAST_SLOPPY
 	  triggerTripped_ = ldStDataTriggerHit(elem, timing, isLd);
@@ -11256,7 +11255,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   auto& ldStInfo = vecRegs_.ldStInfo_;
   ldStInfo.init(elemCount, elemSize, vd, group, false /*isLoad*/);
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
@@ -11497,7 +11496,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   if (start >= elemCount)
     return true;
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = true;
@@ -11508,20 +11507,13 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
       uint64_t gpa1 = addr;
 
-      ELEM_TYPE elem = 0;
-
-      bool skip = false;  // Not masked off
-      ldStInfo.addElem(VecLdStElem{addr, pa1, pa2, 0, ix, skip});
-
-
 #ifndef FAST_SLOPPY
       uint64_t gpa2 = addr;
-      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem), false /*hyper*/);
+      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(ELEM_TYPE), false /*hyper*/);
 
       if (hasTrig and ldStAddrTriggerHit(addr, elemBytes, timing, isLd))
 	{
 	  triggerTripped_ = true;
-	  ldStInfo.removeLastElem();
           markVsDirty();
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	  return false;
@@ -11530,32 +11522,30 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
       if (cause == ExceptionCause::NONE)
 	{
-          ldStInfo.setLastElem(pa1, pa2);
-
 	  uint64_t data = 0;
 	  if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
-	  elem = data;
+	  ELEM_TYPE elem = data;
 
 #ifndef FAST_SLOPPY
-	  triggerTripped_ = ldStDataTriggerHit(elem, timing, isLd);
-	  if (triggerTripped_)
+          if (hasTrig and ldStDataTriggerHit(elem, timing, isLd))
             {
-	      ldStInfo.removeLastElem();
+              triggerTripped_ = true;
+              markVsDirty();
+              csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
               return false;
             }
 #endif
+          ldStInfo.addElem(VecLdStElem{addr, pa1, pa2, elem, ix, false /*skip*/});
+          vecRegs_.write(vd, ix, effGroupX8, elem);
 	}
       else
         {
-          ldStInfo.removeLastElem();
           markVsDirty();
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
           return false;
         }
-
-      vecRegs_.write(vd, ix, effGroupX8, elem);
     }
 
   vecRegs_.touchReg(vd, groupX8);  // We want the group and not the effective group.
@@ -11674,7 +11664,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di)
   auto& ldStInfo = vecRegs_.ldStInfo_;
   ldStInfo.init(elemCount, elemBytes, vd, group*fieldCount, false /*isLoad*/);
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
@@ -11870,7 +11860,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   if (start >= elemCount)
     return true;
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = true;
@@ -11879,7 +11869,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
     {
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, groupX8, masked, elem);
-      ldStInfo.addElem(VecLdStElem{addr, addr, addr, 0, ix, skip});
+      ldStInfo.addElem(VecLdStElem{addr, addr, addr, elem, ix, skip});
 
       if (skip)
 	{
@@ -11907,12 +11897,11 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
       if (cause == ExceptionCause::NONE)
         {
-          ldStInfo.setLastElem(pa1, pa2);
-
 	  uint64_t data = 0;
 	  if (not readForLoad<ELEM_TYPE>(di, addr, pa1, pa2, data, ix))
 	    assert(0);
 	  elem = data;
+          ldStInfo.setLastElem(pa1, pa2, elem);
         }
       else
         {
@@ -12043,7 +12032,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   auto& ldStInfo = vecRegs_.ldStInfo_;
   ldStInfo.initStrided(elemCount, elemSize, vd, group, stride, false /*isLoad*/);
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
@@ -12212,7 +12201,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   if (start >= elemCount)
     return true;
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = true;
@@ -12224,12 +12213,11 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
       bool skip = not vecRegs_.isDestActive(vd, ix, groupX8, masked, elem);
       if (ix < vecRegs_.elemCount())
         {
-          uint64_t offset = 0;
-          vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset);
+          uint64_t offset = vecRegs_.readIndexReg(vi, ix, offsetEew, offsetGroupX8);
           vaddr = addr + offset;
         }
 
-      ldStInfo.addElem(VecLdStElem{vaddr, vaddr, vaddr, 0, ix, skip});
+      ldStInfo.addElem(VecLdStElem{vaddr, vaddr, vaddr, elem, ix, skip});
 
       if (skip)
 	{
@@ -12258,12 +12246,11 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
       if (cause == ExceptionCause::NONE)
 	{
-          ldStInfo.setLastElem(pa1, pa2);
-
 	  uint64_t data = 0;
 	  if (not readForLoad<ELEM_TYPE>(di, vaddr, pa1, pa2, data, ix))
 	    assert(0);
 	  elem = data;
+          ldStInfo.setLastElem(pa1, pa2, elem);
 	  vecRegs_.write(vd, ix, groupX8, elem);
 	}
       else
@@ -12444,16 +12431,14 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   auto& ldStInfo = vecRegs_.ldStInfo_;
   ldStInfo.initIndexed(elemCount, elemSize, vd, vi, group, ixGroup, false /*isLoad*/);
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
-      uint64_t offset = 0;
-      if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
-	assert(0);
+      uint64_t offset = vecRegs_.readIndexReg(vi, ix, offsetEew, offsetGroupX8);
 
       uint64_t vaddr = addr + offset, data = 0;
       bool skip = masked and not vecRegs_.isActive(0, ix);
@@ -12697,20 +12682,19 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   uint64_t addr = intRegs_.read(rs1) + start*stride;
   unsigned elemMax = vecRegs_.elemMax(eew);  // Includes tail elements.
   unsigned elemCount = vecRegs_.elemCount();  // Does not include tail elements.
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
-  // Used registers must not exceed 32.
-  if (vd + fieldCount*eg > 32)
+  // Effective group. If group is fractional, snap to 1.
+  groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
+  unsigned group = groupX8 / 8;
+
+  // Used registers must not exceed register count (32).
+  if (vd + fieldCount*group > vecRegs_.registerCount())
     {
       postVecFail(di);
       return false;
     }
 
   unsigned elemSize = sizeof(ELEM_TYPE);
-
-  // Effective group. If group is fractional, snap to 1.
-  groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
-  unsigned group = groupX8 / 8;
 
   auto& ldStInfo = vecRegs_.ldStInfo_;
   
@@ -12723,9 +12707,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   if (start >= elemCount)
     return true;
 
-  unsigned destGroup = 8*eg;
-
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = true;
@@ -12736,15 +12718,16 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
       for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
 	{
-	  unsigned dvg = vd + field*eg;   // Destination vector gorup.
+	  unsigned fdv = vd + field*group;   // Field destination register
 	  ELEM_TYPE elem(0);
-	  bool skip = not vecRegs_.isDestActive(dvg, ix, destGroup, masked, elem);
+	  bool skip = not vecRegs_.isDestActive(fdv, ix, groupX8, masked, elem);
 
-	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
+	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, elem, ix, skip, field});
 
 	  if (skip)
 	    {
-	      vecRegs_.write(dvg, ix, destGroup, elem);
+              if (vecRegs_.partialSegUpdate_)
+                vecRegs_.write(fdv, ix, groupX8, elem);
 	      continue;
 	    }
 
@@ -12755,7 +12738,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
 #ifndef FAST_SLOPPY
 	  uint64_t gpa2 = faddr;
-	  cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem), false /*hyper*/);
+          cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/);
 
 	  if (hasTrig and ldStAddrTriggerHit(faddr, elemSize, timing, isLd))
 	    {
@@ -12769,12 +12752,11 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
 	  if (cause == ExceptionCause::NONE)
             {
-              ldStInfo.setLastElem(pa1, pa2);
-
 	      uint64_t data = 0;
 	      if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data, ix, field))
 		assert(0);
 	      elem = data;
+              ldStInfo.setLastElem(pa1, pa2, elem);
             }
 	  else
 	    {
@@ -12797,15 +12779,30 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 		  for (unsigned ti = vecRegs_.elemCount(); ti < elemMax; ti++)
 		    for (unsigned fi = 0; fi < fieldCount; ++fi)
 		      {
-			unsigned dvg = vd + fi*eg;   // Destination vector gorup.
-			vecRegs_.write(dvg, ti, destGroup, ones);
+			unsigned fdv = vd + fi*group;   // Field destination vector.
+			vecRegs_.write(fdv, ti, groupX8, ones);
 		      }
 		}
 	      return false;
 	    }
 
-	  vecRegs_.write(dvg, ix, destGroup, elem);
+          if (vecRegs_.partialSegUpdate_)
+            vecRegs_.write(fdv, ix, groupX8, elem);
 	}
+
+      // If we get here then no excpections were encoutered. Commit all the fields if
+      // partial update is not on.
+      if (not vecRegs_.partialSegUpdate_)
+        {
+          unsigned nelems = ldStInfo.elems_.size();
+          assert(nelems >= fieldCount);
+          for (unsigned field = 0; field < fieldCount; ++field)
+            {
+              const auto& elem = ldStInfo.elems_.at(nelems - fieldCount + field);
+              unsigned fdv = vd + field*group;   // Field destination vector.
+              vecRegs_.write(fdv, ix, groupX8, ELEM_TYPE(elem.data_));
+            }
+        }
     }
 
   return true;
@@ -12946,7 +12943,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
     ldStInfo.init(elemCount, elemSize, vd, group, false /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
@@ -12957,39 +12954,56 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 
       for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
 	{
-	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
+	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addrs or faulting virtual addrs.
           uint64_t gpa1 = faddr, gpa2 = faddr;
-	  unsigned dvg = vd + field*eg;   // Source vector gorup.
+	  unsigned dvg = vd + field*eg;   // Source vector group.
 
 	  bool skip = masked and not vecRegs_.isActive(0, ix);
-	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field}); 
+	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
 	  if (skip)
 	    continue;
 
 	  ELEM_TYPE val = 0;
 	  vecRegs_.read(dvg, ix, groupX8, val);
 
-	  auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/);
-	  if (hasTrig and (ldStAddrTriggerHit(faddr, elemSize, timing, isLd) or
-			   ldStDataTriggerHit(val, timing, isLd)))
+          auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/);
+
+          if (hasTrig and (ldStAddrTriggerHit(faddr, elemSize, timing, isLd) or
+                           ldStDataTriggerHit(val, timing, isLd)))
 	    triggerTripped_ = true;
 
-	  if (cause == ExceptionCause::NONE and not triggerTripped_)
-	    {
-	      if (not writeForStore(faddr, pa1, pa2, val))
-		assert(0);
-	      ldStInfo.setLastElem(pa1, pa2, val);
-	    }
-	  else
-	    {
-	      ldStInfo.removeLastElem();
+          if (cause == ExceptionCause::NONE and not triggerTripped_)
+            {
+              if (vecRegs_.partialSegUpdate_)
+                if (not writeForStore(faddr, pa1, pa2, val))
+                  assert(0);
+              ldStInfo.setLastElem(pa1, pa2, val);
+            }
+          else
+            {
+              ldStInfo.removeLastElem();
               markVsDirty();
-	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      if (not triggerTripped_)
-		initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
-	      return false;
-	    }
-	}
+              csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
+              if (not triggerTripped_)
+                initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
+              return false;
+            }
+        }
+
+      // If we get here, no exception was encoutered, update all the fields if not in
+      // partial-update.
+      if (not vecRegs_.partialSegUpdate_)
+        {
+          for (const auto& elem : ldStInfo.elems_)
+            {
+              if (elem.skip_)
+                continue;
+
+              ELEM_TYPE val = ELEM_TYPE(elem.data_);
+              if (not writeForStore(elem.va_, elem.pa_, elem.pa2_, val))
+                assert(0);
+            }
+        }
     }
 
   return true;
@@ -13272,18 +13286,17 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   unsigned start = csRegs_.peekVstart(), elemSize = elemWidth / 8;
   unsigned elemMax = vecRegs_.elemMax();  // Includes tail elements.
   unsigned elemCount = vecRegs_.elemCount();  // Does not include tail elements.
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-
-  // Used registers must not exceed 32.
-  if (vd + fieldCount*eg > 32)
-    {
-      postVecFail(di);
-      return false;
-    }
 
   // Effective group. If group is fractional, snap to 1.
   groupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), groupX8);
   unsigned group = groupX8 / 8;
+
+  // Used registers must not exceed register count (32).
+  if (vd + fieldCount*group > vecRegs_.registerCount())
+    {
+      postVecFail(di);
+      return false;
+    }
 
   // Effective index reg group. If group is fractional, snap to 1.
   offsetGroupX8 = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), offsetGroupX8);
@@ -13296,9 +13309,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   if (start >= elemCount)
     return true;
 
-  unsigned destGroup = 8*eg;
-
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = true;
@@ -13306,66 +13317,79 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   for (unsigned ix = start; ix < elemMax; ++ix)
     {
       for (unsigned field = 0; field < fieldCount; ++field)
-	{
+        {
           uint64_t faddr = 0;
-	  unsigned dvg = vd + field*eg;  // Destination vector grop.
-	  ELEM_TYPE elem = 0;
-	  bool skip = not vecRegs_.isDestActive(dvg, ix, destGroup, masked, elem);
+          unsigned fdv = vd + field*group;  // Field destination register
+          ELEM_TYPE elem(0);
+          bool skip = not vecRegs_.isDestActive(fdv, ix, groupX8, masked, elem);
           if (ix < vecRegs_.elemCount())
             {
-              uint64_t offset = 0;
-              if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
-                assert(0);
-
+              uint64_t offset = vecRegs_.readIndexReg(vi, ix, offsetEew, offsetGroupX8);
               faddr = addr + offset + field*elemSize;
             }
 
-	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
+          ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, elem, ix, skip, field});
 
-	  if (skip)
-	    {
-	      vecRegs_.write(dvg, ix, destGroup, elem);
-	      continue;
-	    }
+          if (skip)
+            {
+              if (vecRegs_.partialSegUpdate_)
+                vecRegs_.write(fdv, ix, groupX8, elem);
+              continue;
+            }
 
-	  uint64_t pa1 = faddr, pa2 = faddr; // Physical adds or faulting virtual addrs.
+          uint64_t pa1 = faddr, pa2 = faddr; // Physical addrs or faulting virtual addrs.
           uint64_t gpa1 = faddr;
 
-	  auto cause = ExceptionCause::NONE;
+          auto cause = ExceptionCause::NONE;
 
 #ifndef FAST_SLOPPY
-	  uint64_t gpa2 = faddr;
+          uint64_t gpa2 = faddr;
           cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/);
 
-	  if (hasTrig and ldStAddrTriggerHit(faddr, elemSize, timing, isLd))
-	    {
-	      triggerTripped_ = true;
-	      ldStInfo.removeLastElem();
+          if (hasTrig and ldStAddrTriggerHit(faddr, elemSize, timing, isLd))
+            {
+              triggerTripped_ = true;
+              ldStInfo.removeLastElem();
               markVsDirty();
-	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      return false;
-	    }
+              csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
+              return false;
+            }
 #endif
 
-	  if (cause == ExceptionCause::NONE)
-	    {
-              ldStInfo.setLastElem(pa1, pa2);
+          if (cause == ExceptionCause::NONE)
+            {
+              uint64_t data = 0;
+              if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data, ix, field))
+                assert(0);
+              elem = data;
+              ldStInfo.setLastElem(pa1, pa2, elem);
 
-	      uint64_t data = 0;
-	      if (not readForLoad<ELEM_TYPE>(di, faddr, pa1, pa2, data, ix, field))
-		assert(0);
-	      elem = data;
-	      vecRegs_.write(dvg, ix, destGroup, elem);
-	    }
-	  else
-	    {
-	      ldStInfo.removeLastElem();
+              if (vecRegs_.partialSegUpdate_)
+                vecRegs_.write(fdv, ix, groupX8, elem);
+            }
+          else
+            {
+              ldStInfo.removeLastElem();
               markVsDirty();
-	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
-	      return false;
-	    }
-	}
+              csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
+              initiateLoadException(di, cause, ldStFaultAddr_, gpa1);
+              return false;
+            }
+        }
+
+      // If we get here then no excpections were encoutered. Commit all the fields if
+      // partial update is not on.
+      if (not vecRegs_.partialSegUpdate_)
+        {
+          unsigned nelems = ldStInfo.elems_.size();
+          assert(nelems >= fieldCount);
+          for (unsigned field = 0; field < fieldCount; ++field)
+            {
+              const auto& elem = ldStInfo.elems_.at(nelems - fieldCount + field);
+              unsigned fdv = vd + field*group;   // Field destination vector.
+              vecRegs_.write(fdv, ix, groupX8, ELEM_TYPE(elem.data_));
+            }
+        }
     }
 
   return true;
@@ -13492,104 +13516,68 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
   ldStInfo.initIndexed(elemCount, elemSize, vd, vi, group, ixGroup, false /*isLoad*/);
   ldStInfo.setFieldCount(fieldCount, true /*isSeg*/);
 
-  dataAddrTrig_ = not triggerTripped_;  // Data trigger unless instr already tripped.
+  dataAddrTrig_ = true;
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
-      uint64_t offset = 0;
-      if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
-	assert(0);
-
-      uint64_t faddr = addr + offset, data = 0;
+      uint64_t offset = vecRegs_.readIndexReg(vi, ix, offsetEew, offsetGroupX8);
+      uint64_t faddr = addr + offset;
 
       for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
-	{
-	  unsigned dvg = vd + field*eg;  // Source vector group.
-	  bool skip = masked and not vecRegs_.isActive(0, ix);
-	  ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
-	  if (skip)
-	    continue;
-
-	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addrs or faulting virtual addrs.
+        {
+          uint64_t pa1 = faddr, pa2 = faddr; // Physical addrs or faulting virtual addrs.
           uint64_t gpa1 = faddr, gpa2 = faddr;
+          unsigned dvg = vd + field*eg;   // Source vector group.
 
-	  auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, elemSize,
-					       false /*hyper*/);
+          bool skip = masked and not vecRegs_.isActive(0, ix);
+          ldStInfo.addElem(VecLdStElem{faddr, faddr, faddr, 0, ix, skip, field});
+          if (skip)
+            continue;
 
-	  if (elemSize == 1)
-	    {
-	      uint8_t x = 0;
-	      vecRegs_.read(dvg, ix, groupX8, x);
+          ELEM_TYPE val = 0;
+          vecRegs_.read(dvg, ix, groupX8, val);
 
-	      if (hasTrig and (ldStAddrTriggerHit(faddr, elemSize, timing, isLd) or
-			       ldStDataTriggerHit(x, timing, isLd)))
-		triggerTripped_ = true;
+          auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/);
 
-	      if (cause == ExceptionCause::NONE and not triggerTripped_)
-		if (not writeForStore(faddr, pa1, pa2, x))
-		  assert(0);
-	      data = x;
-	    }
-	  else if (elemSize == 2)
-	    {
-	      uint16_t x = 0;
-	      vecRegs_.read(dvg, ix, groupX8, x);
+          if (hasTrig and (ldStAddrTriggerHit(faddr, elemSize, timing, isLd) or
+                           ldStDataTriggerHit(val, timing, isLd)))
+            triggerTripped_ = true;
 
-	      if (hasTrig and (ldStAddrTriggerHit(faddr, elemSize, timing, isLd) or
-			       ldStDataTriggerHit(x, timing, isLd)))
-		triggerTripped_ = true;
-
-	      if (cause == ExceptionCause::NONE and not triggerTripped_)
-		if (not writeForStore(faddr, pa1, pa2, x))
-		  assert(0);
-	      data = x;
-	    }
-	  else if (elemSize == 4)
-	    {
-	      uint32_t x = 0;
-	      vecRegs_.read(dvg, ix, groupX8, x);
-
-	      if (hasTrig and (ldStAddrTriggerHit(faddr, elemSize, timing, isLd) or
-			       ldStDataTriggerHit(x, timing, isLd)))
-		triggerTripped_ = true;
-
-	      if (cause == ExceptionCause::NONE and not triggerTripped_)
-		if (not writeForStore(faddr, pa1, pa2, x))
-		  assert(0);
-	      data = x;
-	    }
-	  else if (elemSize == 8)
-	    {
-	      uint64_t x = 0;
-	      vecRegs_.read(dvg, ix, groupX8, x);
-
-	      if (hasTrig and (ldStAddrTriggerHit(faddr, elemSize, timing, isLd) or
-			       ldStDataTriggerHit(x, timing, isLd)))
-		triggerTripped_ = true;
-
-	      if (cause == ExceptionCause::NONE and not triggerTripped_)
-		if (not writeForStore(faddr, pa1, pa2, x))
-		  assert(0);
-	      data = x;
-	    }
-	  else
-	    assert(0);
-
-	  if (cause != ExceptionCause::NONE or triggerTripped_)
-	    {
-	      ldStInfo.removeLastElem();
+          if (cause == ExceptionCause::NONE and not triggerTripped_)
+            {
+              if (vecRegs_.partialSegUpdate_)
+                if (not writeForStore(faddr, pa1, pa2, val))
+                  assert(0);
+              ldStInfo.setLastElem(pa1, pa2, val);
+            }
+          else
+            {
+              ldStInfo.removeLastElem();
               markVsDirty();
-	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      if (not triggerTripped_)
-		initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
-	      return false;
-	    }
+              csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
+              if (not triggerTripped_)
+                initiateStoreException(di, cause, ldStFaultAddr_, gpa1);
+              return false;
+            }
+        }
 
-	  ldStInfo.setLastElem(pa1, pa2, data);
-	}
+      // If we get here, no exception was encoutered, update all the fields if not in
+      // partial-update.
+      if (not vecRegs_.partialSegUpdate_)
+        {
+          for (const auto& elem : ldStInfo.elems_)
+            {
+              if (elem.skip_)
+                continue;
+
+              ELEM_TYPE val = ELEM_TYPE(elem.data_);
+              if (not writeForStore(elem.va_, elem.pa_, elem.pa2_, val))
+                assert(0);
+            }
+        }
     }
 
   return true;

@@ -33,6 +33,7 @@ void
 PmpManager::reset()
 {
   regions_.clear();
+  fastRegion_.reset();
 }
 
 

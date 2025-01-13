@@ -90,7 +90,7 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory, Syscall<URV>& sysca
     syscall_(syscall),
     time_(time),
     pmpManager_(memory.size(), UINT64_C(1024)*1024),
-    virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16)
+    virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 2048)
 {
   // Enable default extensions
   for (RvExtension ext : { RvExtension::C,
@@ -1798,6 +1798,7 @@ bool
 Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool hyper, uint64_t& data)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
+  ldStFaultAddr_ = virtAddr;
   ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = sizeof(LOAD_TYPE);
 
@@ -1809,10 +1810,13 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
     {
       if (ldStAddrTriggerHit(virtAddr, ldStSize_, TriggerTiming::Before, true /*isLoad*/))
 	{
-	  dataAddrTrig_ = not triggerTripped_;  // Mark data unless instruction already tripped.
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
     }
+
+  if (triggerTripped_)
+    return false;
 
   uint64_t addr1 = virtAddr;
   uint64_t addr2 = addr1;
@@ -1821,8 +1825,6 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
   auto cause = determineLoadException(addr1, addr2, gaddr1, gaddr2, ldStSize_, hyper);
   if (cause != ExceptionCause::NONE)
     {
-      if (triggerTripped_)
-        return false;
       initiateLoadException(di, cause, ldStFaultAddr_, gaddr1);
       return false;
     }
@@ -2028,7 +2030,7 @@ Hart<URV>::readForLoad([[maybe_unused]] const DecodedInst* di, uint64_t virtAddr
       bool isLoad = true;
       if (ldStDataTriggerHit(uval, timing, isLoad))
 	{
-	  dataAddrTrig_ = not triggerTripped_;
+	  dataAddrTrig_ = true;
 	  triggerTripped_ = true;
 	}
     }
@@ -2143,6 +2145,7 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
 		 STORE_TYPE storeVal, [[maybe_unused]] bool amoLock)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
+  ldStFaultAddr_ = virtAddr;
   ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = sizeof(STORE_TYPE);
 
@@ -2162,9 +2165,12 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   if (hasTrig and (ldStAddrTriggerHit(virtAddr, ldStSize_, timing, isLd) or
                    ldStDataTriggerHit(storeVal, timing, isLd)))
     {
-      dataAddrTrig_ = not triggerTripped_;
+      dataAddrTrig_ = true;
       triggerTripped_ = true;
     }
+
+  if (triggerTripped_)
+    return false;
 
   // Determine if a store exception is possible. Determine sore exception will do address
   // translation and change pa1/pa2 to physical addresses. Ga1/ga2 are the guest addresses
@@ -2174,9 +2180,6 @@ Hart<URV>::store(const DecodedInst* di, URV virtAddr, [[maybe_unused]] bool hype
   ExceptionCause cause = determineStoreException(pa1, pa2, ga1, ga2, ldStSize_, hyper);
   ldStPhysAddr1_ = pa1;
   ldStPhysAddr2_ = pa2;
-
-  if (triggerTripped_)
-    return false;
 
   if (cause != ExceptionCause::NONE)
     {
@@ -2357,6 +2360,28 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 
   // Address did not match any hart entry in clint.
   storeVal = 0;
+}
+
+
+template <typename URV>
+unsigned
+Hart<URV>::vecLdStElemSize(const DecodedInst& di) const
+{
+  assert(di.isVectorLoad() or di.isVectorStore());
+
+  if (di.isVectorLoadIndexed() or di.isVectorStoreIndexed())
+    return vecRegs_.elemWidthInBytes();
+
+  return di.vecLoadOrStoreElemSize();
+}
+
+
+template <typename URV>
+unsigned
+Hart<URV>::vecLdStIndexElemSize(const DecodedInst& di) const
+{
+  assert(di.isVectorLoadIndexed() or di.isVectorStoreIndexed());
+  return di.vecLoadOrStoreElemSize();
 }
 
 
@@ -4812,7 +4837,9 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
   std::string instStr;
   instStr.reserve(128);
 
-  uint64_t limit = instCountLim_;
+  const uint64_t instLim = instCountLim_;
+  const uint64_t retInstLim = retInstCountLim_;
+
   bool doStats = instFreq_ or enableCounters_;
   bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
 
@@ -4822,17 +4849,11 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
   if (enableGdb_)
     handleExceptionForGdb(*this, gdbInputFd_);
 
-  while (pc_ != address and instCounter_ < limit)
+  while (pc_ != address and instCounter_ < instLim and
+           retInstCounter_ < retInstLim)
     {
       if (userStop)
         break;
-
-      if (suspended_)
-        {
-          if (resumeTime_ and time_ > resumeTime_)
-            setSuspendState(false);
-          continue;
-        }
 
       resetExecInfo(); clearTraceData();
 
@@ -4871,13 +4892,6 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
           if (not hartIx_)
 	    tickTime();  // Hart 0 increments timer.
-
-          if (suspended_)
-            {
-              if (resumeTime_ and time_ > resumeTime_)
-                setSuspendState(false);
-              continue;
-            }
 
           uint32_t inst = 0;
 	  currPc_ = pc_;
@@ -4925,7 +4939,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  if (triggerTripped_)
 	    {
-	      URV tval = ldStAddr_;
+	      URV tval = ldStFaultAddr_;
 	      if (takeTriggerAction(traceFile, currPc_, tval, instCounter_, true))
 		return true;
 	      continue;
@@ -4939,6 +4953,9 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
           if (minstretEnabled())
             ++retiredInsts_;
+
+          // Unlike minstret, this is not inhibited.
+          ++retInstCounter_;
 
 	  if (bbFile_)
 	    {
@@ -4979,15 +4996,18 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
   struct timeval t0;
   gettimeofday(&t0, nullptr);
 
-  uint64_t limit = instCountLim_;
-  uint64_t counter0 = instCounter_;
+  const uint64_t instLim = instCountLim_;
+  const uint64_t retInstLim = retInstCountLim_;
+  const uint64_t counter0 = instCounter_;
+  const uint64_t counter1 = retInstCounter_;
 
   // Setup signal handlers. Restore on destruction.
   SignalHandlers handlers;
 
   bool success = untilAddress(address, traceFile);
 
-  if (instCounter_ >= limit)
+  if (instCounter_ >= instLim or
+      retInstCounter_ >= retInstLim)
     std::cerr << "Stopped -- Reached instruction limit hart=" << hartIx_ << "\n";
   else if (pc_ == address)
     std::cerr << "Stopped -- Reached end address hart=" << hartIx_ << "\n";
@@ -4999,9 +5019,9 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
 		    double(t1.tv_usec - t0.tv_usec)*1e-6);
 
   uint64_t numInsts = instCounter_ - counter0;
+  uint64_t numRetInsts = retInstCounter_ - counter1;
 
-  reportInstsPerSec(numInsts, elapsed, userStop);
-
+  reportInstsPerSec(numInsts, numRetInsts, elapsed, userStop);
   return success;
 }
 
@@ -5013,13 +5033,15 @@ Hart<URV>::runSteps(uint64_t steps, bool& stop, FILE* traceFile)
   // Setup signal handlers. Restore on destruction.
   SignalHandlers handlers;
 
-  uint64_t limit = instCountLim_;
+  const uint64_t instLim = instCountLim_;
+  const uint64_t retInstLim = retInstCountLim_;
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
   stop = false;
 
   for (unsigned i = 0; i < steps; i++)
     {
-      if (instCounter_ >= limit)
+      if (instCounter_ >= instLim or
+          retInstCounter_ >= retInstLim)
         {
           stop = true;
           std::cerr << "Stopped -- Reached instruction limit\n";
@@ -5163,22 +5185,19 @@ template <typename URV>
 bool
 Hart<URV>::simpleRunWithLimit()
 {
-  uint64_t limit = instCountLim_;
   std::string instStr;
 
   bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
 
-  while (noUserStop and instCounter_ < limit)
+  const uint64_t instLim = instCountLim_;
+  const uint64_t retInstLim = retInstCountLim_;
+
+  while (noUserStop and
+         instCounter_ < instLim and
+         retInstCounter_ < retInstLim)
     {
       if (not hartIx_)
 	tickTime();
-
-      if (suspended_)
-        {
-          if (resumeTime_ and time_ > resumeTime_)
-            setSuspendState(false);
-          continue;
-        }
 
       resetExecInfo();
 
@@ -5209,8 +5228,11 @@ Hart<URV>::simpleRunWithLimit()
       execute(di);
 
       if (not hasException_)
-	if (minstretEnabled())
-	  ++retiredInsts_;
+        {
+          if (minstretEnabled())
+            ++retiredInsts_;
+          ++retInstCounter_;
+        }
 
       if (instrLineTrace_)
 	memory_.traceInstructionLine(currPc_, physPc);
@@ -5237,13 +5259,6 @@ Hart<URV>::simpleRunNoLimit()
     {
       if (not hartIx_)
 	tickTime();
-
-      if (suspended_)
-        {
-          if (resumeTime_ and time_ > resumeTime_)
-            setSuspendState(false);
-          continue;
-        }
 
       currPc_ = pc_;
       ++instCounter_;
@@ -5443,7 +5458,8 @@ Hart<URV>::run(FILE* file)
   if (complex)
     return runUntilAddress(stopAddr, file);
 
-  uint64_t counter0 = instCounter_;
+  const uint64_t counter0 = instCounter_;
+  const uint64_t counter1 = retInstCounter_;
 
   struct timeval t0;
   gettimeofday(&t0, nullptr);
@@ -5460,7 +5476,9 @@ Hart<URV>::run(FILE* file)
 		    double(t1.tv_usec - t0.tv_usec)*1e-6);
 
   uint64_t numInsts = instCounter_ - counter0;
-  reportInstsPerSec(numInsts, elapsed, userStop);
+  uint64_t numRetInsts = retInstCounter_ - counter1;
+
+  reportInstsPerSec(numInsts, numRetInsts, elapsed, userStop);
   return success;
 }
 
@@ -5810,13 +5828,6 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       if (not hartIx_)
 	tickTime();
 
-      if (suspended_)
-        {
-          if (resumeTime_ and time_ > resumeTime_)
-            setSuspendState(false);
-          return;
-        }
-
       uint32_t inst = 0;
       currPc_ = pc_;
 
@@ -5851,7 +5862,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 
       if (triggerTripped_)
 	{
-	  URV tval = ldStAddr_;
+          URV tval = ldStFaultAddr_;
 	  takeTriggerAction(traceFile, currPc_, tval, instCounter_, true);
 	  return;
 	}

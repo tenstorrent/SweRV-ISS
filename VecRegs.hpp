@@ -177,65 +177,33 @@ namespace WdRiscv
       value = data[elemIx];
     }
 
-    /// Set the element with given index within the vector register of
-    /// the given number to the given value. Throw an exception
-    /// if the combination of element index, vector number and group
-    /// multiplier (pre-scaled by 8) is invalid. We require a
-    /// pre-scaled multiplier to avoid passing a fraction.
+    /// Set the element with given index within the vector register of the given number to
+    /// the given value. Throw an exception if the combination of element index, vector
+    /// number and group multiplier (pre-scaled by 8) is invalid. We require a pre-scaled
+    /// multiplier to avoid passing a fraction. Keep track of register written and
+    /// associated group multiplier to use when reporting currently executing instruction.
     template<typename T>
     void write(uint32_t regNum, uint64_t elemIx, uint32_t groupX8, const T& value)
     {
       if (not isValidIndex(regNum, elemIx, groupX8, sizeof(T)))
         throw std::runtime_error("invalid vector register index");
       std::size_t regOffset = static_cast<std::size_t>(regNum)*bytesPerReg_;
+
+      if (not lastWrittenReg_.has_value())
+        {
+          lastWrittenReg_ = regNum;
+          lastGroupX8_ = groupX8;
+          saveRegValue(regNum, groupX8);
+        }
+
       T* data = reinterpret_cast<T*>(data_.data() + regOffset);
       data[elemIx] = value;
-      lastWrittenReg_ = regNum;
-      lastGroupX8_ = groupX8;
     }
 
-    /// Return true if the combination regNum, elemIx, eew, and
-    /// groupX8 is valid setting stride to the value of the designated
-    /// register element. Return false otherwise leaving stride
-    /// unmodified.
-    bool readStride(uint32_t regNum, uint32_t elemIx, ElementWidth eew,
-		    uint32_t groupX8, uint64_t& stride) const
-    {
-      switch(eew)
-        {
-        case ElementWidth::Byte:
-          {
-            uint8_t temp = 0;
-            read(regNum, elemIx, groupX8, temp);
-            stride = temp;
-	    return true;
-          }
-        case ElementWidth::Half:
-          {
-            uint16_t temp = 0;
-            read(regNum, elemIx, groupX8, temp);
-            stride = temp;
-            return true;
-          }
-        case ElementWidth::Word:
-          {
-            uint32_t temp = 0;
-	    read(regNum, elemIx, groupX8, temp);
-            stride = temp;
-            return true;
-          }
-        case ElementWidth::Word2:
-          {
-            uint64_t temp = 0;
-	    read(regNum, elemIx, groupX8, temp);
-            stride = temp;
-            return true;
-          }
-        default:
-          return false;
-        }
-      return false;
-    }
+    /// Similar to th read method except that the value is always uint64_t. Used to read
+    /// the value of an index register of an indexed load/store instruction.
+    uint64_t readIndexReg(uint32_t vecReg, uint32_t elemIx, ElementWidth eew,
+                          uint32_t groupX8) const;
 
     /// Return the count of registers in this register file.
     size_t size() const
@@ -257,6 +225,11 @@ namespace WdRiscv
     /// example if SEW is Byte, then this returns 8).
     uint32_t elemWidthInBits() const
     { return sewInBits_; }
+
+
+    /// Return the currently configured element width in bytes.
+    uint32_t elemWidthInBytes() const
+    { return sewInBits_ / 8; }
 
     /// Return the width in bits corresponding to the given symbolic
     /// element width. Return 0 if symbolic value is out of bounds.
@@ -441,11 +414,16 @@ namespace WdRiscv
     void configMaskAgnosticAllOnes(bool flag)
     { maskAgnOnes_ = flag; }
 
-    /// If flag is true, configure vector engine for writing ones in
-    /// tail destination register elements when tail-agnostic is
-    /// on. Otherwise, preserve tail elements.
+    /// If flag is true, configure vector engine for writing ones in tail destination
+    /// register elements when tail-agnostic is on. Otherwise, preserve tail elements.
     void configTailAgnosticAllOnes(bool flag)
     { tailAgnOnes_ = flag; }
+
+    /// If flag is false then vector segment load/store will not commit any of the fields
+    /// at a given index if any of those fields encouters an exception. Otherwise, the
+    /// fields up to the one that encoutered the exception are updated.
+    void configPartialSegmentUpdate(bool flag)
+    { partialSegUpdate_ = flag; }
 
     /// When flag is true, trap on invalid/unsuported vtype configuraions in vsetvl,
     /// vsetvli, vsetivli. When flag is false, set vtype.vill instead.
@@ -480,20 +458,7 @@ namespace WdRiscv
     /// Return true if elems/vstart is a multiple of EGS or if it is legalized to be a
     /// multiple of egs. Return false if legalization is not enabled and elems/vstart is
     /// not a multiple of EGS. This is for some vector-crypto instructions.
-    bool validateForEgs(unsigned egs, unsigned& vl, unsigned& vstart) const
-    {
-      if (legalizeForEgs_)
-	{
-	  if ((vl % egs) != 0)
-	    vl = vl - (vl % egs);
-
-	  if ((vstart % egs) != 0)
-	    vstart = vstart - (vstart % egs);
-	  return true;
-	}
-
-      return (vl % egs) == 0  and  (vstart % egs) == 0;
-    }
+    bool validateForEgs(unsigned egs, unsigned& vl, unsigned& vstart) const;
 
     /// Return a string representation of the given group multiplier.
     static constexpr std::string_view to_string(GroupMultiplier group)
@@ -590,6 +555,7 @@ namespace WdRiscv
       uint64_t result_;
     };
 
+    /// Incremental floating point flag changes from last vector instruction.
     void lastIncVec(std::vector<uint8_t>& fpFlags, std::vector<uint8_t>& vxsat,
                     std::vector<Step>& steps) const
     {
@@ -663,14 +629,32 @@ namespace WdRiscv
     void setOpEmul(unsigned emul0, unsigned emul1 = 1, unsigned emul2 = 1)
     { opsEmul_.at(0) = emul0; opsEmul_.at(1) = emul1; opsEmul_.at(2) = emul2; }
 
-    /// For instructions that do not use the write method, mark the
-    /// last written register and the effective group multiplier.
+    /// For instructions that do not use the write method, mark the last written register
+    /// and the effective group multiplier.
     void touchReg(uint32_t reg, uint32_t groupX8)
-    { lastWrittenReg_ = reg; lastGroupX8_ = groupX8; }
+    {
+      lastWrittenReg_ = reg;
+      lastGroupX8_ = groupX8;
+      if (not lastWrittenReg_.has_value())
+        saveRegValue(reg, groupX8);
+    }
 
     /// Same as above for mask registers
     void touchMask(uint32_t reg)
     { touchReg(reg, 8); }  // Grouping of of 1
+
+    /// Save value of register so that register write can be later undone.
+    /// This supports Perfapi.
+    void saveRegValue(uint32_t reg, uint32_t groupX8)
+    {
+      unsigned effGroup = groupX8 < 8 ? 1 : groupX8 / 8;
+      assert(reg + effGroup <= registerCount());
+      unsigned byteCount = effGroup * bytesPerReg_;
+      lastWrittenRegData_.resize(byteCount);
+      std::size_t regOffset = static_cast<std::size_t>(reg)*bytesPerReg_;
+      assert(regOffset + byteCount <= data_.size());
+      memcpy(lastWrittenRegData_.data(), data_.data() + regOffset, byteCount);
+    }
 
     /// Return true if element of given index is active with respect
     /// to the given mask vector register. Element is active if the
@@ -785,8 +769,13 @@ namespace WdRiscv
         data[byteIx] |= mask;
       else
         data[byteIx] &= ~mask;
-      lastWrittenReg_ = maskReg;
-      lastGroupX8_ = 8;
+
+      if (not lastWrittenReg_.has_value())
+        {
+          lastWrittenReg_ = maskReg;
+          lastGroupX8_ = 8;
+          saveRegValue(maskReg, 8);
+        }
     }
 
     /// Set value to the ith bit of the given mask register.
@@ -906,6 +895,7 @@ namespace WdRiscv
     bool legalizeVsetvlAvl_ = false; // If true legalize VL to VLMAX if vtype is legal (if applicable).
     bool legalizeVsetvliAvl_ = false; // If true legalize VL to VLMAX if vtype is legal (if applicable).
     bool legalizeForEgs_ = false;
+    bool partialSegUpdate_ = false;
 
     uint32_t groupX8_ = 8;    // Group multiplier as a number scaled by 8.
     uint32_t sewInBits_ = 8;  // SEW expressed in bits (Byte corresponds to 8).
@@ -913,6 +903,7 @@ namespace WdRiscv
     GroupsForWidth legalConfigs_;
 
     std::optional<unsigned> lastWrittenReg_;
+    std::vector<uint8_t> lastWrittenRegData_;
     uint32_t lastGroupX8_ = 8;   // 8 times last grouping factor
     uint32_t lastVstart_ = 0;    // Vstart at beginning of last vec instruction.
 

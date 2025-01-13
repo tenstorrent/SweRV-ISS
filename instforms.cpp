@@ -328,7 +328,7 @@ RFormInst::encodeFmvdx(uint32_t rd, uint32_t rs1)
     return false;
   bits.opcode = 0x53;
   bits.funct3 = 0;
-  bits.funct7 = 0x39;
+  bits.funct7 = 0x79;
   return true;
 }
 
@@ -2365,7 +2365,7 @@ bool
 WdRiscv::encodeFcvtdl(uint32_t rd, uint32_t rs1, uint32_t rm, uint32_t& inst)
 {
   RFormInst rfi(0);
-  if (not rfi.encodeFcvtdw(rd, rs1, rm))
+  if (not rfi.encodeFcvtdl(rd, rs1, rm))
     return false;
   inst = rfi.code;
   return true;

@@ -335,7 +335,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 	      if (einfo.pa_ != einfo.va_)
 		oss << ":0x" << einfo.pa_;
 	      if (not vecInfo.isLoad_)
-		oss << '=' << "0x" << std::setfill('0') << std::setw(num_nibbles) << einfo.stData_;
+		oss << '=' << "0x" << std::setfill('0') << std::setw(num_nibbles) << einfo.data_;
 	    }
 	  tmp += " [" + oss.str() + "]";
 	}
@@ -712,7 +712,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
           if (einfo.skip_)
             buffer.printChar('m');
           if (not vecInfo.isLoad_)
-            buffer.printChar('=').print(einfo.stData_);
+            buffer.printChar('=').print(einfo.data_);
         }
     }
   else if (lastLdStAddress(virtDataAddr, physDataAddr))
@@ -840,11 +840,12 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 }
 
 
-/// Report the number of retired instruction count and the simulation
+/// Report the number of executed and retired instruction count and the simulation
 /// rate.
 template <typename URV>
 void
-Hart<URV>::reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop)
+Hart<URV>::reportInstsPerSec(uint64_t instCount, uint64_t retInstCount, double elapsed,
+                             bool userStop)
 {
   std::lock_guard<std::mutex> guard(printInstTraceMutex());
 
@@ -856,9 +857,11 @@ Hart<URV>::reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop)
 
   if (userStop)
     std::cerr << "User stop\n";
-  std::cerr << "Retired " << instCount << " instruction"
-	    << (instCount > 1? "s" : "") << " in "
-	    << secStr;
+  std::cerr << "Executed " << instCount << " instruction"
+	    << (instCount > 1? "s" : "") << " and "
+            << "retired " << retInstCount << " instruction"
+            << (retInstCount > 1? "s" : "")
+            << " in " << secStr;
   if (elapsed > 0)
     std::cerr << "  " << uint64_t(double(instCount)/elapsed) << " inst/s";
   std::cerr << " hart=" << hartIx_ << '\n';

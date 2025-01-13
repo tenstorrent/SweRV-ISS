@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include <span>
 #include <unordered_map>
 #include <functional>
 #include <shared_mutex>
@@ -437,32 +438,36 @@ namespace WdRiscv
     /// Delete currently configured cache.
     void deleteCache();
 
-    /// Define read memory callback. This (along with
-    /// defineWriteMemoryCallback) allows the caller to bypass the
-    /// memory model with their own.
+    /// Define read memory callback. This (along with defineWriteMemoryCallback) allows
+    /// the caller to bypass the memory model with their own.
     void defineReadMemoryCallback(
          std::function<bool(uint64_t, unsigned, uint64_t&)> callback )
-    {
-      readCallback_ = std::move(callback);
-    }
+    { readCallback_ = std::move(callback); }
 
-    /// Define write memory callback. This (along with
-    /// defineReadMemoryCallback) allows the caller to bypass the
-    /// memory model with their own.
+    /// Define write memory callback. This (along with defineReadMemoryCallback) allows
+    /// the caller to bypass the memory model with their own.
     void defineWriteMemoryCallback(std::function<bool(uint64_t, unsigned, uint64_t)> callback)
     { writeCallback_ = std::move(callback); }
 
-    /// Enable tracing of memory data lines referenced by current
-    /// run. A memory data line is typically 64-bytes long and corresponds to
-    /// a cachable line.
+    /// Define page initialization callback. This is used to speed-up memory insitialization
+    /// for the sparse-memory mode..
+    void defineInitPageCallback(std::function<bool(uint64_t, const std::span<uint8_t>)> callback)
+    { initPageCallback_ = std::move(callback); }
+
+    /// Enable tracing of memory data lines referenced by current run. A memory data line
+    /// is typically 64-bytes long and corresponds to a cachable line.
     void enableDataLineTrace(const std::string& path)
-    { dataLineTrace_ = true; dataLineFile_ = path; }
+    { dataLineFile_ = path; dataLineTrace_ = not path.empty(); }
+
+    /// Return the path to the file of the data line trace.
+    const std::string& dataLineTracePath() const
+    { return dataLineFile_; }
 
     /// Enable tracing of memory instruction fetch lines referenced by
     /// current run. A memory line is typically 64-bytes long and
     /// corresponds to a cachable line.
     void enableInstructionLineTrace(const std::string& path)
-    { instrLineTrace_ = true;  instrLineFile_ = path; }
+    { instrLineFile_ = path; instrLineTrace_ = not path.empty(); }
 
     void registerIoDevice(std::shared_ptr<IoDevice> dev)
     { assert(dev); ioDevs_.push_back(std::move(dev)); }
@@ -479,7 +484,7 @@ namespace WdRiscv
 
     /// If address tracing enabled, then write the accumulated data
     /// addresses into the given file.
-    bool saveDataAddressTrace(const std::string& path) const;
+    bool saveDataAddressTrace(const std::string& path, bool writeValues = false) const;
 
     /// If instruction tracing enabled, then write the accumulated
     /// addresses into the given file.
@@ -559,6 +564,10 @@ namespace WdRiscv
     bool hasReserveAttribute(uint64_t addr) const
     { return pmaMgr_.accessPma(addr).isRsrv(); }
 
+    /// Return true if given address is page aligned.
+    bool isPageAligned(uint64_t addr) const
+    { return ((addr >> pageShift_) << pageShift_) == addr; }
+
   protected:
 
     /// Write byte to given address without write-access check. Return
@@ -567,6 +576,10 @@ namespace WdRiscv
     /// memory-mapped-register region, then both mem-mapped-register
     /// and external memory are written.
     bool initializeByte(uint64_t address, uint8_t value);
+
+    /// Write given buffer to the page at the given address. Buffer size
+    /// must be >= pageSize_.
+    bool initializePage(uint64_t addr, const std::span<uint8_t> buffer);
 
     /// Clear the information associated with last write.
     void clearLastWriteInfo(unsigned sysHartIx)
@@ -708,13 +721,10 @@ namespace WdRiscv
     };
     typedef std::unordered_map<uint64_t, LineEntry> LineMap;
 
-    static bool saveAddressTrace(std::string_view tag,
-                                 const LineMap& lineMap,
-                                 const std::string& path);
+    bool saveAddressTrace(std::string_view tag, const LineMap& lineMap,
+                          const std::string& path, bool writeValues = false) const;
 
-    static bool loadAddressTrace(LineMap& lineMap,
-                                 uint64_t& refCount,
-                                 const std::string& path);
+    bool loadAddressTrace(LineMap& lineMap, uint64_t& refCount, const std::string& path);
 
     /// Add line of given address to the data line address trace.
     void traceDataLine(uint64_t vaddr, uint64_t paddr)
@@ -773,8 +783,8 @@ namespace WdRiscv
     /// Callback for write: bool func(uint64_t addr, unsigned size, uint64_t val);
     std::function<bool(uint64_t, unsigned, uint64_t)> writeCallback_ = nullptr;
 
-    /// Callback to obtain pointer to memory; uint8_t*(uint64_t addr, size_t len);
-    std::function<uint8_t*(uint64_t, size_t)> mapCallback_ = nullptr;
+    /// Callback to initialize a page of memory.
+    std::function<bool(uint64_t, const std::span<uint8_t>)> initPageCallback_ = nullptr;
 
     std::pair<std::unique_ptr<uint8_t[]>, size_t> loadFile(const std::string& filename);
   };

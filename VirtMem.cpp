@@ -23,6 +23,10 @@ VirtMem::VirtMem(unsigned hartIx, Memory& memory, unsigned pageSize,
   assert(p2PageSize == pageSize);
   assert(pageSize >= 64);
 
+  tlb_.setMode(mode_);
+  vsTlb_.setMode(vsMode_);
+  stage2Tlb_.setMode(stage2Mode_);
+
   pageMask_ = pageSize_ - 1;
 }
 
@@ -280,7 +284,7 @@ VirtMem::twoStageTranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read,
 	return cause;
     }
 
-  if (modeStage2_ == Mode::Bare)
+  if (stage2Mode_ == Mode::Bare)
     {
       pa = gpa;
       return ExceptionCause::NONE;
@@ -344,25 +348,25 @@ VirtMem::stage2TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read,
   ExceptionCause (VirtMem::*stage2PageTableWalk)(uint64_t, PrivilegeMode, bool, bool, bool, bool, uint64_t&, TlbEntry&);
   unsigned lowerMaskBitIndex = 0;
 
-  if (modeStage2_ == Mode::Sv32)
+  if (stage2Mode_ == Mode::Sv32)
     {
       // Part 2 of address translation: Bits 63-34 must be zero
       lowerMaskBitIndex   = 34;
       stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte32, Va32x4>;
     }
-  else if (modeStage2_ == Mode::Sv39)
+  else if (stage2Mode_ == Mode::Sv39)
     {
       // Part 2 of address translation: Bits 63-41 must be zero
       lowerMaskBitIndex   = 41;
       stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte39, Va39x4>;
     }
-  else if (modeStage2_ == Mode::Sv48)
+  else if (stage2Mode_ == Mode::Sv48)
     {
       // Part 2 of address translation: Bits 63-50 must be zero
       lowerMaskBitIndex   = 50;
       stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte48, Va48x4>;
     }
-  else if (modeStage2_ == Mode::Sv57)
+  else if (stage2Mode_ == Mode::Sv57)
     {
       // Part 2 of address translation: Bits 63-59 must be zero
       lowerMaskBitIndex   = 59;
@@ -387,7 +391,7 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
   // Exactly one of read/write/exec must be true.
   assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
-  if (modeStage2_ == Mode::Bare)
+  if (stage2Mode_ == Mode::Bare)
     {
       pa = va;
       return ExceptionCause::NONE;
@@ -677,7 +681,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
   tlbEntry.exec_ = pte.exec();
   tlbEntry.accessed_ = pte.accessed();
   tlbEntry.dirty_ = pte.dirty();
-  tlbEntry.levels_ = 1+ii;
+  tlbEntry.level_ = 1+ii;
   tlbEntry.pbmt_ = pte.pbmt();
 
   pbmt_ = Pbmt(pte.pbmt());
@@ -834,7 +838,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   tlbEntry.exec_ = pte.exec();
   tlbEntry.accessed_ = pte.accessed();
   tlbEntry.dirty_ = pte.dirty();
-  tlbEntry.levels_ = 1+ii;
+  tlbEntry.level_ = 1+ii;
   tlbEntry.pbmt_ = pte.pbmt();
 
   pbmt_ = Pbmt(pte.pbmt());
@@ -1011,7 +1015,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   tlbEntry.exec_ = pte.exec();
   tlbEntry.accessed_ = pte.accessed();
   tlbEntry.dirty_ = pte.dirty();
-  tlbEntry.levels_ = 1+ii;
+  tlbEntry.level_ = 1+ii;
   tlbEntry.pbmt_ = pte.pbmt();
 
   vsPbmt_ = Pbmt(pte.pbmt());
