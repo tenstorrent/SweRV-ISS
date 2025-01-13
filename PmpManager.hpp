@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <vector>
 #include <string>
+#include <optional>
 #include "CsRegs.hpp"
 
 namespace WdRiscv
@@ -135,9 +136,9 @@ namespace WdRiscv
     Pmp getPmp(uint64_t addr) const
     {
       addr = (addr >> 2) << 2;
-      if (fastRegion_.region_)
-        if (addr >= fastRegion_.firstAddr_ and addr <= fastRegion_.lastAddr_)
-          return fastRegion_.region_->pmp_;
+      if (fastRegion_)
+        if (addr >= fastRegion_->firstAddr_ and addr <= fastRegion_->lastAddr_)
+          return fastRegion_->region_.pmp_;
       for (unsigned ix = 0; ix < regions_.size(); ++ix)
         {
           const auto& region = regions_.at(ix);
@@ -177,18 +178,18 @@ namespace WdRiscv
     inline const Pmp& accessPmp(uint64_t addr) const
     {
       addr = (addr >> 2) << 2;
-      if (fastRegion_.region_)
+      if (fastRegion_)
         {
-          if (addr >= fastRegion_.firstAddr_ and addr <= fastRegion_.lastAddr_)
+          if (addr >= fastRegion_->firstAddr_ and addr <= fastRegion_->lastAddr_)
             {
               if (trace_)
                 {
-                  const auto& pmp = fastRegion_.region_->pmp_;
+                  const auto& pmp = fastRegion_->region_.pmp_;
                   auto ix = pmp.pmpIndex();
                   auto val = pmp.val();
                   pmpTrace_.push_back({ix, addr, val, reason_});
                 }
-              return fastRegion_.region_->pmp_;
+              return fastRegion_->region_.pmp_;
             }
         }
       for (unsigned ix = 0; ix < regions_.size(); ++ix)
@@ -277,7 +278,7 @@ namespace WdRiscv
     {
       uint64_t firstAddr_ = 0;
       uint64_t lastAddr_ = 0;
-      const Region* region_ = nullptr;
+      const Region& region_;
     };
 
     /// Return the Region object associated with the
@@ -313,11 +314,11 @@ namespace WdRiscv
             }
         }
       if (firstAddr <= lastAddr)
-        fastRegion_ = FastRegion{firstAddr, lastAddr, &region};
+        fastRegion_.emplace(firstAddr, lastAddr, region);
     }
 
     std::vector<Region> regions_;
-    mutable FastRegion fastRegion_;
+    mutable std::optional<FastRegion> fastRegion_;
     bool enabled_ = false;
     bool trace_ = false;   // Collect stats if true.
     Pmp defaultPmp_;
