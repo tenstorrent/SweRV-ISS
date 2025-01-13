@@ -1009,6 +1009,17 @@ System<URV>::mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
 
 template <typename URV>
+bool
+System<URV>::mcmSkipReadDataCheck(uint64_t addr, unsigned size, bool enable)
+{
+  if (not mcm_)
+    return false;
+  mcm_->skipReadDataCheck(addr, size, enable);
+  return true;
+}
+
+
+template <typename URV>
 void
 System<URV>::perfApiCommandLog(FILE* log)
 {
