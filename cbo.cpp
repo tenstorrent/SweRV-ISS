@@ -277,23 +277,6 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
 	}
     }
 
-
-#if 0
-  // If we are doing a flush then we require write access. If we are
-  // doing an invalidate then we only require read access.
-  bool isFlush = false;
-  if (not virtMode_)
-    {
-      isFlush = ( (pm != PM::Machine and menvf.bits_.CBIE == 1) or
-		  (pm == PM::User and senvf.bits_.CBIE == 1) );
-    }
-  else
-    {
-      isFlush = ( (pm == PM::Supervisor and henvf.bits_.CBIE == 1) or
-		  (pm == PM::User and (henvf.bits_.CBIE == 1 or senvf.bits_.CBIE == 1)) );
-    }
-#endif
-
   bool isZero = false;
 
   uint64_t virtAddr = intRegs_.read(di->op0());
