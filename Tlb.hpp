@@ -254,7 +254,8 @@ namespace WdRiscv
     void setMode(Mode m)
     {
       mode_ = m;
-      invalidate();
+      if (mode_ != m)
+        invalidate();
     }
 
     /// Return the size of a page/megapage for the given mode and TLB entry level in units
