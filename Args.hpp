@@ -138,6 +138,7 @@ namespace WdRiscv
     bool csv = false;        // Log files in CSV format when true.
     std::optional<bool> triggers;   // Enable debug triggers when true.
     std::optional<bool> notriggers;   // Disable debug triggers when true.
+    bool semiHosting = false;   // Enable semi hosting capabilities
     bool counters = false;   // Enable performance counters when true.
     bool gdb = false;        // Enable gdb mode when true.
     std::vector<unsigned> gdbTcpPort;   // Enable gdb mode over TCP when port is positive.
