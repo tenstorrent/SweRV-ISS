@@ -2557,10 +2557,10 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 
   if (activeCount > 0 and instr.memOps_.empty()) //  and not hart.inDebugMode())
     {
-      cerr << "Error: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
+      cerr << "Warning: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
 	   << instr.tag_ << " vector load instruction retires without any memory "
 	   << "read operation.\n";
-      return false;
+      return true;
     }
 
   // Check if all elements masked off or VL == 0.
@@ -2682,10 +2682,10 @@ Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr& instr)
 
       if (not hart.inDebugMode())
 	{
-	  cerr << "Error: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
+	  cerr << "Warning: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
 	       << instr.tag_ << " load/amo instruction retires witout any memory "
 	       << "read operation.\n";
-	  return false;
+	  return true;
 	}
     }
 
