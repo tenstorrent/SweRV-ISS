@@ -1755,6 +1755,10 @@ namespace WdRiscv
     void enableClearMtvalOnEbreak(bool flag)
     { clearMtvalOnEbreak_ = flag; }
 
+    /// Clear MTINST/HTINST on cbo.inval if flag is true.
+    void enableClearTinstOnCboInval(bool flag)
+    { clearTinstOnCboInval_ = flag; }
+
     /// Enable/disable clearing of reservation set after xRET
     void enableCancelLrOnTrap(bool flag)
     { cancelLrOnTrap_ = flag; }
@@ -5450,6 +5454,8 @@ namespace WdRiscv
     bool clearMtvalOnIllInst_ = true;
     bool clearMtvalOnEbreak_ = true;
     bool lastEbreak_ = false;
+
+    bool clearTinstOnCboInval_ = false;
 
     bool targetProgFinished_ = false;
     bool stepResult_ = false;        // Set by singleStep on caught exception (program success/fail).

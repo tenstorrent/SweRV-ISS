@@ -2867,6 +2867,9 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
   if (di->isVector())
     return 0;
 
+  if (clearTinstOnCboInval_)
+    return 0;
+
   // Otherwise we write a transformed instruction.
   uint32_t uncompressed;
   if (not di->isCompressed())
