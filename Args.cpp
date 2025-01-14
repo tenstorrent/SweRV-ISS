@@ -413,6 +413,8 @@ Args::parseCmdLineArgs(std::span<char*> argv)
 	 "Enable tracing of load/store instruction data address (deprecated -- now always on).")
 	("traceptw", po::bool_switch(&this->tracePtw),
 	 "Enable printing of page table walk information in log.")
+	("semihosting", po::bool_switch(&this->semiHosting),
+	 "enable semihosting capabilities on Whisper")
 	("triggers",
 	 "Enable debug triggers (triggers are on in interactive and server modes)")
 	("notriggers",
