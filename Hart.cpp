@@ -2867,7 +2867,7 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
   if (di->isVector())
     return 0;
 
-  if (clearTinstOnCboInval_)
+  if (clearTinstOnCboInval_ and di->instId() == InstId::cbo_inval)
     return 0;
 
   // Otherwise we write a transformed instruction.
