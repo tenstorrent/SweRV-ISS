@@ -898,6 +898,7 @@ namespace WdRiscv
       injectExceptionElemIx_ = elemIx;
     }
 
+
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
     /// address of the instruction is identical to the given address.

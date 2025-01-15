@@ -49,7 +49,7 @@ Hart<URV>::validateAmoAddr(uint64_t& addr, uint64_t& gaddr, unsigned accessSize)
   if (misal)
     return misalAtomicCauseAccessFault_? EC::STORE_ACC_FAULT : EC::STORE_ADDR_MISAL;
 
-  if (URV(injectException_) and injectExceptionIsLd_)
+  if (injectException_ != EC::NONE and injectExceptionIsLd_)
     return injectException_;
 
   return ExceptionCause::NONE;
@@ -377,7 +377,9 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
     cause = misalAtomicCauseAccessFault_ ? EC::STORE_ACC_FAULT : EC::STORE_ADDR_MISAL;
 
   // Special case for injected exception on non-load instruction.
-  if (URV(injectException_) and injectExceptionIsLd_)
+  if (cause != EC::NONE and
+      injectException_ != EC::NONE
+      and injectExceptionIsLd_)
     cause = injectException_;
 
   if (cause != EC::NONE)

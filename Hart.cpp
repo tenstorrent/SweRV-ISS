@@ -1647,7 +1647,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
     }
 
-  if (URV(injectException_) and
+  if (injectException_ != EC::NONE and
       injectExceptionIsLd_ and
       elemIx == injectExceptionElemIx_)
     return injectException_;
@@ -4812,7 +4812,7 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst, FI
   // Fetch instruction.
   bool fetch = fetchInst(addr, physAddr, inst);
   if (not fetch or
-      (URV(injectException_) and not injectExceptionIsLd_))
+      (injectException_ != ExceptionCause::NONE and not injectExceptionIsLd_))
     {
       if (mcycleEnabled())
 	++cycleCount_;
