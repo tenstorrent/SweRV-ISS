@@ -1784,8 +1784,11 @@ Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
   // Major hack (temporary until RTL HTIF addresses are rationalized).
   skip = skip or (addr >= 0x70000000 and addr <= 0x70000008);
 
+  skip = skip or (not isReadDataCheckEnabled(addr));
+
   if (skip)
     return true;
+
 
   if (op.rtlData_ != op.data_)
     {
@@ -2446,6 +2449,9 @@ Mcm<URV>::commitVecReadOpsStride0(Hart<URV>& hart, McmInstr& instr)
               mask &= ~byteMask;
               op.canceled_ = false;
 
+              if (not isReadDataCheckEnabled(byteAddr))
+                continue;
+
               unsigned offset = byteAddr - op.pa_;
               uint8_t refVal = op.data_ >> (offset*8);
               uint8_t rtlVal = op.rtlData_ >> (offset*8);
@@ -2518,6 +2524,10 @@ Mcm<URV>::commitVecReadOpsUnitStride(Hart<URV>& hart, McmInstr& instr)
             continue;  // Address already covered by another read op.
 
           covered = true;
+
+          if (not isReadDataCheckEnabled(addr))
+            continue;
+
           uint8_t refVal = op.data_ >> (i*8);
           uint8_t rtlVal = op.rtlData_ >> (i*8);
 
@@ -2655,6 +2665,10 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
             continue;  // Address already covered by another read op.
 
           covered = true;
+
+          if (not isReadDataCheckEnabled(addr))
+            continue;
+
           uint8_t refVal = op.data_ >> (i*8);
           uint8_t rtlVal = op.rtlData_ >> (i*8);
 

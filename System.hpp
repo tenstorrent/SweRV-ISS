@@ -358,6 +358,9 @@ namespace WdRiscv
     bool mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		   const DecodedInst& di, bool trapped);
 
+    /// Enable to skip an address read check for specified range. This is used for the
+    /// testbench to resync memory operations.
+    bool mcmSkipReadDataCheck(uint64_t addr, unsigned size, bool enable);
 
     /// Perf model APIs.
     void perfApiCommandLog(FILE* log);
