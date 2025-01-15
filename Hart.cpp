@@ -1524,7 +1524,7 @@ Hart<URV>::initiateStoreException(const DecodedInst* di, ExceptionCause cause, U
 template <typename URV>
 ExceptionCause
 Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& gaddr1,
-				  uint64_t& gaddr2, unsigned ldSize, bool hyper)
+				  uint64_t& gaddr2, unsigned ldSize, bool hyper, unsigned elemIx)
 {
   uint64_t va1 = URV(addr1);   // Virtual address. Truncate to 32-bits in 32-bit mode.
   uint64_t va2 = va1;
@@ -1646,6 +1646,11 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
     }
+
+  if (URV(injectException_) and
+      injectExceptionIsLd_ and
+      elemIx == injectExceptionElemIx_)
+    return injectException_;
 
   return EC::NONE;
 }
@@ -4806,13 +4811,15 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst, FI
 
   // Fetch instruction.
   bool fetch = fetchInst(addr, physAddr, inst);
-  if (not fetch or URV(fetchExceptionByUser_))
+  if (not fetch or
+      (URV(injectException_) and not injectExceptionIsLd_))
     {
       if (mcycleEnabled())
 	++cycleCount_;
 
+      // Fetch was successful, but injected exception.
       if (fetch)
-        initiateException(fetchExceptionByUser_, pc_, pc_);
+        initiateException(injectException_, pc_, pc_);
 
       std::string instStr;
       printInstTrace(inst, instCounter_, instStr, file);
@@ -5857,14 +5864,8 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       pc_ += di.instSize();
       execute(&di);
 
-      if (lastInstructionTrapped() or URV(ldStExceptionByUser_))
+      if (lastInstructionTrapped())
 	{
-          if (not lastInstructionTrapped())
-            {
-              assert(di.isLoad() or di.isStore() or di.isAtomic() or
-                     di.isCmo() or di.isVectorLoad() or di.isVectorStore());
-              initiateException(ldStExceptionByUser_, pc_, tvalByUser_);
-            }
 	  if (doStats)
 	    accumulateInstructionStats(di);
 	  printDecodedInstTrace(di, instCounter_, instStr, traceFile);

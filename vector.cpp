@@ -11073,7 +11073,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
       uint64_t gpa1 = addr, gpa2 = addr;
 
 #ifndef FAST_SLOPPY
-      cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false);
+      cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false, ix);
 
       if (hasTrig and ldStAddrTriggerHit(addr, elemSize, timing, isLd))
 	{
@@ -11085,7 +11085,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 	}
 #else
       if (faultFirst)
-	cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false);
+	cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false, ix);
 #endif
 
       if (cause == ExceptionCause::NONE)
@@ -11509,7 +11509,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
 #ifndef FAST_SLOPPY
       uint64_t gpa2 = addr;
-      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(ELEM_TYPE), false /*hyper*/);
+      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(ELEM_TYPE), false /*hyper*/, ix);
 
       if (hasTrig and ldStAddrTriggerHit(addr, elemBytes, timing, isLd))
 	{
@@ -11883,7 +11883,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
 #ifndef FAST_SLOPPY
       uint64_t gpa2 = addr;
-      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem), false /*hyper*/);
+      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem), false /*hyper*/, ix);
 
       if (hasTrig and ldStAddrTriggerHit(addr, elemSize, timing, isLd))
 	{
@@ -12232,7 +12232,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
 #ifndef FAST_SLOPPY
       uint64_t gpa2 = vaddr;
-      cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/);
+      cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/, ix);
 
       if (hasTrig and ldStAddrTriggerHit(vaddr, elemSize, timing, isLd))
 	{
@@ -12738,7 +12738,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
 #ifndef FAST_SLOPPY
 	  uint64_t gpa2 = faddr;
-          cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/);
+          cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/, ix);
 
 	  if (hasTrig and ldStAddrTriggerHit(faddr, elemSize, timing, isLd))
 	    {
@@ -13344,7 +13344,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew,
 
 #ifndef FAST_SLOPPY
           uint64_t gpa2 = faddr;
-          cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/);
+          cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize, false /*hyper*/, ix);
 
           if (hasTrig and ldStAddrTriggerHit(faddr, elemSize, timing, isLd))
             {

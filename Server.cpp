@@ -240,8 +240,6 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
           hart.setDeferredInterrupts(val);
         else if (req.address == WhisperSpecialResource::Seipin)
 	  hart.setSeiPin(val);
-        else if (req.address == WhisperSpecialResource::ExceptionByUser)
-          hart.setExceptionByUser(val, req.instrTag, bool(req.type));
 	else
           ok = false;
         if (ok)
@@ -990,7 +988,6 @@ specialResourceToStr(uint64_t v)
     case WhisperSpecialResource::Seipin:              return "seipin";
     case WhisperSpecialResource::EffMemAttr:          return "effma";
     case WhisperSpecialResource::LastLdStAddress:     return "lastldst";
-    case WhisperSpecialResource::ExceptionByUser:     return "excbu";
     }
   return "?";
 }
@@ -1443,6 +1440,17 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           if (commandLog)
             fprintf(commandLog, "hart=%" PRIu32 " pma 0x%" PRIx64 "\n",
                     hartId, msg.address);
+          break;
+        }
+
+      case InjectException:
+        {
+          // This won't work correctly for segmented vector loads with partial segment
+          // completion.
+          hart.injectException(bool(msg.type), msg.address, msg.resource);
+          if (commandLog)
+            fprintf(commandLog, "hart=%" PRIu32 " inject_exception 0x%" PRIxMAX " 0x%" PRIxMAX " 0x%" PRIxMAX "\n", hartId,
+                                uintmax_t(msg.type), uintmax_t(msg.address), uintmax_t(msg.resource));
           break;
         }
 

@@ -888,15 +888,14 @@ namespace WdRiscv
     bool getSeiPin() const
     { return seiPin_; }
 
-    /// Set/clear low priorty exception for fetch/ld/st scenarios. This is
-    /// useful for RAS errors. We also write the approriate *tval value. 
-    void setExceptionByUser(URV code, URV tval, bool fetch)
+    /// Set/clear low priorty exception for fetch/ld scenarios. For vector
+    /// loads, we use the element index to determine the exception. This is
+    /// useful for TB to inject errors.
+    void injectException(bool isLoad, URV code, unsigned elemIx)
     {
-      if (fetch)
-        fetchExceptionByUser_ = static_cast<ExceptionCause>(code);
-      else
-        ldStExceptionByUser_ = static_cast<ExceptionCause>(code);
-      tvalByUser_ = tval;
+      injectException_ = static_cast<ExceptionCause>(code);
+      injectExceptionIsLd_ = isLoad;
+      injectExceptionElemIx_ = elemIx;
     }
 
     /// Define address to which a write will stop the simulator. An
@@ -2903,7 +2902,7 @@ namespace WdRiscv
     /// load/store instructions (e.g. hlv.b).
     ExceptionCause determineLoadException(uint64_t& addr1, uint64_t& addr2,
                                           uint64_t& gaddr1, uint64_t& gaddr2,
-					  unsigned ldSize, bool hyper);
+					  unsigned ldSize, bool hyper, unsigned elemIx = 0);
 
     /// Helper to load method. Vaddr is the virtual address. Paddr1 is the physical
     /// address.  Paddr2 is identical to paddr1 for non-page-crossing loads; otherwise, it
@@ -5518,10 +5517,10 @@ namespace WdRiscv
     bool steeInsec1_ = false;  // True if insecure access to a secure region.
     bool steeInsec2_ = false;  // True if insecure access to a secure region.
 
-    // Low priority exceptions
-    ExceptionCause fetchExceptionByUser_ = ExceptionCause::NONE;   // Raise exception code if non-zero.
-    ExceptionCause ldStExceptionByUser_ = ExceptionCause::NONE;    // Raise exception code if non-zero.
-    URV tvalByUser_ = 0;                        // Value to write to *tval.
+    // Exceptions injected by user.
+    ExceptionCause injectException_ = ExceptionCause::NONE;
+    bool injectExceptionIsLd_ = false;
+    unsigned injectExceptionElemIx_ = 0;
 
     // Landing pad (zicfilp)
     bool mLpEnabled_ = false;
