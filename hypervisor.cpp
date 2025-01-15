@@ -96,7 +96,8 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
       return;
     }
 
-  auto& tlb = virtMem_.stage2Tlb_;
+  auto& stage2Tlb = virtMem_.stage2Tlb_;
+  auto& vsTlb = virtMem_.vsTlb_;
 
   // Some implementations do not store guest-physical-addresses in the TLB. For those, we
   // over-invalidate.
@@ -104,18 +105,25 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
 
   // Invalidate whole VS TLB. This is overkill.
   if (di->op0() == 0 and di->op1() == 0)
-    tlb.invalidate();
+    {
+      stage2Tlb.invalidate();
+      vsTlb.invalidate();
+    }
   else if (di->op0() == 0 and di->op1() != 0)
     {
       URV vmid = intRegs_.read(di->op1());
-      tlb.invalidateVmid(vmid);
+      stage2Tlb.invalidateVmid(vmid);
+      vsTlb.invalidateVmid(vmid);
     }
   else if (di->op0() != 0 and di->op1() == 0)
     {
       URV addr = intRegs_.read(di->op0()) << 2;
       uint64_t vpn = virtMem_.pageNumber(addr);
       if (useGpa)
-	tlb.invalidateVirtualPage(vpn);
+	stage2Tlb.invalidateVirtualPage(vpn);
+      else
+        stage2Tlb.invalidate();
+      vsTlb.invalidate();
     }
   else
     {
@@ -123,9 +131,11 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV vmid = intRegs_.read(di->op1());
       if (useGpa)
-	tlb.invalidateVirtualPageVmid(vpn, vmid);
+        stage2Tlb.invalidateVirtualPageVmid(vpn, vmid);
       else
-	tlb.invalidateVmid(vmid);
+        stage2Tlb.invalidateVmid(vmid);
+
+      vsTlb.invalidateVmid(vmid);
     }
 }
 
