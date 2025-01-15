@@ -23,9 +23,6 @@
 using namespace WdRiscv;
 
 
-SparseMem::SparseMem() = default;
-
-
 SparseMem::~SparseMem() = default;
 
 
