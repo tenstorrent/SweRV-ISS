@@ -213,6 +213,24 @@ namespace WdRiscv
     bool retire(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 		const DecodedInst& di, bool trapped);
 
+    /// Skip read check on containing address. This is a workaround for cbo.inval
+    /// operations.
+    void skipReadDataCheck(uint64_t addr, unsigned size, bool enable)
+    {
+      skipReadCheckAddr_ = addr;
+      skipReadCheckSize_ = size;
+      skipReadCheckEnable_ = enable;
+    }
+
+    bool isReadDataCheckEnabled(uint64_t addr) const
+    {
+      if (skipReadCheckEnable_ and
+          addr >= skipReadCheckAddr_ and
+          addr < (skipReadCheckAddr_ + skipReadCheckSize_))
+        return false;
+      return true;
+    }
+
     /// Perform PPO checks (e.g. rule 4) on pending instructions.
     bool finalChecks(Hart<URV>& hart);
 
@@ -967,6 +985,11 @@ namespace WdRiscv
     // Check whole merge buffer line if true otherwise check bytes covered by store
     // instructions.
     bool checkWholeLine_ = false;
+
+    // When enabled, skip read data checks on containing addresses.
+    uint64_t skipReadCheckAddr_ = 0;
+    unsigned skipReadCheckSize_ = 0;
+    bool skipReadCheckEnable_ = false;
 
     std::vector<bool> ppoEnabled_;
 

@@ -24,7 +24,7 @@ enum WhisperMessageType
     Peek, Poke, Step, Until, Change, ChangeCount, Quit, Invalid, Reset, Nmi, ClearNmi,
     EnterDebug, ExitDebug, LoadFinished, CancelDiv, CancelLr, DumpMemory, McmRead,
     McmInsert, McmWrite, McmEnd, PageTableWalk, Translate, CheckInterrupt, McmBypass,
-    SeiPin, McmIFetch, McmIEvict, PmpEntry, PmaEntry
+    SeiPin, McmIFetch, McmIEvict, McmSkipReadChk, PmpEntry, PmaEntry
   };
 
 
