@@ -179,6 +179,8 @@ Mcm<URV>::readOp_(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, uns
 
   assert(pageNum(pa) == pageNum(pa + size - 1));
 
+  instr->isLoad_ = true;
+
   // Read Whisper memory and keep it in op, this will be updated when the load is retired
   // by forwarding from preceding stores.
   uint64_t refVal = 0;
@@ -187,9 +189,39 @@ Mcm<URV>::readOp_(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, uns
   else
     op.failRead_ = true;
 
-  instr->addMemOp(sysMemOps_.size());
-  sysMemOps_.push_back(op);
-  instr->isLoad_ = true;
+  if (sysMemOps_.empty() or sysMemOps_.back().time_ <= time)
+    {
+      instr->addMemOp(sysMemOps_.size());
+      sysMemOps_.push_back(op);
+    }
+  else
+    {
+      // Sometimes the test-bench will unexpectedly send us a read-op with an out of order
+      // time-stamp. We hack a repair.
+
+      // Find first existing op with time > current time.
+      auto iter = std::upper_bound(sysMemOps_.begin(), sysMemOps_.end(), time,
+                                   [](const uint64_t& t, const MemoryOp& mop) -> bool
+                                   { return t < mop.time_; });
+
+      // Insert new op before the found op.
+      assert(iter != sysMemOps_.end());
+      size_t ix = iter - sysMemOps_.begin();
+      instr->addMemOp(ix);
+      sysMemOps_.insert(iter, op);
+
+      // Adjust indices of all the instructions referencing ops that are now after new op
+      // in sysMemOps_.
+      for (size_t i = ix + 1; i < sysMemOps_.size(); ++i)
+        {
+          auto& movedOp = sysMemOps_.at(i);
+          auto& instrVec = hartData_.at(movedOp.hartIx_).instrVec_;
+          auto& instr = instrVec.at(movedOp.tag_);
+          for (auto& instrOpIx : instr.memOps_)
+            if (instrOpIx >= ix)
+              instrOpIx++;
+        }
+    }
 
   if (instr->retired_)
     instr->complete_ = checkLoadComplete(*instr);
@@ -2895,7 +2927,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
 
   // Vector cover check done in commitVecReadOps.
   if (not covered and not isVector)
-    cerr << "Error: hart-id= " << hart.hartId() << " tag=" << tag << " read ops do not"
+    cerr << "Error: hart-id=" << hart.hartId() << " tag=" << tag << " read ops do not"
 	 << " cover all the bytes of load instruction\n";
 
   // Vector completion check done in commitVecReadOps.
