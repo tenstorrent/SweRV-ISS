@@ -2229,6 +2229,9 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
       return true;
     }
 
+  if (dataLineTrace_)
+    memory_.traceDataLine(virtAddr, pa1, true /*write*/);
+
   if (ooo_)
     {
       if (perfApi_)
@@ -2257,9 +2260,6 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
     memory_.invalidateOtherHartLr(hartIx_, pa2, ldStSize_);
 
   memWrite(pa1, pa2, storeVal);
-
-  if (dataLineTrace_)
-    memory_.traceDataLine(virtAddr, pa1, true /*write*/);
 
   STORE_TYPE temp = 0;
   memPeek(pa1, pa2, temp, false /*usePma*/);
