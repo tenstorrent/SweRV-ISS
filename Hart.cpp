@@ -10196,16 +10196,12 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
     }
 
   auto& tlb = virtMode_ ? virtMem_.vsTlb_ : virtMem_.tlb_;
-  auto& stage2Tlb = virtMem_.stage2Tlb_;
   auto vmid = virtMem_.vmid();
 
   if (di->op0() == 0 and di->op1() == 0)
     {
       if (virtMode_)
-        {
-          tlb.invalidateVmid(vmid);
-          stage2Tlb.invalidateVmid(vmid);
-        }
+        tlb.invalidateVmid(vmid);
       else
         tlb.invalidate();
     }
@@ -10213,10 +10209,7 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
     {
       URV asid = intRegs_.read(di->op1());
       if (virtMode_)
-        {
-          tlb.invalidateAsidVmid(asid, vmid);
-          stage2Tlb.invalidateAsidVmid(asid, vmid);
-        }
+        tlb.invalidateAsidVmid(asid, vmid);
       else
         tlb.invalidateAsid(asid);
     }
@@ -10236,10 +10229,7 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       URV asid = intRegs_.read(di->op1());
 
       if (virtMode_)
-        {
-          tlb.invalidateVirtualPageAsidVmid(vpn, asid, vmid);
-          stage2Tlb.invalidateAsidVmid(asid, vmid);
-        }
+        tlb.invalidateVirtualPageAsidVmid(vpn, asid, vmid);
       else
         tlb.invalidateVirtualPageAsid(vpn, asid);
     }
