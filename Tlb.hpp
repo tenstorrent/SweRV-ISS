@@ -242,7 +242,7 @@ namespace WdRiscv
         {
           unsigned size = sizeIn4kBytes(mode_, entry.level_);
 
-          if (entry.virtPageNum_ == vpn and vpn < entry.virtPageNum_ + size and
+          if (entry.virtPageNum_ <= vpn and vpn < entry.virtPageNum_ + size and
               entry.vmid_ == vmid)
             {
               entry.valid_ = false;
@@ -259,7 +259,7 @@ namespace WdRiscv
         {
           unsigned size = sizeIn4kBytes(mode_, entry.level_);
 
-          if (entry.virtPageNum_ == vpn and vpn < entry.virtPageNum_ + size and
+          if (entry.virtPageNum_ <= vpn and vpn < entry.virtPageNum_ + size and
               entry.vmid_ == vmid and entry.asid_ == asid and not entry.global_)
             {
               entry.valid_ = false;
