@@ -2086,7 +2086,7 @@ Hart<URV>::fastStore(const DecodedInst* di, URV addr, STORE_TYPE storeVal)
 	}
 
       if (dataLineTrace_)
-	memory_.traceDataLine(addr, addr);
+	memory_.traceDataLine(addr, addr, true /*write*/);
 
       ldStWrite_ = true;
       ldStData_ = storeVal;
@@ -2259,7 +2259,7 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
   memWrite(pa1, pa2, storeVal);
 
   if (dataLineTrace_)
-    memory_.traceDataLine(virtAddr, pa1);
+    memory_.traceDataLine(virtAddr, pa1, true /*write*/);
 
   STORE_TYPE temp = 0;
   memPeek(pa1, pa2, temp, false /*usePma*/);

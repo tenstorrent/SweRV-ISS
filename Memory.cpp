@@ -1016,7 +1016,8 @@ Memory::loadSnapshot(const std::string & filename,
 
 bool
 Memory::saveAddressTrace(std::string_view tag, const LineMap& lineMap,
-			 const std::string& path, bool writeValues) const
+			 const std::string& path, bool skipClean,
+                         bool includeValues) const
 {
   std::ofstream out(path, std::ios::trunc);
   if (not out)
@@ -1044,10 +1045,14 @@ Memory::saveAddressTrace(std::string_view tag, const LineMap& lineMap,
 
   for (auto vaddr : addrVec)
     {
-      uint64_t paddr = lineMap.at(vaddr).paddr;
+      auto& entry = lineMap.at(vaddr);
+      if (skipClean and entry.clean)
+        continue;
+
+      uint64_t paddr = entry.paddr;
       out << vaddr << ':' << paddr;
 
-      if (writeValues)
+      if (includeValues)
         {
           out << ':';
           uint64_t lineAddr = paddr << lineShift_;
@@ -1101,11 +1106,12 @@ Memory::loadAddressTrace(LineMap& lineMap, uint64_t& refCount, const std::string
 
 
 bool
-Memory::saveDataAddressTrace(const std::string& path, bool writeValues) const
+Memory::saveDataAddressTrace(const std::string& path, bool skipClean,
+                             bool includeValues) const
 {
   if (not dataLineTrace_)
     return true;
-  return saveAddressTrace("data", dataLineMap_, path, writeValues);
+  return saveAddressTrace("data", dataLineMap_, path, skipClean, includeValues);
 }
 
 

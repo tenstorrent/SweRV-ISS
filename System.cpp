@@ -889,7 +889,9 @@ System<URV>::endMcm()
       auto& path = memory_->dataLineTracePath();
       if (not path.empty())
         {
-          memory_->saveDataAddressTrace(path, true /* writeValues */);
+          bool skipClean = true;
+          bool includeValues = true;
+          memory_->saveDataAddressTrace(path, skipClean, includeValues);
 
           std::string emptyPath;
           memory_->enableDataLineTrace(emptyPath);  // Disable
