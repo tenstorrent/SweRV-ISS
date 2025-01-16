@@ -47,27 +47,33 @@ Hart<URV>::execHfence_vvma(const DecodedInst* di)
       return;
     }
 
-  auto& tlb = virtMem_.vsTlb_;
+  auto& vsTlb = virtMem_.vsTlb_;
+  auto& stage2Tlb = virtMem_.stage2Tlb_;
 
   if (di->op0() == 0 and di->op1() == 0)
-    tlb.invalidate();
+    {
+      vsTlb.invalidate();
+      stage2Tlb.invalidate();
+    }
   else if (di->op0() == 0 and di->op1() != 0)
     {
       URV asid = intRegs_.read(di->op1());
-      tlb.invalidateAsid(asid);
+      vsTlb.invalidateAsid(asid);
+      stage2Tlb.invalidateAsid(asid);
     }
   else if (di->op0() != 0 and di->op1() == 0)
     {
       URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
-      tlb.invalidateVirtualPage(vpn);
+      vsTlb.invalidateVirtualPage(vpn);
     }
   else
     {
       URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV asid = intRegs_.read(di->op1());
-      tlb.invalidateVirtualPageAsid(vpn, asid);
+      vsTlb.invalidateVirtualPageAsid(vpn, asid);
+      stage2Tlb.invalidateAsid(asid);
     }
 }
 

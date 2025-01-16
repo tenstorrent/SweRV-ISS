@@ -75,9 +75,9 @@ namespace WdRiscv
     {
       auto* entry = getEntry(pageNum);
 
-      if (entry and entry->valid_ and entry->virtPageNum_ == pageNum)
-        if (entry->global_ or (entry->asid_ == asid and entry->vmid_ == vmid))
-            return entry;
+      if (entry and entry->valid_ and entry->virtPageNum_ == pageNum and
+          entry->vmid_ == vmid and (entry->global_ or entry->asid_ == asid))
+        return entry;
       return nullptr;
     }
 

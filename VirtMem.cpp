@@ -399,7 +399,7 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
 
   // Lookup virtual page number in TLB.
   uint64_t virPageNum = va >> pageBits_;
-  TlbEntry* entry = stage2Tlb_.findEntryUpdateTime(virPageNum, asid_, vmid_);
+  TlbEntry* entry = stage2Tlb_.findEntryUpdateTime(virPageNum, vsAsid_, vmid_);
   if (entry)
     {
       // Use TLB entry.
@@ -445,7 +445,7 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
     {
       // Lookup virtual page number in TLB.
       uint64_t virPageNum = va >> pageBits_;
-      TlbEntry* entry = vsTlb_.findEntryUpdateTime(virPageNum, vsAsid_);
+      TlbEntry* entry = vsTlb_.findEntryUpdateTime(virPageNum, vsAsid_, vmid_);
       if (entry)
 	{
 	  if (priv == PrivilegeMode::User and not entry->user_)
@@ -828,7 +828,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   // Update tlb-entry with data found in page table entry.
   tlbEntry.virtPageNum_ = address >> pageBits_;
   tlbEntry.physPageNum_ = pa >> pageBits_;
-  tlbEntry.asid_ = asid_;
+  tlbEntry.asid_ = vsAsid_;
   tlbEntry.vmid_ = vmid_;
   tlbEntry.valid_ = true;
   tlbEntry.global_ = global;
