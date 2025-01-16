@@ -1858,6 +1858,15 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.enableClearTinstOnCboInval(flag);
     }
 
+  tag = "clear_tinst_on_cbo_flush";
+  if (config_ -> contains(tag))
+    {
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.enableClearTinstOnCboFlush(flag);
+    }
+
   // This is used to reduce the frequency of timer interupts. By
   // default the timer runs at the frequence of the instruction
   // counter. By adding a time shift, we put additional delay before
