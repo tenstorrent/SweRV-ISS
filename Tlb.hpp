@@ -168,8 +168,8 @@ namespace WdRiscv
     /// Insert copy of given entry. Return true on success and false otherwise.
     bool insertEntry(const TlbEntry& entry);
 
-    /// Invalidate every entry matching given address space identifier
-    /// unless it is global.
+    /// Invalidate every entry matching given address space identifier unless it is
+    /// global.
     void invalidateAsid(uint32_t asid)
     {
       for (auto& entry : entries_)
@@ -185,6 +185,17 @@ namespace WdRiscv
     {
       for (auto& entry : entries_)
 	if (entry.vmid_ == vmid)
+          {
+            entry.valid_ = false;
+            entry.counter_ = 0;
+          }
+    }
+
+    /// Invalidate every entry matching given vmid and address space identifier.
+    void invalidateAsidVmid(uint32_t asid, uint32_t vmid)
+    {
+      for (auto& entry : entries_)
+	if (entry.vmid_ == vmid and entry.asid_ == asid and (not entry.global_))
           {
             entry.valid_ = false;
             entry.counter_ = 0;
@@ -223,8 +234,8 @@ namespace WdRiscv
         }
     }
 
-    /// Invalidate every entry matching given virtual page number and
-    /// virtual machine identifer except for global entries.
+    /// Invalidate every entry matching given virtual page number and virtual machine
+    /// identifer except for global entries.
     void invalidateVirtualPageVmid(uint64_t vpn, uint32_t vmid)
     {
       for (auto& entry : entries_)
@@ -233,6 +244,23 @@ namespace WdRiscv
 
           if (entry.virtPageNum_ == vpn and vpn < entry.virtPageNum_ + size and
               entry.vmid_ == vmid and not entry.global_)
+            {
+              entry.valid_ = false;
+              entry.counter_ = 0;
+            }
+        }
+    }
+
+    /// Invalidate every entry matching given virtual page number, asid, and virtual
+    /// machine identifer except for global entries.
+    void invalidateVirtualPageAsidVmid(uint64_t vpn, uint32_t asid, uint32_t vmid)
+    {
+      for (auto& entry : entries_)
+        {
+          unsigned size = sizeIn4kBytes(mode_, entry.level_);
+
+          if (entry.virtPageNum_ == vpn and vpn < entry.virtPageNum_ + size and
+              entry.vmid_ == vmid and entry.asid_ == asid and not entry.global_)
             {
               entry.valid_ = false;
               entry.counter_ = 0;

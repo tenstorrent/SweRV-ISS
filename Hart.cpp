@@ -10197,34 +10197,51 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
 
   auto& tlb = virtMode_ ? virtMem_.vsTlb_ : virtMem_.tlb_;
   auto& stage2Tlb = virtMem_.stage2Tlb_;
+  auto vmid = virtMem_.vmid();
 
   if (di->op0() == 0 and di->op1() == 0)
     {
-      tlb.invalidate();
       if (virtMode_)
-        stage2Tlb.invalidate();
+        {
+          tlb.invalidateVmid(vmid);
+          stage2Tlb.invalidateVmid(vmid);
+        }
+      else
+        tlb.invalidate();
     }
   else if (di->op0() == 0 and di->op1() != 0)
     {
       URV asid = intRegs_.read(di->op1());
-      tlb.invalidateAsid(asid);
       if (virtMode_)
-        stage2Tlb.invalidate();
+        {
+          tlb.invalidateAsidVmid(asid, vmid);
+          stage2Tlb.invalidateAsidVmid(asid, vmid);
+        }
+      else
+        tlb.invalidateAsid(asid);
     }
   else if (di->op0() != 0 and di->op1() == 0)
     {
       URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
-      tlb.invalidateVirtualPage(vpn);
+      if (virtMode_)
+        tlb.invalidateVirtualPageVmid(vpn, vmid);
+      else
+        tlb.invalidateVirtualPage(vpn);
     }
   else
     {
       URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV asid = intRegs_.read(di->op1());
-      tlb.invalidateVirtualPageAsid(vpn, asid);
+
       if (virtMode_)
-        stage2Tlb.invalidate();
+        {
+          tlb.invalidateVirtualPageAsidVmid(vpn, asid, vmid);
+          stage2Tlb.invalidateAsidVmid(asid, vmid);
+        }
+      else
+        tlb.invalidateVirtualPageAsid(vpn, asid);
     }
 
 #if 0
