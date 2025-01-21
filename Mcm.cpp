@@ -2532,18 +2532,18 @@ Mcm<URV>::commitVecReadOpsUnitStride(Hart<URV>& hart, McmInstr& instr)
 
           covered = true;
 
-          if (not isReadDataCheckEnabled(addr))
-            continue;
-
-          uint8_t refVal = op.data_ >> (i*8);
-          uint8_t rtlVal = op.rtlData_ >> (i*8);
-
-          if (refVal != rtlVal)
+          if (isReadDataCheckEnabled(addr))
             {
-              if (not mismatch)
-                printReadMismatch(hart, op.time_, op.tag_, addr, op.size_, rtlVal, refVal);
-              mismatch = true;
-              ok = false;
+              uint8_t refVal = op.data_ >> (i*8);
+              uint8_t rtlVal = op.rtlData_ >> (i*8);
+
+              if (refVal != rtlVal)
+                {
+                  if (not mismatch)
+                    printReadMismatch(hart, op.time_, op.tag_, addr, op.size_, rtlVal, refVal);
+                  mismatch = true;
+                  ok = false;
+                }
             }
 
           low = std::min(low, addr);
@@ -2673,18 +2673,18 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 
           covered = true;
 
-          if (not isReadDataCheckEnabled(addr))
-            continue;
-
-          uint8_t refVal = op.data_ >> (i*8);
-          uint8_t rtlVal = op.rtlData_ >> (i*8);
-
-          if (refVal != rtlVal)
+          if (isReadDataCheckEnabled(addr))
             {
-              if (not mismatch)
-                printReadMismatch(hart, op.time_, op.tag_, addr, op.size_, rtlVal, refVal);
-              mismatch = true;
-              ok = false;
+              uint8_t refVal = op.data_ >> (i*8);
+              uint8_t rtlVal = op.rtlData_ >> (i*8);
+
+              if (refVal != rtlVal)
+                {
+                  if (not mismatch)
+                    printReadMismatch(hart, op.time_, op.tag_, addr, op.size_, rtlVal, refVal);
+                  mismatch = true;
+                  ok = false;
+                }
             }
 
           low = std::min(low, addr);
