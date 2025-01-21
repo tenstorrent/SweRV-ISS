@@ -212,11 +212,18 @@ Mcm<URV>::readOp_(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, uns
 
       // Adjust indices of all the instructions referencing ops that are now after new op
       // in sysMemOps_.
+      std::unordered_set<uint64_t> adjustedTags;
       for (size_t i = ix + 1; i < sysMemOps_.size(); ++i)
         {
           auto& movedOp = sysMemOps_.at(i);
           auto& instrVec = hartData_.at(movedOp.hartIx_).instrVec_;
-          auto& instr = instrVec.at(movedOp.tag_);
+
+          auto tag = movedOp.tag_;
+          if (adjustedTags.contains(tag))
+            continue;
+          adjustedTags.insert(tag);
+
+          auto& instr = instrVec.at(tag);
           for (auto& instrOpIx : instr.memOps_)
             if (instrOpIx >= ix)
               instrOpIx++;
