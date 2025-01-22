@@ -4527,6 +4527,48 @@ CsRegs<URV>::addMachineFields()
   setCsrFields(CsrNumber::MNSTATUS,
       {{"res0", 3}, {"NMIE",   1}, {"res1", 3}, {"MNPV", 1},
        {"res2", 1}, {"MNPELP", 2}, {"res3", 1}, {"MNPP", 2}, {"res4", xlen-14}});
+  //stateen
+  std::vector<typename Csr<URV>::Field> stateen_start = {{"C", 1}, {"FCSR", 1}, {"JVT", 1}}; // stateen common fields
+  std::vector<typename Csr<URV>::Field> stateen_end = {{"CNTXT", 1}, {"IMSIC", 1}, {"AIA", 1}, {"CSRIND", 1}, {"zero", 1}, {"ENVCFG", 1}, {"SEO", 1}};
+  for (auto &i : {CsrNumber::MSTATEEN0, CsrNumber::SSTATEEN0, CsrNumber::HSTATEEN0})
+    {
+      std::vector<typename Csr<URV>::Field> stateen, stateenh;
+      stateen.insert(stateen.end(), stateen_start.begin(), stateen_start.end());
+      if (rv32_)
+        stateen.push_back({"zero",  xlen-3});
+      if (i == CsrNumber::MSTATEEN0)
+        {
+          if (rv32_)
+            {
+             stateenh.push_back({"zero", 24});
+             stateenh.push_back({"p1p13", 1});
+            }
+          else
+            {
+            stateen.push_back({"zero", 53});
+            stateen.push_back({"p1p13", 1});
+            }
+          stateenh.insert(stateenh.end(), stateen_end.begin(), stateen_end.end());
+          stateen.insert(stateen.end(), stateen_end.begin(), stateen_end.end());
+        }
+      else if (i == CsrNumber::HSTATEEN0)
+        {
+          if (rv32_)
+            stateenh.push_back({"zero", 25});
+          else
+            stateen.push_back({"zero", 54});
+          stateenh.insert(stateenh.end(), stateen_end.begin(), stateen_end.end());
+          stateen.insert(stateen.end(), stateen_end.begin(), stateen_end.end());
+        }
+      else
+        {
+          if (!rv32_)
+            stateen.push_back({"zero", 61});
+        }
+      setCsrFields(i, stateen);
+      if (rv32_ && i != CsrNumber::SSTATEEN0)
+        setCsrFields(advance(i, 0x10), stateenh);
+    }
 
   if (rv32_)
     {
