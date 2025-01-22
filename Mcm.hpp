@@ -641,9 +641,12 @@ namespace WdRiscv
     /// overlaps that of the given memory operation.
     bool overlaps(const McmInstr& instr, const MemoryOp& op) const
     {
-      if (instr.size_ == 0 or op.size_ == 0)
-	std::cerr << "Mcm::overlaps: Error: tag1=" << instr.tag_
-		  << " tag2=" << op.tag_ << " zero data size\n";
+      if (instr.size_ == 0)
+	std::cerr << "Mcm::overlaps: Error: hart-ix=" << unsigned(instr.hartIx_) << " instr-tag="
+                  << instr.tag_ << " zero data size (not a memory instruction)\n";
+      if (op.size_ == 0)
+	std::cerr << "Mcm::overlaps: Error: hart-ix=" << unsigned(op.hartIx_) << " op-tag="
+                  << op.tag_ << " zero data size\n";
 
       if (instr.di_.isVector())
 	return vecOverlaps(instr, op);
