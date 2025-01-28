@@ -829,6 +829,9 @@ Enable matching on all possible addresses in a load/store access [address, addre
 ### all_inst_addr_trigger
 Enable matching on all possible addresses in a instruction fetch access [address, address+size-1].
 
+### icount_down_on_modified
+Enable icount to decrement count on an instruction which writes to an icount trigger.
+
 ### trigger_types
 Define the supported trigger types (type field in tdata1). Example:
 ```

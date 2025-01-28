@@ -345,6 +345,11 @@ namespace WdRiscv
     void configTriggerUseTcontrol(bool flag)
     { csRegs_.triggers_.enableTcontrol(flag); }
 
+    /// Enable trigger icount such that it counts down
+    /// on an instruction write to icount.
+    void configTriggerIcountOnModified(bool flag)
+    { csRegs_.triggers_.enableIcountOnModified(flag); }
+
     /// Set the maximum NAPOT range with maskmax.
     void configTriggerNapotMaskMax(unsigned bits)
     { csRegs_.triggers_.configNapotMaskMax(bits); }

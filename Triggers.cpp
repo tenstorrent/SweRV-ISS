@@ -369,7 +369,7 @@ Triggers<URV>::icountTriggerHit(PrivilegeMode prevPrivMode, bool prevVirtMode, P
 
   for (auto& trig : triggers_)
     {
-      if (trig.isModified())
+      if (trig.isModified() and not icountOnModified_)
 	continue; // Trigger was written by current instruction.
 
       if (not trig.instCountdown(prevPrivMode, prevVirtMode))
