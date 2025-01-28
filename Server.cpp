@@ -1455,10 +1455,10 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         {
           // This won't work correctly for segmented vector loads with partial segment
           // completion.
-          hart.injectException(bool(msg.type), msg.address, msg.resource);
+          hart.injectException(WhisperFlags(msg.flags).bits.load, msg.address, msg.resource);
           if (commandLog)
             fprintf(commandLog, "hart=%" PRIu32 " inject_exception 0x%" PRIxMAX " 0x%" PRIxMAX " 0x%" PRIxMAX "\n", hartId,
-                                uintmax_t(msg.type), uintmax_t(msg.address), uintmax_t(msg.resource));
+                                uintmax_t(WhisperFlags(msg.flags).bits.load), uintmax_t(msg.address), uintmax_t(msg.resource));
           break;
         }
 
