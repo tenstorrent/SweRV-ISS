@@ -4953,7 +4953,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  if (sdtrigOn_ and icountTriggerHit())
 	    {
-	      if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
+	      if (takeTriggerAction(traceFile, pc_, 0, instCounter_, false))
 		return true;
 	    }
 
