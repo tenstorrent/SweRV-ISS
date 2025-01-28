@@ -482,9 +482,11 @@ namespace WdRiscv
     bool loadSnapshot(const std::string& filename,
                       const std::vector<std::pair<uint64_t,uint64_t>>& used_blocks);
 
-    /// If address tracing enabled, then write the accumulated data
-    /// addresses into the given file.
-    bool saveDataAddressTrace(const std::string& path, bool writeValues = false) const;
+    /// If address tracing enabled, then write the accumulated data addresses into the
+    /// given file. If skipClean is true, then skip lines that were never modified. If
+    /// includeValues is true, then include the values of the saved lines.
+    bool saveDataAddressTrace(const std::string& path, bool skipClean = false,
+                              bool includeValues = false) const;
 
     /// If instruction tracing enabled, then write the accumulated
     /// addresses into the given file.
@@ -718,21 +720,31 @@ namespace WdRiscv
     {
       uint64_t paddr = 0;   // Physical line number.
       uint64_t order = 0;   // Reference order.
+      bool clean = true;    // True if line is never written.
     };
     typedef std::unordered_map<uint64_t, LineEntry> LineMap;
 
     bool saveAddressTrace(std::string_view tag, const LineMap& lineMap,
-                          const std::string& path, bool writeValues = false) const;
+                          const std::string& path, bool skipClean = false,
+                          bool writeValues = false) const;
 
     bool loadAddressTrace(LineMap& lineMap, uint64_t& refCount, const std::string& path);
 
     /// Add line of given address to the data line address trace.
-    void traceDataLine(uint64_t vaddr, uint64_t paddr)
-    { dataLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, memRefCount_++}; }
+    void traceDataLine(uint64_t vaddr, uint64_t paddr, bool write = false)
+    {
+      auto& entry = dataLineMap_[vaddr >> lineShift_];
+
+      entry.paddr = paddr >> lineShift_;
+      entry.order = memRefCount_++;
+      entry.clean = entry.clean and not write;
+    }
 
     /// Add line of given address to the instruction line address trace.
     void traceInstructionLine(uint64_t vaddr, uint64_t paddr)
-    { instrLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, memRefCount_++}; }
+    {
+      instrLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, memRefCount_++, true};
+    }
 
   private:
 

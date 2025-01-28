@@ -1370,6 +1370,14 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           reply.type = Invalid;
 	break;
 
+      case McmSkipReadChk:
+        if (commandLog)
+          fprintf(commandLog, "hart=%" PRIu32 " mskipreadchk 0x%" PRIx64 " 0x%" PRIx32 " %" PRIu64 "\n",
+                  hartId, msg.address, msg.size, msg.value);
+        if (not system_.mcmSkipReadDataCheck(msg.address, msg.size, msg.value))
+          reply.type = Invalid;
+        break;
+
       case PageTableWalk:
         doPageTableWalk(hart, reply);
         break;

@@ -2091,7 +2091,7 @@ Hart<URV>::fastStore(const DecodedInst* di, URV addr, STORE_TYPE storeVal)
 	}
 
       if (dataLineTrace_)
-	memory_.traceDataLine(addr, addr);
+	memory_.traceDataLine(addr, addr, true /*write*/);
 
       ldStWrite_ = true;
       ldStData_ = storeVal;
@@ -2234,6 +2234,9 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
       return true;
     }
 
+  if (dataLineTrace_)
+    memory_.traceDataLine(virtAddr, pa1, true /*write*/);
+
   if (ooo_)
     {
       if (perfApi_)
@@ -2262,9 +2265,6 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
     memory_.invalidateOtherHartLr(hartIx_, pa2, ldStSize_);
 
   memWrite(pa1, pa2, storeVal);
-
-  if (dataLineTrace_)
-    memory_.traceDataLine(virtAddr, pa1);
 
   STORE_TYPE temp = 0;
   memPeek(pa1, pa2, temp, false /*usePma*/);
@@ -2872,7 +2872,10 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
   if (di->isVector())
     return 0;
 
-  if (clearTinstOnCboInval_)
+  if (clearTinstOnCboInval_ and di->instId() == InstId::cbo_inval)
+    return 0;
+
+  if (clearTinstOnCboFlush_ and di->instId() == InstId::cbo_flush)
     return 0;
 
   // Otherwise we write a transformed instruction.
@@ -4961,7 +4964,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  if (sdtrigOn_ and icountTriggerHit())
 	    {
-	      if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
+	      if (takeTriggerAction(traceFile, pc_, 0, instCounter_, false))
 		return true;
 	    }
 
@@ -10204,26 +10207,42 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
     }
 
   auto& tlb = virtMode_ ? virtMem_.vsTlb_ : virtMem_.tlb_;
+  auto vmid = virtMem_.vmid();
 
   if (di->op0() == 0 and di->op1() == 0)
-    tlb.invalidate();
+    {
+      if (virtMode_)
+        tlb.invalidateVmid(vmid);
+      else
+        tlb.invalidate();
+    }
   else if (di->op0() == 0 and di->op1() != 0)
     {
       URV asid = intRegs_.read(di->op1());
-      tlb.invalidateAsid(asid);
+      if (virtMode_)
+        tlb.invalidateAsidVmid(asid, vmid);
+      else
+        tlb.invalidateAsid(asid);
     }
   else if (di->op0() != 0 and di->op1() == 0)
     {
       URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
-      tlb.invalidateVirtualPage(vpn);
+      if (virtMode_)
+        tlb.invalidateVirtualPageVmid(vpn, vmid);
+      else
+        tlb.invalidateVirtualPage(vpn);
     }
   else
     {
       URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV asid = intRegs_.read(di->op1());
-      tlb.invalidateVirtualPageAsid(vpn, asid);
+
+      if (virtMode_)
+        tlb.invalidateVirtualPageAsidVmid(vpn, asid, vmid);
+      else
+        tlb.invalidateVirtualPageAsid(vpn, asid);
     }
 
 #if 0

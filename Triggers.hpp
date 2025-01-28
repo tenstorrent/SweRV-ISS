@@ -555,8 +555,11 @@ namespace WdRiscv
         return false;
       Icount<URV>& icount = data1_.icount_;
 
-      icount.count_ = icount.count_? icount.count_ - 1 : 0;
-      icount.pending_ = not icount.count_;
+      if (icount.count_)
+        {
+          icount.count_ = icount.count_ - 1;
+          icount.pending_ = not icount.count_;
+        }
       return icount.pending_;
     }
 

@@ -1770,6 +1770,10 @@ namespace WdRiscv
     void enableClearTinstOnCboInval(bool flag)
     { clearTinstOnCboInval_ = flag; }
 
+    /// Clear MTINST/HTINST on cbo.flush if flag is true.
+    void enableClearTinstOnCboFlush(bool flag)
+    { clearTinstOnCboFlush_ = flag; }
+
     /// Enable/disable clearing of reservation set after xRET
     void enableCancelLrOnTrap(bool flag)
     { cancelLrOnTrap_ = flag; }
@@ -5467,6 +5471,7 @@ namespace WdRiscv
     bool lastEbreak_ = false;
 
     bool clearTinstOnCboInval_ = false;
+    bool clearTinstOnCboFlush_ = false;
 
     bool targetProgFinished_ = false;
     bool stepResult_ = false;        // Set by singleStep on caught exception (program success/fail).

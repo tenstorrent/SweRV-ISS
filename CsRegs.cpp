@@ -4530,6 +4530,25 @@ CsRegs<URV>::addMachineFields()
 
   if (rv32_)
     {
+       setCsrFields(CsrNumber::MSTATEEN0, {{"C", 1}, {"FCSR", 1}, {"JVT", 1}, {"zero", 29}});
+       setCsrFields(CsrNumber::MSTATEEN0H, {{"zero", 24},{"P1P13", 1},{"CNTXT", 1}, {"IMSIC", 1}, {"AIA", 1},
+                                           {"CSRIND",1}, {"zero",  1},{"ENVCFG",1}, {"SEO", 1}});
+       // no fields defined yet for mstateen1,2,3
+       setCsrFields(CsrNumber::MSTATEEN1H, {{"zero", 31}, {"SEO", 1}});
+       setCsrFields(CsrNumber::MSTATEEN2H, {{"zero", 31}, {"SEO", 1}});
+       setCsrFields(CsrNumber::MSTATEEN3H, {{"zero", 31}, {"SEO", 1}});
+    }
+  else
+    {
+       setCsrFields(CsrNumber::MSTATEEN0, {{"C", 1},    {"FCSR", 1}, {"JVT", 1}, {"zero",  53}, {"P1P13", 1}, {"CNTXT",1},
+                                           {"IMSIC", 1},{"AIA",1}, {"CSRIND",1}, {"zero",1}, {"ENVCFG", 1}, {"SEO",  1}});
+       setCsrFields(CsrNumber::MSTATEEN1, {{"zero", 63}, {"SEO", 1}});
+       setCsrFields(CsrNumber::MSTATEEN2, {{"zero", 63}, {"SEO", 1}});
+       setCsrFields(CsrNumber::MSTATEEN3, {{"zero", 63}, {"SEO", 1}});
+    }
+
+  if (rv32_)
+    {
       setCsrFields(CsrNumber::MSTATUS,
         {{"UIE",  1}, {"SIE",  1}, {"res1", 1}, {"MIE",   1},
          {"UPIE", 1}, {"SPIE", 1}, {"UBE",  1}, {"MPIE",  1},
@@ -4708,6 +4727,11 @@ CsRegs<URV>::addSupervisorFields()
         {{"FIOM", 1}, {"res0",  3}, {"CBIE", 2}, {"CBCFE", 1},
          {"CBZE", 1}, {"res1", 24}, {"PMM",  2}, {"res2", xlen - 34}});
     }
+
+  if (rv32_)
+     setCsrFields(CsrNumber::SSTATEEN0, {{"C", 1}, {"FCSR", 1}, {"JVT", 1}, {"zero", 29}});
+  else
+     setCsrFields(CsrNumber::SSTATEEN0, {{"C", 1}, {"FCSR", 1}, {"JVT", 1}, {"zero",  61}});
 }
 
 
@@ -4884,6 +4908,24 @@ CsRegs<URV>::addHypervisorFields()
          {"res6", 29}, {"SD",   1}});
       setCsrFields(Csrn::VSATP,
         {{"PPN", 44}, {"ASID", 16}, {"MODE", 4}});
+    }
+  if (rv32_)
+    {
+       setCsrFields(CsrNumber::HSTATEEN0, {{"C", 1}, {"FCSR", 1}, {"JVT", 1}, {"zero", 29}});
+       setCsrFields(CsrNumber::HSTATEEN0H, {{"zero", 25}, {"CNTXT", 1}, {"IMSIC", 1}, {"AIA", 1},
+                                           {"CSRIND",1}, {"zero",  1},{"ENVCFG",1}, {"SEO", 1}});
+       // no fields defined yet for Hstateen1,2,3
+       setCsrFields(CsrNumber::HSTATEEN1H, {{"zero", 31}, {"SEO", 1}});
+       setCsrFields(CsrNumber::HSTATEEN2H, {{"zero", 31}, {"SEO", 1}});
+       setCsrFields(CsrNumber::HSTATEEN3H, {{"zero", 31}, {"SEO", 1}});
+    }
+  else
+    {
+       setCsrFields(CsrNumber::HSTATEEN0, {{"C", 1}, {"FCSR", 1}, {"JVT", 1}, {"zero",  54}, {"CNTXT",1},
+                                           {"IMSIC", 1},{"AIA",1}, {"CSRIND",1}, {"zero",1}, {"ENVCFG",1}, {"SEO",  1}});
+       setCsrFields(CsrNumber::HSTATEEN1, {{"zero", 63}, {"SEO", 1}});
+       setCsrFields(CsrNumber::HSTATEEN2, {{"zero", 63}, {"SEO", 1}});
+       setCsrFields(CsrNumber::HSTATEEN3, {{"zero", 63}, {"SEO", 1}});
     }
 }
 

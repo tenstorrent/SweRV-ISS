@@ -138,6 +138,9 @@ namespace WdRiscv
     bool mievictCommand(Hart<URV>& hart, const std::string& line,
 			const std::vector<std::string>& tokens);
 
+    bool mskipReadChkCommand(Hart<URV>& hart, const std::string& line,
+                             const std::vector<std::string>& tokens);
+
     bool translateCommand(Hart<URV>& hart, const std::string& line,
 			  const std::vector<std::string>& tokens);
 
