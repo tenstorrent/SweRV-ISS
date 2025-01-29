@@ -4905,7 +4905,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
           // We want amo instructions to print in the same order as executed.
 	  // This avoid interleaving of amo execution and tracing.
 	  static std::mutex execMutex;
-	  auto lock = (ownTrace_)? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(execMutex);
+	  auto lock = (ownTrace_ or !traceFile)? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(execMutex);
 
           if (not hartIx_)
 	    tickTime();  // Hart 0 increments timer.
