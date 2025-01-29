@@ -1527,11 +1527,10 @@ CsRegs<URV>::writeSie(URV value, bool recordWr)
   if (mideleg and mvien and mvip)
     {
       URV smask = mvien->read() & ~mideleg->read();
+      sieMask &= ~ smask;  // Don't write SIE where SIE is indepedent of MIE
       // We always write the shadow SIE on SIE write to match RTL behavior. This is legal
       // because when the writable SIE portion is enabled, its value is undefined by the spec.
-      URV mask = smask | sieMask;
-      shadowSie_ = (shadowSie_ & ~mask) | (value & mask);
-      sieMask &= ~ smask;  // Don't write SIE where SIE is indepedent of MIE
+      shadowSie_ = value;
     }
 
   sie->setWriteMask(sieMask);
