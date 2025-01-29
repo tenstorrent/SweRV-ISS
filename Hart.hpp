@@ -893,6 +893,17 @@ namespace WdRiscv
     bool getSeiPin() const
     { return seiPin_; }
 
+    /// Set/clear low priorty exception for fetch/ld scenarios. For vector
+    /// loads, we use the element index to determine the exception. This is
+    /// useful for TB to inject errors.
+    void injectException(bool isLoad, URV code, unsigned elemIx)
+    {
+      injectException_ = static_cast<ExceptionCause>(code);
+      injectExceptionIsLd_ = isLoad;
+      injectExceptionElemIx_ = elemIx;
+    }
+
+
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
     /// address of the instruction is identical to the given address.
@@ -2901,7 +2912,7 @@ namespace WdRiscv
     /// load/store instructions (e.g. hlv.b).
     ExceptionCause determineLoadException(uint64_t& addr1, uint64_t& addr2,
                                           uint64_t& gaddr1, uint64_t& gaddr2,
-					  unsigned ldSize, bool hyper);
+					  unsigned ldSize, bool hyper, unsigned elemIx = 0);
 
     /// Helper to load method. Vaddr is the virtual address. Paddr1 is the physical
     /// address.  Paddr2 is identical to paddr1 for non-page-crossing loads; otherwise, it
@@ -5516,6 +5527,11 @@ namespace WdRiscv
     TT_STEE::Stee stee_;
     bool steeInsec1_ = false;  // True if insecure access to a secure region.
     bool steeInsec2_ = false;  // True if insecure access to a secure region.
+
+    // Exceptions injected by user.
+    ExceptionCause injectException_ = ExceptionCause::NONE;
+    bool injectExceptionIsLd_ = false;
+    unsigned injectExceptionElemIx_ = 0;
 
     // Landing pad (zicfilp)
     bool mLpEnabled_ = false;
