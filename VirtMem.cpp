@@ -674,6 +674,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
   tlbEntry.virtPageNum_ = address >> pageBits_;
   tlbEntry.physPageNum_ = pa >> pageBits_;
   tlbEntry.asid_ = asid_;
+  tlbEntry.wid_ = wid_;
   tlbEntry.valid_ = true;
   tlbEntry.global_ = global;
   tlbEntry.user_ = pte.user();
@@ -832,6 +833,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   tlbEntry.physPageNum_ = pa >> pageBits_;
   tlbEntry.asid_ = vsAsid_;
   tlbEntry.vmid_ = vmid_;
+  tlbEntry.wid_ = wid_;
   tlbEntry.valid_ = true;
   tlbEntry.global_ = global;
   tlbEntry.user_ = pte.user();
@@ -1011,6 +1013,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   tlbEntry.physPageNum_ = pa >> pageBits_;
   tlbEntry.asid_ = vsAsid_;
   tlbEntry.vmid_ = vmid_;
+  tlbEntry.wid_ = wid_;
   tlbEntry.valid_ = true;
   tlbEntry.global_ = global;
   tlbEntry.user_ = pte.user();

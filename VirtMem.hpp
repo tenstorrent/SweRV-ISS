@@ -586,6 +586,11 @@ namespace WdRiscv
     void setVmid(uint32_t vmid)
     { vmid_ = vmid; }
 
+    /// Set the trusted world id (wid). This is for the static trusted execution
+    /// environmen (STEE).
+    void setWorldId(uint32_t wid)
+    { wid_ = wid; }
+
     /// Make executable pages also readable (supports MXR bit in
     /// MSTATUS/SSTATUS).  This affects both stages of translation in
     /// virtual mode.
@@ -727,6 +732,10 @@ namespace WdRiscv
     uint32_t vmid() const
     { return vmid_; }
 
+    /// Return the current trused world id.
+    uint32_t worldId() const
+    { return wid_; }
+
     /// Return whether previous translation was page crossing.
     bool pageCross(bool flag) const
     { return (flag)? fetchPageCross_ : dataPageCross_; }
@@ -820,15 +829,16 @@ namespace WdRiscv
     };
 
     Memory& memory_;
-    uint64_t rootPage_ = 0;        // Root page for S mode (V==0).
-    uint64_t vsRootPage_ = 0;      // Root page of VS 1st stage translation (V == 1).
-    uint64_t rootPageStage2_ = 0;  // Root page of VS 2nd stage translation (V == 1).
+    uint64_t rootPage_ = 0;         // Root page for S mode (V==0).
+    uint64_t vsRootPage_ = 0;       // Root page of VS 1st stage translation (V == 1).
+    uint64_t rootPageStage2_ = 0;   // Root page of VS 2nd stage translation (V == 1).
     Mode mode_ = Mode::Bare;
     Mode vsMode_ = Mode::Bare;
-    Mode stage2Mode_ = Mode::Bare; // For 2nd stage translation.
-    uint32_t asid_ = 0;
-    uint32_t vsAsid_ = 0;
-    uint32_t vmid_ = 0;
+    Mode stage2Mode_ = Mode::Bare;  // For 2nd stage translation.
+    uint32_t asid_ = 0;             // Current address space identifier.
+    uint32_t vsAsid_ = 0;           // Current virtual address space id.
+    uint32_t vmid_ = 0;             // Current virtual machine id.
+    uint32_t wid_ = 0;              // Current world id (for STEE).
     unsigned mPmBits_ = 0;          // Pointer asking for M mode.
     unsigned sPmBits_ = 0;          // Pointer masking for HS translation.
     unsigned vsPmBits_ = 0;         // Pointer masking for VS translation.

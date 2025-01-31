@@ -51,32 +51,33 @@ Hart<URV>::execHfence_vvma(const DecodedInst* di)
   auto& stage2Tlb = virtMem_.stage2Tlb_;
 
   auto vmid = virtMem_.vmid();
+  uint32_t wid = steeEnabled_? stee_.secureWorld() : 0;
 
   if (di->op0() == 0 and di->op1() == 0)
     {
-      vsTlb.invalidateVmid(vmid);
-      stage2Tlb.invalidateVmid(vmid);
+      vsTlb.invalidateVmid(vmid, wid);
+      stage2Tlb.invalidateVmid(vmid, wid);
     }
   else if (di->op0() == 0 and di->op1() != 0)
     {
       URV asid = intRegs_.read(di->op1());
-      vsTlb.invalidateAsidVmid(asid, vmid);
-      stage2Tlb.invalidateAsidVmid(asid, vmid);
+      vsTlb.invalidateAsidVmid(asid, vmid, wid);
+      stage2Tlb.invalidateAsidVmid(asid, vmid, wid);
     }
   else if (di->op0() != 0 and di->op1() == 0)
     {
       URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
-      vsTlb.invalidateVirtualPageVmid(vpn, vmid);
-      stage2Tlb.invalidateVmid(vmid);
+      vsTlb.invalidateVirtualPageVmid(vpn, vmid, wid);
+      stage2Tlb.invalidateVmid(vmid, wid);
     }
   else
     {
       URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV asid = intRegs_.read(di->op1());
-      vsTlb.invalidateVirtualPageAsid(vpn, asid);
-      stage2Tlb.invalidateAsidVmid(asid, vmid);
+      vsTlb.invalidateVirtualPageAsid(vpn, asid, wid);
+      stage2Tlb.invalidateAsidVmid(asid, vmid, wid);
     }
 }
 
@@ -109,6 +110,7 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
   auto& vsTlb = virtMem_.vsTlb_;
 
   auto vmid = virtMem_.vmid();
+  uint32_t wid = steeEnabled_? stee_.secureWorld() : 0;
 
   // Some implementations do not store guest-physical-addresses in the TLB. For those, we
   // over-invalidate.
@@ -117,24 +119,24 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
   // Invalidate whole VS TLB. This is overkill.
   if (di->op0() == 0 and di->op1() == 0)
     {
-      stage2Tlb.invalidateVmid(vmid);
-      vsTlb.invalidateVmid(vmid);
+      stage2Tlb.invalidateVmid(vmid, wid);
+      vsTlb.invalidateVmid(vmid, wid);
     }
   else if (di->op0() == 0 and di->op1() != 0)
     {
       URV vmid = intRegs_.read(di->op1());
-      stage2Tlb.invalidateVmid(vmid);
-      vsTlb.invalidateVmid(vmid);
+      stage2Tlb.invalidateVmid(vmid, wid);
+      vsTlb.invalidateVmid(vmid, wid);
     }
   else if (di->op0() != 0 and di->op1() == 0)
     {
       URV addr = intRegs_.read(di->op0()) << 2;
       uint64_t vpn = virtMem_.pageNumber(addr);
       if (useGpa)
-	stage2Tlb.invalidateVirtualPageVmid(vpn, vmid);
+	stage2Tlb.invalidateVirtualPageVmid(vpn, vmid, wid);
       else
-        stage2Tlb.invalidateVmid(vmid);
-      vsTlb.invalidateVmid(vmid);
+        stage2Tlb.invalidateVmid(vmid, wid);
+      vsTlb.invalidateVmid(vmid, wid);
     }
   else
     {
@@ -142,11 +144,11 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV vmid = intRegs_.read(di->op1());
       if (useGpa)
-        stage2Tlb.invalidateVirtualPageVmid(vpn, vmid);
+        stage2Tlb.invalidateVirtualPageVmid(vpn, vmid, wid);
       else
-        stage2Tlb.invalidateVmid(vmid);
+        stage2Tlb.invalidateVmid(vmid, wid);
 
-      vsTlb.invalidateVmid(vmid);
+      vsTlb.invalidateVmid(vmid, wid);
     }
 }
 

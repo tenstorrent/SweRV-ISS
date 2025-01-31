@@ -3509,6 +3509,7 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
     {
       unsigned world = val & 1;
       stee_.setSecureWorld(world);
+      virtMem_.setWorldId(world);
       return;
     }
 
@@ -10208,11 +10209,12 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
 
   auto& tlb = virtMode_ ? virtMem_.vsTlb_ : virtMem_.tlb_;
   auto vmid = virtMem_.vmid();
+  uint32_t wid = steeEnabled_? stee_.secureWorld() : 0;
 
   if (di->op0() == 0 and di->op1() == 0)
     {
       if (virtMode_)
-        tlb.invalidateVmid(vmid);
+        tlb.invalidateVmid(vmid, wid);
       else
         tlb.invalidate();
     }
@@ -10220,18 +10222,18 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
     {
       URV asid = intRegs_.read(di->op1());
       if (virtMode_)
-        tlb.invalidateAsidVmid(asid, vmid);
+        tlb.invalidateAsidVmid(asid, vmid, wid);
       else
-        tlb.invalidateAsid(asid);
+        tlb.invalidateAsid(asid, wid);
     }
   else if (di->op0() != 0 and di->op1() == 0)
     {
       URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
       if (virtMode_)
-        tlb.invalidateVirtualPageVmid(vpn, vmid);
+        tlb.invalidateVirtualPageVmid(vpn, vmid, wid);
       else
-        tlb.invalidateVirtualPage(vpn);
+        tlb.invalidateVirtualPage(vpn, wid);
     }
   else
     {
@@ -10240,9 +10242,9 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       URV asid = intRegs_.read(di->op1());
 
       if (virtMode_)
-        tlb.invalidateVirtualPageAsidVmid(vpn, asid, vmid);
+        tlb.invalidateVirtualPageAsidVmid(vpn, asid, vmid, wid);
       else
-        tlb.invalidateVirtualPageAsid(vpn, asid);
+        tlb.invalidateVirtualPageAsid(vpn, asid, wid);
     }
 
 #if 0

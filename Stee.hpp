@@ -75,6 +75,10 @@ namespace TT_STEE      // TensTorrent Static Trusted Execution Environment.
     void setSecureWorld(unsigned world)
     { secWorld_ = world; }
 
+    /// Return current secure world id.
+    unsigned secureWorld() const
+    { return secWorld_; }
+
   private:
 
     uint64_t zmask_ = uint64_t(7) << 52;  // Bits 52, 53, and 54.

@@ -30,6 +30,7 @@ namespace WdRiscv
     uint64_t counter_ = 0;   // 2-bit counter for replacement.
     uint32_t asid_ = 0;      // Address space identifier.
     uint32_t vmid_ = 0;      // Virtual machine identifier.
+    uint32_t wid_ = 0;       // Secure world id (STEE related).
     bool valid_ = false;
     bool global_ = false;    //
     bool user_ = false;      // User-mode entry if true.
@@ -158,22 +159,22 @@ namespace WdRiscv
     void setTlbSize(unsigned size)
     { entries_.resize(size); }
 
-    /// Insert a TLB entry for the given translation parameters. If TLB is full
-    /// the contents of the  least recently accessed slot are replaced by the
-    /// given parameters. Return true on success and false otherwise.
-    bool insertEntry(uint64_t virtPageNum, uint64_t physPageNum,
-                     uint32_t asid, bool global, bool isUser, bool read,
-                     bool write, bool exec);
+    /// Insert a TLB entry for the given translation parameters. If TLB is full the
+    /// contents of the least recently accessed slot are replaced by the given
+    /// parameters. Return true on success and false otherwise.
+    bool insertEntry(uint64_t virtPageNum, uint64_t physPageNum, uint32_t asid,
+                     uint32_t wid, bool global, bool isUser, bool read, bool write,
+                     bool exec);
 
     /// Insert copy of given entry. Return true on success and false otherwise.
     bool insertEntry(const TlbEntry& entry);
 
     /// Invalidate every entry matching given address space identifier unless it is
     /// global.
-    void invalidateAsid(uint32_t asid)
+    void invalidateAsid(uint32_t asid, uint32_t wid)
     {
       for (auto& entry : entries_)
-	if (entry.asid_ == asid and not entry.global_)
+	if ((not entry.global_) and entry.asid_ == asid and entry.wid_ == wid)
           {
             entry.valid_ = false;
             entry.counter_ = 0;
@@ -181,10 +182,10 @@ namespace WdRiscv
     }
 
     /// Invalidate every entry matching given virtual-machine identifier.
-    void invalidateVmid(uint32_t vmid)
+    void invalidateVmid(uint32_t vmid, uint32_t wid)
     {
       for (auto& entry : entries_)
-	if (entry.vmid_ == vmid)
+	if (entry.vmid_ == vmid and entry.wid_ == wid)
           {
             entry.valid_ = false;
             entry.counter_ = 0;
@@ -192,10 +193,11 @@ namespace WdRiscv
     }
 
     /// Invalidate every entry matching given vmid and address space identifier.
-    void invalidateAsidVmid(uint32_t asid, uint32_t vmid)
+    void invalidateAsidVmid(uint32_t asid, uint32_t vmid, uint32_t wid)
     {
       for (auto& entry : entries_)
-	if (entry.vmid_ == vmid and entry.asid_ == asid and (not entry.global_))
+	if ((not entry.global_) and entry.vmid_ == vmid and entry.asid_ == asid and
+            entry.wid_ == wid)
           {
             entry.valid_ = false;
             entry.counter_ = 0;
@@ -203,13 +205,14 @@ namespace WdRiscv
     }
 
     /// Invalidate every entry matching given virtual page number.
-    void invalidateVirtualPage(uint64_t vpn)
+    void invalidateVirtualPage(uint64_t vpn, uint32_t wid)
     {
       for (auto& entry : entries_)
         {
           unsigned size = sizeIn4kBytes(mode_, entry.level_);
 
-          if (entry.virtPageNum_ <= vpn and vpn < entry.virtPageNum_ + size)
+          if (entry.wid_ == wid and entry.virtPageNum_ <= vpn and
+              vpn < entry.virtPageNum_ + size)
             {
               entry.valid_ = false;
               entry.counter_ = 0;
@@ -219,14 +222,14 @@ namespace WdRiscv
 
     /// Invalidate every entry matching given virtual page number and address space
     /// identifer except for global entries.
-    void invalidateVirtualPageAsid(uint64_t vpn, uint32_t asid)
+    void invalidateVirtualPageAsid(uint64_t vpn, uint32_t asid, uint32_t wid)
     {
       for (auto& entry : entries_)
         {
           unsigned size = sizeIn4kBytes(mode_, entry.level_);
 
           if (entry.virtPageNum_ <= vpn and vpn < entry.virtPageNum_ + size and
-              entry.asid_ == asid and not entry.global_)
+              entry.asid_ == asid and entry.wid_ == wid and not entry.global_)
             {
               entry.valid_ = false;
               entry.counter_ = 0;
@@ -236,14 +239,14 @@ namespace WdRiscv
 
     /// Invalidate every entry matching given virtual page number and virtual machine
     /// identifer except for global entries.
-    void invalidateVirtualPageVmid(uint64_t vpn, uint32_t vmid)
+    void invalidateVirtualPageVmid(uint64_t vpn, uint32_t vmid, uint32_t wid)
     {
       for (auto& entry : entries_)
         {
           unsigned size = sizeIn4kBytes(mode_, entry.level_);
 
           if (entry.virtPageNum_ <= vpn and vpn < entry.virtPageNum_ + size and
-              entry.vmid_ == vmid)
+              entry.vmid_ == vmid and entry.wid_ == wid)
             {
               entry.valid_ = false;
               entry.counter_ = 0;
@@ -253,14 +256,16 @@ namespace WdRiscv
 
     /// Invalidate every entry matching given virtual page number, asid, and virtual
     /// machine identifer except for global entries.
-    void invalidateVirtualPageAsidVmid(uint64_t vpn, uint32_t asid, uint32_t vmid)
+    void invalidateVirtualPageAsidVmid(uint64_t vpn, uint32_t asid, uint32_t vmid,
+                                       uint32_t wid)
     {
       for (auto& entry : entries_)
         {
           unsigned size = sizeIn4kBytes(mode_, entry.level_);
 
           if (entry.virtPageNum_ <= vpn and vpn < entry.virtPageNum_ + size and
-              entry.vmid_ == vmid and entry.asid_ == asid and not entry.global_)
+              entry.vmid_ == vmid and entry.asid_ == asid and entry.wid_ == wid and
+              not entry.global_)
             {
               entry.valid_ = false;
               entry.counter_ = 0;
