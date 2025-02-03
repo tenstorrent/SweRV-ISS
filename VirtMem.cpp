@@ -464,7 +464,7 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 	  if (entry->valid_)
 	    {
 	      // Use TLB entry.
-	      pbmt_ = Pbmt(entry->pbmt_);
+	      vsPbmt_ = Pbmt(entry->pbmt_);
 	      gpa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
 	    }
 	}
