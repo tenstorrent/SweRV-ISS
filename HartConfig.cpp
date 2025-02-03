@@ -1663,6 +1663,15 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.configTriggerUseTcontrol(flag);
     }
 
+  /// Enable trigger icount such that it counts down
+  /// on an instruction write to icount.
+  tag = "icount_down_on_modified";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.configTriggerIcountOnModified(flag);
+    }
+
   tag = "trigger_types";
   if (config_ -> contains(tag))
     {
@@ -1847,6 +1856,24 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
       else
         hart.enableClearMtvalOnEbreak(flag);
+    }
+
+  tag = "clear_tinst_on_cbo_inval";
+  if (config_ -> contains(tag))
+    {
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.enableClearTinstOnCboInval(flag);
+    }
+
+  tag = "clear_tinst_on_cbo_flush";
+  if (config_ -> contains(tag))
+    {
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.enableClearTinstOnCboFlush(flag);
     }
 
   // This is used to reduce the frequency of timer interupts. By

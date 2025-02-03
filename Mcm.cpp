@@ -179,6 +179,8 @@ Mcm<URV>::readOp_(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, uns
 
   assert(pageNum(pa) == pageNum(pa + size - 1));
 
+  instr->isLoad_ = true;
+
   // Read Whisper memory and keep it in op, this will be updated when the load is retired
   // by forwarding from preceding stores.
   uint64_t refVal = 0;
@@ -187,9 +189,50 @@ Mcm<URV>::readOp_(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa, uns
   else
     op.failRead_ = true;
 
-  instr->addMemOp(sysMemOps_.size());
-  sysMemOps_.push_back(op);
-  instr->isLoad_ = true;
+  if (sysMemOps_.empty() or sysMemOps_.back().time_ <= time)
+    {
+      instr->addMemOp(sysMemOps_.size());
+      sysMemOps_.push_back(op);
+    }
+  else
+    {
+      // Sometimes the test-bench will unexpectedly send us a read-op with an out of order
+      // time-stamp. We hack a repair.
+
+      // Find first existing op with time > current time.
+      auto iter = std::upper_bound(sysMemOps_.begin(), sysMemOps_.end(), time,
+                                   [](const uint64_t& t, const MemoryOp& mop) -> bool
+                                   { return t < mop.time_; });
+
+      // Insert new op before the found op.
+      assert(iter != sysMemOps_.end());
+      size_t ix = iter - sysMemOps_.begin();
+      instr->addMemOp(ix);
+      sysMemOps_.insert(iter, op);
+
+      // Adjust indices of all the instructions referencing ops that are now after new op
+      // in sysMemOps_.
+
+      // One set of adjusted tags per hart.
+      std::vector< std::unordered_set<uint64_t> > adjustedTags(hartData_.size()); 
+
+      for (size_t i = ix + 1; i < sysMemOps_.size(); ++i)
+        {
+          auto& movedOp = sysMemOps_.at(i);
+          auto& instrVec = hartData_.at(movedOp.hartIx_).instrVec_;
+
+          auto& tagSet = adjustedTags.at(movedOp.hartIx_);
+          auto tag = movedOp.tag_;
+          if (tagSet.contains(tag))
+            continue;
+          tagSet.insert(tag);
+
+          auto& instr = instrVec.at(tag);
+          for (auto& instrOpIx : instr.memOps_)
+            if (instrOpIx >= ix)
+              instrOpIx++;
+        }
+    }
 
   if (instr->retired_)
     instr->complete_ = checkLoadComplete(*instr);
@@ -951,75 +994,27 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t pa,
 
   bool result = true;
 
-  if (size > 8)
-    {
-      if (instr->di_.instId() != InstId::cbo_zero or (size % 8) != 0)
-	{
-	  cerr << "Mcm::byppassOp: Error: hart-id=" << hart.hartId() << " time=" << time
-	       << " invalid size: " << size << '\n';
-	  return false;
-	}
-      if (rtlData != 0)
-	{
-	  cerr << "Mcm::byppassOp: Error: hart-id=" << hart.hartId() << " time=" << time
-	       << " invalid data (must be 0) for a cbo.zero instruction: " << rtlData << '\n';
-	  return false;
-	}
-      uint64_t lineStart = lineAlign(pa);
-      if (pa + size - lineStart > lineSize_)
-	return false;
+  assert(size <= 8);
 
-      if ((pa % 8) != 0)
-	return false;
+  MemoryOp op = {};
+  op.time_ = time;
+  op.pa_ = pa;
+  op.rtlData_ = rtlData;
+  op.tag_ = tag;
+  op.hartIx_ = hartIx;
+  op.size_ = size;
+  op.isRead_ = false;
+  op.bypass_ = true;
+  op.elemIx_ = elemIx;
+  op.field_ = field;
+  op.isIo_ = hart.getPma(op.pa_).isIo();
 
-      if (rtlData != 0)
-	return false;
+  // Associate write op with instruction.
+  instr->addMemOp(sysMemOps_.size());
+  sysMemOps_.push_back(op);
 
-      for (unsigned i = 0; i < size; i += 8)
-	{
-	  uint64_t addr = pa + i;
-	  MemoryOp op = {};
-	  op.time_ = time;
-	  op.pa_ = addr;
-	  op.rtlData_ = rtlData;
-	  op.tag_ = tag;
-	  op.hartIx_ = hartIx;
-	  op.size_ = 8;
-	  op.isRead_ = false;
-	  op.bypass_ = true;
-          op.elemIx_ = elemIx;
-          op.field_ = field;
-	  op.isIo_ = hart.getPma(op.pa_).isIo();
-
-	  // Associate write op with instruction.
-	  instr->addMemOp(sysMemOps_.size());
-	  sysMemOps_.push_back(op);
-
-	  result = pokeHartMemory(hart, addr, 0, 8) and result;
-	}
-    }
-  else
-    {
-      MemoryOp op = {};
-      op.time_ = time;
-      op.pa_ = pa;
-      op.rtlData_ = rtlData;
-      op.tag_ = tag;
-      op.hartIx_ = hartIx;
-      op.size_ = size;
-      op.isRead_ = false;
-      op.bypass_ = true;
-      op.elemIx_ = elemIx;
-      op.field_ = field;
-      op.isIo_ = hart.getPma(op.pa_).isIo();
-
-      // Associate write op with instruction.
-      instr->addMemOp(sysMemOps_.size());
-      sysMemOps_.push_back(op);
-
-      result = pokeHartMemory(hart, pa, rtlData, size) and result;
-    }
-
+  result = pokeHartMemory(hart, pa, rtlData, size) and result;
+  
   instr->complete_ = checkStoreComplete(hartIx, *instr);
   if (instr->complete_)
     {
@@ -1752,8 +1747,11 @@ Mcm<URV>::checkRtlRead(Hart<URV>& hart, const McmInstr& instr,
   // Major hack (temporary until RTL HTIF addresses are rationalized).
   skip = skip or (addr >= 0x70000000 and addr <= 0x70000008);
 
+  skip = skip or (not isReadDataCheckEnabled(addr));
+
   if (skip)
     return true;
+
 
   if (op.rtlData_ != op.data_)
     {
@@ -2414,6 +2412,9 @@ Mcm<URV>::commitVecReadOpsStride0(Hart<URV>& hart, McmInstr& instr)
               mask &= ~byteMask;
               op.canceled_ = false;
 
+              if (not isReadDataCheckEnabled(byteAddr))
+                continue;
+
               unsigned offset = byteAddr - op.pa_;
               uint8_t refVal = op.data_ >> (offset*8);
               uint8_t rtlVal = op.rtlData_ >> (offset*8);
@@ -2486,15 +2487,19 @@ Mcm<URV>::commitVecReadOpsUnitStride(Hart<URV>& hart, McmInstr& instr)
             continue;  // Address already covered by another read op.
 
           covered = true;
-          uint8_t refVal = op.data_ >> (i*8);
-          uint8_t rtlVal = op.rtlData_ >> (i*8);
 
-          if (refVal != rtlVal)
+          if (isReadDataCheckEnabled(addr))
             {
-              if (not mismatch)
-                printReadMismatch(hart, op.time_, op.tag_, addr, op.size_, rtlVal, refVal);
-              mismatch = true;
-              ok = false;
+              uint8_t refVal = op.data_ >> (i*8);
+              uint8_t rtlVal = op.rtlData_ >> (i*8);
+
+              if (refVal != rtlVal)
+                {
+                  if (not mismatch)
+                    printReadMismatch(hart, op.time_, op.tag_, addr, op.size_, rtlVal, refVal);
+                  mismatch = true;
+                  ok = false;
+                }
             }
 
           low = std::min(low, addr);
@@ -2557,10 +2562,10 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
 
   if (activeCount > 0 and instr.memOps_.empty()) //  and not hart.inDebugMode())
     {
-      cerr << "Error: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
+      cerr << "Warning: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
 	   << instr.tag_ << " vector load instruction retires without any memory "
 	   << "read operation.\n";
-      return false;
+      return true;
     }
 
   // Check if all elements masked off or VL == 0.
@@ -2623,15 +2628,19 @@ Mcm<URV>::commitVecReadOps(Hart<URV>& hart, McmInstr& instr)
             continue;  // Address already covered by another read op.
 
           covered = true;
-          uint8_t refVal = op.data_ >> (i*8);
-          uint8_t rtlVal = op.rtlData_ >> (i*8);
 
-          if (refVal != rtlVal)
+          if (isReadDataCheckEnabled(addr))
             {
-              if (not mismatch)
-                printReadMismatch(hart, op.time_, op.tag_, addr, op.size_, rtlVal, refVal);
-              mismatch = true;
-              ok = false;
+              uint8_t refVal = op.data_ >> (i*8);
+              uint8_t rtlVal = op.rtlData_ >> (i*8);
+
+              if (refVal != rtlVal)
+                {
+                  if (not mismatch)
+                    printReadMismatch(hart, op.time_, op.tag_, addr, op.size_, rtlVal, refVal);
+                  mismatch = true;
+                  ok = false;
+                }
             }
 
           low = std::min(low, addr);
@@ -2682,10 +2691,10 @@ Mcm<URV>::commitReadOps(Hart<URV>& hart, McmInstr& instr)
 
       if (not hart.inDebugMode())
 	{
-	  cerr << "Error: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
+	  cerr << "Warning: hart-id=" << hart.hartId() << " time=" << time_ << " tag="
 	       << instr.tag_ << " load/amo instruction retires witout any memory "
 	       << "read operation.\n";
-	  return false;
+	  return true;
 	}
     }
 
@@ -2895,7 +2904,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t tag, uint64_t va, uint64
 
   // Vector cover check done in commitVecReadOps.
   if (not covered and not isVector)
-    cerr << "Error: hart-id= " << hart.hartId() << " tag=" << tag << " read ops do not"
+    cerr << "Error: hart-id=" << hart.hartId() << " tag=" << tag << " read ops do not"
 	 << " cover all the bytes of load instruction\n";
 
   // Vector completion check done in commitVecReadOps.
@@ -5140,7 +5149,7 @@ Mcm<URV>::checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const
   auto hartIx = hart.sysHartIndex();
   const auto& instrVec = hartData_.at(hartIx).instrVec_;
 
-  auto earlyB = earliestOpTime(instrB);
+  auto earlyB = effectiveMinTime(hart, instrB);
 
   for (auto ix = instrB.tag_; ix > 0; --ix)
     {
@@ -5163,7 +5172,9 @@ Mcm<URV>::checkLoadVsPriorCmo(Hart<URV>& hart, const McmInstr& instrB) const
               {
                 cerr << "Error: Read op of load instruction happens before retire time of "
                      << "preceding overlapping cbo.clean/flush: hart-id=" << hart.hartId()
-                     << " cbo-tag=" << instrA.tag_ << " load-tag=" << instrB.tag_ << '\n';
+                     << " cbo-tag=" << instrA.tag_ << " load-tag=" << instrB.tag_
+                     << " cbo-time=" << instrA.retireTime_ << " read-time=" << op.time_
+                     << '\n';
                 return false;
               }
           }

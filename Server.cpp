@@ -1370,6 +1370,14 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           reply.type = Invalid;
 	break;
 
+      case McmSkipReadChk:
+        if (commandLog)
+          fprintf(commandLog, "hart=%" PRIu32 " mskipreadchk 0x%" PRIx64 " 0x%" PRIx32 " %" PRIu64 "\n",
+                  hartId, msg.address, msg.size, msg.value);
+        if (not system_.mcmSkipReadDataCheck(msg.address, msg.size, msg.value))
+          reply.type = Invalid;
+        break;
+
       case PageTableWalk:
         doPageTableWalk(hart, reply);
         break;
@@ -1440,6 +1448,17 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           if (commandLog)
             fprintf(commandLog, "hart=%" PRIu32 " pma 0x%" PRIx64 "\n",
                     hartId, msg.address);
+          break;
+        }
+
+      case InjectException:
+        {
+          // This won't work correctly for segmented vector loads with partial segment
+          // completion.
+          hart.injectException(WhisperFlags(msg.flags).bits.load, msg.address, msg.resource);
+          if (commandLog)
+            fprintf(commandLog, "hart=%" PRIu32 " inject_exception 0x%" PRIxMAX " 0x%" PRIxMAX " 0x%" PRIxMAX "\n", hartId,
+                                uintmax_t(WhisperFlags(msg.flags).bits.load), uintmax_t(msg.address), uintmax_t(msg.resource));
           break;
         }
 

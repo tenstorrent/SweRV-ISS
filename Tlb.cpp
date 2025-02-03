@@ -16,7 +16,7 @@ Tlb::Tlb(unsigned size)
 
 
 bool
-Tlb::insertEntry(uint64_t virtPageNum, uint64_t physPageNum, uint32_t asid,
+Tlb::insertEntry(uint64_t virtPageNum, uint64_t physPageNum, uint32_t asid, uint32_t wid,
                  bool global, bool isUser, bool read, bool write, bool exec)
 {
   auto* entry = getEntry(virtPageNum);
@@ -36,6 +36,7 @@ Tlb::insertEntry(uint64_t virtPageNum, uint64_t physPageNum, uint32_t asid,
       entry->physPageNum_ = physPageNum;
       entry->counter_ = 0;
       entry->asid_ = asid;
+      entry->wid_ = wid;
       entry->global_ = global;
       entry->user_ = isUser;
       entry->read_ = read;

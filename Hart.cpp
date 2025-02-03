@@ -1524,7 +1524,7 @@ Hart<URV>::initiateStoreException(const DecodedInst* di, ExceptionCause cause, U
 template <typename URV>
 ExceptionCause
 Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& gaddr1,
-				  uint64_t& gaddr2, unsigned ldSize, bool hyper)
+				  uint64_t& gaddr2, unsigned ldSize, bool hyper, unsigned elemIx)
 {
   uint64_t va1 = URV(addr1);   // Virtual address. Truncate to 32-bits in 32-bit mode.
   uint64_t va2 = va1;
@@ -1646,6 +1646,11 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
     }
+
+  if (injectException_ != EC::NONE and
+      injectExceptionIsLd_ and
+      elemIx == injectExceptionElemIx_)
+    return injectException_;
 
   return EC::NONE;
 }
@@ -2086,7 +2091,7 @@ Hart<URV>::fastStore(const DecodedInst* di, URV addr, STORE_TYPE storeVal)
 	}
 
       if (dataLineTrace_)
-	memory_.traceDataLine(addr, addr);
+	memory_.traceDataLine(addr, addr, true /*write*/);
 
       ldStWrite_ = true;
       ldStData_ = storeVal;
@@ -2229,6 +2234,9 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
       return true;
     }
 
+  if (dataLineTrace_)
+    memory_.traceDataLine(virtAddr, pa1, true /*write*/);
+
   if (ooo_)
     {
       if (perfApi_)
@@ -2257,9 +2265,6 @@ Hart<URV>::writeForStore(uint64_t virtAddr, uint64_t pa1, uint64_t pa2, STORE_TY
     memory_.invalidateOtherHartLr(hartIx_, pa2, ldStSize_);
 
   memWrite(pa1, pa2, storeVal);
-
-  if (dataLineTrace_)
-    memory_.traceDataLine(virtAddr, pa1);
 
   STORE_TYPE temp = 0;
   memPeek(pa1, pa2, temp, false /*usePma*/);
@@ -2867,6 +2872,12 @@ Hart<URV>::createTrapInst(const DecodedInst* di, bool interrupt, unsigned causeC
   if (di->isVector())
     return 0;
 
+  if (clearTinstOnCboInval_ and di->instId() == InstId::cbo_inval)
+    return 0;
+
+  if (clearTinstOnCboFlush_ and di->instId() == InstId::cbo_flush)
+    return 0;
+
   // Otherwise we write a transformed instruction.
   uint32_t uncompressed;
   if (not di->isCompressed())
@@ -2904,6 +2915,8 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt,
 {
   if (cancelLrOnTrap_)
     cancelLr(CancelLrCause::TRAP);
+
+  injectException_ = ExceptionCause::NONE;
 
   bool origVirtMode = virtMode_;
   bool gvaVirtMode = effectiveVirtualMode();
@@ -3498,6 +3511,7 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
     {
       unsigned world = val & 1;
       stee_.setSecureWorld(world);
+      virtMem_.setWorldId(world);
       return;
     }
 
@@ -4802,10 +4816,16 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst, FI
   setMemProtAccIsFetch(true);
 
   // Fetch instruction.
-  if (not fetchInst(addr, physAddr, inst))
+  bool fetch = fetchInst(addr, physAddr, inst);
+  if (not fetch or
+      (injectException_ != ExceptionCause::NONE and not injectExceptionIsLd_))
     {
       if (mcycleEnabled())
 	++cycleCount_;
+
+      // Fetch was successful, but injected exception.
+      if (fetch)
+        initiateException(injectException_, pc_, pc_);
 
       std::string instStr;
       printInstTrace(inst, instCounter_, instStr, file);
@@ -4888,7 +4908,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
           // We want amo instructions to print in the same order as executed.
 	  // This avoid interleaving of amo execution and tracing.
 	  static std::mutex execMutex;
-	  auto lock = (ownTrace_)? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(execMutex);
+	  auto lock = (ownTrace_ or !traceFile)? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(execMutex);
 
           if (not hartIx_)
 	    tickTime();  // Hart 0 increments timer.
@@ -4947,7 +4967,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  if (sdtrigOn_ and icountTriggerHit())
 	    {
-	      if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
+	      if (takeTriggerAction(traceFile, pc_, 0, instCounter_, false))
 		return true;
 	    }
 
@@ -5850,7 +5870,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       pc_ += di.instSize();
       execute(&di);
 
-      if (hasException_ or hasInterrupt_)
+      if (lastInstructionTrapped())
 	{
 	  if (doStats)
 	    accumulateInstructionStats(di);
@@ -10190,26 +10210,43 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
     }
 
   auto& tlb = virtMode_ ? virtMem_.vsTlb_ : virtMem_.tlb_;
+  auto vmid = virtMem_.vmid();
+  uint32_t wid = steeEnabled_? stee_.secureWorld() : 0;
 
   if (di->op0() == 0 and di->op1() == 0)
-    tlb.invalidate();
+    {
+      if (virtMode_)
+        tlb.invalidateVmid(vmid, wid);
+      else
+        tlb.invalidate();
+    }
   else if (di->op0() == 0 and di->op1() != 0)
     {
       URV asid = intRegs_.read(di->op1());
-      tlb.invalidateAsid(asid);
+      if (virtMode_)
+        tlb.invalidateAsidVmid(asid, vmid, wid);
+      else
+        tlb.invalidateAsid(asid, wid);
     }
   else if (di->op0() != 0 and di->op1() == 0)
     {
       URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
-      tlb.invalidateVirtualPage(vpn);
+      if (virtMode_)
+        tlb.invalidateVirtualPageVmid(vpn, vmid, wid);
+      else
+        tlb.invalidateVirtualPage(vpn, wid);
     }
   else
     {
       URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV asid = intRegs_.read(di->op1());
-      tlb.invalidateVirtualPageAsid(vpn, asid);
+
+      if (virtMode_)
+        tlb.invalidateVirtualPageAsidVmid(vpn, asid, vmid, wid);
+      else
+        tlb.invalidateVirtualPageAsid(vpn, asid, wid);
     }
 
 #if 0

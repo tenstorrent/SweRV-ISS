@@ -889,7 +889,9 @@ System<URV>::endMcm()
       auto& path = memory_->dataLineTracePath();
       if (not path.empty())
         {
-          memory_->saveDataAddressTrace(path, true /* writeValues */);
+          bool skipClean = true;
+          bool includeValues = true;
+          memory_->saveDataAddressTrace(path, skipClean, includeValues);
 
           std::string emptyPath;
           memory_->enableDataLineTrace(emptyPath);  // Disable
@@ -1005,6 +1007,17 @@ System<URV>::mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (not mcm_)
     return false;
   return mcm_->retire(hart, time, tag, di, trapped);
+}
+
+
+template <typename URV>
+bool
+System<URV>::mcmSkipReadDataCheck(uint64_t addr, unsigned size, bool enable)
+{
+  if (not mcm_)
+    return false;
+  mcm_->skipReadDataCheck(addr, size, enable);
+  return true;
 }
 
 

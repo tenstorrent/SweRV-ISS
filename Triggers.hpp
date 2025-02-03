@@ -555,8 +555,11 @@ namespace WdRiscv
         return false;
       Icount<URV>& icount = data1_.icount_;
 
-      icount.count_ = icount.count_? icount.count_ - 1 : 0;
-      icount.pending_ = not icount.count_;
+      if (icount.count_)
+        {
+          icount.count_ = icount.count_ - 1;
+          icount.pending_ = not icount.count_;
+        }
       return icount.pending_;
     }
 
@@ -991,6 +994,11 @@ namespace WdRiscv
     void enableAllInstAddrMatch(bool flag)
     { for ( auto& trig : triggers_) trig.enableAllInstAddrMatch(flag); }
 
+    /// Configure icount such that it counts down on an instruction write
+    /// to icount.
+    void enableIcountOnModified(bool flag)
+    { icountOnModified_ = flag; }
+
     /// Set the maximum NAPOT range with maskmax.
     void configNapotMaskMax(unsigned bits)
     {
@@ -1095,6 +1103,7 @@ namespace WdRiscv
     std::vector< Trigger<URV> > triggers_;
     bool mmodeEnabled_ = true;  // Triggers trip in Machine mode when true.
     bool tcontrolEnabled_ = true;
+    bool icountOnModified_ = false;
 
     // Set a read mask for each type.
     constexpr static unsigned typeLimit_ = unsigned(TriggerType::Disabled) + 1;

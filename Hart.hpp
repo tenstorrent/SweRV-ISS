@@ -345,6 +345,11 @@ namespace WdRiscv
     void configTriggerUseTcontrol(bool flag)
     { csRegs_.triggers_.enableTcontrol(flag); }
 
+    /// Enable trigger icount such that it counts down
+    /// on an instruction write to icount.
+    void configTriggerIcountOnModified(bool flag)
+    { csRegs_.triggers_.enableIcountOnModified(flag); }
+
     /// Set the maximum NAPOT range with maskmax.
     void configTriggerNapotMaskMax(unsigned bits)
     { csRegs_.triggers_.configNapotMaskMax(bits); }
@@ -887,6 +892,17 @@ namespace WdRiscv
     /// Return the current state of the Supervisor external interrupt pin.
     bool getSeiPin() const
     { return seiPin_; }
+
+    /// Set/clear low priorty exception for fetch/ld scenarios. For vector
+    /// loads, we use the element index to determine the exception. This is
+    /// useful for TB to inject errors.
+    void injectException(bool isLoad, URV code, unsigned elemIx)
+    {
+      injectException_ = static_cast<ExceptionCause>(code);
+      injectExceptionIsLd_ = isLoad;
+      injectExceptionElemIx_ = elemIx;
+    }
+
 
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
@@ -1754,6 +1770,14 @@ namespace WdRiscv
     /// Otherwise, set MTVAL to the virtual address of the instruction.
     void enableClearMtvalOnEbreak(bool flag)
     { clearMtvalOnEbreak_ = flag; }
+
+    /// Clear MTINST/HTINST on cbo.inval if flag is true.
+    void enableClearTinstOnCboInval(bool flag)
+    { clearTinstOnCboInval_ = flag; }
+
+    /// Clear MTINST/HTINST on cbo.flush if flag is true.
+    void enableClearTinstOnCboFlush(bool flag)
+    { clearTinstOnCboFlush_ = flag; }
 
     /// Enable/disable clearing of reservation set after xRET
     void enableCancelLrOnTrap(bool flag)
@@ -2888,7 +2912,7 @@ namespace WdRiscv
     /// load/store instructions (e.g. hlv.b).
     ExceptionCause determineLoadException(uint64_t& addr1, uint64_t& addr2,
                                           uint64_t& gaddr1, uint64_t& gaddr2,
-					  unsigned ldSize, bool hyper);
+					  unsigned ldSize, bool hyper, unsigned elemIx = 0);
 
     /// Helper to load method. Vaddr is the virtual address. Paddr1 is the physical
     /// address.  Paddr2 is identical to paddr1 for non-page-crossing loads; otherwise, it
@@ -5451,6 +5475,9 @@ namespace WdRiscv
     bool clearMtvalOnEbreak_ = true;
     bool lastEbreak_ = false;
 
+    bool clearTinstOnCboInval_ = false;
+    bool clearTinstOnCboFlush_ = false;
+
     bool targetProgFinished_ = false;
     bool stepResult_ = false;        // Set by singleStep on caught exception (program success/fail).
     bool tracePtw_ = false;          // Trace paget table walk.
@@ -5500,6 +5527,11 @@ namespace WdRiscv
     TT_STEE::Stee stee_;
     bool steeInsec1_ = false;  // True if insecure access to a secure region.
     bool steeInsec2_ = false;  // True if insecure access to a secure region.
+
+    // Exceptions injected by user.
+    ExceptionCause injectException_ = ExceptionCause::NONE;
+    bool injectExceptionIsLd_ = false;
+    unsigned injectExceptionElemIx_ = 0;
 
     // Landing pad (zicfilp)
     bool mLpEnabled_ = false;
