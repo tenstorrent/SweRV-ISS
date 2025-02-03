@@ -2916,6 +2916,8 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt,
   if (cancelLrOnTrap_)
     cancelLr(CancelLrCause::TRAP);
 
+  injectException_ = ExceptionCause::NONE;
+
   bool origVirtMode = virtMode_;
   bool gvaVirtMode = effectiveVirtualMode();
 
